@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api-client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { cn, formatComma, parseComma, formatCommaDecimal, parseCommaDecimal, normalizeDiscountInput, formatDiscountDisplay } from "@/lib/utils";
@@ -54,7 +54,6 @@ function IncomingPageInner() {
   const queryClient = useQueryClient();
 
   // 등록 시트
-  const [submitting, setSubmitting] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [viewMode, setViewMode] = useState<"items" | "statements">("statements");
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,10 +62,8 @@ function IncomingPageInner() {
   const [viewPopoverOpen, setViewPopoverOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [selectedSupplierName, setSelectedSupplierName] = useState("");
-  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
   const [incomingDate, setIncomingDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [unitPriceVatIncluded, setUnitPriceVatIncluded] = useState(false);
   const [vatInputBuffer, setVatInputBuffer] = useState<{ idx: number; text: string } | null>(null);
@@ -94,10 +91,7 @@ function IncomingPageInner() {
 
 
   // 상세 시트
-  const [detail, setDetail] = useState<IncomingDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
@@ -107,7 +101,27 @@ function IncomingPageInner() {
   const [shippingEditSupply, setShippingEditSupply] = useState("");
   const [shippingEditIsTaxable, setShippingEditIsTaxable] = useState(true);
   const [shippingEditDeducted, setShippingEditDeducted] = useState(false);
-  const [shippingEditSaving, setShippingEditSaving] = useState(false);
+
+  const suppliersQuery = useQuery({
+    queryKey: queryKeys.suppliers.list(),
+    queryFn: () => apiGet<Supplier[]>("/api/suppliers"),
+  });
+  const suppliers = suppliersQuery.data ?? [];
+
+  const supplierProductsQuery = useQuery({
+    queryKey: queryKeys.supplierProducts.list({ supplierId: selectedSupplierId }),
+    queryFn: () => apiGet<SupplierProduct[]>(`/api/supplier-products?supplierId=${selectedSupplierId}`),
+    enabled: !!selectedSupplierId,
+  });
+  const supplierProducts = supplierProductsQuery.data ?? [];
+
+  const detailQuery = useQuery({
+    queryKey: queryKeys.incoming.detail(detailId ?? ""),
+    queryFn: () => apiGet<IncomingDetail>(`/api/incoming/${detailId}`),
+    enabled: !!detailId,
+  });
+  const detail = detailQuery.data ?? null;
+  const detailLoading = detailQuery.isFetching;
 
   const incomingsQuery = useQuery({
     queryKey: queryKeys.incoming.list(),
@@ -129,19 +143,15 @@ function IncomingPageInner() {
   const incomings = incomingsQuery.data?.list ?? [];
   const allDetails = incomingsQuery.data?.details ?? [];
   const loading = incomingsQuery.isPending;
-  const fetchIncomings = () => queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
 
   // ─── 거래처 관련 ───
-  const handleSupplierChange = async (supplierId: string, name: string) => {
+  const handleSupplierChange = (supplierId: string, name: string) => {
     setSelectedSupplierId(supplierId);
     setSelectedSupplierName(name);
     setItems([{
       supplierProductId: "", supplierProductName: "", supplierCode: "", spec: "",
       unitOfMeasure: "EA", quantity: "", unitPrice: "", supplyAmount: "", discount: "", originalPrice: "", memo: "",
     }]);
-    if (!supplierId) { setSupplierProducts([]); return; }
-    const res = await fetch(`/api/supplier-products?supplierId=${supplierId}`);
-    setSupplierProducts(await res.json());
   };
 
   const handleCreateSupplier = (name: string) => {
@@ -150,9 +160,7 @@ function IncomingPageInner() {
   };
 
   const handleQuickSupplierCreated = async (supplier: { id: string; name: string }) => {
-    const listRes = await fetch("/api/suppliers");
-    const newList = await listRes.json();
-    setSuppliers(newList);
+    await queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all });
     handleSupplierChange(supplier.id, supplier.name);
   };
 
@@ -307,12 +315,9 @@ function IncomingPageInner() {
   const taxAmount = Math.round(supplyAmount * 0.1);
 
   // ─── 시트 열기 ───
-  const openCreateSheet = async () => {
-    const res = await fetch("/api/suppliers");
-    setSuppliers(await res.json());
+  const openCreateSheet = () => {
     setSelectedSupplierId("");
     setSelectedSupplierName("");
-    setSupplierProducts([]);
     setItems([{
       supplierProductId: "", supplierProductName: "", supplierCode: "", spec: "",
       unitOfMeasure: "EA", quantity: "", unitPrice: "", supplyAmount: "", discount: "", originalPrice: "", memo: "",
@@ -329,9 +334,7 @@ function IncomingPageInner() {
     setCreateOpen(true);
   };
 
-  const openEditSheet = async (incoming: IncomingDetail) => {
-    const res = await fetch("/api/suppliers");
-    setSuppliers(await res.json());
+  const openEditSheet = (incoming: IncomingDetail) => {
     setSelectedSupplierId(incoming.supplier.id);
     setSelectedSupplierName(incoming.supplier.name);
     setIncomingDate(new Date(incoming.incomingDate).toISOString().split("T")[0]);
@@ -378,112 +381,83 @@ function IncomingPageInner() {
       return;
     }
 
-    setSubmitting(true);
-    try {
-
-    // 1) isNew 항목 → 같은 (name, spec, supplierCode)끼리 1건만 등록 (10+1 중복 방지)
-    const resolvedItems: Array<{ supplierProductId: string; quantity: string; unitPrice: string; originalPrice: string; discountAmount: string }> = [];
-    const newProductCache = new Map<string, string>(); // "name||spec||supplierCode" → created id
-
-    for (const item of validItems) {
-      if (!item.isNew) continue;
-      const key = `${item.supplierProductName}||${item.spec || ""}||${item.supplierCode || ""}`;
-      if (newProductCache.has(key)) continue;
-      const up = parseFloat(item.unitPrice || "0");
-      const discPerUnit = calcDiscountPerUnit(up, item.discount);
-      const res = await fetch("/api/supplier-products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          supplierId: selectedSupplierId,
-          name: item.supplierProductName,
-          spec: item.spec || undefined,
-          supplierCode: item.supplierCode || undefined,
-          unitPrice: String(up - discPerUnit),
-          unitOfMeasure: item.unitOfMeasure,
-        }),
-      });
-      if (!res.ok) {
-        toast.error(`"${item.supplierProductName}" 상품 등록에 실패했습니다`);
-        return;
-      }
-      const created = await res.json();
-      newProductCache.set(key, created.id);
-    }
-
-    for (const item of validItems) {
-      const up = parseFloat(item.unitPrice || "0");
-      const discPerUnit = calcDiscountPerUnit(up, item.discount);
-      const actualPrice = String(up - discPerUnit);
-      if (item.isNew) {
-        const key = `${item.supplierProductName}||${item.spec || ""}||${item.supplierCode || ""}`;
-        resolvedItems.push({
-          supplierProductId: newProductCache.get(key)!,
-          quantity: item.quantity,
-          unitPrice: actualPrice,
-          originalPrice: item.unitPrice,
-          discountAmount: String(discPerUnit),
-        });
-      } else {
-        resolvedItems.push({
-          supplierProductId: item.supplierProductId,
-          quantity: item.quantity,
-          unitPrice: actualPrice,
-          originalPrice: item.unitPrice,
-          discountAmount: String(discPerUnit),
-        });
-      }
-    }
-
-    // 2) 입고 등록 or 수정
-    const payload = {
-      supplierId: selectedSupplierId,
-      incomingDate,
-      memo,
-      shippingCost: shippingCost || undefined,
-      shippingIsTaxable,
-      shippingDeducted,
-      items: resolvedItems,
-    };
-
-    const res = editingId
-      ? await fetch(`/api/incoming/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      : await fetch("/api/incoming", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-    if (!res.ok) {
-      const err = await res.json();
-      toast.error(typeof err.error === "string" ? err.error : editingId ? "수정에 실패했습니다" : "등록에 실패했습니다");
-      return;
-    }
-
-    toast.success(editingId ? "입고가 수정되었습니다" : "입고가 등록되었습니다");
-    setCreateOpen(false);
-    setEditingId(null);
-    fetchIncomings();
-    if (editingId) openDetail(editingId);
-    } finally {
-      setSubmitting(false);
-    }
+    submitMutation.mutate({ validItems });
   };
 
+  const submitMutation = useMutation({
+    mutationFn: async ({ validItems }: { validItems: IncomingItemForm[] }) => {
+      // 1) isNew 항목 → 같은 (name, spec, supplierCode)끼리 1건만 등록 (10+1 중복 방지)
+      const newProductCache = new Map<string, string>();
+      for (const item of validItems) {
+        if (!item.isNew) continue;
+        const key = `${item.supplierProductName}||${item.spec || ""}||${item.supplierCode || ""}`;
+        if (newProductCache.has(key)) continue;
+        const up = parseFloat(item.unitPrice || "0");
+        const discPerUnit = calcDiscountPerUnit(up, item.discount);
+        try {
+          const created = await apiMutate<{ id: string }>(
+            "/api/supplier-products",
+            "POST",
+            {
+              supplierId: selectedSupplierId,
+              name: item.supplierProductName,
+              spec: item.spec || undefined,
+              supplierCode: item.supplierCode || undefined,
+              unitPrice: String(up - discPerUnit),
+              unitOfMeasure: item.unitOfMeasure,
+            }
+          );
+          newProductCache.set(key, created.id);
+        } catch {
+          throw new ApiError(`"${item.supplierProductName}" 상품 등록에 실패했습니다`, 500);
+        }
+      }
+
+      const resolvedItems = validItems.map((item) => {
+        const up = parseFloat(item.unitPrice || "0");
+        const discPerUnit = calcDiscountPerUnit(up, item.discount);
+        const actualPrice = String(up - discPerUnit);
+        const key = `${item.supplierProductName}||${item.spec || ""}||${item.supplierCode || ""}`;
+        return {
+          supplierProductId: item.isNew ? newProductCache.get(key)! : item.supplierProductId,
+          quantity: item.quantity,
+          unitPrice: actualPrice,
+          originalPrice: item.unitPrice,
+          discountAmount: String(discPerUnit),
+        };
+      });
+
+      const payload = {
+        supplierId: selectedSupplierId,
+        incomingDate,
+        memo,
+        shippingCost: shippingCost || undefined,
+        shippingIsTaxable,
+        shippingDeducted,
+        items: resolvedItems,
+      };
+
+      return editingId
+        ? await apiMutate(`/api/incoming/${editingId}`, "PUT", payload)
+        : await apiMutate("/api/incoming", "POST", payload);
+    },
+    onSuccess: () => {
+      const wasEditing = editingId;
+      toast.success(wasEditing ? "입고가 수정되었습니다" : "입고가 등록되었습니다");
+      setCreateOpen(false);
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.supplierProducts.all });
+      if (wasEditing) openDetail(wasEditing);
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : editingId ? "수정에 실패했습니다" : "등록에 실패했습니다");
+    },
+  });
+
   // ─── 상세/확인/취소/삭제 ───
-  const openDetail = useCallback(async (id: string) => {
-    setDetail(null);
-    setDetailLoading(true);
-    try {
-      const res = await fetch(`/api/incoming/${id}`);
-      if (res.ok) { setDetail(await res.json()); }
-    } finally {
-      setDetailLoading(false);
-    }
+  const openDetail = useCallback((id: string) => {
+    setDetailId(id);
   }, []);
 
   // 딥링크: ?incomingId= 쿼리가 있으면 자동으로 상세 Sheet 열기
@@ -493,94 +467,72 @@ function IncomingPageInner() {
     }
   }, [incomingIdParam, openDetail]);
 
-  const handleConfirm = async (id: string) => {
-    setConfirming(true);
-    try {
-      const res = await fetch(`/api/incoming/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "confirm" }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "확인 실패");
-        return;
-      }
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/incoming/${id}`, "PUT", { action: "confirm" }),
+    onSuccess: () => {
       toast.success("입고가 확인되었습니다. 재고가 반영되었습니다.");
       setConfirmDialogOpen(false);
-      setDetail(null);
-      fetchIncomings();
-    } finally {
-      setConfirming(false);
-    }
-  };
+      setDetailId(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "확인 실패"),
+  });
+  const handleConfirm = (id: string) => confirmMutation.mutate(id);
+  const confirming = confirmMutation.isPending;
 
-  const handleCancel = async (id: string) => {
-    setCancelling(true);
-    try {
-      const res = await fetch(`/api/incoming/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cancel" }),
-      });
-      if (!res.ok) { toast.error("취소 실패"); return; }
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/incoming/${id}`, "PUT", { action: "cancel" }),
+    onSuccess: () => {
       toast.success("입고가 취소되었습니다");
       setCancelDialogOpen(false);
-      setDetail(null);
-      fetchIncomings();
-    } finally {
-      setCancelling(false);
-    }
-  };
+      setDetailId(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "취소 실패"),
+  });
+  const handleCancel = (id: string) => cancelMutation.mutate(id);
+  const cancelling = cancelMutation.isPending;
 
-  const handleShippingEdit = async () => {
-    if (!detail) return;
-    setShippingEditSaving(true);
-    try {
-      const res = await fetch(`/api/incoming/${detail.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "update-shipping",
-          shippingCost: shippingEditCost || "0",
-          shippingIsTaxable: shippingEditIsTaxable,
-          shippingDeducted: shippingEditDeducted,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "저장 실패");
-        return;
-      }
-      const updated = await res.json();
-      setDetail(updated);
+  const shippingEditMutation = useMutation({
+    mutationFn: (vars: { id: string; cost: string; isTaxable: boolean; deducted: boolean }) =>
+      apiMutate(`/api/incoming/${vars.id}`, "PUT", {
+        action: "update-shipping",
+        shippingCost: vars.cost || "0",
+        shippingIsTaxable: vars.isTaxable,
+        shippingDeducted: vars.deducted,
+      }),
+    onSuccess: (_data, vars) => {
       setShippingEditOpen(false);
       toast.success("택배비가 저장되었습니다");
-      fetchIncomings();
-    } finally {
-      setShippingEditSaving(false);
-    }
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.detail(vars.id) });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+  });
+  const handleShippingEdit = () => {
+    if (!detail) return;
+    shippingEditMutation.mutate({
+      id: detail.id,
+      cost: shippingEditCost,
+      isTaxable: shippingEditIsTaxable,
+      deducted: shippingEditDeducted,
+    });
   };
+  const shippingEditSaving = shippingEditMutation.isPending;
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  const handleDelete = async (id: string) => {
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/incoming/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "삭제 실패");
-        return;
-      }
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/incoming/${id}`, "DELETE"),
+    onSuccess: () => {
       toast.success("입고가 삭제되었습니다");
       setDeleteTarget(null);
-      fetchIncomings();
-    } finally {
-      setDeleting(false);
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+  const handleDelete = (id: string) => deleteMutation.mutate(id);
+  const deleting = deleteMutation.isPending;
 
   const formatPrice = (price: string | number) =>
     (typeof price === "string" ? parseFloat(price) : price).toLocaleString("ko-KR");
@@ -634,13 +586,13 @@ function IncomingPageInner() {
                   <PopoverContent className="w-[var(--anchor-width)] p-1" align="start">
                     <button
                       className={cn("flex w-full items-center rounded-md px-2.5 py-1.5 text-xs", viewMode === "items" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted")}
-                      onClick={() => { setViewMode("items"); setDetail(null); setSelectedSupplierFilter(null); setViewPopoverOpen(false); }}
+                      onClick={() => { setViewMode("items"); setDetailId(null); setSelectedSupplierFilter(null); setViewPopoverOpen(false); }}
                     >
                       품목별
                     </button>
                     <button
                       className={cn("flex w-full items-center rounded-md px-2.5 py-1.5 text-xs", viewMode === "statements" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted")}
-                      onClick={() => { setViewMode("statements"); setDetail(null); setSelectedSupplierFilter(null); setViewPopoverOpen(false); }}
+                      onClick={() => { setViewMode("statements"); setDetailId(null); setSelectedSupplierFilter(null); setViewPopoverOpen(false); }}
                     >
                       명세표별
                     </button>
@@ -1678,9 +1630,9 @@ function IncomingPageInner() {
               <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); setEditingId(null); }}>
                 취소
               </Button>
-              <Button type="button" onClick={handleCreate} disabled={submitting || items.length === 0 || !selectedSupplierId}>
-                {submitting ? <Loader2 className="animate-spin" /> : <Check />}
-                <span>{submitting ? "처리 중..." : editingId ? "수정 저장" : "입고 등록"}</span>
+              <Button type="button" onClick={handleCreate} disabled={submitMutation.isPending || items.length === 0 || !selectedSupplierId}>
+                {submitMutation.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+                <span>{submitMutation.isPending ? "처리 중..." : editingId ? "수정 저장" : "입고 등록"}</span>
               </Button>
             </div>
           </div>
