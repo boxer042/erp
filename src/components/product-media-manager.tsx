@@ -4,14 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film } from "lucide-react";
+import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon } from "lucide-react";
 import { extractYoutubeId } from "@/lib/utils";
 
 type MediaType = "IMAGE" | "YOUTUBE";
@@ -28,13 +24,10 @@ interface ProductMedia {
 export function ProductMediaManager({ productId }: { productId: string }) {
   const [items, setItems] = useState<ProductMedia[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<{ type: MediaType; url: string; title: string }>({
-    type: "IMAGE",
-    url: "",
-    title: "",
-  });
+  const [urlInput, setUrlInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -65,20 +58,19 @@ export function ProductMediaManager({ productId }: { productId: string }) {
   };
 
   const add = async () => {
-    if (!form.url.trim()) {
+    const url = urlInput.trim();
+    if (!url) {
       toast.error("URL을 입력하세요");
       return;
     }
-    if (form.type === "YOUTUBE" && !extractYoutubeId(form.url)) {
-      toast.error("유효한 YouTube URL이 아닙니다");
-      return;
-    }
+    // URL 패턴 자동 감지: YouTube ID 추출되면 YOUTUBE, 아니면 IMAGE
+    const type: MediaType = extractYoutubeId(url) ? "YOUTUBE" : "IMAGE";
     setSubmitting(true);
     try {
-      await create({ type: form.type, url: form.url.trim(), title: form.title.trim() || null });
-      setForm({ type: form.type, url: "", title: "" });
+      await create({ type, url, title: null });
+      setUrlInput("");
       await load();
-      toast.success("추가되었습니다");
+      toast.success(type === "YOUTUBE" ? "YouTube 영상이 추가되었습니다" : "이미지가 추가되었습니다");
     } catch {
       toast.error("추가에 실패했습니다");
     } finally {
@@ -105,7 +97,7 @@ export function ProductMediaManager({ productId }: { productId: string }) {
           await create({
             type: "IMAGE",
             url,
-            title: form.title.trim() || file.name.replace(/\.[^.]+$/, "") || null,
+            title: file.name.replace(/\.[^.]+$/, "") || null,
           });
           successCount += 1;
         } catch {
@@ -114,7 +106,6 @@ export function ProductMediaManager({ productId }: { productId: string }) {
       }
       if (successCount > 0) {
         toast.success(`${successCount}개 이미지를 추가했습니다`);
-        setForm({ type: form.type, url: "", title: "" });
         await load();
       }
     } finally {
@@ -154,27 +145,44 @@ export function ProductMediaManager({ productId }: { productId: string }) {
     await load();
   };
 
+  // URL 입력 미리 감지로 아이콘 토글
+  const detectedIsYoutube = !!extractYoutubeId(urlInput.trim());
+
   return (
     <div className="space-y-4">
-      {/* 이미지 업로드 — drop & click */}
+      {/* 통합 추가 패널 — 파일 업로드 + URL */}
       <div
-        className="rounded-lg border border-dashed border-border p-4 hover:bg-muted/30 transition-colors"
+        className={`rounded-lg border border-dashed p-4 transition-colors ${
+          dragActive ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"
+        }`}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragActive(true);
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragActive(false);
+        }}
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          setDragActive(false);
           handleFiles(e.dataTransfer.files);
         }}
       >
+        {/* 상단: 파일 업로드 */}
         <div className="flex items-center gap-3">
           <ImageIcon className="h-5 w-5 text-muted-foreground shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">이미지 업로드</p>
+            <p className="text-sm font-medium">이미지 파일 업로드</p>
             <p className="text-xs text-muted-foreground">
-              JPG/PNG/WebP/GIF/SVG · 10MB 이하 · 여러 개 동시 업로드 가능
+              드래그앤드롭 가능 · JPG/PNG/WebP/GIF/SVG · 10MB 이하 · 여러 개 동시 업로드
             </p>
           </div>
           <Button
@@ -202,51 +210,55 @@ export function ProductMediaManager({ productId }: { productId: string }) {
             onChange={(e) => handleFiles(e.target.files)}
           />
         </div>
-      </div>
 
-      {/* URL 직접 입력 (YouTube + 외부 이미지 URL) */}
-      <div className="rounded-lg border border-border p-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <Film className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium">URL로 추가 (YouTube · 외부 이미지)</span>
+        {/* 구분선 + 안내 */}
+        <div className="my-3 flex items-center gap-3">
+          <div className="flex-1 border-t border-border" />
+          <span className="text-[11px] text-muted-foreground">또는</span>
+          <div className="flex-1 border-t border-border" />
         </div>
-        <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-2">
-          <div>
-            <Label className="text-[11px] text-muted-foreground">타입</Label>
-            <Select
-              value={form.type}
-              onValueChange={(v) => setForm({ ...form, type: v as MediaType })}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="YOUTUBE">YouTube</SelectItem>
-                <SelectItem value="IMAGE">이미지 URL</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-[11px] text-muted-foreground">URL</Label>
-            <Input
-              value={form.url}
-              onChange={(e) => setForm({ ...form, url: e.target.value })}
-              placeholder={form.type === "YOUTUBE" ? "https://youtu.be/..." : "https://..."}
-              className="h-9"
-            />
-          </div>
-          <div>
-            <Label className="text-[11px] text-muted-foreground">제목 (선택)</Label>
-            <Input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="h-9"
-            />
-          </div>
-          <Button onClick={add} disabled={submitting} size="sm" className="h-9">
-            <Plus className="mr-1 h-3.5 w-3.5" /> 추가
+
+        {/* 하단: URL 입력 (자동 타입 감지) */}
+        <div className="flex items-center gap-2">
+          {detectedIsYoutube ? (
+            <Film className="h-4 w-4 text-muted-foreground shrink-0" />
+          ) : (
+            <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+          )}
+          <Input
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                add();
+              }
+            }}
+            placeholder="YouTube URL 또는 이미지 URL 붙여넣기"
+            className="h-9 flex-1"
+            disabled={submitting}
+          />
+          <Button
+            onClick={add}
+            disabled={submitting || !urlInput.trim()}
+            size="sm"
+            className="h-9"
+          >
+            {submitting ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Plus className="mr-1 h-3.5 w-3.5" />
+            )}
+            추가
           </Button>
         </div>
+        {urlInput.trim() && (
+          <p className="text-[11px] text-muted-foreground mt-1.5 ml-6">
+            {detectedIsYoutube
+              ? "YouTube 영상으로 추가됩니다"
+              : "이미지 URL로 추가됩니다"}
+          </p>
+        )}
       </div>
 
       <Table>

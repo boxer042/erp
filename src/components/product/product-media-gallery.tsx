@@ -38,6 +38,9 @@ export function ProductMediaGallery({
 
   const compact = variant === "compact";
 
+  // bare 모드 + 비어있음 → 외부에서 추가 UI 를 별도로 렌더하므로 여기는 침묵
+  if (bare && !hasMedia) return null;
+
   const body = !hasMedia ? (
     <p className="text-sm text-muted-foreground">등록된 이미지·영상이 없습니다</p>
   ) : (

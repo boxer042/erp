@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ChipToggle } from "@/components/ui/chip-toggle";
 
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import { QuickBrandSheet } from "@/components/quick-register-sheets";
@@ -62,6 +63,7 @@ function ProductInfoEditSheetContent({
 }: ProductInfoEditSheetProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
+    name: product.name,
     brandId: product.brandId ?? "",
     brandName: product.brandRef?.name ?? product.brand ?? "",
     categoryId: product.categoryId ?? "",
@@ -86,8 +88,11 @@ function ProductInfoEditSheetContent({
 
   const saveMutation = useMutation({
     mutationFn: () => {
+      if (!form.name.trim()) {
+        throw new Error("상품명을 입력해주세요");
+      }
       const fields: ProductFieldsInput = {
-        name: product.name,
+        name: form.name.trim(),
         sku: product.sku,
         brand: form.brandName || product.brand || null,
         brandId: form.brandId || null,
@@ -140,6 +145,16 @@ function ProductInfoEditSheetContent({
 
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              <Field label="상품명">
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="상품명"
+                  className="h-9"
+                  autoFocus
+                />
+              </Field>
+
               <Field label="브랜드">
                 <BrandCombobox
                   brands={brandsQuery.data ?? []}
@@ -212,24 +227,15 @@ function ProductInfoEditSheetContent({
               </Field>
 
               <Field label="세금유형">
-                <Select
+                <ChipToggle<"TAXABLE" | "TAX_FREE" | "ZERO_RATE">
                   value={form.taxType}
-                  onValueChange={(v) =>
-                    setForm((p) => ({
-                      ...p,
-                      taxType: (v ?? p.taxType) as "TAXABLE" | "TAX_FREE" | "ZERO_RATE",
-                    }))
-                  }
-                >
-                  <SelectTrigger className="!h-9 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TAXABLE">과세</SelectItem>
-                    <SelectItem value="TAX_FREE">면세</SelectItem>
-                    <SelectItem value="ZERO_RATE">영세율</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setForm((p) => ({ ...p, taxType: v }))}
+                  options={[
+                    { value: "TAXABLE", label: "과세" },
+                    { value: "ZERO_RATE", label: "영세율" },
+                    { value: "TAX_FREE", label: "면세" },
+                  ]}
+                />
               </Field>
             </div>
 
