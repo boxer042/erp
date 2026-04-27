@@ -57,7 +57,7 @@ export interface IncomingDetail {
     totalPrice: string;
     memo: string | null;
     supplierProduct: {
-      id: string; name: string; supplierCode: string | null; unitOfMeasure: string; unitPrice: string;
+      id: string; name: string; supplierCode: string | null; spec: string | null; unitOfMeasure: string; unitPrice: string;
       productMappings?: Array<{ id: string; product: { id: string; name: string; sku: string } }>;
     };
   }>;

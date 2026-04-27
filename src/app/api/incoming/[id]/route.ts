@@ -510,7 +510,18 @@ export async function PUT(
       )
     );
 
-    // Step D: 그룹별 로트 1개 생성 (10+1 프로모션 — 같은 공급상품은 1로트로 합산)
+    // Step D: 그룹별 로트 생성 — N+1 방지 위해 batch 패턴 사용
+    // (1) 작업 항목 수집: 매핑 없으면 오르판 로트, 있으면 매핑별 work item
+    type MappedWork = {
+      productId: string;
+      supplierProductId: string;
+      addQty: number;
+      addUnitCost: number;
+      canonicalItemId: string;
+    };
+    const orphanLots: Array<{ supplierProductId: string; totalQty: number; unitCost: number; canonicalItemId: string }> = [];
+    const mappedWorks: MappedWork[] = [];
+
     for (const [supplierProductId, rows] of groups) {
       const totalQty = rows.reduce((s, r) => s + r.qty, 0);
       const unitCostSnapshot = groupAvgBySpId.get(supplierProductId)!;
@@ -518,74 +529,109 @@ export async function PUT(
       const mappings = canonicalItem.supplierProduct.productMappings;
 
       if (mappings.length === 0) {
-        // 매핑 없음 → 오르판 로트 1개 (그룹 합산 수량)
-        await tx.inventoryLot.create({
-          data: {
-            supplierProduct: { connect: { id: supplierProductId } },
-            receivedQty: totalQty,
-            remainingQty: totalQty,
-            unitCost: unitCostSnapshot,
-            receivedAt: incoming.incomingDate,
-            source: "INCOMING",
-            incomingItemId: canonicalItem.id,
-            memo: `입고 ${incoming.incomingNo}`,
-          },
-        });
+        orphanLots.push({ supplierProductId, totalQty, unitCost: unitCostSnapshot, canonicalItemId: canonicalItem.id });
         continue;
       }
-
       for (const mapping of mappings) {
-        const addQty = totalQty * Number(mapping.conversionRate);
-        const addUnitCost = unitCostSnapshot / Number(mapping.conversionRate);
-
-        const existing = await tx.inventory.findUnique({
-          where: { productId: mapping.productId },
+        mappedWorks.push({
+          productId: mapping.productId,
+          supplierProductId,
+          addQty: totalQty * Number(mapping.conversionRate),
+          addUnitCost: unitCostSnapshot / Number(mapping.conversionRate),
+          canonicalItemId: canonicalItem.id,
         });
+      }
+    }
+
+    // (2) 관련 inventory 일괄 조회
+    const productIdsForInv = Array.from(new Set(mappedWorks.map((w) => w.productId)));
+    const existingInventories = productIdsForInv.length > 0
+      ? await tx.inventory.findMany({ where: { productId: { in: productIdsForInv } } })
+      : [];
+    const invByProductId = new Map(existingInventories.map((inv) => [inv.productId, inv]));
+
+    // (3) productId당 누적 신규 수량/원가 계산 (같은 product에 매핑이 여러 spId에서 들어올 수 있음)
+    const aggByProductId = new Map<string, { addQty: number; addCost: number }>();
+    for (const w of mappedWorks) {
+      const cur = aggByProductId.get(w.productId) ?? { addQty: 0, addCost: 0 };
+      cur.addQty += w.addQty;
+      cur.addCost += w.addQty * w.addUnitCost;
+      aggByProductId.set(w.productId, cur);
+    }
+
+    // (4) inventory upsert를 병렬로 실행 (각 productId당 1회)
+    const upsertedInvByProductId = new Map<string, { id: string; quantity: unknown }>();
+    await Promise.all(
+      Array.from(aggByProductId.entries()).map(async ([productId, agg]) => {
+        const existing = invByProductId.get(productId);
         const prevQty = existing ? Number(existing.quantity) : 0;
         const prevAvgCost = existing?.avgCost != null ? Number(existing.avgCost) : null;
-        const newAvgCost = computeMovingAverage(prevQty, prevAvgCost, addQty, addUnitCost);
+        const addAvgUnitCost = agg.addQty > 0 ? agg.addCost / agg.addQty : 0;
+        const newAvgCost = computeMovingAverage(prevQty, prevAvgCost, agg.addQty, addAvgUnitCost);
 
-        const inventory = await tx.inventory.upsert({
-          where: { productId: mapping.productId },
+        const inv = await tx.inventory.upsert({
+          where: { productId },
           update: {
-            quantity: { increment: addQty },
+            quantity: { increment: agg.addQty },
             avgCost: newAvgCost,
             avgCostUpdatedAt: new Date(),
           },
           create: {
-            productId: mapping.productId,
-            quantity: addQty,
+            productId,
+            quantity: agg.addQty,
             avgCost: newAvgCost,
             avgCostUpdatedAt: new Date(),
           },
         });
+        upsertedInvByProductId.set(productId, { id: inv.id, quantity: inv.quantity });
+      })
+    );
 
-        await tx.inventoryLot.create({
-          data: {
-            product: { connect: { id: mapping.productId } },
-            supplierProduct: { connect: { id: supplierProductId } },
-            receivedQty: addQty,
-            remainingQty: addQty,
-            unitCost: addUnitCost,
+    // (5) InventoryLot batch 생성 (오르판 + 매핑된 것 모두)
+    if (orphanLots.length > 0 || mappedWorks.length > 0) {
+      await tx.inventoryLot.createMany({
+        data: [
+          ...orphanLots.map((o) => ({
+            supplierProductId: o.supplierProductId,
+            receivedQty: o.totalQty,
+            remainingQty: o.totalQty,
+            unitCost: o.unitCost,
             receivedAt: incoming.incomingDate,
-            source: "INCOMING",
-            incomingItemId: canonicalItem.id,
+            source: "INCOMING" as const,
+            incomingItemId: o.canonicalItemId,
             memo: `입고 ${incoming.incomingNo}`,
-          },
-        });
+          })),
+          ...mappedWorks.map((w) => ({
+            productId: w.productId,
+            supplierProductId: w.supplierProductId,
+            receivedQty: w.addQty,
+            remainingQty: w.addQty,
+            unitCost: w.addUnitCost,
+            receivedAt: incoming.incomingDate,
+            source: "INCOMING" as const,
+            incomingItemId: w.canonicalItemId,
+            memo: `입고 ${incoming.incomingNo}`,
+          })),
+        ],
+      });
+    }
 
-        await tx.inventoryMovement.create({
-          data: {
-            inventoryId: inventory.id,
-            type: "INCOMING",
-            quantity: addQty,
-            balanceAfter: inventory.quantity,
+    // (6) InventoryMovement batch 생성 (매핑된 work만 — 오르판은 inventory 영향 없음)
+    if (mappedWorks.length > 0) {
+      await tx.inventoryMovement.createMany({
+        data: mappedWorks.map((w) => {
+          const inv = upsertedInvByProductId.get(w.productId)!;
+          return {
+            inventoryId: inv.id,
+            type: "INCOMING" as const,
+            quantity: w.addQty,
+            balanceAfter: inv.quantity as never,
             referenceId: incoming.id,
             referenceType: "INCOMING",
             memo: `입고 ${incoming.incomingNo}`,
-          },
-        });
-      }
+          };
+        }),
+      });
     }
 
     // 3. 외상 거래처면 원장 기록 (VAT 포함 금액을 미지급금으로 반영)
@@ -657,7 +703,7 @@ export async function PUT(
         },
       });
     }
-  });
+  }, { timeout: 30000, maxWait: 10000 });
 
   const updated = await prisma.incoming.findUnique({
     where: { id },

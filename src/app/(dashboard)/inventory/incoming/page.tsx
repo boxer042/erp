@@ -68,6 +68,10 @@ function IncomingPageInner() {
   const [selectedSupplierName, setSelectedSupplierName] = useState("");
   const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
   const [incomingDate, setIncomingDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [unitPriceVatIncluded, setUnitPriceVatIncluded] = useState(false);
+  const [vatInputBuffer, setVatInputBuffer] = useState<{ idx: number; text: string } | null>(null);
+  // VAT포함 입력 원본 보관 (round-trip 오차 방지: 50,000 입력 → 45,455 저장 → 50,000.5×반올림 = 50,001 노출되는 문제)
+  const [vatRawByIdx, setVatRawByIdx] = useState<Record<number, string>>({});
   const [memo, setMemo] = useState("");
   const [shippingCost, setShippingCost] = useState("");
   const [shippingSupply, setShippingSupply] = useState("");
@@ -314,6 +318,9 @@ function IncomingPageInner() {
       unitOfMeasure: "EA", quantity: "", unitPrice: "", supplyAmount: "", discount: "", originalPrice: "", memo: "",
     }]);
     setIncomingDate(new Date().toISOString().split("T")[0]);
+    setUnitPriceVatIncluded(false);
+    setVatInputBuffer(null);
+    setVatRawByIdx({});
     setMemo("");
     setShippingCost("");
     setShippingSupply("");
@@ -328,6 +335,9 @@ function IncomingPageInner() {
     setSelectedSupplierId(incoming.supplier.id);
     setSelectedSupplierName(incoming.supplier.name);
     setIncomingDate(new Date(incoming.incomingDate).toISOString().split("T")[0]);
+    setUnitPriceVatIncluded(false);
+    setVatInputBuffer(null);
+    setVatRawByIdx({});
     setMemo(incoming.memo ?? "");
     {
       const total = incoming.shippingCost ? String(parseFloat(incoming.shippingCost)) : "";
@@ -362,6 +372,11 @@ function IncomingPageInner() {
     if (!selectedSupplierId) { toast.error("거래처를 선택해주세요"); return; }
     const validItems = items.filter((i) => i.supplierProductId || i.isNew);
     if (validItems.length === 0) { toast.error("입고 항목을 추가해주세요"); return; }
+    const emptyRowCount = items.length - validItems.length;
+    if (emptyRowCount > 0) {
+      toast.error(`비어있는 행 ${emptyRowCount}개가 있습니다. 삭제하거나 채워주세요.`);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -1073,7 +1088,7 @@ function IncomingPageInner() {
                             <td className="border-r border-border text-center text-muted-foreground py-1.5">{idx + 1}</td>
                             <td className="border-r border-border px-2 py-1.5 text-muted-foreground text-xs">{item.supplierProduct.supplierCode || ""}</td>
                             <td className="border-r border-border px-2 py-1.5 font-medium">{item.supplierProduct.name}</td>
-                            <td className="border-r border-border px-2 py-1.5 text-muted-foreground"></td>
+                            <td className="border-r border-border px-2 py-1.5 text-muted-foreground">{item.supplierProduct.spec || ""}</td>
                             <td className="border-r border-border text-center text-muted-foreground py-1.5">{item.supplierProduct.unitOfMeasure}</td>
                             <td className="border-r border-border text-right px-2 py-1.5 tabular-nums">{qty.toLocaleString()}</td>
                             <td className="border-r border-border text-right px-2 py-1.5 tabular-nums">{formatPrice(origPrice)}</td>
@@ -1318,7 +1333,23 @@ function IncomingPageInner() {
                       <th className="border-r border-b border-border w-[100px] py-2 px-2 text-left font-medium">규격</th>
                       <th className="border-r border-b border-border w-[50px] py-2 text-center font-medium">단위</th>
                       <th className="border-r border-b border-border w-[70px] py-2 text-center font-medium">수량</th>
-                      <th className="border-r border-b border-border w-[90px] py-2 text-center font-medium">단가</th>
+                      <th className="border-r border-b border-border w-[90px] py-1 text-center font-medium">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span>단가</span>
+                          <button
+                            type="button"
+                            onClick={() => setUnitPriceVatIncluded((v) => !v)}
+                            className={`text-[10px] leading-none px-1.5 py-0.5 rounded border ${
+                              unitPriceVatIncluded
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border text-muted-foreground hover:bg-muted/70"
+                            }`}
+                            title="ON: VAT포함 금액으로 입력 → 자동 ÷1.1 저장"
+                          >
+                            VAT포함
+                          </button>
+                        </div>
+                      </th>
                       <th className="border-r border-b border-border w-[80px] py-2 text-center font-medium">할인</th>
                       <th className="border-r border-b border-border w-[90px] py-2 text-center font-medium">실제단가</th>
                       <th className="border-r border-b border-border w-[100px] py-2 text-center font-medium">공급가액</th>
@@ -1402,21 +1433,55 @@ function IncomingPageInner() {
                             />
                           </td>
 
-                          {/* 단가 (부가세 미포함) */}
+                          {/* 단가 (부가세 미포함) — VAT포함 토글 ON이면 표시는 ×1.1, 저장은 round(input/1.1) */}
                           <td className="border-r border-border p-0.5">
                             <input
                               data-row={idx}
                               data-field="unitPrice"
                               inputMode="decimal"
-                              value={formatCommaDecimal(item.unitPrice)}
-                              onChange={(e) => updateItem(idx, "unitPrice", parseCommaDecimal(e.target.value))}
-                              onBlur={() => recalcOnBlur(idx, "unitPrice")}
+                              value={
+                                unitPriceVatIncluded
+                                  ? (vatInputBuffer?.idx === idx
+                                      ? vatInputBuffer.text
+                                      : vatRawByIdx[idx] !== undefined
+                                        ? formatCommaDecimal(vatRawByIdx[idx])
+                                        : item.unitPrice
+                                          ? formatCommaDecimal(String(Math.round(parseFloat(item.unitPrice) * 1.1)))
+                                          : "")
+                                  : formatCommaDecimal(item.unitPrice)
+                              }
+                              onChange={(e) => {
+                                if (unitPriceVatIncluded) {
+                                  setVatInputBuffer({ idx, text: e.target.value });
+                                } else {
+                                  updateItem(idx, "unitPrice", parseCommaDecimal(e.target.value));
+                                  setVatRawByIdx((prev) => {
+                                    if (prev[idx] === undefined) return prev;
+                                    const { [idx]: _, ...rest } = prev;
+                                    return rest;
+                                  });
+                                }
+                              }}
+                              onBlur={() => {
+                                if (unitPriceVatIncluded && vatInputBuffer?.idx === idx) {
+                                  const raw = parseCommaDecimal(vatInputBuffer.text);
+                                  const stored = raw
+                                    ? String(Math.round(parseFloat(raw) / 1.1))
+                                    : "";
+                                  updateItem(idx, "unitPrice", stored);
+                                  setVatRawByIdx((prev) => ({ ...prev, [idx]: raw }));
+                                  setVatInputBuffer(null);
+                                }
+                                recalcOnBlur(idx, "unitPrice");
+                              }}
                               onFocus={(e) => {
                                 if (item.unitPrice === "0") updateItem(idx, "unitPrice", "");
                                 else e.currentTarget.select();
                               }}
                               disabled={isEmptyRow}
-                              className="w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30"
+                              className={`w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30 ${
+                                unitPriceVatIncluded ? "text-blue-600 dark:text-blue-400" : ""
+                              }`}
                             />
                           </td>
 
@@ -1445,11 +1510,13 @@ function IncomingPageInner() {
                             <input
                               data-row={idx}
                               data-field="supplyAmount"
-                              value={item.supplyAmount}
-                              onChange={(e) => updateItem(idx, "supplyAmount", e.target.value)}
+                              inputMode="decimal"
+                              value={formatCommaDecimal(item.supplyAmount)}
+                              onChange={(e) => updateItem(idx, "supplyAmount", parseCommaDecimal(e.target.value))}
                               onBlur={() => recalcOnBlur(idx, "supplyAmount")}
+                              onFocus={(e) => e.currentTarget.select()}
                               disabled={isEmptyRow}
-                              placeholder={isEmptyRow ? "" : lineSupply ? String(lineSupply) : ""}
+                              placeholder={isEmptyRow ? "" : lineSupply ? formatPrice(lineSupply) : ""}
                               className="w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30 tabular-nums placeholder:text-muted-foreground"
                             />
                           </td>

@@ -92,6 +92,98 @@ export async function replaceProductMapping(
   return { mappingId: null };
 }
 
+// ───────── 2b. ProductMapping diff (다중 매핑) ─────────
+
+export interface ProductMappingRow {
+  /** null = 신규 행 (POST), 값 있음 = 기존 매핑 */
+  mappingId: string | null;
+  supplierProductId: string;
+  conversionRate: string;
+}
+
+export interface ExistingProductMapping {
+  mappingId: string;
+  supplierProductId: string;
+  conversionRate: string;
+}
+
+/**
+ * 다중 매핑 diff:
+ * - prev 의 mappingId 가 next 에 없음 → DELETE
+ * - next 의 mappingId 없음 (신규) → POST
+ * - 같은 mappingId 인데 SP 또는 conversionRate 변경됨 → DELETE + POST (PUT API 미존재로 재생성)
+ *
+ * 같은 supplierProductId 가 next 에 두 번 들어가면 호출 측에서 사전 차단해야 한다 (POST 시 409).
+ */
+export async function diffProductMappings(
+  productId: string,
+  prev: ExistingProductMapping[],
+  next: ProductMappingRow[],
+): Promise<{ failed: string[] }> {
+  const failed: string[] = [];
+  const nextById = new Map(
+    next.filter((r) => r.mappingId).map((r) => [r.mappingId!, r]),
+  );
+
+  // 1) 삭제: prev 에 있는데 next 에 없음
+  for (const p of prev) {
+    if (!nextById.has(p.mappingId)) {
+      try {
+        await apiMutate(`/api/products/mapping?id=${p.mappingId}`, "DELETE");
+      } catch (e) {
+        failed.push(`매핑 삭제 (${p.mappingId})`);
+        if (!(e instanceof ApiError)) throw e;
+      }
+    }
+  }
+
+  // 2) 변경: 같은 mappingId 인데 SP/rate 다름 → DELETE + POST
+  for (const n of next) {
+    if (!n.mappingId) continue;
+    const before = prev.find((p) => p.mappingId === n.mappingId);
+    if (!before) continue;
+    const unchanged =
+      before.supplierProductId === n.supplierProductId &&
+      (before.conversionRate || "1") === (n.conversionRate || "1");
+    if (unchanged) continue;
+    try {
+      await apiMutate(`/api/products/mapping?id=${n.mappingId}`, "DELETE");
+    } catch (e) {
+      failed.push("매핑 갱신 삭제");
+      if (!(e instanceof ApiError)) throw e;
+      continue;
+    }
+    try {
+      await apiMutate("/api/products/mapping", "POST", {
+        productId,
+        supplierProductId: n.supplierProductId,
+        conversionRate: n.conversionRate || "1",
+      });
+    } catch (e) {
+      failed.push("매핑 갱신 등록");
+      if (!(e instanceof ApiError)) throw e;
+    }
+  }
+
+  // 3) 신규: mappingId 없음
+  for (const n of next) {
+    if (n.mappingId) continue;
+    if (!n.supplierProductId) continue;
+    try {
+      await apiMutate("/api/products/mapping", "POST", {
+        productId,
+        supplierProductId: n.supplierProductId,
+        conversionRate: n.conversionRate || "1",
+      });
+    } catch (e) {
+      failed.push("매핑 추가");
+      if (!(e instanceof ApiError)) throw e;
+    }
+  }
+
+  return { failed };
+}
+
 // ───────── 3. SellingCost diff (전사 + 채널별) ─────────
 
 /**

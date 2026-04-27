@@ -116,19 +116,22 @@ export function SupplierCombobox({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        className="flex h-9 w-full items-center justify-between rounded-lg border border-input bg-transparent px-3 py-2 text-sm cursor-pointer hover:bg-accent/50"
-      >
-        <span className={selected ? "" : "text-muted-foreground"}>
-          {selected ? selected.name : "거래처 선택..."}
-        </span>
-        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="거래처 검색..."
+    <div className="relative h-9">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          className="relative flex h-9 max-h-9 box-border w-full items-center overflow-hidden rounded-lg border border-input bg-transparent pl-3 pr-9 text-sm cursor-pointer hover:bg-accent/50 focus:outline-none focus-visible:outline-none"
+        >
+          <span className={`truncate ${selected ? "" : "text-muted-foreground"}`}>
+            {selected ? selected.name : "거래처 선택..."}
+          </span>
+          <span className="absolute inset-y-0 right-2 flex items-center">
+            <ChevronsUpDown className="h-4 w-4 opacity-50" />
+          </span>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="거래처 검색..."
             value={search}
             onValueChange={setSearch}
           />
@@ -188,7 +191,8 @@ export function SupplierCombobox({
           </CommandList>
         </Command>
       </PopoverContent>
-    </Popover>
+      </Popover>
+    </div>
   );
 }
 
@@ -222,29 +226,26 @@ export function InlineCellProductSearch({
     return p.name.toLowerCase().includes(q) || (p.supplierCode?.toLowerCase().includes(q) ?? false);
   });
 
-  const hasExactMatch = products.some(
-    (p) => p.name.toLowerCase() === search.toLowerCase()
-  );
-
   return (
-    <Popover open={open} onOpenChange={(v) => {
-      setOpen(v);
-      if (v && selectedName) setSearch(selectedName);
-      if (!v) setSearch("");
-    }}>
-      <PopoverTrigger
-        data-product-trigger={rowIndex}
-        className={`flex h-7 w-full items-center rounded bg-transparent px-2 text-sm cursor-pointer hover:bg-muted ${selectedName ? "text-foreground" : "text-primary"}`}
-      >
-        {selectedName ? (
-          <span className="flex items-center gap-1.5 truncate">
-            <span className="font-medium truncate">{selectedName}</span>
-            {isNew && <Badge variant="outline" className="text-[10px] text-primary border-[#3ECF8E]/40 shrink-0">신규</Badge>}
-          </span>
-        ) : (
-          <span className="flex items-center gap-1.5"><Plus className="size-3.5 shrink-0" />품명 검색...</span>
-        )}
-      </PopoverTrigger>
+    <div className="relative h-7">
+      <Popover open={open} onOpenChange={(v) => {
+        setOpen(v);
+        if (v && selectedName) setSearch(selectedName);
+        if (!v) setSearch("");
+      }}>
+        <PopoverTrigger
+          data-product-trigger={rowIndex}
+          className={`relative flex h-7 max-h-7 box-border w-full items-center overflow-hidden rounded bg-transparent px-2 text-sm cursor-pointer hover:bg-muted focus:outline-none focus-visible:outline-none ${selectedName ? "text-foreground" : "text-primary"}`}
+        >
+          {selectedName ? (
+            <span className="flex items-center gap-1.5 truncate">
+              <span className="font-medium truncate">{selectedName}</span>
+              {isNew && <Badge variant="outline" className="text-[10px] text-primary border-[#3ECF8E]/40 shrink-0">신규</Badge>}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5"><Plus className="size-3.5 shrink-0" />품명 검색...</span>
+          )}
+        </PopoverTrigger>
       <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
@@ -328,7 +329,7 @@ export function InlineCellProductSearch({
                 );
               })}
             </CommandGroup>
-            {search.trim() && !hasExactMatch && filtered.length > 0 && (
+            {search.trim() && filtered.length > 0 && (
               <CommandGroup>
                 <CommandItem
                   onSelect={() => {
@@ -347,6 +348,7 @@ export function InlineCellProductSearch({
           </CommandList>
         </Command>
       </PopoverContent>
-    </Popover>
+      </Popover>
+    </div>
   );
 }
