@@ -1,4 +1,6 @@
+import { Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   TAX_TYPE_LABELS,
   PRODUCT_TYPE_LABELS,
@@ -12,6 +14,8 @@ import type { ProductCardVariant, ProductDetail } from "./types";
 interface ProductInfoCardProps {
   product: ProductDetail;
   variant?: ProductCardVariant;
+  /** 편집 버튼 클릭 핸들러 — 제공 시 우측 상단에 "편집" 버튼 노출 */
+  onEdit?: () => void;
 }
 
 interface FieldItem {
@@ -29,7 +33,7 @@ function Field({ label, value, full }: FieldItem) {
   );
 }
 
-export function ProductInfoCard({ product, variant = "admin" }: ProductInfoCardProps) {
+export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductInfoCardProps) {
   const isCustomer = variant === "customer";
   const displayVat = toVatPrice(product.sellingPrice, product.taxType);
   const displayList = product.listPrice
@@ -119,7 +123,17 @@ export function ProductInfoCard({ product, variant = "admin" }: ProductInfoCardP
   const fields = isCustomer ? customerFields : adminFields;
 
   return (
-    <ProductSection title="기본 정보">
+    <ProductSection
+      title="기본 정보"
+      actions={
+        onEdit ? (
+          <Button size="sm" variant="outline" className="h-7" onClick={onEdit}>
+            <Pencil className="h-3 w-3 mr-1" />
+            편집
+          </Button>
+        ) : undefined
+      }
+    >
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
         {fields.map((f) => (
           <Field key={f.label} {...f} />

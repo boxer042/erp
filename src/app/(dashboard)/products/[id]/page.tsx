@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -39,6 +38,7 @@ import {
   fmtPrice,
   toVatPrice,
 } from "@/components/product";
+import { ProductInfoEditSheet } from "@/components/product/edit/product-info-edit-sheet";
 import { ProductMediaManager } from "@/components/product-media-manager";
 import type { ProductDetail } from "@/components/product/types";
 import type { Movement } from "./_types";
@@ -48,6 +48,7 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [infoEditOpen, setInfoEditOpen] = useState(false);
 
   const productQuery = useQuery({
     queryKey: queryKeys.products.detail(id),
@@ -109,21 +110,14 @@ export default function ProductDetailPage() {
           <ProductHeaderBar
             product={product}
             actions={
-              <>
-                <Link href={`/products/${id}/edit`}>
-                  <Button size="sm" className="h-8">
-                    <Pencil className="h-3.5 w-3.5 mr-1.5" />수정
-                  </Button>
-                </Link>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="h-8"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />삭제
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-8"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />삭제
+              </Button>
             }
           />
 
@@ -136,7 +130,7 @@ export default function ProductDetailPage() {
               variants={product.variants ?? []}
             />
           )}
-          <ProductInfoCard product={product} />
+          <ProductInfoCard product={product} onEdit={() => setInfoEditOpen(true)} />
           <ProductDescriptionBlock product={product} />
 
           {/* 2. 가격·비용 */}
@@ -263,6 +257,12 @@ export default function ProductDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ProductInfoEditSheet
+        open={infoEditOpen}
+        onOpenChange={setInfoEditOpen}
+        product={product}
+      />
     </div>
   );
 }

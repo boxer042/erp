@@ -60,9 +60,6 @@ import {
   TypeSelectScreen,
   PRODUCT_TYPE_CARDS,
 } from "./new-product-form/parts";
-import { submitEdit } from "./new-product-form/submit-edit";
-import type { ProductDetail } from "@/components/product/types";
-
 export interface NewProductFormProps {
   suppliers: Supplier[];
   channels: Channel[];
@@ -73,132 +70,6 @@ export interface NewProductFormProps {
   defaultProductType?: ProductType;
   /** true면 상품 유형 변경 불가 (조립상품 전용 진입점에서 사용) */
   lockProductType?: boolean;
-  /** 모드: "create" (default) | "edit" */
-  mode?: "create" | "edit";
-  /** edit 모드에서 PUT 대상 productId */
-  productId?: string;
-  /** edit 모드 초기 데이터 (GET /api/products/[id] 응답 + 매핑된 supplierProducts) */
-  initialData?: {
-    product: ProductDetail;
-    /** 선택된 거래처의 공급상품 리스트 (mapping의 supplierId 기반으로 풀로드) */
-    supplierProducts?: SupplierProduct[];
-  };
-}
-
-// 편집 모드에서 GET 응답을 form state 초기값으로 변환
-function buildEditInit(initial: NonNullable<NewProductFormProps["initialData"]>) {
-  const p = initial.product;
-  const m = p.productMappings?.[0] ?? null;
-  const sp = m?.supplierProduct;
-
-  const incomingCosts: CostRow[] =
-    sp?.incomingCosts?.map((c) => ({
-      id: Math.random().toString(36).slice(2),
-      serverId: c.id,
-      name: c.name,
-      costType: c.costType as "FIXED" | "PERCENTAGE",
-      value: String(c.value),
-      perUnit: c.perUnit,
-      isTaxable: c.isTaxable,
-    })) ?? [];
-
-  const allSelling = p.sellingCosts ?? [];
-  const sellingCosts: CostRow[] = allSelling
-    .filter((c) => c.channelId == null)
-    .map((c) => ({
-      id: Math.random().toString(36).slice(2),
-      serverId: c.id,
-      name: c.name,
-      costType: c.costType as "FIXED" | "PERCENTAGE",
-      value: String(c.value),
-      perUnit: c.perUnit,
-      isTaxable: c.isTaxable,
-    }));
-
-  const channelSellingCosts: Record<string, CostRow[]> = {};
-  for (const c of allSelling) {
-    if (!c.channelId) continue;
-    (channelSellingCosts[c.channelId] ??= []).push({
-      id: Math.random().toString(36).slice(2),
-      serverId: c.id,
-      name: c.name,
-      costType: c.costType as "FIXED" | "PERCENTAGE",
-      value: String(c.value),
-      perUnit: c.perUnit,
-      isTaxable: c.isTaxable,
-    });
-  }
-
-  const setComponents: SetComponentRow[] = (p.setComponents ?? []).map((sc) => ({
-    id: Math.random().toString(36).slice(2),
-    product: {
-      id: sc.component.id,
-      name: sc.component.name,
-      sku: sc.component.sku,
-      sellingPrice: "0",
-      unitCost: null,
-      unitOfMeasure: "EA",
-      isSet: false,
-      isCanonical: false,
-      canonicalProductId: null,
-    },
-    quantity: String(sc.quantity),
-    label: sc.label ?? undefined,
-  }));
-
-  const initialChannelPricings: Array<{ id: string; channelId: string }> = (
-    p.channelPricings ?? []
-  ).map((cp) => ({ id: cp.id, channelId: cp.channelId }));
-
-  return {
-    productType: p.productType as ProductType,
-    form: {
-      name: p.name,
-      brand: p.brand ?? "",
-      brandId: p.brandId ?? "",
-      brandName: p.brandRef?.name ?? p.brand ?? "",
-      spec: p.spec ?? "",
-      sku: p.sku,
-      modelName: p.modelName ?? "",
-      unitOfMeasure: p.unitOfMeasure,
-      taxType: p.taxType as "TAXABLE" | "TAX_FREE" | "ZERO_RATE",
-      taxRate: p.taxRate ?? "0.1",
-      listPrice: p.listPrice ?? p.sellingPrice,
-      sellingPrice: p.sellingPrice,
-      memo: p.memo ?? "",
-      vatIncluded: false, // DB는 항상 세전 — 편집 시작 시점도 세전 표시
-      categoryId: p.categoryId ?? "",
-    },
-    mapping: {
-      supplierId: sp?.supplier?.id ?? "",
-      supplierProductId: sp?.id ?? "",
-      conversionRate: m?.conversionRate ?? "1",
-      isProvisional: sp?.isProvisional ?? false,
-    },
-    incomingCosts,
-    sellingCosts,
-    channelSellingCosts,
-    setComponents,
-    pricingsByChannel: new Map(
-      (p.channelPricings ?? []).map((cp) => [cp.channelId, String(cp.sellingPrice)]),
-    ),
-    initialMappingId: m?.id ?? null,
-    initialSupplierProductId: sp?.id ?? null,
-    initialConversionRate: m?.conversionRate ?? null,
-    initialIncomingCostIds: incomingCosts.map((c) => c.serverId!).filter(Boolean),
-    initialSellingCostIds: sellingCosts.map((c) => c.serverId!).filter(Boolean),
-    initialChannelSellingCostIds: Object.fromEntries(
-      Object.entries(channelSellingCosts).map(([k, v]) => [
-        k,
-        v.map((c) => c.serverId!).filter(Boolean),
-      ]),
-    ),
-    initialChannelPricings,
-    isBulk: p.isBulk ?? false,
-    initialContainerSize: p.containerSize ?? "",
-    bulkProductId: p.bulkProductId ?? null,
-    imageUrl: p.imageUrl ?? null,
-  };
 }
 
 // ── 메인 컴포넌트 ──
@@ -210,73 +81,57 @@ export function NewProductForm({
   categories = [],
   defaultProductType,
   lockProductType = false,
-  mode = "create",
-  productId,
-  initialData,
 }: NewProductFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const presetCanonicalId = searchParams?.get("canonicalProductId") ?? "";
   const presetSupplierId = searchParams?.get("supplierId") ?? "";
   const presetSupplierProductId = searchParams?.get("supplierProductId") ?? "";
-  const isEdit = mode === "edit" && !!initialData;
-  // edit 모드: 초기값 1회 계산 (initialData ref가 동일하므로 stable)
-  const editInitRef = useRef(isEdit ? buildEditInit(initialData) : null);
-  const editInit = editInitRef.current;
-  const effectiveLockProductType = lockProductType || isEdit;
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [brands, setBrands] = useState<BrandOption[]>(initialBrands);
   const [quickBrandOpen, setQuickBrandOpen] = useState(false);
   const [quickBrandDefaultName, setQuickBrandDefaultName] = useState("");
   // 벌크 상품 옵션 (Phase 9)
   const [bulkUsable, setBulkUsable] = useState(false);
-  const [containerSize, setContainerSize] = useState(editInit?.initialContainerSize ?? "");
+  const [containerSize, setContainerSize] = useState("");
   const [newBulkName, setNewBulkName] = useState("");
   const [newBulkUnit, setNewBulkUnit] = useState("mL");
   const bulkNameAutoSync = useRef(true);
   const [step, setStep] = useState<"type" | "form">(
-    isEdit || defaultProductType || presetCanonicalId ? "form" : "type",
+    defaultProductType || presetCanonicalId ? "form" : "type",
   );
   const [productType, setProductType] = useState<ProductType>(
-    editInit?.productType ?? defaultProductType ?? "FINISHED",
+    defaultProductType ?? "FINISHED",
   );
 
-  const [form, setForm] = useState(
-    editInit?.form ?? {
-      name: "",
-      brand: "",
-      brandId: "",
-      brandName: "",
-      spec: "",
-      sku: generateSku(),
-      modelName: "",
-      unitOfMeasure: "EA",
-      taxType: "TAXABLE" as "TAXABLE" | "TAX_FREE" | "ZERO_RATE",
-      taxRate: "0.1",
-      listPrice: "0",
-      sellingPrice: "0",
-      memo: "",
-      vatIncluded: false,
-      categoryId: "",
-    },
-  );
+  const [form, setForm] = useState({
+    name: "",
+    brand: "",
+    brandId: "",
+    brandName: "",
+    spec: "",
+    sku: generateSku(),
+    modelName: "",
+    unitOfMeasure: "EA",
+    taxType: "TAXABLE" as "TAXABLE" | "TAX_FREE" | "ZERO_RATE",
+    taxRate: "0.1",
+    listPrice: "0",
+    sellingPrice: "0",
+    memo: "",
+    vatIncluded: false,
+    categoryId: "",
+  });
 
   // 변형(variant) 연결 — URL `?canonicalProductId=<id>` 로 진입 시 자동 채움
-  const [canonicalProductId] = useState<string>(
-    isEdit ? initialData!.product.canonicalProductId ?? "" : presetCanonicalId,
-  );
+  const [canonicalProductId] = useState<string>(presetCanonicalId);
 
-  const [mapping, setMapping] = useState(
-    editInit?.mapping ?? {
-      supplierId: presetSupplierId,
-      supplierProductId: presetSupplierProductId,
-      conversionRate: "1",
-      isProvisional: false,
-    },
-  );
-  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>(
-    () => initialData?.supplierProducts ?? [],
-  );
+  const [mapping, setMapping] = useState({
+    supplierId: presetSupplierId,
+    supplierProductId: presetSupplierProductId,
+    conversionRate: "1",
+    isProvisional: false,
+  });
+  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
   const [loadingSupplierProducts, setLoadingSupplierProducts] = useState(false);
 
   const [quickSupplierOpen, setQuickSupplierOpen] = useState(false);
@@ -284,16 +139,10 @@ export function NewProductForm({
   const [quickSupplierProductOpen, setQuickSupplierProductOpen] = useState(false);
   const [quickSupplierProductDefaultName, setQuickSupplierProductDefaultName] = useState("");
 
-  const [incomingCosts, setIncomingCosts] = useState<CostRow[]>(
-    editInit?.incomingCosts ?? [],
-  );
-  const [sellingCosts, setSellingCosts] = useState<CostRow[]>(
-    editInit?.sellingCosts ?? [],
-  );
+  const [incomingCosts, setIncomingCosts] = useState<CostRow[]>([]);
+  const [sellingCosts, setSellingCosts] = useState<CostRow[]>([]);
   // 채널별 전용 판매비용 (key: channelId)
-  const [channelSellingCosts, setChannelSellingCosts] = useState<Record<string, CostRow[]>>(
-    editInit?.channelSellingCosts ?? {},
-  );
+  const [channelSellingCosts, setChannelSellingCosts] = useState<Record<string, CostRow[]>>({});
   const [avgShippingCost, setAvgShippingCost] = useState<number | null>(null);
   const [avgShippingIsTaxable, setAvgShippingIsTaxable] = useState(false);
   const [avgIncomingCost, setAvgIncomingCost] = useState<number | null>(null);
@@ -307,24 +156,17 @@ export function NewProductForm({
   const [cardFeeRate, setCardFeeRate] = useState<number>(0);
 
   const [channelPrices, setChannelPrices] = useState<ChannelPriceRow[]>(() =>
-    channels.map((ch) => {
-      const existingPrice = editInit?.pricingsByChannel.get(ch.id);
-      return {
-        channelId: ch.id,
-        price: existingPrice ?? "",
-        enabled: !!existingPrice,
-        lastEdited: existingPrice ? "price" : null,
-        targetRate: "",
-        targetAmount: "",
-      };
-    })
+    channels.map((ch) => ({
+      channelId: ch.id,
+      price: "",
+      enabled: false,
+      lastEdited: null,
+      targetRate: "",
+      targetAmount: "",
+    })),
   );
 
-  const [setComponents, setSetComponents] = useState<SetComponentRow[]>(
-    editInit?.setComponents && editInit.setComponents.length > 0
-      ? editInit.setComponents
-      : [emptySetComponent()],
-  );
+  const [setComponents, setSetComponents] = useState<SetComponentRow[]>([emptySetComponent()]);
   const [assemblyCosts, setAssemblyCosts] = useState<CostRow[]>([]);
   const [parentProducts, setParentProducts] = useState<ParentProductRow[]>([]);
 
@@ -979,50 +821,6 @@ export function NewProductForm({
         }
         seen.add(id);
       }
-    }
-
-    // ── EDIT 모드: PUT + diff ──
-    if (isEdit && productId && editInit) {
-      setSubmitting(true);
-      try {
-        const result = await submitEdit({
-          productId,
-          productType,
-          form,
-          toNetPrice,
-          mapping,
-          initialMappingId: editInit.initialMappingId,
-          initialSupplierProductId: editInit.initialSupplierProductId,
-          initialConversionRate: editInit.initialConversionRate,
-          incomingCosts,
-          initialIncomingCostIds: editInit.initialIncomingCostIds,
-          sellingCosts,
-          initialSellingCostIds: editInit.initialSellingCostIds,
-          channelSellingCosts,
-          initialChannelSellingCostIds: editInit.initialChannelSellingCostIds,
-          channelPrices,
-          initialChannelPricings: editInit.initialChannelPricings,
-          setComponents,
-          isBulk: editInit.isBulk,
-          containerSize,
-          bulkProductId: editInit.bulkProductId,
-          imageUrl: editInit.imageUrl,
-        });
-        if (result.ok) {
-          toast.success("저장되었습니다");
-        } else {
-          toast.warning(`저장됐으나 일부 실패: ${result.errors.join(", ")}`, {
-            duration: 8000,
-          });
-        }
-        router.push(`/products/${productId}`);
-        router.refresh();
-      } catch {
-        toast.error("저장 중 오류가 발생했습니다");
-      } finally {
-        setSubmitting(false);
-      }
-      return;
     }
 
     // 변형이 있으면 묶음(canonical+variants) 모드로 전환
@@ -1692,7 +1490,7 @@ export function NewProductForm({
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => {
                   if (step === "form") {
-                    if (effectiveLockProductType) {
+                    if (lockProductType) {
                       handleLeave();
                       return;
                     }
@@ -1705,7 +1503,7 @@ export function NewProductForm({
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-base font-medium flex-1">{isEdit ? "상품 수정" : "새 상품 등록"}</h1>
+              <h1 className="text-base font-medium flex-1">새 상품 등록</h1>
               {step === "form" && currentTypeCard && (
                 <div
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[12px] font-medium leading-none"
@@ -1917,7 +1715,7 @@ export function NewProductForm({
                       )}
                     </div>
 
-                    {(productType === "FINISHED" || productType === "PARTS") && !isEdit && (
+                    {(productType === "FINISHED" || productType === "PARTS") && true && (
                       <div className="space-y-2 rounded-md border border-dashed border-border p-3">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <Checkbox
@@ -2164,7 +1962,7 @@ export function NewProductForm({
                   )}
 
                   {/* 상위 상품 연결 (부속) */}
-                  {productType === "PARTS" && !isEdit && (
+                  {productType === "PARTS" && true && (
                     <section>
                       <SectionTitle
                         title="상위 상품 연결"
@@ -2390,7 +2188,7 @@ export function NewProductForm({
                   })()}
 
                   {/* 변형 등록 (멀티 변형 모드) — ASSEMBLED 일 때만, edit 모드에서는 숨김 */}
-                  {productType === "ASSEMBLED" && !isEdit && (
+                  {productType === "ASSEMBLED" && true && (
                     <section>
                       <SectionTitle
                         title="변형 등록"
@@ -2727,7 +2525,7 @@ export function NewProductForm({
               <Button variant="outline" onClick={handleLeave} disabled={submitting}>취소</Button>
               <Button onClick={handleSubmit} disabled={submitting}>
                 {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {isEdit ? "저장" : "등록"}
+                등록
               </Button>
             </>
           )}
