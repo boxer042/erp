@@ -3,10 +3,12 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { ProductDetail } from "./types";
+import { InlineTextEdit } from "./edit/inline-text-edit";
 
 interface ProductHeaderBarProps {
   product: Pick<
     ProductDetail,
+    | "id"
     | "name"
     | "sku"
     | "imageUrl"
@@ -19,6 +21,8 @@ interface ProductHeaderBarProps {
   backHref?: string;
   backLabel?: string;
   actions?: React.ReactNode;
+  /** 상품명 인라인 편집 — 제공 시 hover Pencil 아이콘 노출 */
+  onSaveName?: (next: string) => Promise<void>;
 }
 
 export function ProductHeaderBar({
@@ -26,6 +30,7 @@ export function ProductHeaderBar({
   backHref = "/products",
   backLabel = "목록",
   actions,
+  onSaveName,
 }: ProductHeaderBarProps) {
   return (
     <div className="flex items-center gap-3 flex-wrap">
@@ -42,7 +47,17 @@ export function ProductHeaderBar({
           className="h-10 w-10 rounded-md object-cover border border-border shrink-0"
         />
       ) : null}
-      <h2 className="text-lg font-semibold truncate">{product.name}</h2>
+      {onSaveName ? (
+        <h2 className="text-lg font-semibold truncate">
+          <InlineTextEdit
+            value={product.name}
+            productId={product.id}
+            onSave={onSaveName}
+          />
+        </h2>
+      ) : (
+        <h2 className="text-lg font-semibold truncate">{product.name}</h2>
+      )}
       <Badge variant="outline">{product.sku}</Badge>
       {product.isSet && <Badge>세트</Badge>}
       {product.productType === "ASSEMBLED" && <Badge>조립</Badge>}

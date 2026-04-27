@@ -17,6 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import {
+  updateProductFields,
+  type ProductFieldsInput,
+} from "@/lib/product-mutations";
 
 import {
   ProductBulkCard,
@@ -39,6 +43,9 @@ import {
   toVatPrice,
 } from "@/components/product";
 import { ProductInfoEditSheet } from "@/components/product/edit/product-info-edit-sheet";
+import { ProductMappingEditSheet } from "@/components/product/edit/product-mapping-edit-sheet";
+import { ProductCostsEditSheet } from "@/components/product/edit/product-costs-edit-sheet";
+import { Pencil } from "lucide-react";
 import { ProductMediaManager } from "@/components/product-media-manager";
 import type { ProductDetail } from "@/components/product/types";
 import type { Movement } from "./_types";
@@ -49,6 +56,8 @@ export default function ProductDetailPage() {
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [infoEditOpen, setInfoEditOpen] = useState(false);
+  const [mappingEditOpen, setMappingEditOpen] = useState(false);
+  const [costsEditOpen, setCostsEditOpen] = useState(false);
 
   const productQuery = useQuery({
     queryKey: queryKeys.products.detail(id),
@@ -103,12 +112,39 @@ export default function ProductDetailPage() {
       ? Math.round(((displayList - displayVat) / displayList) * 100)
       : 0;
 
+  // 인라인 편집 헬퍼: 현재 product 의 모든 필드를 베이스로 1개 필드만 덮어쓰고 PUT.
+  const buildFieldsBase = (): ProductFieldsInput => ({
+    name: product.name,
+    sku: product.sku,
+    brand: product.brandRef?.name ?? product.brand ?? null,
+    brandId: product.brandId ?? null,
+    modelName: product.modelName ?? null,
+    spec: product.spec ?? null,
+    description: product.description ?? null,
+    unitOfMeasure: product.unitOfMeasure,
+    productType: product.productType as ProductFieldsInput["productType"],
+    taxType: product.taxType as ProductFieldsInput["taxType"],
+    taxRate: product.taxRate ?? "0.1",
+    listPrice: product.listPrice ?? product.sellingPrice,
+    sellingPrice: product.sellingPrice,
+    isSet: product.isSet,
+    isBulk: product.isBulk,
+    containerSize: product.containerSize ?? null,
+    bulkProductId: product.bulkProductId ?? null,
+    imageUrl: product.imageUrl ?? null,
+    memo: product.memo ?? null,
+    categoryId: product.categoryId ?? null,
+  });
+  const saveSingleField = (patch: Partial<ProductFieldsInput>) =>
+    updateProductFields(product.id, { ...buildFieldsBase(), ...patch });
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-6">
           <ProductHeaderBar
             product={product}
+            onSaveName={(name) => saveSingleField({ name })}
             actions={
               <Button
                 size="sm"
@@ -131,7 +167,11 @@ export default function ProductDetailPage() {
             />
           )}
           <ProductInfoCard product={product} onEdit={() => setInfoEditOpen(true)} />
-          <ProductDescriptionBlock product={product} />
+          <ProductDescriptionBlock
+            product={product}
+            onSaveDescription={(description) => saveSingleField({ description: description || null })}
+            onSaveMemo={(memo) => saveSingleField({ memo: memo || null })}
+          />
 
           {/* 2. 가격·비용 */}
           <ProductSection title="가격 요약">
@@ -150,6 +190,17 @@ export default function ProductDetailPage() {
             title="전사 공통 판매비용"
             description="모든 채널에 공통으로 적용되는 비용"
             noPadding
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => setCostsEditOpen(true)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                편집
+              </Button>
+            }
           >
             <ProductSellingCostsTable costs={globalCosts} />
           </ProductSection>
@@ -173,6 +224,17 @@ export default function ProductDetailPage() {
             title="공급자 매핑"
             description="이 판매상품으로 환산되는 공급자 상품"
             noPadding
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => setMappingEditOpen(true)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                편집
+              </Button>
+            }
           >
             <ProductMappingsTable mappings={mappings} />
           </ProductSection>
@@ -262,6 +324,17 @@ export default function ProductDetailPage() {
         open={infoEditOpen}
         onOpenChange={setInfoEditOpen}
         product={product}
+      />
+      <ProductMappingEditSheet
+        open={mappingEditOpen}
+        onOpenChange={setMappingEditOpen}
+        product={product}
+      />
+      <ProductCostsEditSheet
+        open={costsEditOpen}
+        onOpenChange={setCostsEditOpen}
+        product={product}
+        channelId={null}
       />
     </div>
   );
