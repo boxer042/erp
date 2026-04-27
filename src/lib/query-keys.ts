@@ -43,4 +43,8 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => ["categories", "list", params ?? {}] as const,
     detail: (id: string) => ["categories", "detail", id] as const,
   },
+  assemblySlotLabels: {
+    all: ["assembly-slot-labels"] as const,
+    list: (params?: Record<string, unknown>) => ["assembly-slot-labels", "list", params ?? {}] as const,
+  },
 } as const;

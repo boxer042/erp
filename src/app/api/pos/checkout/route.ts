@@ -57,15 +57,7 @@ function genNo(prefix: string) {
   return `${prefix}${y}${m}${d}-${r}`;
 }
 
-async function getOrCreateOfflineChannel() {
-  let ch = await prisma.salesChannel.findFirst({ where: { code: "OFFLINE" } });
-  if (!ch) {
-    ch = await prisma.salesChannel.create({
-      data: { name: "오프라인", code: "OFFLINE", commissionRate: 0 },
-    });
-  }
-  return ch;
-}
+// 오프라인 매출은 channelId IS NULL 로 표현 (베이스라인). 별도 SalesChannel row 불필요.
 
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
@@ -160,9 +152,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ kind: "statement", id: s.id, no: s.statementNo }, { status: 201 });
   }
 
-  // action === "order" — 주문 확정 + FIFO 소진
-  const channel = await getOrCreateOfflineChannel();
-
+  // action === "order" — 주문 확정 + FIFO 소진 (오프라인 매출이라 channelId 는 null)
   const productIds = items.map((i) => i.productId).filter((id): id is string => !!id);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
@@ -177,7 +167,7 @@ export async function POST(request: NextRequest) {
       const order = await tx.order.create({
         data: {
           orderNo: genNo("ORD"),
-          channelId: channel.id,
+          channelId: null,
           status: "CONFIRMED",
           customerId: body.customerId || null,
           customerName: body.customerName || null,

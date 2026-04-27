@@ -114,13 +114,16 @@ export default async function DashboardPage() {
       _sum: { totalAmount: true, commissionAmount: true },
       _count: true,
     }).then(async (groups) => {
+      const channelIds = groups.map((g) => g.channelId).filter((x): x is string => !!x);
       const channels = await prisma.salesChannel.findMany({
-        where: { id: { in: groups.map((g) => g.channelId) } },
+        where: { id: { in: channelIds } },
         select: { id: true, name: true },
       });
       return groups
         .map((g) => ({
-          channelName: channels.find((c) => c.id === g.channelId)?.name ?? "",
+          channelName: g.channelId
+            ? channels.find((c) => c.id === g.channelId)?.name ?? ""
+            : "오프라인",
           orderCount: g._count,
           totalAmount: Number(g._sum.totalAmount ?? 0),
           commissionAmount: Number(g._sum.commissionAmount ?? 0),
@@ -286,7 +289,7 @@ export default async function DashboardPage() {
                     return (
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.orderNo}</TableCell>
-                        <TableCell>{order.channel.name}</TableCell>
+                        <TableCell>{order.channel?.name ?? "오프라인"}</TableCell>
                         <TableCell>
                           <Badge variant={s.variant}>{s.label}</Badge>
                         </TableCell>

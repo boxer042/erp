@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogTitle,
+} from "@/components/ui/dialog";
 import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon } from "lucide-react";
 import { extractYoutubeId } from "@/lib/utils";
 
@@ -28,6 +31,7 @@ export function ProductMediaManager({ productId }: { productId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [previewItem, setPreviewItem] = useState<ProductMedia | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -149,11 +153,11 @@ export function ProductMediaManager({ productId }: { productId: string }) {
   const detectedIsYoutube = !!extractYoutubeId(urlInput.trim());
 
   return (
-    <div className="space-y-4">
-      {/* 통합 추가 패널 — 파일 업로드 + URL */}
+    <div>
+      {/* 통합 추가 패널 — 파일 업로드 + URL (외곽선 없음, 풀폭) */}
       <div
-        className={`rounded-lg border border-dashed p-4 transition-colors ${
-          dragActive ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"
+        className={`px-4 py-4 transition-colors ${
+          dragActive ? "bg-primary/5" : ""
         }`}
         onDragEnter={(e) => {
           e.preventDefault();
@@ -242,14 +246,17 @@ export function ProductMediaManager({ productId }: { productId: string }) {
             onClick={add}
             disabled={submitting || !urlInput.trim()}
             size="sm"
-            className="h-9"
+            variant="outline"
           >
             {submitting ? (
-              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> 추가 중...
+              </>
             ) : (
-              <Plus className="mr-1 h-3.5 w-3.5" />
+              <>
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> URL 추가
+              </>
             )}
-            추가
           </Button>
         </div>
         {urlInput.trim() && (
@@ -260,6 +267,8 @@ export function ProductMediaManager({ productId }: { productId: string }) {
           </p>
         )}
       </div>
+
+      <div className="border-t border-border" />
 
       <Table>
         <TableHeader>
@@ -299,16 +308,35 @@ export function ProductMediaManager({ productId }: { productId: string }) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {m.type === "IMAGE" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={m.url}
-                      alt=""
-                      className="h-10 w-10 rounded object-cover border border-border"
-                    />
-                  ) : (
-                    <Film className="h-5 w-5 text-muted-foreground" />
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewItem(m)}
+                    className="block h-10 w-10 rounded overflow-hidden border border-border hover:ring-2 hover:ring-primary/40 transition-all"
+                    aria-label="미리보기"
+                  >
+                    {m.type === "IMAGE" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={m.url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (() => {
+                      const yid = extractYoutubeId(m.url);
+                      return yid ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`https://img.youtube.com/vi/${yid}/default.jpg`}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-muted">
+                          <Film className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      );
+                    })()}
+                  </button>
                 </TableCell>
                 <TableCell>{m.type === "YOUTUBE" ? "YouTube" : "이미지"}</TableCell>
                 <TableCell className="max-w-[320px] truncate">
@@ -327,6 +355,43 @@ export function ProductMediaManager({ productId }: { productId: string }) {
           )}
         </TableBody>
       </Table>
+
+      {/* 라이트박스 — 클릭 시 큰 미리보기 */}
+      <Dialog open={previewItem !== null} onOpenChange={(o) => { if (!o) setPreviewItem(null); }}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden">
+          <DialogTitle className="sr-only">{previewItem?.title ?? "미디어 미리보기"}</DialogTitle>
+          {previewItem?.type === "IMAGE" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewItem.url}
+              alt={previewItem.title ?? ""}
+              className="w-full max-h-[85vh] object-contain bg-black"
+            />
+          ) : previewItem ? (() => {
+            const yid = extractYoutubeId(previewItem.url);
+            return yid ? (
+              <div className="aspect-video w-full bg-black">
+                <iframe
+                  title={previewItem.title ?? "youtube"}
+                  src={`https://www.youtube.com/embed/${yid}?autoplay=1`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="h-full w-full"
+                />
+              </div>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground text-sm">
+                유효하지 않은 URL 입니다
+              </div>
+            );
+          })() : null}
+          {previewItem?.title && (
+            <div className="px-4 py-3 text-sm border-t border-border">
+              {previewItem.title}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -84,6 +84,7 @@ export async function PUT(
         const s = data.slots[idx];
         const slotData = {
           label: s.label,
+          slotLabelId: s.slotLabelId || null,
           order: s.order ?? idx,
           defaultProductId: s.defaultProductId || null,
           defaultQuantity: parseFloat(s.defaultQuantity),

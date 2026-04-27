@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
 
-  // 채널 수수료율 조회
-  const channel = await prisma.salesChannel.findUnique({
-    where: { id: data.channelId },
-  });
+  // 채널 수수료율 조회 — channelId 없으면 오프라인 (수수료 0)
+  const channel = data.channelId
+    ? await prisma.salesChannel.findUnique({ where: { id: data.channelId } })
+    : null;
 
-  if (!channel) {
+  if (data.channelId && !channel) {
     return NextResponse.json({ error: "채널을 찾을 수 없습니다" }, { status: 404 });
   }
 
@@ -83,12 +83,14 @@ export async function POST(request: NextRequest) {
   const shippingFee = parseFloat(data.shippingFee || "0");
   const taxAmount = Math.round((subtotalAmount - discountAmount) * 0.1); // 부가세 10%
   const totalAmount = subtotalAmount - discountAmount + shippingFee + taxAmount;
-  const commissionAmount = Math.round(subtotalAmount * Number(channel.commissionRate));
+  const commissionAmount = channel
+    ? Math.round(subtotalAmount * Number(channel.commissionRate))
+    : 0;
 
   const order = await prisma.order.create({
     data: {
       orderNo: generateOrderNo(),
-      channelId: data.channelId,
+      channelId: data.channelId || null,
       channelOrderNo: data.channelOrderNo || null,
       customerName: data.customerName || null,
       customerPhone: data.customerPhone || null,

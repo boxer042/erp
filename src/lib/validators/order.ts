@@ -7,7 +7,7 @@ export const orderItemSchema = z.object({
 });
 
 export const orderSchema = z.object({
-  channelId: z.string().min(1, "채널을 선택해주세요"),
+  channelId: z.string().nullable().optional(),  // null/undefined = 오프라인 매출
   channelOrderNo: z.string().optional(),
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),

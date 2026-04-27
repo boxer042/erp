@@ -575,8 +575,8 @@ enum OrderStatus {
 model Order {
   id                  String              @id @default(uuid())
   orderNo             String              @unique @map("order_no")
-  channelId           String              @map("channel_id")
-  channel             SalesChannel        @relation(fields: [channelId], references: [id])
+  channelId           String?             @map("channel_id")
+  channel             SalesChannel?       @relation(fields: [channelId], references: [id])
   channelOrderNo      String?             @map("channel_order_no")
   status              OrderStatus         @default(PENDING)
   customerId          String?             @map("customer_id")
@@ -1336,19 +1336,34 @@ model AssemblyTemplate {
 }
 
 model AssemblyTemplateSlot {
-  id               String           @id @default(uuid())
-  templateId       String           @map("template_id")
-  template         AssemblyTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id               String             @id @default(uuid())
+  templateId       String             @map("template_id")
+  template         AssemblyTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
   label            String
+  slotLabelId      String?            @map("slot_label_id")
+  slotLabel        AssemblySlotLabel? @relation(fields: [slotLabelId], references: [id], onDelete: Restrict)
   order            Int
-  defaultProductId String?          @map("default_product_id")
-  defaultProduct   Product?         @relation(fields: [defaultProductId], references: [id], onDelete: SetNull)
-  defaultQuantity  Decimal          @default(1) @map("default_quantity") @db.Decimal(10, 4)
+  defaultProductId String?            @map("default_product_id")
+  defaultProduct   Product?           @relation(fields: [defaultProductId], references: [id], onDelete: SetNull)
+  defaultQuantity  Decimal            @default(1) @map("default_quantity") @db.Decimal(10, 4)
 
   presetItems AssemblyPresetItem[]
 
   @@index([templateId, order])
+  @@index([slotLabelId])
   @@map("assembly_template_slots")
+}
+
+model AssemblySlotLabel {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  slots AssemblyTemplateSlot[]
+
+  @@map("assembly_slot_labels")
 }
 
 model AssemblyPreset {

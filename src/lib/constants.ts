@@ -1,10 +1,11 @@
 export const DEFAULT_TAX_RATE = 0.1; // 10% 부가세
 
+// 외부 마켓플레이스 시드 데이터.
+// 오프라인 매출은 channelId IS NULL 로 표현되므로 여기 포함하지 않는다.
 export const SALES_CHANNELS = [
   { name: "쿠팡", code: "COUPANG", commissionRate: 0.108 },
   { name: "네이버", code: "NAVER", commissionRate: 0.055 },
   { name: "자사몰", code: "OWN", commissionRate: 0 },
-  { name: "오프라인", code: "OFFLINE", commissionRate: 0 },
 ] as const;
 
 export const PAYMENT_METHODS = [

@@ -83,13 +83,12 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
       ),
     },
     {
-      label: "등록 / 수정",
-      value:
-        product.createdAt || product.updatedAt
-          ? `${product.createdAt ? formatDateOnly(product.createdAt) : "-"} / ${
-              product.updatedAt ? formatDateOnly(product.updatedAt) : "-"
-            }`
-          : null,
+      label: "등록일",
+      value: product.createdAt ? formatDateOnly(product.createdAt) : null,
+    },
+    {
+      label: "최종 수정",
+      value: product.updatedAt ? formatDateOnly(product.updatedAt) : null,
     },
     {
       label: "상태",

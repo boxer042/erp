@@ -120,9 +120,9 @@ export async function PUT(
 
   // === 확인 시 재고 차감 + cost snapshot ===
   if (action === "confirm") {
-    // 채널 수수료율 + 오프라인이면 현재 카드수수료율 (트랜잭션 외에서 fetch)
+    // 채널 수수료율 + 오프라인(channelId IS NULL) 이면 현재 카드수수료율 (트랜잭션 외에서 fetch)
     const channelCommRate = order.channel ? Number(order.channel.commissionRate) : 0;
-    const isOffline = order.channel?.code === "OFFLINE";
+    const isOffline = order.channelId == null;
     const currentCardFee = isOffline
       ? await prisma.cardFeeRate.findFirst({
           where: { appliedFrom: { lte: new Date() } },

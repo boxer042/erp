@@ -32,12 +32,12 @@ import {
   ProductInventoryLotsTable,
   ProductKpiCards,
   ProductMappingsTable,
-  ProductMediaGallery,
   ProductMovementsTable,
   ProductSection,
   ProductSellingCostsTable,
   ProductSetComponentsTable,
   ProductVariantsCard,
+  computeAvgInboundUnitCost,
   computeCostSum,
   fmtPrice,
   toVatPrice,
@@ -273,6 +273,8 @@ export default function ProductDetailPage() {
               globalCostTotal={globalCostTotal}
               pricings={product.channelPricings ?? []}
               costsByChannel={costsByChannel}
+              baseSellingPrice={parseFloat(product.sellingPrice || "0")}
+              baseInboundCost={computeAvgInboundUnitCost(product)}
             />
           </ProductSection>
 
@@ -337,18 +339,9 @@ export default function ProductDetailPage() {
           <ProductSection
             title="이미지 · 영상"
             description="POS 카탈로그·판매 화면에 함께 노출됩니다"
+            noPadding
           >
-            <div className="space-y-6">
-              <ProductMediaGallery
-                imageUrl={product.imageUrl}
-                media={product.media}
-                productName={product.name}
-                bare
-              />
-              <div className="border-t border-border pt-4">
-                <ProductMediaManager productId={product.id} />
-              </div>
-            </div>
+            <ProductMediaManager productId={product.id} />
           </ProductSection>
 
           {/* 6. 이력 */}

@@ -1,4 +1,4 @@
-import type { SellingCostItem } from "./types";
+import type { ProductDetail, SellingCostItem } from "./types";
 
 // 라벨 매핑
 export const TAX_TYPE_LABELS: Record<string, string> = {
@@ -83,3 +83,30 @@ export const summarizeCosts = (list: SellingCostItem[], max = 3): string => {
 
 export const costTypeLabel = (t: string): string =>
   t === "FIXED" ? "고정" : t === "PERCENTAGE" ? "비율(%)" : t;
+
+/**
+ * 잔여 InventoryLot 의 가중평균 unitCost (세전, 배송비·입고비용 포함된 스냅샷).
+ * 잔여 로트가 없으면 매핑된 공급단가 / conversionRate 로 폴백.
+ *
+ * KPI 입고가 카드와 채널별 가격 표의 오프라인 가상 행 마진에서 공통 사용.
+ */
+export function computeAvgInboundUnitCost(product: ProductDetail): number {
+  const lots = product.inventoryLots ?? [];
+  let totalQty = 0;
+  let totalValue = 0;
+  for (const lot of lots) {
+    const remain = parseFloat(lot.remainingQty);
+    const unit = parseFloat(lot.unitCost);
+    if (remain <= 0) continue;
+    totalQty += remain;
+    totalValue += remain * unit;
+  }
+  if (totalQty > 0) return totalValue / totalQty;
+  const m = product.productMappings?.[0];
+  if (m) {
+    return (
+      parseFloat(m.supplierProduct.unitPrice) / parseFloat(m.conversionRate || "1")
+    );
+  }
+  return 0;
+}

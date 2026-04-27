@@ -3,10 +3,18 @@ import { z } from "zod";
 export const assemblyTemplateSlotSchema = z.object({
   id: z.string().optional(), // 수정 시 기존 slot id
   label: z.string().min(1, "라벨을 입력해주세요"),
+  slotLabelId: z.string().nullable().optional(),
   order: z.number().int(),
   defaultProductId: z.string().nullable().optional(),
   defaultQuantity: z.string().min(1, "기본 수량을 입력해주세요"),
 });
+
+export const assemblySlotLabelSchema = z.object({
+  name: z.string().trim().min(1, "라벨명을 입력해주세요"),
+  isActive: z.boolean().optional(),
+});
+
+export type AssemblySlotLabelInput = z.infer<typeof assemblySlotLabelSchema>;
 
 export const assemblyTemplateSchema = z.object({
   name: z.string().min(1, "템플릿명을 입력해주세요"),

@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       slots: {
         create: data.slots.map((s, idx) => ({
           label: s.label,
+          slotLabelId: s.slotLabelId || null,
           order: s.order ?? idx,
           defaultProductId: s.defaultProductId || null,
           defaultQuantity: parseFloat(s.defaultQuantity),

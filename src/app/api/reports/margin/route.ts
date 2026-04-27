@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 //   costAmount     = Σ(LotConsumption.quantity × LotConsumption.unitCost)
 //                    (LotConsumption 없으면 unitCostSnapshot × quantity로 폴백)
 //   commissionAmt  = totalPrice × channelCommissionRateSnapshot
-//   cardFeeAmt     = totalPrice × cardFeeRateSnapshot (오프라인만)
+//   cardFeeAmt     = totalPrice × cardFeeRateSnapshot (오프라인 = channelId IS NULL 만)
 //   sellingCostAmt = sellingCostSnapshot × quantity (주문 확정 시 스냅샷된 단위당 판매비용)
 //
 // 기간 단위 (summary 전용 — 주문 행에는 반영 안 함):
@@ -164,8 +164,8 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       oCard = 0,
       oSelling = 0;
 
-    const chId = order.channel?.id ?? "__none__";
-    const chName = order.channel?.name ?? "—";
+    const chId = order.channel?.id ?? "__offline__";
+    const chName = order.channel?.name ?? "오프라인";
     if (!channelMap.has(chId)) {
       channelMap.set(chId, {
         channelId: order.channel?.id ?? null,
