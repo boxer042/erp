@@ -42,7 +42,9 @@ export function DateInput({ label, value, onChange }: { label: string; value: st
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground w-12 shrink-0">{label}</span>
+      {label ? (
+        <span className="text-xs text-muted-foreground w-12 shrink-0">{label}</span>
+      ) : null}
       <div className="flex-1 flex items-center gap-1">
         {editing ? (
           <input

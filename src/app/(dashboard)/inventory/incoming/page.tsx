@@ -1279,7 +1279,15 @@ function IncomingPageInner() {
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             <ScrollArea className="flex-1 min-h-0">
               {/* 상단 정보 */}
-              <div className="px-5 py-4 border-b border-border grid grid-cols-2 gap-x-8 gap-y-3">
+              <div className="px-5 py-4 border-b border-border grid grid-cols-1 gap-y-3">
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">입고일</p>
+                  <DateInput
+                    label=""
+                    value={incomingDate}
+                    onChange={setIncomingDate}
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <p className="text-xs text-muted-foreground">거래처</p>
                   <SupplierCombobox
@@ -1290,14 +1298,6 @@ function IncomingPageInner() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <p className="text-xs text-muted-foreground">입고일</p>
-                  <DateInput
-                    label=""
-                    value={incomingDate}
-                    onChange={setIncomingDate}
-                  />
-                </div>
-                <div className="space-y-1.5 col-span-2">
                   <p className="text-xs text-muted-foreground">비고</p>
                   <Input
                     value={memo}

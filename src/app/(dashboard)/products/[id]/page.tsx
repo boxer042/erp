@@ -45,6 +45,9 @@ import {
 import { ProductInfoEditSheet } from "@/components/product/edit/product-info-edit-sheet";
 import { ProductMappingEditSheet } from "@/components/product/edit/product-mapping-edit-sheet";
 import { ProductCostsEditSheet } from "@/components/product/edit/product-costs-edit-sheet";
+import { ProductChannelPricingEditSheet } from "@/components/product/edit/product-channel-pricing-edit-sheet";
+import { ProductSetComponentsEditSheet } from "@/components/product/edit/product-set-components-edit-sheet";
+import { InlineTextEdit } from "@/components/product/edit/inline-text-edit";
 import { Pencil } from "lucide-react";
 import { ProductMediaManager } from "@/components/product-media-manager";
 import type { ProductDetail } from "@/components/product/types";
@@ -58,6 +61,8 @@ export default function ProductDetailPage() {
   const [infoEditOpen, setInfoEditOpen] = useState(false);
   const [mappingEditOpen, setMappingEditOpen] = useState(false);
   const [costsEditOpen, setCostsEditOpen] = useState(false);
+  const [channelEditOpen, setChannelEditOpen] = useState(false);
+  const [setComponentsEditOpen, setSetComponentsEditOpen] = useState(false);
 
   const productQuery = useQuery({
     queryKey: queryKeys.products.detail(id),
@@ -138,6 +143,22 @@ export default function ProductDetailPage() {
   const saveSingleField = (patch: Partial<ProductFieldsInput>) =>
     updateProductFields(product.id, { ...buildFieldsBase(), ...patch });
 
+  // 가격 인라인: VAT 포함 입력 → 세전 변환 후 저장
+  const taxRate = parseFloat(product.taxRate ?? "0.1");
+  const isTaxablePrice =
+    product.taxType === "TAXABLE" || product.taxType === "ZERO_RATE";
+  const vatInputToNet = (vatStr: string): string => {
+    const vat = parseInt(vatStr.replace(/,/g, ""), 10) || 0;
+    if (isTaxablePrice && taxRate > 0) {
+      return String(Math.round(vat / (1 + taxRate)));
+    }
+    return String(vat);
+  };
+  const saveSellingPriceFromVat = (vatStr: string) =>
+    saveSingleField({ sellingPrice: vatInputToNet(vatStr) });
+  const saveListPriceFromVat = (vatStr: string) =>
+    saveSingleField({ listPrice: vatInputToNet(vatStr) });
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto">
@@ -145,6 +166,7 @@ export default function ProductDetailPage() {
           <ProductHeaderBar
             product={product}
             onSaveName={(name) => saveSingleField({ name })}
+            onSaveImageUrl={(imageUrl) => saveSingleField({ imageUrl })}
             actions={
               <Button
                 size="sm"
@@ -176,8 +198,32 @@ export default function ProductDetailPage() {
           {/* 2. 가격·비용 */}
           <ProductSection title="가격 요약">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-3 text-sm">
-              <Stat label="정가 (VAT 포함)" value={displayList != null ? `₩${fmtPrice(displayList)}` : "—"} />
-              <Stat label="판매가 (VAT 포함)" value={`₩${fmtPrice(displayVat)}`} />
+              <div className="space-y-0.5">
+                <div className="text-[11px] font-medium text-muted-foreground">정가 (VAT 포함)</div>
+                <div className="text-base font-semibold tabular-nums">
+                  ₩
+                  <InlineTextEdit
+                    value={displayList != null ? String(displayList) : "0"}
+                    productId={product.id}
+                    onSave={saveListPriceFromVat}
+                    inputMode="numeric"
+                    commaFormat
+                  />
+                </div>
+              </div>
+              <div className="space-y-0.5">
+                <div className="text-[11px] font-medium text-muted-foreground">판매가 (VAT 포함)</div>
+                <div className="text-base font-semibold tabular-nums">
+                  ₩
+                  <InlineTextEdit
+                    value={String(displayVat)}
+                    productId={product.id}
+                    onSave={saveSellingPriceFromVat}
+                    inputMode="numeric"
+                    commaFormat
+                  />
+                </div>
+              </div>
               <Stat label="할인율" value={discount > 0 ? `${discount}%` : "—"} />
               <Stat
                 label="원가 / 전사비용"
@@ -209,6 +255,17 @@ export default function ProductDetailPage() {
             title="채널별 가격 · 비용 · 마진"
             description="채널 전용 비용 상세는 우측 (i) 버튼"
             noPadding
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => setChannelEditOpen(true)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                편집
+              </Button>
+            }
           >
             <ProductChannelPricingTable
               taxType={product.taxType}
@@ -257,6 +314,17 @@ export default function ProductDetailPage() {
                   : "세트 상품의 구성품"
               }
               noPadding
+              actions={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7"
+                  onClick={() => setSetComponentsEditOpen(true)}
+                >
+                  <Pencil className="h-3 w-3 mr-1" />
+                  편집
+                </Button>
+              }
             >
               <ProductSetComponentsTable components={product.setComponents ?? []} />
             </ProductSection>
@@ -335,6 +403,16 @@ export default function ProductDetailPage() {
         onOpenChange={setCostsEditOpen}
         product={product}
         channelId={null}
+      />
+      <ProductChannelPricingEditSheet
+        open={channelEditOpen}
+        onOpenChange={setChannelEditOpen}
+        product={product}
+      />
+      <ProductSetComponentsEditSheet
+        open={setComponentsEditOpen}
+        onOpenChange={setSetComponentsEditOpen}
+        product={product}
       />
     </div>
   );

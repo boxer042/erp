@@ -248,10 +248,11 @@ export function NewProductForm({
   const suppressScrollUpdateRef = useRef(false);
 
   const stepItems = useMemo(() => [
-    { id: 1, anchor: "np-step-1", label: "상품 정보" },
-    { id: 2, anchor: "np-step-2", label: "공급원 & 원가" },
-    { id: 3, anchor: "np-step-3", label: "가격 설정" },
-    ...(channels.length > 0 ? [{ id: 4, anchor: "np-step-4", label: "채널별 가격" }] : []),
+    { id: 1, anchor: "np-step-1", label: "거래처 매핑" },
+    { id: 2, anchor: "np-step-2", label: "상품 정보" },
+    { id: 3, anchor: "np-step-3", label: "비용" },
+    { id: 4, anchor: "np-step-4", label: "가격 설정" },
+    ...(channels.length > 0 ? [{ id: 5, anchor: "np-step-5", label: "채널별 가격" }] : []),
   ], [channels.length]);
 
   const getViewport = useCallback((): HTMLElement | null => {
@@ -619,7 +620,7 @@ export function NewProductForm({
     ]);
     if (costsRes.ok) {
       const data = await costsRes.json();
-      setIncomingCosts(data.map((c: SupplierProductCostItem) => ({
+      const fromServer: CostRow[] = data.map((c: SupplierProductCostItem) => ({
         id: Math.random().toString(36).slice(2),
         serverId: c.id,
         name: c.name,
@@ -627,7 +628,12 @@ export function NewProductForm({
         value: c.value.toString(),
         perUnit: c.perUnit,
         isTaxable: c.isTaxable,
-      })));
+      }));
+      // 매핑 선택 전에 사용자가 수동 추가한 행(serverId 없음)은 보존하여 머지
+      setIncomingCosts((prev) => {
+        const manual = prev.filter((c) => !c.serverId && (c.name || c.value));
+        return [...fromServer, ...manual];
+      });
     }
     if (shippingRes.ok) {
       const data = await shippingRes.json();
@@ -1576,7 +1582,151 @@ export function NewProductForm({
                 {/* ── 입력 폼 ── */}
                 <div className="px-5 py-5 space-y-5">
 
-                  <GroupHeader step="STEP 1" title="상품 정보" id="np-step-1" />
+                  {/* 변형 추가 인라인 진입 시 대표 연결 안내 배너 */}
+                  {presetCanonicalId && canonicalProductId && (
+                    <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-[12px] text-foreground">
+                      <span className="text-muted-foreground">대표 상품 변형으로 등록: </span>
+                      <span className="font-medium">
+                        {existingProducts.find((p) => p.id === canonicalProductId)?.name ?? "선택된 대표"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 거래처 매핑 (STEP 1) */}
+                  {(productType === "FINISHED" || productType === "PARTS") && (
+                    <>
+                      <GroupHeader step="STEP 1" title="거래처 매핑" id="np-step-1" />
+                      <section>
+                        <SectionTitle
+                          title="거래처 매핑"
+                          badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
+                        />
+                        <Card size="sm"><CardContent className="space-y-3">
+                        <Field label="거래처">
+                          <SupplierCombobox
+                            suppliers={suppliers}
+                            value={mapping.supplierId}
+                            onChange={(id) => {
+                              setMapping((prev) => ({ ...prev, supplierId: id, supplierProductId: "" }));
+                              fetchSupplierProducts(id);
+                            }}
+                            onCreateNew={(name) => {
+                              setQuickSupplierDefaultName(name);
+                              setQuickSupplierOpen(true);
+                            }}
+                          />
+                        </Field>
+
+                        {mapping.supplierId && (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={mapping.isProvisional}
+                              onCheckedChange={(checked) => setMapping((prev) => ({ ...prev, isProvisional: !!checked }))}
+                            />
+                            <span className="text-[13px] text-muted-foreground">임시 등록 <span className="text-[11px]">(실제 입고 전 어림잡은 정보)</span></span>
+                          </label>
+                        )}
+
+                        {mapping.supplierId && (
+                          <Field label="공급상품">
+                            <SupplierProductCombobox
+                              supplierProducts={supplierProducts}
+                              value={mapping.supplierProductId}
+                              onChange={(sp) => {
+                                setMapping((prev) => ({ ...prev, supplierProductId: sp.id }));
+                                fetchIncomingCosts(sp.id);
+                              }}
+                              onCreateNew={(name) => {
+                                setQuickSupplierProductDefaultName(name);
+                                setQuickSupplierProductOpen(true);
+                              }}
+                              disabled={loadingSupplierProducts}
+                              placeholder={loadingSupplierProducts ? "불러오는 중..." : "공급상품 선택..."}
+                            />
+                          </Field>
+                        )}
+
+                        {mapping.supplierProductId && (() => {
+                          const selectedSp = supplierProducts.find((sp) => sp.id === mapping.supplierProductId);
+                          const unitMismatch = !!selectedSp && selectedSp.unitOfMeasure !== form.unitOfMeasure;
+                          return (
+                          <Field
+                            label="환산비율"
+                            hint={unitMismatch ? `공급상품 단위(${selectedSp!.unitOfMeasure})와 판매상품 단위(${form.unitOfMeasure})가 다릅니다. 환산비율을 확인하세요.` : undefined}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={mapping.conversionRate}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) {
+                                    setMapping((prev) => ({ ...prev, conversionRate: v }));
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const n = parseFloat(e.target.value);
+                                  if (!isFinite(n) || n <= 0) {
+                                    setMapping((prev) => ({ ...prev, conversionRate: "1" }));
+                                  }
+                                }}
+                                onFocus={(e) => e.currentTarget.select()}
+                                className="h-9 w-28"
+                              />
+                              <p className="text-[12px] text-muted-foreground">공급상품 1개 → 판매상품 <span className="text-foreground font-medium">{mapping.conversionRate || "1"}</span>개</p>
+                            </div>
+                          </Field>
+                          );
+                        })()}
+                        </CardContent>
+                        {mapping.supplierProductId && (() => {
+                          const sp = supplierProducts.find((s) => s.id === mapping.supplierProductId);
+                          if (!sp) return null;
+                          const listPrice = parseFloat(sp.listPrice) || 0;
+                          const unitPrice = parseFloat(sp.unitPrice) || 0;
+                          const discount = listPrice - unitPrice;
+                          const supplyAmt = unitPrice * 1;
+                          const taxAmt = sp.isTaxable ? Math.round(supplyAmt * 0.1) : 0;
+                          return (
+                            <table className="w-full text-[12px] border-t border-border">
+                              <thead>
+                                <tr className="bg-muted text-muted-foreground">
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap w-28">품번</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap">규격</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-center font-medium whitespace-nowrap">단위</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-center font-medium whitespace-nowrap">수량</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">단가</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">할인</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">실제단가</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">공급가액</th>
+                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">세액</th>
+                                  <th className="border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap">비고</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-b border-border">
+                                  <td className="border-r border-border py-1.5 px-2 text-muted-foreground w-28 max-w-28 truncate">{sp.supplierCode || "-"}</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-muted-foreground">{sp.spec || "-"}</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-center">{sp.unitOfMeasure}</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-center">1</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-right">{listPrice > 0 ? `₩${listPrice.toLocaleString("ko-KR")}` : "-"}</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-right">{discount > 0 ? `₩${discount.toLocaleString("ko-KR")}` : "-"}</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-right font-medium">₩{unitPrice.toLocaleString("ko-KR")}</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-right">₩{supplyAmt.toLocaleString("ko-KR")}</td>
+                                  <td className="border-r border-border py-1.5 px-2 text-right">{taxAmt > 0 ? `₩${taxAmt.toLocaleString("ko-KR")}` : "-"}</td>
+                                  <td className="border-border py-1.5 px-2 text-muted-foreground">{sp.memo || "-"}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          );
+                        })()}
+                        </Card>
+                      </section>
+                    </>
+                  )}
+
+                  <GroupHeader step="STEP 2" title="상품 정보" id="np-step-2" />
 
                   {/* 기본 정보 */}
                   <section>
@@ -1585,7 +1735,6 @@ export function NewProductForm({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Field label="상품명" required>
                         <Input
-                          autoFocus
                           placeholder="상품명을 입력하세요"
                           value={form.name}
                           onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -1817,149 +1966,6 @@ export function NewProductForm({
                     </Field>
                     </CardContent></Card>
                   </section>
-
-                  {/* 변형 추가 인라인 진입 시 대표 연결 안내 배너 */}
-                  {presetCanonicalId && canonicalProductId && (
-                    <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-[12px] text-foreground">
-                      <span className="text-muted-foreground">대표 상품 변형으로 등록: </span>
-                      <span className="font-medium">
-                        {existingProducts.find((p) => p.id === canonicalProductId)?.name ?? "선택된 대표"}
-                      </span>
-                    </div>
-                  )}
-
-                  <GroupHeader step="STEP 2" title="공급원 & 원가" id="np-step-2" />
-
-                  {/* 거래처 매핑 */}
-                  {(productType === "FINISHED" || productType === "PARTS") && (
-                    <section>
-                      <SectionTitle
-                        title="거래처 매핑"
-                        badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
-                      />
-                      <Card size="sm"><CardContent className="space-y-3">
-                      <Field label="거래처">
-                        <SupplierCombobox
-                          suppliers={suppliers}
-                          value={mapping.supplierId}
-                          onChange={(id) => {
-                            setMapping((prev) => ({ ...prev, supplierId: id, supplierProductId: "" }));
-                            fetchSupplierProducts(id);
-                          }}
-                          onCreateNew={(name) => {
-                            setQuickSupplierDefaultName(name);
-                            setQuickSupplierOpen(true);
-                          }}
-                        />
-                      </Field>
-
-                      {mapping.supplierId && (
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <Checkbox
-                            checked={mapping.isProvisional}
-                            onCheckedChange={(checked) => setMapping((prev) => ({ ...prev, isProvisional: !!checked }))}
-                          />
-                          <span className="text-[13px] text-muted-foreground">임시 등록 <span className="text-[11px]">(실제 입고 전 어림잡은 정보)</span></span>
-                        </label>
-                      )}
-
-                      {mapping.supplierId && (
-                        <Field label="공급상품">
-                          <SupplierProductCombobox
-                            supplierProducts={supplierProducts}
-                            value={mapping.supplierProductId}
-                            onChange={(sp) => {
-                              setMapping((prev) => ({ ...prev, supplierProductId: sp.id }));
-                              fetchIncomingCosts(sp.id);
-                            }}
-                            onCreateNew={(name) => {
-                              setQuickSupplierProductDefaultName(name);
-                              setQuickSupplierProductOpen(true);
-                            }}
-                            disabled={loadingSupplierProducts}
-                            placeholder={loadingSupplierProducts ? "불러오는 중..." : "공급상품 선택..."}
-                          />
-                        </Field>
-                      )}
-
-                      {mapping.supplierProductId && (() => {
-                        const selectedSp = supplierProducts.find((sp) => sp.id === mapping.supplierProductId);
-                        const unitMismatch = !!selectedSp && selectedSp.unitOfMeasure !== form.unitOfMeasure;
-                        return (
-                        <Field
-                          label="환산비율"
-                          hint={unitMismatch ? `공급상품 단위(${selectedSp!.unitOfMeasure})와 판매상품 단위(${form.unitOfMeasure})가 다릅니다. 환산비율을 확인하세요.` : undefined}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Input
-                              type="text"
-                              inputMode="decimal"
-                              value={mapping.conversionRate}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) {
-                                  setMapping((prev) => ({ ...prev, conversionRate: v }));
-                                }
-                              }}
-                              onBlur={(e) => {
-                                const n = parseFloat(e.target.value);
-                                if (!isFinite(n) || n <= 0) {
-                                  setMapping((prev) => ({ ...prev, conversionRate: "1" }));
-                                }
-                              }}
-                              onFocus={(e) => e.currentTarget.select()}
-                              className="h-9 w-28"
-                            />
-                            <p className="text-[12px] text-muted-foreground">공급상품 1개 → 판매상품 <span className="text-foreground font-medium">{mapping.conversionRate || "1"}</span>개</p>
-                          </div>
-                        </Field>
-                        );
-                      })()}
-                      </CardContent>
-                      {mapping.supplierProductId && (() => {
-                        const sp = supplierProducts.find((s) => s.id === mapping.supplierProductId);
-                        if (!sp) return null;
-                        const listPrice = parseFloat(sp.listPrice) || 0;
-                        const unitPrice = parseFloat(sp.unitPrice) || 0;
-                        const discount = listPrice - unitPrice;
-                        const supplyAmt = unitPrice * 1;
-                        const taxAmt = sp.isTaxable ? Math.round(supplyAmt * 0.1) : 0;
-                        return (
-                          <table className="w-full text-[12px] border-t border-border">
-                            <thead>
-                              <tr className="bg-muted text-muted-foreground">
-                                <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap w-28">품번</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap">규격</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-center font-medium whitespace-nowrap">단위</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-center font-medium whitespace-nowrap">수량</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">단가</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">할인</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">실제단가</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">공급가액</th>
-                                <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">세액</th>
-                                <th className="border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap">비고</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr className="border-b border-border">
-                                <td className="border-r border-border py-1.5 px-2 text-muted-foreground w-28 max-w-28 truncate">{sp.supplierCode || "-"}</td>
-                                <td className="border-r border-border py-1.5 px-2 text-muted-foreground">{sp.spec || "-"}</td>
-                                <td className="border-r border-border py-1.5 px-2 text-center">{sp.unitOfMeasure}</td>
-                                <td className="border-r border-border py-1.5 px-2 text-center">1</td>
-                                <td className="border-r border-border py-1.5 px-2 text-right">{listPrice > 0 ? `₩${listPrice.toLocaleString("ko-KR")}` : "-"}</td>
-                                <td className="border-r border-border py-1.5 px-2 text-right">{discount > 0 ? `₩${discount.toLocaleString("ko-KR")}` : "-"}</td>
-                                <td className="border-r border-border py-1.5 px-2 text-right font-medium">₩{unitPrice.toLocaleString("ko-KR")}</td>
-                                <td className="border-r border-border py-1.5 px-2 text-right">₩{supplyAmt.toLocaleString("ko-KR")}</td>
-                                <td className="border-r border-border py-1.5 px-2 text-right">{taxAmt > 0 ? `₩${taxAmt.toLocaleString("ko-KR")}` : "-"}</td>
-                                <td className="border-border py-1.5 px-2 text-muted-foreground">{sp.memo || "-"}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        );
-                      })()}
-                      </Card>
-                    </section>
-                  )}
 
                   {/* 상위 상품 연결 (부속) */}
                   {productType === "PARTS" && true && (
@@ -2450,6 +2456,8 @@ export function NewProductForm({
                     </section>
                   )}
 
+                  <GroupHeader step="STEP 3" title="비용" id="np-step-3" />
+
                   {/* 조립 비용 */}
                   {productType === "ASSEMBLED" && (
                     <section>
@@ -2469,8 +2477,8 @@ export function NewProductForm({
                     </section>
                   )}
 
-                  {/* 입고 비용 (완제품/부속, 매핑 있을 때) */}
-                  {(productType === "FINISHED" || productType === "PARTS") && mapping.supplierProductId && (
+                  {/* 입고 비용 (완제품/부속) — 매핑 미선택 시에도 항상 표시 */}
+                  {(productType === "FINISHED" || productType === "PARTS") && (
                     <section>
                       <SectionTitle
                         title="입고 비용"
@@ -2499,14 +2507,14 @@ export function NewProductForm({
                     </Card>
                   </section>
 
-                  <GroupHeader step="STEP 3" title="가격 설정" id="np-step-3" />
+                  <GroupHeader step="STEP 4" title="가격 설정" id="np-step-4" />
 
                   {/* 가격 계산기 */}
                   {PricePanel()}
 
                   {channels.length > 0 && (
                     <>
-                      <GroupHeader step="STEP 4" title="채널별 가격" id="np-step-4" />
+                      <GroupHeader step="STEP 5" title="채널별 가격" id="np-step-5" />
                       {ChannelPricingPanel()}
                     </>
                   )}
