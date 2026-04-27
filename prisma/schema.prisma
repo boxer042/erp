@@ -3,9 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 // ============================================================
@@ -27,9 +25,17 @@ model User {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  createdOrders    Order[]
-  createdIncomings Incoming[]
-  supplierPayments SupplierPayment[]
+  createdOrders     Order[]
+  createdIncomings  Incoming[]
+  supplierPayments  SupplierPayment[]
+  customerPayments  CustomerPayment[]
+  supplierReturns   SupplierReturn[]
+  createdQuotations Quotation[]
+  createdStatements Statement[]
+  customerNotes     CustomerNote[]
+  createdRepairs    RepairTicket[]
+  createdRentals    Rental[]
+  createdExpenses   Expense[]
 
   @@map("users")
 }
@@ -48,9 +54,11 @@ model SalesChannel {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  channelFees     ChannelFee[]
-  channelPricings ChannelPricing[]
-  orders          Order[]
+  channelFees              ChannelFee[]
+  channelPricings          ChannelPricing[]
+  orders                   Order[]
+  sellingCosts             SellingCost[]
+  channelCategoryMappings  ChannelCategoryMapping[]
 
   @@map("sales_channels")
 }
@@ -88,8 +96,12 @@ model Supplier {
   businessNumber  String?       @map("business_number")
   representative  String?
   phone           String?
+  fax             String?
   email           String?
   address         String?
+  bankName        String?       @map("bank_name")
+  bankAccount     String?       @map("bank_account")
+  bankHolder      String?       @map("bank_holder")
   paymentMethod   PaymentMethod @default(CREDIT) @map("payment_method")
   paymentTermDays Int           @default(30) @map("payment_term_days")
   memo            String?
@@ -101,8 +113,26 @@ model Supplier {
   incomings        Incoming[]
   payments         SupplierPayment[]
   balanceLedger    SupplierLedger[]
+  contacts         SupplierContact[]
+  supplierReturns  SupplierReturn[]
+  quotations       Quotation[]
+  expenses         Expense[]
 
   @@map("suppliers")
+}
+
+model SupplierContact {
+  id         String   @id @default(uuid())
+  supplierId String   @map("supplier_id")
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name       String
+  phone      String?
+  email      String?
+  position   String?
+  memo       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("supplier_contacts")
 }
 
 model SupplierLedger {
@@ -156,56 +186,172 @@ enum TaxType {
   ZERO_RATE
 }
 
-model Product {
-  id            String   @id @default(uuid())
-  name          String
-  sku           String   @unique
-  barcode       String?  @unique
-  description   String?
-  unitOfMeasure String   @default("EA") @map("unit_of_measure")
-  taxType       TaxType  @default(TAXABLE) @map("tax_type")
-  taxRate       Decimal  @default(0.1) @map("tax_rate") @db.Decimal(5, 4)
-  sellingPrice  Decimal  @default(0) @map("selling_price") @db.Decimal(15, 2)
-  isSet         Boolean  @default(false) @map("is_set")
-  isActive      Boolean  @default(true) @map("is_active")
-  imageUrl      String?  @map("image_url")
-  memo          String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+enum ProductType {
+  FINISHED // 완제품
+  PARTS // 부속
+  SET // 세트상품
+  ASSEMBLED // 조립상품
+}
 
-  setComponents   SetComponent[]   @relation("SetParent")
-  partOfSets      SetComponent[]   @relation("SetChild")
-  productMappings ProductMapping[]
-  channelPricings ChannelPricing[]
-  inventory       Inventory?
-  orderItems      OrderItem[]
-  sellingCosts    SellingCost[]
+model Product {
+  id                 String        @id @default(uuid())
+  name               String
+  brand              String?
+  brandId            String?       @map("brand_id")
+  brandRef           Brand?        @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  modelName          String?       @map("model_name")
+  spec               String?
+  sku                String        @unique
+  barcode            String?       @unique
+  description        String?
+  unitOfMeasure      String        @default("EA") @map("unit_of_measure")
+  productType        ProductType   @default(FINISHED) @map("product_type")
+  taxType            TaxType       @default(TAXABLE) @map("tax_type")
+  taxRate            Decimal       @default(0.1) @map("tax_rate") @db.Decimal(5, 4)
+  listPrice          Decimal       @default(0) @map("list_price") @db.Decimal(15, 2)
+  sellingPrice       Decimal       @default(0) @map("selling_price") @db.Decimal(15, 2)
+  isSet              Boolean       @default(false) @map("is_set")
+  isCanonical        Boolean       @default(false) @map("is_canonical")
+  canonicalProductId String?       @map("canonical_product_id")
+  canonicalProduct   Product?      @relation("ProductVariants", fields: [canonicalProductId], references: [id], onDelete: SetNull)
+  variants           Product[]     @relation("ProductVariants")
+  categoryId         String?       @map("category_id")
+  category           ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  isBulk             Boolean       @default(false) @map("is_bulk")
+  containerSize      Decimal?      @map("container_size") @db.Decimal(10, 4)
+  bulkProductId      String?       @map("bulk_product_id")
+  bulkProduct        Product?      @relation("ProductBulk", fields: [bulkProductId], references: [id], onDelete: SetNull)
+  salesContainers    Product[]     @relation("ProductBulk")
+  isActive           Boolean       @default(true) @map("is_active")
+  imageUrl           String?       @map("image_url")
+  memo               String?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  setComponents      SetComponent[]      @relation("SetParent")
+  partOfSets         SetComponent[]      @relation("SetChild")
+  productMappings    ProductMapping[]
+  channelPricings    ChannelPricing[]
+  repairPackageParts RepairPackagePart[]
+  inventory          Inventory?
+  orderItems         OrderItem[]
+  sellingCosts       SellingCost[]
+  quotationItems     QuotationItem[]
+  statementItems     StatementItem[]
+  inventoryLots      InventoryLot[]
+  media              ProductMedia[]
+  customerMachines   CustomerMachine[]
+  repairParts        RepairPart[]
+  rentalAssets       RentalAsset[]
+
+  assemblies                    Assembly[]
+  assemblyComponentConsumptions AssemblyComponentConsumption[]
+  assemblyTemplateSlotDefaults  AssemblyTemplateSlot[]
+  assemblyPresetItems           AssemblyPresetItem[]
 
   @@map("products")
 }
 
+model Brand {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  logoUrl   String?   @map("logo_url")
+  logoPath  String?   @map("logo_path")
+  memo      String?
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  products  Product[]
+
+  @@map("brands")
+}
+
+model ProductCategory {
+  id        String            @id @default(uuid())
+  name      String
+  parentId  String?           @map("parent_id")
+  parent    ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  ProductCategory[] @relation("CategoryTree")
+  imageUrl  String?           @map("image_url")
+  imagePath String?           @map("image_path")
+  order     Int               @default(0)
+  isActive  Boolean           @default(true) @map("is_active")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  products        Product[]
+  channelMappings ChannelCategoryMapping[]
+
+  @@map("product_categories")
+}
+
+model ChannelCategoryMapping {
+  id                  String          @id @default(uuid())
+  categoryId          String          @map("category_id")
+  category            ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  channelId           String          @map("channel_id")
+  channel             SalesChannel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channelCategoryCode String          @map("channel_category_code")
+  channelCategoryName String?         @map("channel_category_name")
+
+  @@unique([categoryId, channelId])
+  @@map("channel_category_mappings")
+}
+
+enum SupplierProductSource {
+  MANUAL
+  INITIAL
+  INCOMING
+}
+
 model SupplierProduct {
-  id            String   @id @default(uuid())
-  supplierId    String   @map("supplier_id")
-  supplier      Supplier @relation(fields: [supplierId], references: [id])
+  id            String                @id @default(uuid())
+  supplierId    String                @map("supplier_id")
+  supplier      Supplier              @relation(fields: [supplierId], references: [id])
   name          String
-  supplierCode  String?  @map("supplier_code")
-  unitOfMeasure String   @default("EA") @map("unit_of_measure")
-  unitPrice     Decimal  @default(0) @map("unit_price") @db.Decimal(15, 2)
-  currency      String   @default("KRW")
-  leadTimeDays  Int?     @map("lead_time_days")
-  minOrderQty   Int      @default(1) @map("min_order_qty")
-  isActive      Boolean  @default(true) @map("is_active")
+  spec          String?
+  supplierCode  String?               @map("supplier_code")
+  unitOfMeasure String                @default("EA") @map("unit_of_measure")
+  listPrice     Decimal               @default(0) @map("list_price") @db.Decimal(15, 2)
+  unitPrice     Decimal               @default(0) @map("unit_price") @db.Decimal(15, 2)
+  isTaxable     Boolean               @default(true) @map("is_taxable")
+  currency      String                @default("KRW")
+  leadTimeDays  Int?                  @map("lead_time_days")
+  minOrderQty   Int                   @default(1) @map("min_order_qty")
+  source        SupplierProductSource @default(MANUAL)
+  isProvisional Boolean               @default(false) @map("is_provisional")
+  isActive      Boolean               @default(true) @map("is_active")
   memo          String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
 
   productMappings ProductMapping[]
   incomingItems   IncomingItem[]
   incomingCosts   IncomingCost[]
+  priceHistory    SupplierProductPriceHistory[]
+  returnItems     SupplierReturnItem[]
+  quotationItems  QuotationItem[]
+  inventoryLots   InventoryLot[]
 
   @@unique([supplierId, supplierCode])
   @@map("supplier_products")
+}
+
+model SupplierProductPriceHistory {
+  id                String          @id @default(uuid())
+  supplierProductId String          @map("supplier_product_id")
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  oldPrice          Decimal         @map("old_price") @db.Decimal(15, 2)
+  newPrice          Decimal         @map("new_price") @db.Decimal(15, 2)
+  changeAmount      Decimal         @map("change_amount") @db.Decimal(15, 2)
+  changePercent     Decimal         @map("change_percent") @db.Decimal(8, 2)
+  originalPrice     Decimal?        @map("original_price") @db.Decimal(15, 2)
+  discountAmount    Decimal?        @map("discount_amount") @db.Decimal(15, 2)
+  reason            String?
+  incomingId        String?         @map("incoming_id")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  @@map("supplier_product_price_history")
 }
 
 model ProductMapping {
@@ -215,7 +361,6 @@ model ProductMapping {
   productId         String          @map("product_id")
   product           Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   conversionRate    Decimal         @default(1) @map("conversion_rate") @db.Decimal(10, 4)
-  isDefault         Boolean         @default(false) @map("is_default")
   createdAt         DateTime        @default(now()) @map("created_at")
 
   @@unique([supplierProductId, productId])
@@ -229,6 +374,7 @@ model SetComponent {
   componentId  String   @map("component_id")
   component    Product  @relation("SetChild", fields: [componentId], references: [id], onDelete: Restrict)
   quantity     Decimal  @db.Decimal(10, 4)
+  label        String?
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@unique([setProductId, componentId])
@@ -262,6 +408,7 @@ model IncomingCost {
   costType          FeeType         @map("cost_type")
   value             Decimal         @db.Decimal(12, 2)
   perUnit           Boolean         @default(true) @map("per_unit")
+  isTaxable         Boolean         @default(true) @map("is_taxable")
   isActive          Boolean         @default(true) @map("is_active")
   createdAt         DateTime        @default(now()) @map("created_at")
 
@@ -269,16 +416,20 @@ model IncomingCost {
 }
 
 model SellingCost {
-  id        String   @id @default(uuid())
-  productId String   @map("product_id")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id        String        @id @default(uuid())
+  productId String        @map("product_id")
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  channelId String?       @map("channel_id")
+  channel   SalesChannel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
   name      String
-  costType  FeeType  @map("cost_type")
-  value     Decimal  @db.Decimal(12, 2)
-  perUnit   Boolean  @default(true) @map("per_unit")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
+  costType  FeeType       @map("cost_type")
+  value     Decimal       @db.Decimal(12, 2)
+  perUnit   Boolean       @default(true) @map("per_unit")
+  isTaxable Boolean       @default(true) @map("is_taxable")
+  isActive  Boolean       @default(true) @map("is_active")
+  createdAt DateTime      @default(now()) @map("created_at")
 
+  @@index([productId, channelId])
   @@map("selling_costs")
 }
 
@@ -287,12 +438,14 @@ model SellingCost {
 // ============================================================
 
 model Inventory {
-  id          String   @id @default(uuid())
-  productId   String   @unique @map("product_id")
-  product     Product  @relation(fields: [productId], references: [id])
-  quantity    Decimal  @default(0) @db.Decimal(15, 4)
-  safetyStock Decimal  @default(0) @map("safety_stock") @db.Decimal(15, 4)
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id               String    @id @default(uuid())
+  productId        String    @unique @map("product_id")
+  product          Product   @relation(fields: [productId], references: [id])
+  quantity         Decimal   @default(0) @db.Decimal(15, 4)
+  safetyStock      Decimal   @default(1) @map("safety_stock") @db.Decimal(15, 4)
+  avgCost          Decimal?  @map("avg_cost") @db.Decimal(15, 4)
+  avgCostUpdatedAt DateTime? @map("avg_cost_updated_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   movements InventoryMovement[]
 
@@ -307,19 +460,45 @@ enum MovementType {
   SET_CONSUME
   SET_PRODUCE
   RETURN
+  INITIAL
+  STOCKTAKE_PLUS
+  STOCKTAKE_MINUS
+  INTERNAL_USE
+  BOTTLE_OPEN_OUT
+  BOTTLE_OPEN_IN
+}
+
+enum InventoryUsageReason {
+  SAMPLE
+  SELF_USE
+  DAMAGE
+  LOSS
+  SUPPLIES
+}
+
+enum StocktakeReason {
+  PHYSICAL_COUNT
+  DAMAGE
+  LOSS
+  FOUND
+  SAMPLE
+  MISCOUNT
+  OTHER
 }
 
 model InventoryMovement {
-  id            String       @id @default(uuid())
-  inventoryId   String       @map("inventory_id")
-  inventory     Inventory    @relation(fields: [inventoryId], references: [id])
+  id            String                @id @default(uuid())
+  inventoryId   String                @map("inventory_id")
+  inventory     Inventory             @relation(fields: [inventoryId], references: [id])
   type          MovementType
-  quantity      Decimal      @db.Decimal(15, 4)
-  balanceAfter  Decimal      @map("balance_after") @db.Decimal(15, 4)
-  referenceId   String?      @map("reference_id")
-  referenceType String?      @map("reference_type")
+  quantity      Decimal               @db.Decimal(15, 4)
+  balanceAfter  Decimal               @map("balance_after") @db.Decimal(15, 4)
+  reason        StocktakeReason?
+  usageReason   InventoryUsageReason? @map("usage_reason")
+  referenceId   String?               @map("reference_id")
+  referenceType String?               @map("reference_type")
   memo          String?
-  createdAt     DateTime     @default(now()) @map("created_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
 
   @@index([inventoryId, createdAt])
   @@map("inventory_movements")
@@ -336,21 +515,27 @@ enum IncomingStatus {
 }
 
 model Incoming {
-  id           String         @id @default(uuid())
-  incomingNo   String         @unique @map("incoming_no")
-  supplierId   String         @map("supplier_id")
-  supplier     Supplier       @relation(fields: [supplierId], references: [id])
-  status       IncomingStatus @default(PENDING)
-  incomingDate DateTime       @map("incoming_date")
-  totalAmount  Decimal        @default(0) @map("total_amount") @db.Decimal(15, 2)
-  taxAmount    Decimal        @default(0) @map("tax_amount") @db.Decimal(15, 2)
-  memo         String?
-  createdById  String         @map("created_by_id")
-  createdBy    User           @relation(fields: [createdById], references: [id])
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  id                String         @id @default(uuid())
+  incomingNo        String         @unique @map("incoming_no")
+  supplierId        String         @map("supplier_id")
+  supplier          Supplier       @relation(fields: [supplierId], references: [id])
+  status            IncomingStatus @default(PENDING)
+  incomingDate      DateTime       @map("incoming_date")
+  totalAmount       Decimal        @default(0) @map("total_amount") @db.Decimal(15, 2)
+  taxAmount         Decimal        @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  shippingCost      Decimal        @default(0) @map("shipping_cost") @db.Decimal(12, 2)
+  shippingIsTaxable Boolean        @default(true) @map("shipping_is_taxable")
+  shippingDeducted  Boolean        @default(false) @map("shipping_deducted")
+  memo              String?
+  quotationId       String?        @map("quotation_id")
+  quotation         Quotation?     @relation(fields: [quotationId], references: [id])
+  createdById       String         @map("created_by_id")
+  createdBy         User           @relation(fields: [createdById], references: [id])
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  items IncomingItem[]
+  items          IncomingItem[]
+  supplierReturn SupplierReturn?
 
   @@index([supplierId, incomingDate])
   @@map("incomings")
@@ -363,8 +548,11 @@ model IncomingItem {
   supplierProductId String          @map("supplier_product_id")
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id])
   quantity          Decimal         @db.Decimal(15, 4)
+  originalPrice     Decimal?        @map("original_price") @db.Decimal(15, 2)
+  discountAmount    Decimal?        @map("discount_amount") @db.Decimal(15, 2)
   unitPrice         Decimal         @map("unit_price") @db.Decimal(15, 2)
   totalPrice        Decimal         @map("total_price") @db.Decimal(15, 2)
+  unitCostSnapshot  Decimal?        @map("unit_cost_snapshot") @db.Decimal(15, 4)
   memo              String?
 
   @@map("incoming_items")
@@ -385,45 +573,857 @@ enum OrderStatus {
 }
 
 model Order {
-  id               String       @id @default(uuid())
-  orderNo          String       @unique @map("order_no")
-  channelId        String       @map("channel_id")
-  channel          SalesChannel @relation(fields: [channelId], references: [id])
-  channelOrderNo   String?      @map("channel_order_no")
-  status           OrderStatus  @default(PENDING)
-  customerName     String?      @map("customer_name")
-  customerPhone    String?      @map("customer_phone")
-  shippingAddress  String?      @map("shipping_address")
-  orderDate        DateTime     @map("order_date")
-  subtotalAmount   Decimal      @default(0) @map("subtotal_amount") @db.Decimal(15, 2)
-  discountAmount   Decimal      @default(0) @map("discount_amount") @db.Decimal(15, 2)
-  shippingFee      Decimal      @default(0) @map("shipping_fee") @db.Decimal(15, 2)
-  taxAmount        Decimal      @default(0) @map("tax_amount") @db.Decimal(15, 2)
-  totalAmount      Decimal      @default(0) @map("total_amount") @db.Decimal(15, 2)
-  commissionAmount Decimal      @default(0) @map("commission_amount") @db.Decimal(15, 2)
-  memo             String?
-  createdById      String       @map("created_by_id")
-  createdBy        User         @relation(fields: [createdById], references: [id])
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  id                  String              @id @default(uuid())
+  orderNo             String              @unique @map("order_no")
+  channelId           String              @map("channel_id")
+  channel             SalesChannel        @relation(fields: [channelId], references: [id])
+  channelOrderNo      String?             @map("channel_order_no")
+  status              OrderStatus         @default(PENDING)
+  customerId          String?             @map("customer_id")
+  customer            Customer?           @relation(fields: [customerId], references: [id])
+  customerName        String?             @map("customer_name")
+  customerPhone       String?             @map("customer_phone")
+  shippingAddress     String?             @map("shipping_address")
+  orderDate           DateTime            @map("order_date")
+  quotationId         String?             @map("quotation_id")
+  quotation           Quotation?          @relation(fields: [quotationId], references: [id])
+  subtotalAmount      Decimal             @default(0) @map("subtotal_amount") @db.Decimal(15, 2)
+  discountAmount      Decimal             @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  shippingFee         Decimal             @default(0) @map("shipping_fee") @db.Decimal(15, 2)
+  taxAmount           Decimal             @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  totalAmount         Decimal             @default(0) @map("total_amount") @db.Decimal(15, 2)
+  commissionAmount    Decimal             @default(0) @map("commission_amount") @db.Decimal(15, 2)
+  paymentMethod       OrderPaymentMethod? @map("payment_method")
+  taxInvoiceRequested Boolean             @default(false) @map("tax_invoice_requested")
+  taxInvoicedAt       DateTime?           @map("tax_invoiced_at")
+  memo                String?
+  repairTicketId      String?             @map("repair_ticket_id")
+  repairTicket        RepairTicket?       @relation(fields: [repairTicketId], references: [id])
+  rentalId            String?             @map("rental_id")
+  rental              Rental?             @relation(fields: [rentalId], references: [id])
+  createdById         String              @map("created_by_id")
+  createdBy           User                @relation(fields: [createdById], references: [id])
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
 
-  items OrderItem[]
+  items      OrderItem[]
+  statements Statement[]
 
   @@index([channelId, orderDate])
   @@index([status])
+  @@index([repairTicketId])
+  @@index([rentalId])
   @@map("orders")
 }
 
 model OrderItem {
-  id         String  @id @default(uuid())
-  orderId    String  @map("order_id")
-  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId  String  @map("product_id")
-  product    Product @relation(fields: [productId], references: [id])
-  quantity   Decimal @db.Decimal(15, 4)
-  unitPrice  Decimal @map("unit_price") @db.Decimal(15, 2)
-  totalPrice Decimal @map("total_price") @db.Decimal(15, 2)
-  memo       String?
+  id                            String   @id @default(uuid())
+  orderId                       String   @map("order_id")
+  order                         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId                     String?  @map("product_id")
+  product                       Product? @relation(fields: [productId], references: [id])
+  canonicalProductId            String?  @map("canonical_product_id")
+  serviceName                   String?  @map("service_name")
+  quantity                      Decimal  @db.Decimal(15, 4)
+  unitPrice                     Decimal  @map("unit_price") @db.Decimal(15, 2)
+  totalPrice                    Decimal  @map("total_price") @db.Decimal(15, 2)
+  unitCostSnapshot              Decimal? @map("unit_cost_snapshot") @db.Decimal(15, 4)
+  channelCommissionRateSnapshot Decimal? @map("channel_commission_rate_snapshot") @db.Decimal(5, 4)
+  cardFeeRateSnapshot           Decimal? @map("card_fee_rate_snapshot") @db.Decimal(5, 4)
+  sellingCostSnapshot           Decimal? @map("selling_cost_snapshot") @db.Decimal(15, 4)
+  memo                          String?
+
+  lotConsumptions LotConsumption[]
 
   @@map("order_items")
+}
+
+// ============================================================
+// 로트 기반 재고 추적 (FIFO)
+// ============================================================
+
+enum LotSource {
+  INCOMING
+  INITIAL
+  ADJUSTMENT
+  SET_PRODUCE
+}
+
+model InventoryLot {
+  id                String           @id @default(uuid())
+  productId         String?          @map("product_id")
+  product           Product?         @relation(fields: [productId], references: [id])
+  supplierProductId String?          @map("supplier_product_id")
+  supplierProduct   SupplierProduct? @relation(fields: [supplierProductId], references: [id])
+  receivedQty       Decimal          @map("received_qty") @db.Decimal(15, 4)
+  remainingQty      Decimal          @map("remaining_qty") @db.Decimal(15, 4)
+  unitCost          Decimal          @map("unit_cost") @db.Decimal(15, 4)
+  originalPrice     Decimal?         @map("original_price") @db.Decimal(15, 4)
+  discountAmount    Decimal?         @map("discount_amount") @db.Decimal(15, 4)
+  receivedAt        DateTime         @map("received_at")
+  source            LotSource
+  incomingItemId    String?          @map("incoming_item_id")
+  memo              String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  consumptions LotConsumption[]
+
+  @@index([productId, receivedAt])
+  @@index([supplierProductId, receivedAt])
+  @@index([incomingItemId])
+  @@map("inventory_lots")
+}
+
+model LotConsumption {
+  id           String       @id @default(uuid())
+  orderItemId  String?      @map("order_item_id")
+  orderItem    OrderItem?   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  repairPartId String?      @map("repair_part_id")
+  repairPart   RepairPart?  @relation(fields: [repairPartId], references: [id], onDelete: Cascade)
+  lotId        String       @map("lot_id")
+  lot          InventoryLot @relation(fields: [lotId], references: [id])
+  quantity     Decimal      @db.Decimal(15, 4)
+  unitCost     Decimal      @map("unit_cost") @db.Decimal(15, 4)
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@index([orderItemId])
+  @@index([repairPartId])
+  @@index([lotId])
+  @@map("lot_consumptions")
+}
+
+// ============================================================
+// 반품 관리
+// ============================================================
+
+enum ReturnStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model SupplierReturn {
+  id                 String       @id @default(uuid())
+  returnNo           String       @unique @map("return_no")
+  supplierId         String       @map("supplier_id")
+  supplier           Supplier     @relation(fields: [supplierId], references: [id])
+  status             ReturnStatus @default(PENDING)
+  returnDate         DateTime     @map("return_date")
+  returnReason        String?      @map("return_reason")
+  memo                String?
+  returnCost          Decimal?     @map("return_cost") @db.Decimal(12, 2)
+  returnCostIsTaxable Boolean      @default(true) @map("return_cost_is_taxable")
+  returnCostType      String?      @map("return_cost_type") // ADD | DEDUCT | SEPARATE
+  returnCostNote      String?      @map("return_cost_note")
+  exchangeIncomingId  String?      @unique @map("exchange_incoming_id")
+  exchangeIncoming   Incoming?    @relation(fields: [exchangeIncomingId], references: [id])
+  createdById        String       @map("created_by_id")
+  createdBy          User         @relation(fields: [createdById], references: [id])
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  items SupplierReturnItem[]
+
+  @@index([supplierId, returnDate])
+  @@map("supplier_returns")
+}
+
+model SupplierReturnItem {
+  id                String          @id @default(uuid())
+  returnId          String          @map("return_id")
+  return            SupplierReturn  @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  supplierProductId String          @map("supplier_product_id")
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id])
+  quantity          Decimal         @db.Decimal(15, 4)
+  unitPrice         Decimal         @map("unit_price") @db.Decimal(15, 2)
+  totalPrice        Decimal         @map("total_price") @db.Decimal(15, 2)
+  memo              String?
+
+  @@map("supplier_return_items")
+}
+
+// ============================================================
+// 카드수수료율
+// ============================================================
+
+model CardFeeRate {
+  id          String   @id @default(uuid())
+  rate        Decimal  @db.Decimal(5, 4)
+  memo        String?
+  appliedFrom DateTime @map("applied_from")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("card_fee_rates")
+}
+
+// ============================================================
+// 고객 (Customer) — 판매 상대방
+// ============================================================
+
+model Customer {
+  id             String   @id @default(uuid())
+  name           String
+  phone          String
+  businessNumber String?  @map("business_number")
+  ceo            String?
+  email          String?
+  address        String?
+  memo           String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  quotations Quotation[]
+  statements Statement[]
+  orders     Order[]
+  ledger     CustomerLedger[]
+  payments   CustomerPayment[]
+  machines   CustomerMachine[]
+  notes      CustomerNote[]
+  repairs    RepairTicket[]
+  rentals    Rental[]
+  expenses   Expense[]
+
+  @@index([name])
+  @@index([phone])
+  @@map("customers")
+}
+
+enum CustomerLedgerType {
+  SALE // 매출 (미수금 증가)
+  RECEIPT // 수금 (미수금 감소)
+  ADJUSTMENT
+  REFUND // 환불 (미수금 증가)
+}
+
+model CustomerLedger {
+  id            String             @id @default(uuid())
+  customerId    String             @map("customer_id")
+  customer      Customer           @relation(fields: [customerId], references: [id])
+  date          DateTime           @default(now())
+  type          CustomerLedgerType
+  description   String
+  debitAmount   Decimal            @default(0) @map("debit_amount") @db.Decimal(15, 2) // 매출/환불(증가)
+  creditAmount  Decimal            @default(0) @map("credit_amount") @db.Decimal(15, 2) // 수금(감소)
+  balance       Decimal            @map("balance") @db.Decimal(15, 2)
+  referenceId   String?            @map("reference_id")
+  referenceType String?            @map("reference_type")
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  @@index([customerId, date])
+  @@map("customer_ledgers")
+}
+
+model CustomerPayment {
+  id          String   @id @default(uuid())
+  customerId  String   @map("customer_id")
+  customer    Customer @relation(fields: [customerId], references: [id])
+  amount      Decimal  @db.Decimal(15, 2)
+  paymentDate DateTime @map("payment_date")
+  method      String
+  memo        String?
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([customerId, paymentDate])
+  @@map("customer_payments")
+}
+
+// ============================================================
+// 견적서 (Quotation) — 판매/매입 통합
+// ============================================================
+
+enum QuotationType {
+  SALES
+  PURCHASE
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model Quotation {
+  id             String          @id @default(uuid())
+  quotationNo    String          @unique @map("quotation_no")
+  type           QuotationType
+  status         QuotationStatus @default(DRAFT)
+  issueDate      DateTime        @map("issue_date")
+  validUntil     DateTime?       @map("valid_until")
+  customerId     String?         @map("customer_id")
+  customer       Customer?       @relation(fields: [customerId], references: [id])
+  supplierId     String?         @map("supplier_id")
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  title          String?
+  subtotalAmount Decimal         @default(0) @map("subtotal_amount") @db.Decimal(15, 2)
+  taxAmount      Decimal         @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  totalAmount    Decimal         @default(0) @map("total_amount") @db.Decimal(15, 2)
+  memo           String?
+  terms          String?
+  createdById    String          @map("created_by_id")
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  items      QuotationItem[]
+  orders     Order[]
+  incomings  Incoming[]
+  statements Statement[]
+
+  @@index([type, issueDate])
+  @@index([status])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id                String           @id @default(uuid())
+  quotationId       String           @map("quotation_id")
+  quotation         Quotation        @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId         String?          @map("product_id")
+  product           Product?         @relation(fields: [productId], references: [id])
+  supplierProductId String?          @map("supplier_product_id")
+  supplierProduct   SupplierProduct? @relation(fields: [supplierProductId], references: [id])
+  name              String
+  spec              String?
+  unitOfMeasure     String           @default("EA") @map("unit_of_measure")
+  quantity          Decimal          @db.Decimal(15, 4)
+  listPrice         Decimal          @default(0) @map("list_price") @db.Decimal(15, 2)
+  discountAmount    Decimal          @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  unitPrice         Decimal          @map("unit_price") @db.Decimal(15, 2)
+  totalPrice        Decimal          @map("total_price") @db.Decimal(15, 2)
+  isTaxable         Boolean          @default(true) @map("is_taxable")
+  sortOrder         Int              @default(0) @map("sort_order")
+  memo              String?
+
+  @@map("quotation_items")
+}
+
+// ============================================================
+// 거래명세표 (Statement) — 판매용
+// ============================================================
+
+enum StatementStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
+model Statement {
+  id                             String          @id @default(uuid())
+  statementNo                    String          @unique @map("statement_no")
+  status                         StatementStatus @default(ISSUED)
+  issueDate                      DateTime        @map("issue_date")
+  customerId                     String?         @map("customer_id")
+  customer                       Customer?       @relation(fields: [customerId], references: [id])
+  customerNameSnapshot           String?         @map("customer_name_snapshot")
+  customerPhoneSnapshot          String?         @map("customer_phone_snapshot")
+  customerAddressSnapshot        String?         @map("customer_address_snapshot")
+  customerBusinessNumberSnapshot String?         @map("customer_business_number_snapshot")
+  orderId                        String?         @map("order_id")
+  order                          Order?          @relation(fields: [orderId], references: [id])
+  quotationId                    String?         @map("quotation_id")
+  quotation                      Quotation?      @relation(fields: [quotationId], references: [id])
+  subtotalAmount                 Decimal         @default(0) @map("subtotal_amount") @db.Decimal(15, 2)
+  taxAmount                      Decimal         @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  totalAmount                    Decimal         @default(0) @map("total_amount") @db.Decimal(15, 2)
+  memo                           String?
+  createdById                    String          @map("created_by_id")
+  createdBy                      User            @relation(fields: [createdById], references: [id])
+  createdAt                      DateTime        @default(now()) @map("created_at")
+  updatedAt                      DateTime        @updatedAt @map("updated_at")
+
+  items StatementItem[]
+
+  @@index([issueDate])
+  @@map("statements")
+}
+
+model StatementItem {
+  id             String    @id @default(uuid())
+  statementId    String    @map("statement_id")
+  statement      Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  productId      String?   @map("product_id")
+  product        Product?  @relation(fields: [productId], references: [id])
+  name           String
+  spec           String?
+  unitOfMeasure  String    @default("EA") @map("unit_of_measure")
+  quantity       Decimal   @db.Decimal(15, 4)
+  listPrice      Decimal   @default(0) @map("list_price") @db.Decimal(15, 2)
+  discountAmount Decimal   @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  unitPrice      Decimal   @map("unit_price") @db.Decimal(15, 2)
+  totalPrice     Decimal   @map("total_price") @db.Decimal(15, 2)
+  isTaxable      Boolean   @default(true) @map("is_taxable")
+  sortOrder      Int       @default(0) @map("sort_order")
+  memo           String?
+
+  @@map("statement_items")
+}
+
+// ============================================================
+// POS — 상품 미디어, 결제수단, 고객 보유 기계, 방문 메모
+// ============================================================
+
+enum ProductMediaType {
+  IMAGE
+  YOUTUBE
+}
+
+model ProductMedia {
+  id        String           @id @default(uuid())
+  productId String           @map("product_id")
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      ProductMediaType
+  url       String
+  title     String?
+  sortOrder Int              @default(0) @map("sort_order")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([productId, sortOrder])
+  @@map("product_media")
+}
+
+enum OrderPaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  MIXED
+  UNPAID
+}
+
+model CustomerMachine {
+  id            String    @id @default(uuid())
+  customerId    String    @map("customer_id")
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId     String?   @map("product_id")
+  product       Product?  @relation(fields: [productId], references: [id])
+  name          String
+  brand         String?
+  modelNo       String?   @map("model_no")
+  serialNo      String?   @map("serial_no")
+  purchasedAt   DateTime? @map("purchased_at")
+  purchasedFrom String?   @map("purchased_from")
+  memo          String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  repairs RepairTicket[]
+
+  @@index([customerId])
+  @@map("customer_machines")
+}
+
+model CustomerNote {
+  id          String   @id @default(uuid())
+  customerId  String   @map("customer_id")
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  content     String
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([customerId, createdAt])
+  @@map("customer_notes")
+}
+
+// ============================================================
+// 수리 (RepairTicket)
+// ============================================================
+
+enum RepairStatus {
+  RECEIVED
+  DIAGNOSING
+  QUOTED
+  APPROVED
+  REPAIRING
+  READY
+  PICKED_UP
+  CANCELLED
+}
+
+enum RepairApprovalMethod {
+  ON_SITE
+  REMOTE
+}
+
+model RepairTicket {
+  id                     String                @id @default(uuid())
+  ticketNo               String                @unique @map("ticket_no")
+  customerId             String                @map("customer_id")
+  customer               Customer              @relation(fields: [customerId], references: [id])
+  customerMachineId      String?               @map("customer_machine_id")
+  customerMachine        CustomerMachine?      @relation(fields: [customerMachineId], references: [id])
+  status                 RepairStatus          @default(RECEIVED)
+  receivedAt             DateTime              @map("received_at")
+  symptom                String?
+  diagnosis              String?
+  repairNotes            String?               @map("repair_notes")
+  quotedLaborAmount      Decimal               @default(0) @map("quoted_labor_amount") @db.Decimal(15, 2)
+  quotedPartsAmount      Decimal               @default(0) @map("quoted_parts_amount") @db.Decimal(15, 2)
+  quotedTotalAmount      Decimal               @default(0) @map("quoted_total_amount") @db.Decimal(15, 2)
+  quotedAt               DateTime?             @map("quoted_at")
+  approvalMethod         RepairApprovalMethod? @map("approval_method")
+  approvalToken          String?               @unique @map("approval_token")
+  approvalTokenExpiresAt DateTime?             @map("approval_token_expires_at")
+  approvedAt             DateTime?             @map("approved_at")
+  approvedByName         String?               @map("approved_by_name")
+  startedAt              DateTime?             @map("started_at")
+  readyAt                DateTime?             @map("ready_at")
+  pickedUpAt             DateTime?             @map("picked_up_at")
+  finalAmount            Decimal               @default(0) @map("final_amount") @db.Decimal(15, 2)
+  paymentMethod          OrderPaymentMethod?   @map("payment_method")
+  memo                   String?
+  createdById            String                @map("created_by_id")
+  createdBy              User                  @relation(fields: [createdById], references: [id])
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+
+  parts  RepairPart[]
+  labors RepairLabor[]
+  orders Order[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([receivedAt])
+  @@map("repair_tickets")
+}
+
+model RepairPart {
+  id               String       @id @default(uuid())
+  repairTicketId   String       @map("repair_ticket_id")
+  repairTicket     RepairTicket @relation(fields: [repairTicketId], references: [id], onDelete: Cascade)
+  productId        String       @map("product_id")
+  product          Product      @relation(fields: [productId], references: [id])
+  quantity         Decimal      @db.Decimal(15, 4)
+  unitPrice        Decimal      @map("unit_price") @db.Decimal(15, 2)
+  totalPrice       Decimal      @map("total_price") @db.Decimal(15, 2)
+  unitCostSnapshot Decimal?     @map("unit_cost_snapshot") @db.Decimal(15, 4)
+  consumedAt       DateTime?    @map("consumed_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  lotConsumptions LotConsumption[]
+
+  @@index([repairTicketId])
+  @@map("repair_parts")
+}
+
+model RepairLabor {
+  id             String       @id @default(uuid())
+  repairTicketId String       @map("repair_ticket_id")
+  repairTicket   RepairTicket @relation(fields: [repairTicketId], references: [id], onDelete: Cascade)
+  name           String
+  hours          Decimal      @default(1) @db.Decimal(10, 2)
+  unitRate       Decimal      @map("unit_rate") @db.Decimal(15, 2)
+  totalPrice     Decimal      @map("total_price") @db.Decimal(15, 2)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([repairTicketId])
+  @@map("repair_labors")
+}
+
+// ============================================================
+// 수리 서비스 카탈로그 (공임 프리셋 / 수리 패키지)
+// ============================================================
+
+model RepairLaborPreset {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  unitRate    Decimal  @map("unit_rate") @db.Decimal(15, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+  memo        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  packageLabors RepairPackageLabor[]
+
+  @@map("repair_labor_presets")
+}
+
+model RepairPackage {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  memo        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  labors RepairPackageLabor[]
+  parts  RepairPackagePart[]
+
+  @@map("repair_packages")
+}
+
+model RepairPackageLabor {
+  id            String             @id @default(uuid())
+  packageId     String             @map("package_id")
+  package       RepairPackage      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  laborPresetId String?            @map("labor_preset_id")
+  laborPreset   RepairLaborPreset? @relation(fields: [laborPresetId], references: [id])
+  name          String
+  unitRate      Decimal            @map("unit_rate") @db.Decimal(15, 2)
+  quantity      Int                @default(1)
+  sortOrder     Int                @default(0) @map("sort_order")
+
+  @@index([packageId])
+  @@map("repair_package_labors")
+}
+
+model RepairPackagePart {
+  id        String        @id @default(uuid())
+  packageId String        @map("package_id")
+  package   RepairPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  productId String        @map("product_id")
+  product   Product       @relation(fields: [productId], references: [id])
+  quantity  Decimal       @db.Decimal(15, 4)
+  unitPrice Decimal       @map("unit_price") @db.Decimal(15, 2)
+
+  @@index([packageId])
+  @@map("repair_package_parts")
+}
+
+// ============================================================
+// 임대 (RentalAsset / Rental) — 판매 재고와 완전 분리
+// ============================================================
+
+enum RentalAssetStatus {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+  RETIRED
+}
+
+enum RentalRateType {
+  DAILY
+  MONTHLY
+}
+
+enum RentalStatus {
+  RESERVED
+  ACTIVE
+  RETURNED
+  OVERDUE
+  CANCELLED
+}
+
+model RentalAsset {
+  id            String            @id @default(uuid())
+  assetNo       String            @unique @map("asset_no")
+  name          String
+  brand         String?
+  modelNo       String?           @map("model_no")
+  serialNo      String?           @map("serial_no")
+  productId     String?           @map("product_id")
+  product       Product?          @relation(fields: [productId], references: [id])
+  dailyRate     Decimal           @default(0) @map("daily_rate") @db.Decimal(15, 2)
+  monthlyRate   Decimal           @default(0) @map("monthly_rate") @db.Decimal(15, 2)
+  depositAmount Decimal           @default(0) @map("deposit_amount") @db.Decimal(15, 2)
+  status        RentalAssetStatus @default(AVAILABLE)
+  acquiredAt    DateTime?         @map("acquired_at")
+  memo          String?
+  isActive      Boolean           @default(true) @map("is_active")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  rentals Rental[]
+
+  @@map("rental_assets")
+}
+
+model Rental {
+  id               String              @id @default(uuid())
+  rentalNo         String              @unique @map("rental_no")
+  assetId          String              @map("asset_id")
+  asset            RentalAsset         @relation(fields: [assetId], references: [id])
+  customerId       String              @map("customer_id")
+  customer         Customer            @relation(fields: [customerId], references: [id])
+  status           RentalStatus        @default(RESERVED)
+  startDate        DateTime            @map("start_date")
+  endDate          DateTime            @map("end_date")
+  actualReturnedAt DateTime?           @map("actual_returned_at")
+  rateType         RentalRateType      @map("rate_type")
+  unitRate         Decimal             @map("unit_rate") @db.Decimal(15, 2)
+  totalUnits       Int                 @map("total_units")
+  rentalAmount     Decimal             @map("rental_amount") @db.Decimal(15, 2)
+  depositAmount    Decimal             @default(0) @map("deposit_amount") @db.Decimal(15, 2)
+  depositReturned  Boolean             @default(false) @map("deposit_returned")
+  overdueAmount    Decimal             @default(0) @map("overdue_amount") @db.Decimal(15, 2)
+  finalAmount      Decimal             @default(0) @map("final_amount") @db.Decimal(15, 2)
+  paymentMethod    OrderPaymentMethod? @map("payment_method")
+  memo             String?
+  createdById      String              @map("created_by_id")
+  createdBy        User                @relation(fields: [createdById], references: [id])
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@index([customerId])
+  @@index([assetId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("rentals")
+}
+
+model Expense {
+  id             String              @id @default(uuid())
+  date           DateTime
+  amount         Decimal             @db.Decimal(12, 2)
+  category       ExpenseCategory
+  description    String
+  isTaxable      Boolean             @default(true) @map("is_taxable")
+  recoverable    Boolean             @default(false) @map("recoverable")
+  paymentMethod  OrderPaymentMethod? @map("payment_method")
+  supplierId     String?             @map("supplier_id")
+  supplier       Supplier?           @relation(fields: [supplierId], references: [id])
+  customerId     String?             @map("customer_id")
+  customer       Customer?           @relation(fields: [customerId], references: [id])
+  createdById    String?             @map("created_by_id")
+  createdBy      User?               @relation(fields: [createdById], references: [id])
+  referenceId    String?             @map("reference_id")
+  referenceType  String?             @map("reference_type")
+  memo           String?
+  attachmentUrl  String?             @map("attachment_url")
+  attachmentPath String?             @map("attachment_path")
+  attachmentName String?             @map("attachment_name")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([category])
+  @@index([supplierId])
+  @@index([customerId])
+  @@index([createdById])
+  @@map("expenses")
+}
+
+enum ExpenseCategory {
+  SHIPPING
+  RENT
+  UTILITIES
+  SALARY
+  PACKAGING
+  OFFICE_SUPPLIES
+  MARKETING
+  MAINTENANCE
+  INVENTORY_USAGE
+  OTHER
+}
+
+// ============================================================
+// 조립상품 템플릿 · 프리셋
+// ============================================================
+
+model AssemblyTemplate {
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  defaultLaborCost Decimal? @map("default_labor_cost") @db.Decimal(15, 2)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  slots   AssemblyTemplateSlot[]
+  presets AssemblyPreset[]
+
+  @@map("assembly_templates")
+}
+
+model AssemblyTemplateSlot {
+  id               String           @id @default(uuid())
+  templateId       String           @map("template_id")
+  template         AssemblyTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label            String
+  order            Int
+  defaultProductId String?          @map("default_product_id")
+  defaultProduct   Product?         @relation(fields: [defaultProductId], references: [id], onDelete: SetNull)
+  defaultQuantity  Decimal          @default(1) @map("default_quantity") @db.Decimal(10, 4)
+
+  presetItems AssemblyPresetItem[]
+
+  @@index([templateId, order])
+  @@map("assembly_template_slots")
+}
+
+model AssemblyPreset {
+  id          String           @id @default(uuid())
+  templateId  String           @map("template_id")
+  template    AssemblyTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  items AssemblyPresetItem[]
+
+  @@unique([templateId, name])
+  @@map("assembly_presets")
+}
+
+model AssemblyPresetItem {
+  id        String               @id @default(uuid())
+  presetId  String               @map("preset_id")
+  preset    AssemblyPreset       @relation(fields: [presetId], references: [id], onDelete: Cascade)
+  slotId    String               @map("slot_id")
+  slot      AssemblyTemplateSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  productId String               @map("product_id")
+  product   Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity  Decimal              @db.Decimal(10, 4)
+
+  @@unique([presetId, slotId])
+  @@map("assembly_preset_items")
+}
+
+// ============================================================
+// 조립 실적 (Assembly / Disassembly)
+// ============================================================
+
+enum AssemblyType {
+  PRODUCE
+  DISASSEMBLE
+}
+
+model Assembly {
+  id            String       @id @default(uuid())
+  assemblyNo    String       @unique @map("assembly_no")
+  productId     String       @map("product_id")
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity      Decimal      @db.Decimal(10, 4)
+  type          AssemblyType @default(PRODUCE)
+  laborCost     Decimal?     @map("labor_cost") @db.Decimal(15, 2)
+  assembledAt   DateTime     @map("assembled_at")
+  memo          String?
+  producedLotId String?      @map("produced_lot_id")
+  reverseOfId   String?      @unique @map("reverse_of_id")
+  reverseOf     Assembly?    @relation("AssemblyReverse", fields: [reverseOfId], references: [id])
+  reversedBy    Assembly?    @relation("AssemblyReverse")
+  createdBy     String?      @map("created_by")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  consumptions AssemblyComponentConsumption[]
+
+  @@index([productId, assembledAt])
+  @@map("assemblies")
+}
+
+model AssemblyComponentConsumption {
+  id          String   @id @default(uuid())
+  assemblyId  String   @map("assembly_id")
+  assembly    Assembly @relation(fields: [assemblyId], references: [id], onDelete: Cascade)
+  componentId String   @map("component_id")
+  component   Product  @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  lotId       String   @map("lot_id")
+  quantity    Decimal  @db.Decimal(10, 4)
+  unitCost    Decimal  @map("unit_cost") @db.Decimal(15, 4)
+
+  @@index([assemblyId])
+  @@index([lotId])
+  @@map("assembly_component_consumptions")
 }

@@ -1,0 +1,693 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { computeMovingAverage } from "@/lib/cost";
+import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
+import { incomingSchema } from "@/lib/validators/incoming";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const incoming = await prisma.incoming.findUnique({
+    where: { id },
+    include: {
+      supplier: { select: { id: true, name: true, paymentMethod: true } },
+      createdBy: { select: { name: true } },
+      items: {
+        include: {
+          supplierProduct: {
+            select: {
+              id: true, name: true, supplierCode: true, spec: true, unitOfMeasure: true, unitPrice: true, isTaxable: true,
+              productMappings: {
+                select: {
+                  id: true,
+                  product: { select: { id: true, name: true, sku: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!incoming) {
+    return NextResponse.json({ error: "입고를 찾을 수 없습니다" }, { status: 404 });
+  }
+
+  return NextResponse.json(incoming);
+}
+
+// 입고 확인/취소/수정
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+  const { action } = body as { action?: "confirm" | "cancel" | "update" | "update-shipping" };
+
+  const incoming = await prisma.incoming.findUnique({
+    where: { id },
+    include: {
+      items: {
+        include: {
+          supplierProduct: {
+            include: {
+              productMappings: { select: { productId: true, conversionRate: true } },
+              incomingCosts: { where: { isActive: true } },
+            },
+          },
+        },
+      },
+      supplier: { select: { paymentMethod: true } },
+    },
+  });
+
+  if (!incoming) {
+    return NextResponse.json({ error: "입고를 찾을 수 없습니다" }, { status: 404 });
+  }
+
+  // === CONFIRMED 입고 택배비 후기입 ===
+  if (action === "update-shipping") {
+    if (incoming.status !== "CONFIRMED") {
+      return NextResponse.json({ error: "확인된 입고만 택배비를 수정할 수 있습니다" }, { status: 400 });
+    }
+
+    const { shippingCost: rawCost, shippingIsTaxable, shippingDeducted } = body as {
+      shippingCost: string;
+      shippingIsTaxable: boolean;
+      shippingDeducted: boolean;
+    };
+    const newShippingCost = parseFloat(rawCost) || 0;
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Incoming 택배비 필드 업데이트
+      await tx.incoming.update({
+        where: { id },
+        data: { shippingCost: newShippingCost, shippingIsTaxable, shippingDeducted },
+      });
+
+      // 2. 각 IncomingItem unitCostSnapshot 재계산 + InventoryLot unitCost 갱신
+      const incomingTotalPrice = incoming.items.reduce((sum, i) => sum + Number(i.totalPrice), 0);
+
+      // Step A: 아이템별 기본 원가 계산
+      const baseCalcs = incoming.items.map((item) => {
+        const qty = Number(item.quantity);
+        const unitPrice = Number(item.unitPrice);
+
+        const lineShipping = incomingTotalPrice > 0
+          ? (Number(item.totalPrice) / incomingTotalPrice) * newShippingCost
+          : 0;
+        const shippingPerUnit = qty > 0 ? lineShipping / qty : 0;
+        const shippingNetPerUnit = shippingDeducted
+          ? 0
+          : shippingIsTaxable ? shippingPerUnit / 1.1 : shippingPerUnit;
+
+        const incomingCostPerUnit = item.supplierProduct.incomingCosts
+          .filter((c) => c.perUnit)
+          .reduce((sum, c) => {
+            const raw = c.costType === "FIXED"
+              ? Number(c.value)
+              : unitPrice * Number(c.value) / 100;
+            return sum + (c.isTaxable ? raw / 1.1 : raw);
+          }, 0);
+
+        const baseSnapshot = unitPrice + shippingNetPerUnit + incomingCostPerUnit;
+        return { item, qty, baseSnapshot };
+      });
+
+      // Step B: 같은 supplierProductId끼리 가중평균 (10+1 프로모션 지원)
+      const groupAvgBySpId = new Map<string, number>();
+      const groups = new Map<string, typeof baseCalcs>();
+      for (const calc of baseCalcs) {
+        const key = calc.item.supplierProductId;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(calc);
+      }
+      for (const [spId, rows] of groups) {
+        const totalQty = rows.reduce((s, r) => s + r.qty, 0);
+        const totalCost = rows.reduce((s, r) => s + r.qty * r.baseSnapshot, 0);
+        groupAvgBySpId.set(spId, totalQty > 0 ? totalCost / totalQty : 0);
+      }
+
+      const itemSnapshots = baseCalcs.map(({ item }) => ({
+        item,
+        newUnitCostSnapshot: groupAvgBySpId.get(item.supplierProductId)!,
+      }));
+
+      // 모든 IncomingItem 업데이트 + 관련 InventoryLot 일괄 조회를 병렬로
+      const itemIds = itemSnapshots.map((s) => s.item.id);
+      const [, allLots] = await Promise.all([
+        Promise.all(
+          itemSnapshots.map(({ item, newUnitCostSnapshot }) =>
+            tx.incomingItem.update({
+              where: { id: item.id },
+              data: { unitCostSnapshot: newUnitCostSnapshot },
+            })
+          )
+        ),
+        tx.inventoryLot.findMany({
+          where: { incomingItemId: { in: itemIds } },
+          select: { id: true, productId: true, incomingItemId: true },
+        }),
+      ]);
+
+      // 메모리에서 lot별 새 unitCost 계산 후 병렬 update
+      const snapshotByItemId = new Map(itemSnapshots.map((s) => [s.item.id, s]));
+      await Promise.all(
+        allLots.map((lot) => {
+          const snap = lot.incomingItemId ? snapshotByItemId.get(lot.incomingItemId) : undefined;
+          if (!snap) return Promise.resolve();
+          let lotUnitCost = snap.newUnitCostSnapshot;
+          if (lot.productId) {
+            const mapping = snap.item.supplierProduct.productMappings.find(
+              (m) => m.productId === lot.productId
+            );
+            if (mapping) {
+              lotUnitCost = snap.newUnitCostSnapshot / Number(mapping.conversionRate);
+            }
+          }
+          return tx.inventoryLot.update({
+            where: { id: lot.id },
+            data: { unitCost: lotUnitCost },
+          });
+        })
+      );
+
+      // 3. CREDIT 거래처: 배송비 차감 원장 처리
+      if (incoming.supplier.paymentMethod === "CREDIT") {
+        const existingAdj = await tx.supplierLedger.findFirst({
+          where: {
+            referenceId: id,
+            referenceType: "INCOMING",
+            type: "ADJUSTMENT",
+            description: { contains: "배송비 차감" },
+          },
+        });
+
+        if (existingAdj) {
+          if (shippingDeducted && newShippingCost > 0) {
+            await tx.supplierLedger.update({
+              where: { id: existingAdj.id },
+              data: { creditAmount: newShippingCost },
+            });
+          } else {
+            await tx.supplierLedger.delete({ where: { id: existingAdj.id } });
+          }
+        } else if (shippingDeducted && newShippingCost > 0) {
+          const lastLedger = await tx.supplierLedger.findFirst({
+            where: { supplierId: incoming.supplierId },
+            orderBy: { createdAt: "desc" },
+          });
+          const prevBalance = lastLedger ? Number(lastLedger.balance) : 0;
+          await tx.supplierLedger.create({
+            data: {
+              supplierId: incoming.supplierId,
+              date: incoming.incomingDate,
+              type: "ADJUSTMENT",
+              description: `배송비 차감 (입고 ${incoming.incomingNo})`,
+              debitAmount: 0,
+              creditAmount: newShippingCost,
+              balance: prevBalance - newShippingCost,
+              referenceId: id,
+              referenceType: "INCOMING",
+            },
+          });
+        }
+
+        await rebalanceSupplierLedger(tx, incoming.supplierId);
+      }
+
+      // 4. 경비 레코드 업데이트 또는 생성
+      const existingExpense = await tx.expense.findFirst({
+        where: { referenceId: id, referenceType: "INCOMING", category: "SHIPPING" },
+      });
+
+      if (existingExpense) {
+        if (newShippingCost > 0) {
+          await tx.expense.update({
+            where: { id: existingExpense.id },
+            data: {
+              amount: newShippingCost,
+              memo: shippingDeducted ? "거래처 차감" : null,
+              recoverable: shippingDeducted,
+            },
+          });
+        } else {
+          await tx.expense.delete({ where: { id: existingExpense.id } });
+        }
+      } else if (newShippingCost > 0) {
+        await tx.expense.create({
+          data: {
+            date: incoming.incomingDate,
+            amount: newShippingCost,
+            category: "SHIPPING",
+            description: `택배비 (입고 ${incoming.incomingNo})`,
+            supplierId: incoming.supplierId,
+            referenceId: id,
+            referenceType: "INCOMING",
+            memo: shippingDeducted ? "거래처 차감" : null,
+            recoverable: shippingDeducted,
+          },
+        });
+      }
+    });
+
+    const updated = await prisma.incoming.findUnique({
+      where: { id },
+      include: {
+        supplier: { select: { id: true, name: true, paymentMethod: true } },
+        createdBy: { select: { name: true } },
+        items: {
+          include: {
+            supplierProduct: {
+              select: {
+                id: true, name: true, supplierCode: true, unitOfMeasure: true, unitPrice: true,
+                productMappings: {
+                  select: {
+                    id: true,
+                    product: { select: { id: true, name: true, sku: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return NextResponse.json(updated);
+  }
+
+  if (incoming.status !== "PENDING") {
+    return NextResponse.json({ error: "대기 상태의 입고만 처리할 수 있습니다" }, { status: 400 });
+  }
+
+  // === 필드 수정 ===
+  if (!action || action === "update") {
+    const parsed = incomingSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const data = parsed.data;
+    const newItems = data.items.map((item) => {
+      const qty = parseFloat(item.quantity);
+      const price = parseFloat(item.unitPrice);
+      const originalPrice = item.originalPrice ? parseFloat(item.originalPrice) : undefined;
+      const discountAmount = item.discountAmount ? parseFloat(item.discountAmount) : undefined;
+      return {
+        supplierProductId: item.supplierProductId,
+        quantity: qty,
+        unitPrice: price,
+        totalPrice: qty * price,
+        originalPrice,
+        discountAmount,
+      };
+    });
+    const totalAmount = newItems.reduce((sum, i) => sum + i.totalPrice, 0);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.incoming.update({
+        where: { id },
+        data: {
+          supplierId: data.supplierId,
+          incomingDate: new Date(data.incomingDate),
+          memo: data.memo || null,
+          shippingCost: data.shippingCost ? parseFloat(data.shippingCost) : 0,
+          shippingIsTaxable: data.shippingIsTaxable ?? false,
+          shippingDeducted: data.shippingDeducted ?? false,
+          totalAmount,
+        },
+      });
+
+      await tx.incomingItem.deleteMany({ where: { incomingId: id } });
+
+      await tx.incomingItem.createMany({
+        data: newItems.map((i) => ({
+          incomingId: id,
+          supplierProductId: i.supplierProductId,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          totalPrice: i.totalPrice,
+          originalPrice: i.originalPrice ?? null,
+          discountAmount: i.discountAmount ?? null,
+        })),
+      });
+
+      // SupplierProduct 가격 변동 검사 — 일괄 조회 후 변경분만 병렬 처리
+      const supplierProductIds = Array.from(new Set(newItems.map((i) => i.supplierProductId)));
+      const sps = await tx.supplierProduct.findMany({
+        where: { id: { in: supplierProductIds } },
+        select: { id: true, unitPrice: true, listPrice: true },
+      });
+      const spById = new Map(sps.map((sp) => [sp.id, sp]));
+
+      // 입고날짜 기준 — 더 최신 입고가 이미 있으면 SP.unitPrice를 덮어쓰지 않음
+      const laterIncomings = await tx.incomingItem.findMany({
+        where: {
+          supplierProductId: { in: supplierProductIds },
+          incomingId: { not: id },
+          incoming: { incomingDate: { gt: new Date(data.incomingDate) } },
+        },
+        select: { supplierProductId: true },
+      });
+      const spsWithLater = new Set(laterIncomings.map((r) => r.supplierProductId));
+
+      // supplierProductId별 그룹화 → 가중평균 단가 계산 (10+1 등 동일 SP 복수 행 대응)
+      type NewItemType = typeof newItems[number];
+      const groupsBySpId = new Map<string, NewItemType[]>();
+      for (const item of newItems) {
+        if (!groupsBySpId.has(item.supplierProductId)) groupsBySpId.set(item.supplierProductId, []);
+        groupsBySpId.get(item.supplierProductId)!.push(item);
+      }
+
+      const priceOps: Promise<unknown>[] = [];
+      for (const [spId, group] of groupsBySpId) {
+        const sp = spById.get(spId);
+        if (!sp) continue;
+        if (spsWithLater.has(spId)) continue;
+
+        const totalQty = group.reduce((s, i) => s + i.quantity, 0);
+        const totalAmount = group.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+        const weightedUnitPrice = totalQty > 0 ? totalAmount / totalQty : 0;
+
+        const canonical = group.reduce((a, b) => b.unitPrice > a.unitPrice ? b : a);
+        const originalPrice = canonical.originalPrice;
+        const discountAmount = canonical.discountAmount ?? 0;
+
+        const currentPrice = Number(sp.unitPrice);
+        const priceChanged = currentPrice !== weightedUnitPrice;
+        const listPriceChanged = originalPrice !== undefined && Number(sp.listPrice) !== originalPrice;
+
+        if (priceChanged || listPriceChanged) {
+          const changeAmount = weightedUnitPrice - currentPrice;
+          const changePercent = currentPrice !== 0 ? (changeAmount / currentPrice) * 100 : 0;
+
+          priceOps.push(
+            tx.supplierProductPriceHistory.create({
+              data: {
+                supplierProductId: spId,
+                oldPrice: currentPrice,
+                newPrice: weightedUnitPrice,
+                changeAmount,
+                changePercent,
+                originalPrice: originalPrice ?? null,
+                discountAmount: discountAmount > 0 ? discountAmount : null,
+                reason: `입고 ${incoming.incomingNo} 수정`,
+                incomingId: id,
+              },
+            }),
+            tx.supplierProduct.update({
+              where: { id: spId },
+              data: {
+                unitPrice: weightedUnitPrice,
+                ...(listPriceChanged ? { listPrice: originalPrice! } : {}),
+              },
+            })
+          );
+        }
+      }
+      await Promise.all(priceOps);
+    });
+
+    const updated = await prisma.incoming.findUnique({
+      where: { id },
+      include: {
+        supplier: { select: { id: true, name: true, paymentMethod: true } },
+        createdBy: { select: { name: true } },
+        items: {
+          include: {
+            supplierProduct: {
+              select: {
+                id: true, name: true, supplierCode: true, unitOfMeasure: true, unitPrice: true,
+                productMappings: {
+                  select: {
+                    id: true,
+                    product: { select: { id: true, name: true, sku: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return NextResponse.json(updated);
+  }
+
+  if (action === "cancel") {
+    const updated = await prisma.incoming.update({
+      where: { id },
+      data: { status: "CANCELLED" },
+    });
+    return NextResponse.json(updated);
+  }
+
+  // === 입고 확인 트랜잭션 ===
+  // 배송비 배분을 위한 입고 전체 금액
+  const incomingTotalPrice = incoming.items.reduce((sum, i) => sum + Number(i.totalPrice), 0);
+  const shippingCost = Number(incoming.shippingCost);
+  const shippingIsTaxable = incoming.shippingIsTaxable;
+  const shippingDeducted = incoming.shippingDeducted;
+
+  await prisma.$transaction(async (tx) => {
+    // 1. 상태 변경
+    await tx.incoming.update({
+      where: { id },
+      data: { status: "CONFIRMED" },
+    });
+
+    // 2. 재고 증가 (매핑된 판매 상품 기준) + 원가 스냅샷 저장
+    // Step A: 아이템별 기본 원가 계산 (shipping + incomingCosts 포함)
+    const itemCalcs = incoming.items.map((item) => {
+      const qty = Number(item.quantity);
+      const unitPrice = Number(item.unitPrice);
+
+      const lineShipping = incomingTotalPrice > 0
+        ? (Number(item.totalPrice) / incomingTotalPrice) * shippingCost
+        : 0;
+      const shippingPerUnit = qty > 0 ? lineShipping / qty : 0;
+      const shippingNetPerUnit = shippingDeducted
+        ? 0
+        : shippingIsTaxable ? shippingPerUnit / 1.1 : shippingPerUnit;
+
+      const incomingCostPerUnit = item.supplierProduct.incomingCosts
+        .filter((c) => c.perUnit)
+        .reduce((sum, c) => {
+          const raw = c.costType === "FIXED"
+            ? Number(c.value)
+            : unitPrice * Number(c.value) / 100;
+          return sum + (c.isTaxable ? raw / 1.1 : raw);
+        }, 0);
+
+      const baseSnapshot = unitPrice + shippingNetPerUnit + incomingCostPerUnit;
+      return { item, qty, baseSnapshot };
+    });
+
+    // Step B: 같은 supplierProductId끼리 그룹화 → 가중평균 원가 계산 (10+1 프로모션 지원)
+    const groupAvgBySpId = new Map<string, number>();
+    const groups = new Map<string, typeof itemCalcs>();
+    for (const calc of itemCalcs) {
+      const key = calc.item.supplierProductId;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(calc);
+    }
+    for (const [spId, rows] of groups) {
+      const totalQty = rows.reduce((s, r) => s + r.qty, 0);
+      const totalCost = rows.reduce((s, r) => s + r.qty * r.baseSnapshot, 0);
+      groupAvgBySpId.set(spId, totalQty > 0 ? totalCost / totalQty : 0);
+    }
+
+    // Step C: 모든 아이템 스냅샷 저장 (병렬)
+    await Promise.all(
+      itemCalcs.map(({ item }) =>
+        tx.incomingItem.update({
+          where: { id: item.id },
+          data: { unitCostSnapshot: groupAvgBySpId.get(item.supplierProductId)! },
+        })
+      )
+    );
+
+    // Step D: 그룹별 로트 1개 생성 (10+1 프로모션 — 같은 공급상품은 1로트로 합산)
+    for (const [supplierProductId, rows] of groups) {
+      const totalQty = rows.reduce((s, r) => s + r.qty, 0);
+      const unitCostSnapshot = groupAvgBySpId.get(supplierProductId)!;
+      const canonicalItem = rows[0].item;
+      const mappings = canonicalItem.supplierProduct.productMappings;
+
+      if (mappings.length === 0) {
+        // 매핑 없음 → 오르판 로트 1개 (그룹 합산 수량)
+        await tx.inventoryLot.create({
+          data: {
+            supplierProduct: { connect: { id: supplierProductId } },
+            receivedQty: totalQty,
+            remainingQty: totalQty,
+            unitCost: unitCostSnapshot,
+            receivedAt: incoming.incomingDate,
+            source: "INCOMING",
+            incomingItemId: canonicalItem.id,
+            memo: `입고 ${incoming.incomingNo}`,
+          },
+        });
+        continue;
+      }
+
+      for (const mapping of mappings) {
+        const addQty = totalQty * Number(mapping.conversionRate);
+        const addUnitCost = unitCostSnapshot / Number(mapping.conversionRate);
+
+        const existing = await tx.inventory.findUnique({
+          where: { productId: mapping.productId },
+        });
+        const prevQty = existing ? Number(existing.quantity) : 0;
+        const prevAvgCost = existing?.avgCost != null ? Number(existing.avgCost) : null;
+        const newAvgCost = computeMovingAverage(prevQty, prevAvgCost, addQty, addUnitCost);
+
+        const inventory = await tx.inventory.upsert({
+          where: { productId: mapping.productId },
+          update: {
+            quantity: { increment: addQty },
+            avgCost: newAvgCost,
+            avgCostUpdatedAt: new Date(),
+          },
+          create: {
+            productId: mapping.productId,
+            quantity: addQty,
+            avgCost: newAvgCost,
+            avgCostUpdatedAt: new Date(),
+          },
+        });
+
+        await tx.inventoryLot.create({
+          data: {
+            product: { connect: { id: mapping.productId } },
+            supplierProduct: { connect: { id: supplierProductId } },
+            receivedQty: addQty,
+            remainingQty: addQty,
+            unitCost: addUnitCost,
+            receivedAt: incoming.incomingDate,
+            source: "INCOMING",
+            incomingItemId: canonicalItem.id,
+            memo: `입고 ${incoming.incomingNo}`,
+          },
+        });
+
+        await tx.inventoryMovement.create({
+          data: {
+            inventoryId: inventory.id,
+            type: "INCOMING",
+            quantity: addQty,
+            balanceAfter: inventory.quantity,
+            referenceId: incoming.id,
+            referenceType: "INCOMING",
+            memo: `입고 ${incoming.incomingNo}`,
+          },
+        });
+      }
+    }
+
+    // 3. 외상 거래처면 원장 기록 (VAT 포함 금액을 미지급금으로 반영)
+    if (incoming.supplier.paymentMethod === "CREDIT") {
+      const totalWithTax = incoming.items.reduce((sum, item) => {
+        const supply = Number(item.totalPrice);
+        const tax = item.supplierProduct.isTaxable ? Math.round(supply * 0.1) : 0;
+        return sum + supply + tax;
+      }, 0);
+
+      // 최근 잔액 조회
+      const lastLedger = await tx.supplierLedger.findFirst({
+        where: { supplierId: incoming.supplierId },
+        orderBy: { createdAt: "desc" },
+      });
+      const prevBalance = lastLedger ? Number(lastLedger.balance) : 0;
+      const newBalance = prevBalance + totalWithTax;
+
+      await tx.supplierLedger.create({
+        data: {
+          supplierId: incoming.supplierId,
+          date: incoming.incomingDate,
+          type: "PURCHASE",
+          description: `입고 ${incoming.incomingNo}`,
+          debitAmount: totalWithTax,
+          creditAmount: 0,
+          balance: newBalance,
+          referenceId: incoming.id,
+          referenceType: "INCOMING",
+        },
+      });
+
+      // 배송비 차감결제 원장 기록
+      const shippingCost = Number(incoming.shippingCost);
+      if (incoming.shippingDeducted && shippingCost > 0) {
+        const shippingBalance = newBalance - shippingCost;
+        await tx.supplierLedger.create({
+          data: {
+            supplierId: incoming.supplierId,
+            date: incoming.incomingDate,
+            type: "ADJUSTMENT",
+            description: `배송비 차감 (입고 ${incoming.incomingNo})`,
+            debitAmount: 0,
+            creditAmount: shippingCost,
+            balance: shippingBalance,
+            referenceId: incoming.id,
+            referenceType: "INCOMING",
+          },
+        });
+      }
+
+      // 백-입력된 입고일에도 잔액이 일관되도록 재계산
+      await rebalanceSupplierLedger(tx, incoming.supplierId);
+    }
+
+    // 4. 택배비 경비 자동 기록
+    if (shippingCost > 0) {
+      await tx.expense.create({
+        data: {
+          date: incoming.incomingDate,
+          amount: shippingCost,
+          category: "SHIPPING",
+          description: `택배비 (입고 ${incoming.incomingNo})`,
+          supplierId: incoming.supplierId,
+          referenceId: incoming.id,
+          referenceType: "INCOMING",
+          memo: incoming.shippingDeducted ? "거래처 차감" : null,
+          recoverable: incoming.shippingDeducted,
+        },
+      });
+    }
+  });
+
+  const updated = await prisma.incoming.findUnique({
+    where: { id },
+    include: {
+      supplier: { select: { name: true } },
+      items: {
+        include: { supplierProduct: { select: { name: true } } },
+      },
+    },
+  });
+
+  return NextResponse.json(updated);
+}
+
+// 입고 삭제 (PENDING 상태만)
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const incoming = await prisma.incoming.findUnique({ where: { id } });
+
+  if (!incoming) {
+    return NextResponse.json({ error: "입고를 찾을 수 없습니다" }, { status: 404 });
+  }
+
+  if (incoming.status !== "PENDING") {
+    return NextResponse.json({ error: "대기 상태의 입고만 삭제할 수 있습니다" }, { status: 400 });
+  }
+
+  await prisma.incoming.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}
