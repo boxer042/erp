@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { channelSchema } from "@/lib/validators/channel";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function GET(
   _request: NextRequest,
@@ -23,6 +24,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   const body = await request.json();
   const parsed = channelSchema.safeParse(body);
@@ -34,7 +37,7 @@ export async function PUT(
     );
   }
 
-  const { name, code, commissionRate, memo } = parsed.data;
+  const { name, code, commissionRate, memo, logoUrl, logoPath } = parsed.data;
 
   const channel = await prisma.salesChannel.update({
     where: { id },
@@ -43,6 +46,8 @@ export async function PUT(
       code,
       commissionRate: parseFloat(commissionRate) / 100,
       memo: memo || null,
+      logoUrl: logoUrl ?? null,
+      logoPath: logoPath ?? null,
     },
   });
 
@@ -53,6 +58,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   await prisma.salesChannel.delete({ where: { id } });
   return NextResponse.json({ success: true });

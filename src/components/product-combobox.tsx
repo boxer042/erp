@@ -1,13 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
-} from "@/components/ui/command";
-import { ChevronsUpDown } from "lucide-react";
+import { useMemo } from "react";
+import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
 
 export interface ProductOption {
   id: string;
@@ -15,6 +9,18 @@ export interface ProductOption {
   sku: string;
   sellingPrice: string;
   unitCost: string | null;
+  /** 분해 — 공급단가 (환산 후, 세전) */
+  supplierUnitPrice?: string | number;
+  /** 분해 — 개당 배송비 (세전) */
+  shippingPerUnit?: string | number;
+  /** 분해 — 개당 부대비용 (세전) */
+  incomingCostPerUnit?: string | number;
+  /** 매핑된 거래처 이름 (조립상품 분해 표시용) */
+  supplierName?: string | null;
+  /** 매핑된 거래처상품 이름 */
+  supplierProductName?: string | null;
+  /** 부대비용 목록 (조립상품 분해 표시용) */
+  incomingCostList?: Array<{ name: string; costType: string; value: number; isTaxable: boolean }>;
   unitOfMeasure: string;
   isSet: boolean;
   isCanonical?: boolean;
@@ -32,7 +38,18 @@ interface ProductComboboxProps {
   filterType?: "set" | "component";
   placeholder?: string;
   disabled?: boolean;
+  clearable?: boolean;
 }
+
+const EMPTY_OPTION: ProductOption = {
+  id: "",
+  name: "",
+  sku: "",
+  sellingPrice: "0",
+  unitCost: null,
+  unitOfMeasure: "EA",
+  isSet: false,
+};
 
 export function ProductCombobox({
   products,
@@ -41,59 +58,46 @@ export function ProductCombobox({
   filterType,
   placeholder = "상품 선택...",
   disabled = false,
+  clearable = true,
 }: ProductComboboxProps) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const items = useMemo(() => {
+    // "set" 모드: 세트/조립상품 중 변형(canonicalProductId 가 있는) 은 가림. 대표 또는 단일만.
+    if (filterType === "set") return products.filter((p) => p.isSet && !p.canonicalProductId);
+    if (filterType === "component") return products.filter((p) => !p.isSet);
+    return products;
+  }, [products, filterType]);
 
-  const filtered = products
-    .filter((p) => {
-      if (filterType === "set") return p.isSet;
-      if (filterType === "component") return !p.isSet;
-      return true;
-    })
-    .filter((p) => {
-      const q = search.toLowerCase();
-      return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
-    });
-
-  const selected = products.find((p) => p.id === value);
+  const selected = items.find((p) => p.id === value);
+  const selectedLabel = selected ? `${selected.name} (${selected.sku})` : undefined;
 
   return (
-    <Popover open={open} onOpenChange={(v) => { if (v) setSearch(""); setOpen(v); }}>
-      <PopoverTrigger
-        disabled={disabled}
-        className="flex h-9 w-full items-center justify-between rounded-lg border border-input bg-transparent px-3 py-2 text-sm cursor-pointer hover:bg-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <span className={selected ? "" : "text-muted-foreground"}>
-          {selected ? `${selected.name} (${selected.sku})` : placeholder}
-        </span>
-        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="상품명 또는 SKU 검색..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>결과 없음</CommandEmpty>
-            <CommandGroup>
-              {filtered.map((p) => (
-                <CommandItem
-                  key={p.id}
-                  value={p.id}
-                  onSelect={() => { onChange(p); setOpen(false); setSearch(""); }}
-                  data-checked={p.id === value ? "true" : undefined}
-                >
-                  <span className="flex-1 truncate">{p.name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground shrink-0">{p.sku}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <ResponsiveCombobox<ProductOption>
+      items={items}
+      value={value}
+      getItemId={(p) => p.id}
+      matches={(p, q) => {
+        const lower = q.toLowerCase();
+        return p.name.toLowerCase().includes(lower) || p.sku.toLowerCase().includes(lower);
+      }}
+      onSelect={(p) => onChange(p)}
+      selectedLabel={selectedLabel}
+      placeholder={placeholder}
+      searchPlaceholder="상품명 또는 SKU 검색..."
+      mobileTitle="상품 선택"
+      clearable={clearable}
+      onClear={() => onChange(EMPTY_OPTION)}
+      disabled={disabled}
+      renderItem={(p) => (
+        <>
+          {p.isCanonical && (
+            <span className="mr-1.5 shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+              그룹
+            </span>
+          )}
+          <span className="flex-1 truncate">{p.name}</span>
+          <span className="ml-2 text-xs text-muted-foreground shrink-0">{p.sku}</span>
+        </>
+      )}
+    />
   );
 }

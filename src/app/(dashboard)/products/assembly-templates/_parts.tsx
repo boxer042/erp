@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,6 +39,40 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
 import type { SlotLabelRow, SlotRow, TemplateRow } from "./_types";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function TemplatesSkeletonRows({ rows = 6 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
+          <TableCell><div className="flex justify-end gap-1"><Skeleton className="h-7 w-7 rounded-md" /><Skeleton className="h-7 w-7 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+function LabelsSkeletonRows({ rows = 5 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
+          <TableCell><div className="flex justify-end gap-1"><Skeleton className="h-7 w-7 rounded-md" /><Skeleton className="h-7 w-7 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 // ============================================================
 // 템플릿 관리 뷰
@@ -80,7 +114,8 @@ export function TemplatesView() {
   }, []);
 
   const fetchProducts = useCallback(async () => {
-    const res = await fetch("/api/products");
+    // 벌크 상품도 슬롯 기본 상품으로 선택 가능하도록 isBulk=all로 전체 조회
+    const res = await fetch("/api/products?isBulk=all");
     if (res.ok) {
       const data = await res.json();
       setProducts(
@@ -112,7 +147,7 @@ export function TemplatesView() {
     setDescription("");
     setDefaultLaborCost("");
     setIsActive(true);
-    setSlots([{ label: "", slotLabelId: null, order: 0, defaultProductId: null, defaultQuantity: "1" }]);
+    setSlots([{ label: "", slotLabelId: null, order: 0, defaultProductId: null, defaultQuantity: "1", isVariable: false }]);
   };
 
   const openCreate = () => {
@@ -140,6 +175,7 @@ export function TemplatesView() {
           order: number;
           defaultProductId: string | null;
           defaultQuantity: string;
+          isVariable: boolean;
         }>;
       };
       setEditingId(t.id);
@@ -157,6 +193,7 @@ export function TemplatesView() {
             order: s.order,
             defaultProductId: s.defaultProductId,
             defaultQuantity: s.defaultQuantity.toString(),
+            isVariable: s.isVariable ?? false,
           })),
       );
       setSheetOpen(true);
@@ -174,6 +211,7 @@ export function TemplatesView() {
         order: prev.length,
         defaultProductId: null,
         defaultQuantity: "1",
+        isVariable: false,
       },
     ]);
 
@@ -184,6 +222,15 @@ export function TemplatesView() {
     setSlots((prev) =>
       prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
     );
+
+  const moveSlot = (idx: number, direction: -1 | 1) =>
+    setSlots((prev) => {
+      const target = idx + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
 
   // 즉석 라벨 등록
   const createLabelMutation = useMutation({
@@ -230,6 +277,7 @@ export function TemplatesView() {
             order: idx,
             defaultProductId: s.defaultProductId,
             defaultQuantity: s.defaultQuantity,
+            isVariable: s.isVariable,
           })),
         }),
       });
@@ -293,11 +341,7 @@ export function TemplatesView() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
-                  로딩 중...
-                </TableCell>
-              </TableRow>
+              <TemplatesSkeletonRows />
             ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8">
@@ -366,7 +410,11 @@ export function TemplatesView() {
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
+        <SheetContent
+          side="bottom"
+          className="p-0 flex flex-col"
+          style={{ height: "90vh", maxHeight: "90vh" }}
+        >
           <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
             <SheetTitle>
               {editingId ? "조립 템플릿 수정" : "조립 템플릿 등록"}
@@ -374,7 +422,7 @@ export function TemplatesView() {
           </SheetHeader>
 
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-            <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 flex flex-col gap-4">
               <div className="grid grid-cols-[120px_1fr] items-center gap-2">
                 <label className="text-sm text-right">템플릿명</label>
                 <Input
@@ -421,9 +469,11 @@ export function TemplatesView() {
                     <thead>
                       <tr className="bg-muted text-muted-foreground text-xs">
                         <th className="border-r border-b border-border w-[40px] py-2 text-center font-medium">번호</th>
+                        <th className="border-r border-b border-border w-[64px] py-2 text-center font-medium">순서</th>
                         <th className="border-r border-b border-border py-2 px-2 text-left font-medium" style={{ width: "30%" }}>라벨</th>
                         <th className="border-r border-b border-border w-[100px] py-2 text-center font-medium">수량</th>
                         <th className="border-r border-b border-border py-2 px-2 text-left font-medium">기본 상품</th>
+                        <th className="border-r border-b border-border w-[60px] py-2 text-center font-medium" title="조립실적에서 부품을 변경할 수 있는 슬롯">가변</th>
                         <th className="border-b border-border w-[40px]"></th>
                       </tr>
                     </thead>
@@ -431,6 +481,28 @@ export function TemplatesView() {
                       {slots.map((s, idx) => (
                         <tr key={idx} className="group border-b border-border hover:bg-muted/50">
                           <td className="border-r border-border text-center text-muted-foreground py-1">{idx + 1}</td>
+                          <td className="border-r border-border p-0.5">
+                            <div className="flex items-center justify-center gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => moveSlot(idx, -1)}
+                                disabled={idx === 0}
+                                className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                                aria-label="위로 이동"
+                              >
+                                <ArrowUp className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveSlot(idx, 1)}
+                                disabled={idx === slots.length - 1}
+                                className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                                aria-label="아래로 이동"
+                              >
+                                <ArrowDown className="size-3.5" />
+                              </button>
+                            </div>
+                          </td>
                           <td className="border-r border-border p-0.5 align-middle">
                             <AssemblySlotLabelCombobox
                               labels={activeLabels.map((l) => ({ id: l.id, name: l.name }))}
@@ -459,6 +531,13 @@ export function TemplatesView() {
                               placeholder="기본 상품 (선택)"
                             />
                           </td>
+                          <td className="border-r border-border text-center">
+                            <Checkbox
+                              checked={s.isVariable}
+                              onCheckedChange={(c) => updateSlot(idx, { isVariable: c === true })}
+                              aria-label="가변 슬롯"
+                            />
+                          </td>
                           <td className="text-center">
                             <button
                               type="button"
@@ -471,7 +550,7 @@ export function TemplatesView() {
                         </tr>
                       ))}
                       <tr>
-                        <td colSpan={5} className="py-1.5 px-2">
+                        <td colSpan={7} className="py-1.5 px-2">
                           <button
                             type="button"
                             onClick={addSlot}
@@ -658,11 +737,7 @@ export function LabelsView() {
           </TableHeader>
           <TableBody>
             {labelsQuery.isPending ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
-                  로딩 중...
-                </TableCell>
-              </TableRow>
+              <LabelsSkeletonRows />
             ) : labels.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center py-8">

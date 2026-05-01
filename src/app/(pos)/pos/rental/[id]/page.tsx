@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronLeft, Loader2, Plus, Trash2 } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ExtraItem {
   productId: string;
@@ -90,7 +92,16 @@ export default function RentalDetailPage() {
   }, [load]);
 
   if (loading || !rental) {
-    return <div className="p-8 text-center text-muted-foreground">로딩 중...</div>;
+    return (
+      <div className="p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <Skeleton className="h-32 w-full rounded-md" />
+        <Skeleton className="h-48 w-full rounded-md" />
+      </div>
+    );
   }
 
   const addExtraItem = () => {
@@ -378,11 +389,9 @@ export default function RentalDetailPage() {
 
             {Number(rental.depositAmount) > 0 ? (
               <label className="mb-5 flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={depositReturned}
-                  onChange={(e) => setDepositReturned(e.target.checked)}
-                  className="h-4 w-4 rounded border-border"
+                  onCheckedChange={(c) => setDepositReturned(c === true)}
                 />
                 보증금 환급 (₩{Number(rental.depositAmount).toLocaleString("ko-KR")})
               </label>

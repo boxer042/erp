@@ -34,7 +34,7 @@ export interface ChannelPricingItem {
   id: string;
   channelId: string;
   sellingPrice: string;
-  channel: { id?: string; name: string; code: string };
+  channel: { id?: string; name: string; code: string; logoUrl?: string | null };
 }
 
 export interface SellingCostItem {
@@ -53,6 +53,14 @@ export interface VariantItem {
   sku: string;
   sellingPrice?: string;
   inventory: { quantity: string } | null;
+  variableComponents?: Array<{
+    slotLabel: string | null;
+    componentName: string;
+    componentSku: string;
+    quantity: string;
+  }>;
+  /** 그 변형의 잔여 lot 가중평균 단가 (공급단가+배송비+부대비용 누적) — API 응답에 enriched */
+  avgInboundUnitCost?: number;
 }
 
 export interface InventoryLotItem {
@@ -67,6 +75,15 @@ export interface InventoryLotItem {
     name: string;
     supplier: { name: string };
   } | null;
+  // 추가: API enrich 필드 (없을 수도 있어 모두 optional)
+  incomingId?: string | null;
+  incomingNo?: string | null;
+  shippingPerUnit?: number;
+  shippingIsTaxable?: boolean;
+  shippingSource?: "ITEM" | "ALLOCATED" | "DEDUCTED" | "ZERO";
+  isCurrentlyConsuming?: boolean;
+  /** canonical 합산 표시용 — 어느 변형의 lot 인지 */
+  variant?: { id: string; name: string; sku: string } | null;
 }
 
 export interface InventoryMovementItem {
@@ -78,6 +95,10 @@ export interface InventoryMovementItem {
   referenceType: string | null;
   memo: string | null;
   createdAt: string;
+  /** canonical 합산 표시용 — 어느 변형/단일 상품의 movement 인지 */
+  inventory?: {
+    product: { id?: string; name: string; sku: string };
+  } | null;
 }
 
 export interface ProductMediaItem {
@@ -128,6 +149,7 @@ export interface ProductDetail {
   bulkProduct?: BulkParentRef | null;
   imageUrl: string | null;
   memo: string | null;
+  assemblyTemplateId?: string | null;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -138,6 +160,57 @@ export interface ProductDetail {
   sellingCosts: SellingCostItem[];
   media?: ProductMediaItem[];
   inventoryLots?: InventoryLotItem[];
+  specValues?: ProductSpecValueItem[];
+  estimatedUnitCost?: number | null;
+  estimatedMargin?: number | null;
+  estimatedMarginRate?: number | null;
+  estimatedCostBreakdown?: Array<{
+    componentId: string;
+    componentName: string;
+    componentSku: string;
+    label?: string | null;
+    quantity: number;
+    unitCost: number;
+    supplierUnitPrice?: number;
+    shippingPerUnit?: number;
+    incomingCostPerUnit?: number;
+    subtotal: number;
+    costSource: "LOT" | "SUPPLIER" | "BULK_PARENT" | "NONE";
+    supplierName?: string | null;
+    supplierProductName?: string | null;
+    incomingCostList?: Array<{ name: string; costType: string; value: number; isTaxable: boolean }>;
+  }>;
+  missingCostCount?: number;
+  estimatedMarginByChannel?: Array<{
+    channelId: string;
+    channelName: string;
+    channelCode: string;
+    channelSellingPrice: number;
+    channelFeeTotal: number;
+    estimatedMargin: number;
+    estimatedMarginRate: number | null;
+  }>;
+  canonicalAggregatedUnitCost?: number;
+  canonicalAggregatedQty?: number;
+}
+
+export interface ProductSpecSlotItem {
+  id: string;
+  name: string;
+  type: "TEXT" | "NUMBER" | "ENUM";
+  unit: string | null;
+  options: string[];
+  order: number;
+  isActive: boolean;
+}
+
+export interface ProductSpecValueItem {
+  id: string;
+  productId: string;
+  slotId: string;
+  value: string;
+  order: number;
+  slot: ProductSpecSlotItem;
 }
 
 export type ProductCardVariant = "admin" | "customer" | "compact";

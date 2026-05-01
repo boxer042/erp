@@ -47,4 +47,13 @@ export const queryKeys = {
     all: ["assembly-slot-labels"] as const,
     list: (params?: Record<string, unknown>) => ["assembly-slot-labels", "list", params ?? {}] as const,
   },
+  companyInfo: {
+    all: ["company-info"] as const,
+  },
+  cardFeeRate: {
+    all: ["card-fee-rate"] as const,
+  },
+  cardCompanyFees: {
+    all: ["card-company-fees"] as const,
+  },
 } as const;

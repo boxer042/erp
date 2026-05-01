@@ -94,6 +94,8 @@ interface ReportData {
   channelGroups: ChannelGroup[];
   productGroups: ProductGroup[];
   categoryGroups: CategoryGroup[];
+  missingCostCount?: number;
+  missingCostOrderIds?: string[];
 }
 
 interface Channel {
@@ -300,6 +302,18 @@ export default function MarginReportPage() {
         </div>
       ) : (
         <>
+          {/* 원가 정보 누락 경고 */}
+          {data.missingCostCount && data.missingCostCount > 0 ? (
+            <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-2.5 text-sm text-yellow-700 dark:text-yellow-400">
+              ⚠️ {data.missingCostCount}건의 주문 항목에 원가 정보가 누락되어 마진이 과대 표시될 수 있습니다.
+              {data.missingCostOrderIds && data.missingCostOrderIds.length > 0 && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (관련 주문 {data.missingCostOrderIds.length}건)
+                </span>
+              )}
+            </div>
+          ) : null}
+
           {/* 요약 카드 그리드 */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <SummaryCard

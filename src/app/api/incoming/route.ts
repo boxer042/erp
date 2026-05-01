@@ -65,6 +65,10 @@ export async function POST(request: NextRequest) {
     const price = parseFloat(item.unitPrice);
     const originalPrice = item.originalPrice ? parseFloat(item.originalPrice) : undefined;
     const discountAmount = item.discountAmount ? parseFloat(item.discountAmount) : undefined;
+    const rawShipping = item.itemShippingCost;
+    const itemShippingCost = rawShipping === null || rawShipping === undefined || rawShipping === ""
+      ? null
+      : (parseFloat(rawShipping) || 0);
     return {
       supplierProductId: item.supplierProductId,
       quantity: qty,
@@ -72,6 +76,8 @@ export async function POST(request: NextRequest) {
       totalPrice: qty * price,
       originalPrice,
       discountAmount,
+      itemShippingCost,
+      itemShippingIsTaxable: item.itemShippingIsTaxable ?? true,
     };
   });
 
@@ -99,6 +105,8 @@ export async function POST(request: NextRequest) {
             discountAmount: i.discountAmount,
             unitPrice: i.unitPrice,
             totalPrice: i.totalPrice,
+            itemShippingCost: i.itemShippingCost,
+            itemShippingIsTaxable: i.itemShippingIsTaxable,
           })),
         },
       },

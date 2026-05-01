@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
 import { z } from "zod";
+import { guardAdmin } from "@/lib/api-auth";
 
 const updateSchema = z.object({
   amount: z.string().min(1, "금액을 입력해주세요")
@@ -31,6 +32,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   const body = await request.json();
   const parsed = updateSchema.safeParse(body);
@@ -69,6 +72,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   const existing = await prisma.supplierLedger.findUnique({ where: { id } });
   if (!existing || existing.referenceType !== "MANUAL_ADJUSTMENT") {

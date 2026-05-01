@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assemblyTemplateSchema } from "@/lib/validators/assembly-template";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function GET(
   _request: NextRequest,
@@ -39,6 +40,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   const body = await request.json();
   const parsed = assemblyTemplateSchema.safeParse(body);
@@ -88,6 +91,7 @@ export async function PUT(
           order: s.order ?? idx,
           defaultProductId: s.defaultProductId || null,
           defaultQuantity: parseFloat(s.defaultQuantity),
+          isVariable: s.isVariable ?? false,
         };
         if (s.id && existingIds.has(s.id)) {
           await tx.assemblyTemplateSlot.update({
@@ -118,6 +122,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   try {
     await prisma.assemblyTemplate.delete({ where: { id } });

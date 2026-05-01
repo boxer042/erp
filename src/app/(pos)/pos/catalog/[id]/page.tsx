@@ -7,6 +7,8 @@ import {
   ProductDescriptionBlock,
   ProductInfoCard,
   ProductMediaGallery,
+  ProductSection,
+  ProductSpecsTable,
 } from "@/components/product";
 import type { ProductDetail } from "@/components/product/types";
 
@@ -22,6 +24,10 @@ export default async function ProductDetailPage({
       media: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       brandRef: { select: { id: true, name: true, logoUrl: true } },
       category: { select: { id: true, name: true } },
+      specValues: {
+        include: { slot: true },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+      },
     },
   });
 
@@ -65,6 +71,12 @@ export default async function ProductDetailPage({
           />
 
           <ProductDescriptionBlock product={productJson} showMemo={false} />
+
+          {(productJson.specValues?.length ?? 0) > 0 && (
+            <ProductSection title="상세 스펙" noPadding>
+              <ProductSpecsTable values={productJson.specValues ?? []} />
+            </ProductSection>
+          )}
         </div>
       </div>
     </div>

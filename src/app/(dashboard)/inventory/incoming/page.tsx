@@ -24,7 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import {
   Plus, Check, X, Trash2, FileText, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, Search, ChevronDown,
-  Loader2, Pencil,
+  Loader2, Pencil, Truck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QuickSupplierSheet } from "@/components/quick-register-sheets";
@@ -37,7 +37,9 @@ import {
   shippingToSupply,
   shippingToTotal,
 } from "./_helpers";
-import { DateInput, SupplierCombobox, InlineCellProductSearch } from "./_parts";
+import { DateInput, InlineCellProductSearch, ItemShippingPopover } from "./_parts";
+import { computeShippingPerUnitDisplay } from "@/lib/incoming-shipping";
+import { SupplierCombobox } from "@/components/supplier-combobox";
 
 
 export default function IncomingPage() {
@@ -101,6 +103,10 @@ function IncomingPageInner() {
   const [shippingEditSupply, setShippingEditSupply] = useState("");
   const [shippingEditIsTaxable, setShippingEditIsTaxable] = useState(true);
   const [shippingEditDeducted, setShippingEditDeducted] = useState(false);
+  // 후기입 다이얼로그의 품목별 운임 override (key=IncomingItem.id)
+  const [shippingEditItemOverrides, setShippingEditItemOverrides] = useState<
+    Record<string, { value: string; taxable: boolean }>
+  >({});
 
   const suppliersQuery = useQuery({
     queryKey: queryKeys.suppliers.list(),
@@ -151,6 +157,7 @@ function IncomingPageInner() {
     setItems([{
       supplierProductId: "", supplierProductName: "", supplierCode: "", spec: "",
       unitOfMeasure: "EA", quantity: "", unitPrice: "", supplyAmount: "", discount: "", originalPrice: "", memo: "",
+      itemShippingCost: "", itemShippingIsTaxable: true,
     }]);
   };
 
@@ -178,6 +185,8 @@ function IncomingPageInner() {
       discount: "",
       originalPrice: "",
       memo: "",
+      itemShippingCost: "",
+      itemShippingIsTaxable: true,
     }]);
   };
 
@@ -195,6 +204,7 @@ function IncomingPageInner() {
         unitOfMeasure: sp.unitOfMeasure,
         originalPrice: sp.unitPrice,
         isNew: undefined,
+        pendingSourceRow: undefined,
         // 금액이 이미 입력되어 있으면 유지, 없으면 상품 기본가 적용
         ...(hasData ? {} : { unitPrice: sp.unitPrice }),
       };
@@ -221,6 +231,7 @@ function IncomingPageInner() {
         supplierProductName: name,
         supplierCode: "",
         isNew: true,
+        pendingSourceRow: undefined,
         ...(hasData ? {} : { spec: "", unitOfMeasure: "EA", quantity: "", unitPrice: "", supplyAmount: "", discount: "", originalPrice: "", memo: "" }),
       };
       return updated;
@@ -242,7 +253,9 @@ function IncomingPageInner() {
         supplierCode: pending.supplierCode, spec: pending.spec,
         unitOfMeasure: "EA", quantity: "", unitPrice: "",
         supplyAmount: "", discount: "", originalPrice: "", memo: "",
+        itemShippingCost: "", itemShippingIsTaxable: true,
         isNew: true,
+        pendingSourceRow: pending.rowIndex,
       };
       return updated;
     });
@@ -255,12 +268,28 @@ function IncomingPageInner() {
   // ─── 품목 편집 ───
   const updateItem = (index: number, field: keyof IncomingItemForm, value: string) => {
     const updated = [...items];
-    updated[index] = { ...updated[index], [field]: value };
+    const next = { ...updated[index], [field]: value };
+    // 재사용으로 들어온 행이 원본과 다른 값으로 수정되면 분리 표시
+    if (
+      next.pendingSourceRow !== undefined &&
+      (field === "supplierProductName" || field === "spec" || field === "supplierCode")
+    ) {
+      const source = updated[next.pendingSourceRow];
+      if (
+        !source ||
+        source.supplierProductName !== next.supplierProductName ||
+        source.spec !== next.spec ||
+        source.supplierCode !== next.supplierCode
+      ) {
+        next.pendingSourceRow = undefined;
+      }
+    }
+    updated[index] = next;
     setItems(updated);
   };
 
   // 단가/공급가액/수량 입력 완료(blur) 시 상호 계산
-  const recalcOnBlur = (index: number, field: string) => {
+  const recalcOnBlur = (index: number, field: string, vatRawOverride?: string) => {
     setItems(prev => {
       const updated = [...prev];
       const item = { ...updated[index] };
@@ -268,10 +297,20 @@ function IncomingPageInner() {
       const up = parseFloat(item.unitPrice || "0");
 
       if (field === "unitPrice" || field === "quantity") {
-        // 공급가액 = 실제단가 × 수량
         const disc = calcDiscountPerUnit(up, item.discount);
-        const actual = up - disc;
-        const supply = actual * qty;
+        // VAT포함 입력 원본이 있으면 그 값 기준으로 공급가액 산출 (단가 반올림 round-trip 오차 방지)
+        const rawStr = vatRawOverride !== undefined
+          ? vatRawOverride
+          : (unitPriceVatIncluded ? vatRawByIdx[index] : undefined);
+        const raw = parseFloat(rawStr || "0");
+        let supply: number;
+        if (raw > 0 && qty > 0) {
+          // VAT포함 합계 / 1.1 - 개당할인 × 수량
+          supply = Math.round((raw * qty) / 1.1) - disc * qty;
+        } else {
+          const actual = up - disc;
+          supply = actual * qty;
+        }
         item.supplyAmount = supply > 0 ? String(supply) : "";
       }
       if (field === "supplyAmount") {
@@ -288,6 +327,14 @@ function IncomingPageInner() {
       }
 
       updated[index] = item;
+      return updated;
+    });
+  };
+
+  const updateItemTaxable = (index: number, value: boolean) => {
+    setItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], itemShippingIsTaxable: value };
       return updated;
     });
   };
@@ -321,6 +368,7 @@ function IncomingPageInner() {
     setItems([{
       supplierProductId: "", supplierProductName: "", supplierCode: "", spec: "",
       unitOfMeasure: "EA", quantity: "", unitPrice: "", supplyAmount: "", discount: "", originalPrice: "", memo: "",
+      itemShippingCost: "", itemShippingIsTaxable: true,
     }]);
     setIncomingDate(new Date().toISOString().split("T")[0]);
     setUnitPriceVatIncluded(false);
@@ -364,6 +412,10 @@ function IncomingPageInner() {
         discount: discAmt > 0 ? String(discAmt) : "",
         originalPrice: beforeDiscount,
         memo: item.memo ?? "",
+        itemShippingCost: item.itemShippingCost != null && item.itemShippingCost !== ""
+          ? String(parseFloat(item.itemShippingCost))
+          : "",
+        itemShippingIsTaxable: item.itemShippingIsTaxable ?? true,
       };
     }));
     setEditingId(incoming.id);
@@ -424,6 +476,8 @@ function IncomingPageInner() {
           unitPrice: actualPrice,
           originalPrice: item.unitPrice,
           discountAmount: String(discPerUnit),
+          itemShippingCost: item.itemShippingCost.trim() === "" ? null : item.itemShippingCost,
+          itemShippingIsTaxable: item.itemShippingIsTaxable,
         };
       });
 
@@ -494,12 +548,19 @@ function IncomingPageInner() {
   const cancelling = cancelMutation.isPending;
 
   const shippingEditMutation = useMutation({
-    mutationFn: (vars: { id: string; cost: string; isTaxable: boolean; deducted: boolean }) =>
+    mutationFn: (vars: {
+      id: string;
+      cost: string;
+      isTaxable: boolean;
+      deducted: boolean;
+      items: Array<{ id: string; itemShippingCost: string | null; itemShippingIsTaxable: boolean }>;
+    }) =>
       apiMutate(`/api/incoming/${vars.id}`, "PUT", {
         action: "update-shipping",
         shippingCost: vars.cost || "0",
         shippingIsTaxable: vars.isTaxable,
         shippingDeducted: vars.deducted,
+        items: vars.items,
       }),
     onSuccess: (_data, vars) => {
       setShippingEditOpen(false);
@@ -511,11 +572,21 @@ function IncomingPageInner() {
   });
   const handleShippingEdit = () => {
     if (!detail) return;
+    const items = detail.items.map((it) => {
+      const ov = shippingEditItemOverrides[it.id];
+      const value = (ov?.value ?? "").trim();
+      return {
+        id: it.id,
+        itemShippingCost: value === "" ? null : value,
+        itemShippingIsTaxable: ov?.taxable ?? it.itemShippingIsTaxable ?? true,
+      };
+    });
     shippingEditMutation.mutate({
       id: detail.id,
       cost: shippingEditCost,
       isTaxable: shippingEditIsTaxable,
       deducted: shippingEditDeducted,
+      items,
     });
   };
   const shippingEditSaving = shippingEditMutation.isPending;
@@ -786,6 +857,15 @@ function IncomingPageInner() {
                   setShippingEditSupply(shippingToSupply(total, detail.shippingIsTaxable));
                   setShippingEditIsTaxable(detail.shippingIsTaxable);
                   setShippingEditDeducted(detail.shippingDeducted);
+                  // 품목별 override 초기화
+                  const overrides: Record<string, { value: string; taxable: boolean }> = {};
+                  for (const it of detail.items) {
+                    const v = it.itemShippingCost != null && it.itemShippingCost !== ""
+                      ? String(parseFloat(it.itemShippingCost))
+                      : "";
+                    overrides[it.id] = { value: v, taxable: it.itemShippingIsTaxable ?? true };
+                  }
+                  setShippingEditItemOverrides(overrides);
                   setShippingEditOpen(true);
                 }}
               >
@@ -1009,6 +1089,31 @@ function IncomingPageInner() {
                     </div>
                   </div>
 
+                  {(() => {
+                    const detailShippingMap = computeShippingPerUnitDisplay(
+                      detail.items.map((i) => ({
+                        id: i.id,
+                        quantity: parseFloat(i.quantity),
+                        totalPrice: parseFloat(i.totalPrice),
+                        itemShippingCost: i.itemShippingCost == null || i.itemShippingCost === ""
+                          ? null
+                          : parseFloat(i.itemShippingCost),
+                        itemShippingIsTaxable: i.itemShippingIsTaxable,
+                      })),
+                      {
+                        shippingCost: parseFloat(detail.shippingCost) || 0,
+                        shippingIsTaxable: detail.shippingIsTaxable,
+                        shippingDeducted: detail.shippingDeducted,
+                      }
+                    );
+                    const itemOverrideTotal = detail.items.reduce((sum, it) => {
+                      const v = it.itemShippingCost == null || it.itemShippingCost === ""
+                        ? 0
+                        : parseFloat(it.itemShippingCost);
+                      return sum + (v > 0 ? v : 0);
+                    }, 0);
+                    return (
+                  <>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-muted text-muted-foreground text-xs">
@@ -1023,11 +1128,13 @@ function IncomingPageInner() {
                         <th className="border-r border-b border-border w-[110px] py-2 text-center font-medium">실제단가</th>
                         <th className="border-r border-b border-border w-[120px] py-2 text-center font-medium">공급가액</th>
                         <th className="border-r border-b border-border w-[100px] py-2 text-center font-medium">세액</th>
+                        <th className="border-r border-b border-border w-[140px] py-2 text-center font-medium">배송비(개당)</th>
                         <th className="border-r border-b border-border w-[80px] py-2 px-2 text-center font-medium">비고</th>
                         <th className="border-b border-border w-[60px] py-2 text-center font-medium">매핑</th>
                       </tr>
                     </thead>
                     <tbody>
+                      {(() => null)()}
                       {detail.items.map((item, idx) => {
                         const qty = parseFloat(item.quantity);
                         const up = parseFloat(item.unitPrice);
@@ -1035,6 +1142,7 @@ function IncomingPageInner() {
                         const discPerUnit = up < origPrice ? origPrice - up : 0;
                         const supplyLine = up * qty;
                         const taxLine = Math.round(supplyLine * 0.1);
+                        const shipDisplay = detailShippingMap.get(item.id);
                         return (
                           <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-muted/50">
                             <td className="border-r border-border text-center text-muted-foreground py-1.5">{idx + 1}</td>
@@ -1048,6 +1156,32 @@ function IncomingPageInner() {
                             <td className="border-r border-border text-right px-2 py-1.5 tabular-nums">{formatPrice(up)}</td>
                             <td className="border-r border-border text-right px-2 py-1.5 tabular-nums">{formatPrice(supplyLine)}</td>
                             <td className="border-r border-border text-right px-2 py-1.5 text-muted-foreground tabular-nums">{formatPrice(taxLine)}</td>
+                            <td className="border-r border-border px-2 py-1.5 text-right tabular-nums">
+                              {shipDisplay && shipDisplay.perUnit > 0 ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <span>₩{formatPrice(Math.round(shipDisplay.perUnit))}</span>
+                                  <span
+                                    className={`text-[10px] px-1 py-0.5 rounded ${
+                                      shipDisplay.source === "ITEM"
+                                        ? "bg-primary/10 text-primary"
+                                        : shipDisplay.source === "ALLOCATED"
+                                          ? "bg-muted text-muted-foreground"
+                                          : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                                    }`}
+                                  >
+                                    {shipDisplay.source === "ITEM"
+                                      ? "직접"
+                                      : shipDisplay.source === "ALLOCATED"
+                                        ? "분배"
+                                        : "차감"}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  {shipDisplay?.source === "DEDUCTED" ? "차감(0)" : "—"}
+                                </span>
+                              )}
+                            </td>
                             <td className="border-r border-border px-2 py-1.5 text-muted-foreground">{item.memo || ""}</td>
                             <td className="text-center py-1.5">
                               {item.supplierProduct.productMappings && item.supplierProduct.productMappings.length > 0 ? (
@@ -1088,8 +1222,17 @@ function IncomingPageInner() {
                             <span className="tabular-nums">₩{formatPrice(parseFloat(detail.shippingCost))}</span>
                           </div>
                         )}
+                        {itemOverrideTotal > 0 && (
+                          <div className="border-t border-border px-3 py-2 flex items-center justify-between text-sm">
+                            <span className="text-xs text-muted-foreground">품목 직접 운임 합계 (분배 제외)</span>
+                            <span className="tabular-nums">₩{formatPrice(itemOverrideTotal)}</span>
+                          </div>
+                        )}
                       </div>
                     );
+                  })()}
+                  </>
+                  );
                   })()}
                 </div>
                 </div>
@@ -1149,7 +1292,7 @@ function IncomingPageInner() {
 
               {/* 택배비 후기입 다이얼로그 */}
               <Dialog open={shippingEditOpen} onOpenChange={setShippingEditOpen}>
-                <DialogContent className="max-w-sm">
+                <DialogContent className="max-w-md">
                   <DialogHeader><DialogTitle>택배비 {parseFloat(detail.shippingCost) > 0 ? "수정" : "추가"}</DialogTitle></DialogHeader>
                   <div className="space-y-4 py-2">
                     <div className="grid grid-cols-[80px_1fr] items-center gap-2">
@@ -1218,6 +1361,60 @@ function IncomingPageInner() {
                         거래처 차감
                       </label>
                     </div>
+
+                    {/* 품목별 운임 — 토글로 펼침 */}
+                    <details className="rounded-md border border-border">
+                      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium hover:bg-muted">
+                        품목별 운임 (선택)
+                      </summary>
+                      <div className="border-t border-border p-2 max-h-[300px] overflow-y-auto space-y-2">
+                        <p className="text-xs text-muted-foreground px-1">
+                          입력한 품목은 전표 운임 분배에서 빠지고 자기 값을 사용합니다. 비워두면 분배 적용.
+                        </p>
+                        {detail.items.map((it) => {
+                          const ov = shippingEditItemOverrides[it.id] ?? { value: "", taxable: true };
+                          return (
+                            <div key={it.id} className="grid grid-cols-[1fr_120px_50px] items-center gap-2 px-1">
+                              <div className="text-xs truncate">
+                                <span className="font-medium">{it.supplierProduct.name}</span>
+                                {it.supplierProduct.supplierCode && (
+                                  <span className="ml-1 text-muted-foreground">[{it.supplierProduct.supplierCode}]</span>
+                                )}
+                              </div>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="분배 적용"
+                                value={formatComma(ov.value)}
+                                onChange={(e) =>
+                                  setShippingEditItemOverrides((prev) => ({
+                                    ...prev,
+                                    [it.id]: { value: parseComma(e.target.value), taxable: prev[it.id]?.taxable ?? true },
+                                  }))
+                                }
+                                onFocus={(e) => e.currentTarget.select()}
+                                className="h-8 text-right tabular-nums text-xs"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShippingEditItemOverrides((prev) => ({
+                                    ...prev,
+                                    [it.id]: { value: prev[it.id]?.value ?? "", taxable: !(prev[it.id]?.taxable ?? true) },
+                                  }))
+                                }
+                                className={`h-8 rounded-md border text-[11px] ${
+                                  ov.taxable ? "border-primary text-primary" : "border-border text-muted-foreground"
+                                }`}
+                                title="과세 여부"
+                              >
+                                {ov.taxable ? "과세" : "면세"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setShippingEditOpen(false)} disabled={shippingEditSaving}>취소</Button>
@@ -1276,7 +1473,8 @@ function IncomingPageInner() {
               </div>
 
               {/* 품목 테이블 — 거래명세표 스타일 (인라인 입력) */}
-                <table className="w-full text-sm table-fixed">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1040px] text-sm table-fixed">
                   <thead>
                     <tr className="bg-muted text-muted-foreground text-xs">
                       <th className="border-r border-b border-border w-[36px] py-2 text-center font-medium">번호</th>
@@ -1348,6 +1546,7 @@ function IncomingPageInner() {
                                 existingIds={items.map((i) => i.supplierProductId).filter(Boolean)}
                                 selectedName={item.supplierProductName}
                                 isNew={item.isNew}
+                                pendingSourceRow={item.pendingSourceRow}
                                 pendingNewProducts={pendingNewProducts}
                                 onSelectPending={(pending) => handleSelectPending(idx, pending)}
                               />
@@ -1423,6 +1622,8 @@ function IncomingPageInner() {
                                   updateItem(idx, "unitPrice", stored);
                                   setVatRawByIdx((prev) => ({ ...prev, [idx]: raw }));
                                   setVatInputBuffer(null);
+                                  recalcOnBlur(idx, "unitPrice", raw);
+                                  return;
                                 }
                                 recalcOnBlur(idx, "unitPrice");
                               }}
@@ -1478,7 +1679,7 @@ function IncomingPageInner() {
                             {!isEmptyRow && lineTax > 0 && formatPrice(lineTax)}
                           </td>
 
-                          {/* 비고 + 삭제 */}
+                          {/* 비고 + 운임 + 삭제 */}
                           <td className="p-0.5">
                             <div className="flex items-center gap-0.5">
                               <input
@@ -1494,6 +1695,13 @@ function IncomingPageInner() {
                                     addEmptyRow();
                                   }
                                 }}
+                              />
+                              <ItemShippingPopover
+                                value={item.itemShippingCost}
+                                isTaxable={item.itemShippingIsTaxable}
+                                onChange={(v) => updateItem(idx, "itemShippingCost", v)}
+                                onTaxableChange={(v) => updateItemTaxable(idx, v)}
+                                disabled={isEmptyRow}
                               />
                               <button type="button" onClick={() => removeItem(idx)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 p-1 shrink-0">
                                 <X className="size-3.5" />
@@ -1520,6 +1728,7 @@ function IncomingPageInner() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
 
                 {/* 합계 — 거래명세표 하단 */}
                 <div className="border-t border-border bg-muted">

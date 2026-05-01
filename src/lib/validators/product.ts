@@ -2,12 +2,12 @@ import { z } from "zod";
 
 export const productSchema = z.object({
   name: z.string().min(1, "상품명을 입력해주세요"),
-  brand: z.string().optional(),
+  brand: z.string().nullable().optional(),
   brandId: z.string().nullable().optional(),
   modelName: z.string().nullable().optional(),
   spec: z.string().nullable().optional(),
   sku: z.string().min(1, "SKU를 입력해주세요"),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   unitOfMeasure: z.string().default("EA"),
   productType: z.enum(["FINISHED", "PARTS", "SET", "ASSEMBLED"]).default("FINISHED"),
   taxType: z.enum(["TAXABLE", "TAX_FREE", "ZERO_RATE"]).default("TAXABLE"),
@@ -47,8 +47,9 @@ export const productSchema = z.object({
     .nullable()
     .optional(),
   imageUrl: z.string().nullable().optional(),
-  memo: z.string().optional(),
+  memo: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
+  assemblyTemplateId: z.string().nullable().optional(),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;
@@ -75,6 +76,7 @@ export const productMappingSchema = z.object({
   supplierProductId: z.string().min(1, "공급자 상품을 선택해주세요"),
   productId: z.string().min(1, "판매 상품을 선택해주세요"),
   conversionRate: z.string().default("1"),
+  isProvisional: z.boolean().optional(),
 });
 
 export type ProductMappingInput = z.infer<typeof productMappingSchema>;
@@ -83,6 +85,7 @@ export const setComponentSchema = z.object({
   componentId: z.string().min(1, "구성품을 선택해주세요"),
   quantity: z.string().min(1, "수량을 입력해주세요"),
   label: z.string().nullable().optional(),
+  slotLabelId: z.string().nullable().optional(),
 });
 
 export type SetComponentInput = z.infer<typeof setComponentSchema>;

@@ -30,12 +30,12 @@ export function ProductInventoryCard({ product }: ProductInventoryCardProps) {
         <Stat label="안전재고" value={safety > 0 ? `${fmtNumber(safety)} ${product.unitOfMeasure}` : "—"} />
         {inv?.avgCost ? (
           <Stat
-            label="평균원가 (deprecated)"
+            label="평균원가 (참고)"
             value={`₩${fmtNumber(inv.avgCost)}`}
-            sub="실제 원가는 로트 기준"
+            sub="캐시값 — FIFO 미반영. 실제 원가는 로트 단가"
           />
         ) : (
-          <Stat label="평균원가" value="—" sub="로트 기반 계산" />
+          <Stat label="평균원가" value="—" sub="로트(FIFO) 기준" />
         )}
         <Stat label="상태" value={isLow ? "부족" : "정상"} tone={isLow ? "bad" : "good"} />
       </div>

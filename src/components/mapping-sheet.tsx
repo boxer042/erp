@@ -7,18 +7,14 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import {
-  Popover, PopoverTrigger, PopoverContent,
-} from "@/components/ui/popover";
-import {
-  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
-} from "@/components/ui/command";
-import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, Loader2, ChevronsUpDown, Plus } from "lucide-react";
+import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { Trash2, Loader2, Plus } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
 
@@ -64,6 +60,8 @@ interface PendingMapping {
 
 // ─── ProductCombobox ──────────────────────────────────────────────────────────
 
+interface MappingItem { id: string; label: string; sub: string }
+
 function ProductCombobox({
   mode,
   products,
@@ -77,12 +75,9 @@ function ProductCombobox({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-
   const isSupplierMode = mode === "supplier-to-product";
 
-  const allItems = isSupplierMode
+  const allItems: MappingItem[] = isSupplierMode
     ? products.map((p) => ({ id: p.id, label: `${p.name} (${p.sku})`, sub: p.sku }))
     : supplierProducts.map((sp) => ({
         id: sp.id,
@@ -90,47 +85,33 @@ function ProductCombobox({
         sub: sp.supplier.name,
       }));
 
-  const filtered = allItems.filter((item) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return item.label.toLowerCase().includes(q) || item.sub.toLowerCase().includes(q);
-  });
-
   const selected = allItems.find((i) => i.id === selectedId);
+  const placeholder = isSupplierMode ? "판매 상품 선택..." : "거래처 상품 선택...";
+  const searchPlaceholder = isSupplierMode ? "판매 상품 검색..." : "거래처 상품 검색...";
 
   return (
-    <Popover open={open} onOpenChange={(v) => { if (v) setSearch(""); setOpen(v); }}>
-      <PopoverTrigger className="flex h-8 w-full items-center justify-between rounded-md border border-border bg-transparent px-2 text-[13px] cursor-pointer hover:bg-muted truncate">
-        <span className={selected ? "truncate" : "text-muted-foreground truncate"}>
-          {selected ? selected.label : (isSupplierMode ? "판매 상품 선택..." : "거래처 상품 선택...")}
-        </span>
-        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-1" />
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={isSupplierMode ? "판매 상품 검색..." : "거래처 상품 검색..."}
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>결과 없음</CommandEmpty>
-            <CommandGroup>
-              {filtered.map((item) => (
-                <CommandItem
-                  key={item.id}
-                  value={item.id}
-                  onSelect={() => { onSelect(item.id); setOpen(false); setSearch(""); }}
-                >
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {!isSupplierMode && <span className="text-xs text-muted-foreground shrink-0">{item.sub}</span>}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <ResponsiveCombobox<MappingItem>
+      items={allItems}
+      value={selectedId}
+      getItemId={(i) => i.id}
+      matches={(i, q) => {
+        const lower = q.toLowerCase();
+        return i.label.toLowerCase().includes(lower) || i.sub.toLowerCase().includes(lower);
+      }}
+      onSelect={(i) => onSelect(i.id)}
+      selectedLabel={selected?.label}
+      placeholder={placeholder}
+      searchPlaceholder={searchPlaceholder}
+      mobileTitle={placeholder}
+      renderItem={(item) => (
+        <>
+          <span className="flex-1 truncate">{item.label}</span>
+          {!isSupplierMode && (
+            <span className="text-xs text-muted-foreground shrink-0">{item.sub}</span>
+          )}
+        </>
+      )}
+    />
   );
 }
 
@@ -313,7 +294,11 @@ export function MappingSheet(props: MappingSheetProps) {
           </div>
 
           {loading ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">로딩 중...</p>
+            <div className="space-y-2 px-5 py-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-md" />
+              ))}
+            </div>
           ) : mappings.length === 0 && pendingMappings.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">매핑된 항목이 없습니다</p>
           ) : (
@@ -574,7 +559,11 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
 
           {/* 비용 목록 */}
           {loading ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">로딩 중...</p>
+            <div className="space-y-2 px-5 py-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-md" />
+              ))}
+            </div>
           ) : costs.length === 0 && avgShippingCost === null ? (
             <p className="text-sm text-muted-foreground py-8 text-center">등록된 비용이 없습니다</p>
           ) : (

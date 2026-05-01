@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { guardAdmin } from "@/lib/api-auth";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -31,6 +32,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   const body = await request.json();
   const parsed = updateSchema.safeParse(body);
@@ -63,6 +66,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   await prisma.brand.update({ where: { id }, data: { isActive: false } });
   return NextResponse.json({ success: true });

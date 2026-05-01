@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
 import { computeUnitCost } from "@/lib/cost-utils";
 import { MappingSheet } from "@/components/mapping-sheet";
+import { ShippingHistoryCard } from "@/components/shipping-history-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { UNITS_OF_MEASURE } from "@/lib/constants";
 import {
@@ -52,6 +53,8 @@ interface IncomingItem {
   shippingAllocation: number;
   shippingPercent: number;
   shippingIsTaxable: boolean;
+  hasItemOverride?: boolean;
+  hasAllocated?: boolean;
   incoming: {
     id: string;
     incomingNo: string;
@@ -93,6 +96,23 @@ interface SupplierProductDetail {
   priceHistory: PriceHistory[];
   avgShippingCost: number | null;
   avgShippingIsTaxable: boolean;
+  activeLots: ActiveLot[];
+}
+
+interface ActiveLot {
+  id: string;
+  receivedAt: string;
+  receivedQty: string;
+  remainingQty: string;
+  unitCost: string;
+  source: string;
+  product: { id: string; name: string; sku: string } | null;
+  incomingId: string | null;
+  incomingNo: string | null;
+  shippingPerUnit: number;
+  shippingIsTaxable: boolean;
+  shippingSource: "ITEM" | "ALLOCATED" | "DEDUCTED" | "ZERO";
+  isCurrentlyConsuming: boolean;
 }
 
 function fmt(v: string | number) {
@@ -101,6 +121,14 @@ function fmt(v: string | number) {
 
 export default function SupplierProductDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/supplier-products");
+    }
+  };
   const [product, setProduct] = useState<SupplierProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -220,11 +248,9 @@ export default function SupplierProductDetailPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-6 py-4 border-b border-border flex items-center gap-3 shrink-0">
-        <Link href="/supplier-products">
-          <Button variant="ghost" size="icon-xs">
-            <ArrowLeft className="size-4" />
-          </Button>
-        </Link>
+        <Button variant="ghost" size="icon-xs" onClick={handleBack} aria-label="뒤로가기">
+          <ArrowLeft className="size-4" />
+        </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold truncate">{product.name}</h1>
@@ -248,23 +274,73 @@ export default function SupplierProductDetailPage() {
 
       <ScrollArea className="flex-1 min-h-0">
       {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-4 px-6 py-4 border-b border-border">
-        <div className="bg-card rounded-lg p-4 border border-border">
-          <p className="text-xs text-muted-foreground mb-1">입고가</p>
-          <p className="text-lg font-bold tabular-nums">₩{Math.round(parseFloat(product.unitPrice) * (product.isTaxable ? 1.1 : 1)).toLocaleString("ko-KR")}</p>
-          {product.isTaxable && (
-            <p className="text-xs text-muted-foreground tabular-nums">공급가 ₩{fmt(product.unitPrice)}</p>
-          )}
-        </div>
-        <div className="bg-card rounded-lg p-4 border border-border">
-          <p className="text-xs text-muted-foreground mb-1">총 입고 횟수</p>
-          <p className="text-lg font-bold">{product.incomingItems.length}건</p>
-        </div>
-        <div className="bg-card rounded-lg p-4 border border-border">
-          <p className="text-xs text-muted-foreground mb-1">마지막 입고일</p>
-          <p className="text-lg font-bold">{lastIncomingDate}</p>
-        </div>
-      </div>
+      {(() => {
+        const unit = parseFloat(product.unitPrice) || 0;
+
+        // 원가
+        const costSupply = unit;
+        const costTax = product.isTaxable ? Math.round(unit * 0.1) : 0;
+        const costTotal = costSupply + costTax;
+
+        // 입고배송비
+        const shipTotal = product.avgShippingCost ?? 0;
+        const shipSupply = product.avgShippingIsTaxable ? Math.round(shipTotal / 1.1) : shipTotal;
+        const shipTax = Math.round(shipTotal - shipSupply);
+        const shipHas = product.avgShippingCost !== null && product.avgShippingCost !== undefined;
+
+        // 입고부대비용
+        let extraSupply = 0;
+        let extraTax = 0;
+        for (const c of product.incomingCosts) {
+          const v = parseFloat(c.value) || 0;
+          if (c.costType === "FIXED") {
+            const supply = c.isTaxable ? Math.round(v / 1.1) : v;
+            const tax = c.isTaxable ? v - supply : 0;
+            extraSupply += supply;
+            extraTax += tax;
+          } else {
+            const amount = (unit * v) / 100;
+            extraSupply += amount;
+            extraTax += c.isTaxable ? Math.round(amount * 0.1) : 0;
+          }
+        }
+        const extraTotal = extraSupply + extraTax;
+        const extraHas = product.incomingCosts.length > 0;
+
+        type KpiData = { label: string; supply: number; tax: number; total: number; show: boolean };
+        const kpis: KpiData[] = [
+          { label: "원가", supply: costSupply, tax: costTax, total: costTotal, show: true },
+          { label: "입고배송비", supply: shipSupply, tax: shipTax, total: shipTotal, show: shipHas },
+          { label: "입고부대비용", supply: extraSupply, tax: extraTax, total: extraTotal, show: extraHas },
+        ];
+
+        return (
+          <div className="grid grid-cols-5 gap-4 px-6 py-4 border-b border-border">
+            {kpis.map((k) => (
+              <div key={k.label} className="bg-card rounded-lg p-4 border border-border">
+                <p className="text-xs text-muted-foreground mb-1">{k.label}</p>
+                {k.show && k.total > 0 ? (
+                  <>
+                    <p className="text-lg font-bold tabular-nums">₩{Math.round(k.total).toLocaleString("ko-KR")}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">공급가 ₩{Math.round(k.supply).toLocaleString("ko-KR")}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">세액 ₩{Math.round(k.tax).toLocaleString("ko-KR")}</p>
+                  </>
+                ) : (
+                  <p className="text-lg font-bold text-muted-foreground">—</p>
+                )}
+              </div>
+            ))}
+            <div className="bg-card rounded-lg p-4 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">총 입고 횟수</p>
+              <p className="text-lg font-bold">{product.incomingItems.length}건</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">마지막 입고일</p>
+              <p className="text-lg font-bold">{lastIncomingDate}</p>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="px-6 py-6 space-y-6">
         {/* 기본 정보 */}
@@ -379,8 +455,6 @@ export default function SupplierProductDetailPage() {
                         value: c.value,
                         isTaxable: c.isTaxable,
                       })),
-                      avgShippingCost: product.avgShippingCost,
-                      avgShippingIsTaxable: product.avgShippingIsTaxable,
                     });
                     const fixedSellingCost = m.product.sellingCosts
                       .filter((c) => c.costType === "FIXED" && c.perUnit)
@@ -416,10 +490,122 @@ export default function SupplierProductDetailPage() {
           </CardContent>
         </Card>
 
-        {/* 입고 비용 */}
+        {/* 재고 로트 (사용 중) */}
         <Card className="bg-card border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">입고 비용</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              재고 로트 (잔여)
+              <span className="ml-2 text-[11px] font-normal text-muted-foreground/70">
+                FIFO 순. 첫 행이 다음 소진 대상 (사용 중)
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {(product.activeLots ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">잔여 재고 로트가 없습니다</p>
+            ) : (
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="bg-muted text-muted-foreground text-xs border-b border-border">
+                    <th className="py-2 px-3 text-left font-medium">상태</th>
+                    <th className="py-2 px-3 text-left font-medium">입고일</th>
+                    <th className="py-2 px-3 text-left font-medium">전표</th>
+                    <th className="py-2 px-3 text-left font-medium">매핑상품</th>
+                    <th className="py-2 px-3 text-right font-medium">입고수량</th>
+                    <th className="py-2 px-3 text-right font-medium">잔량</th>
+                    <th className="py-2 px-3 text-right font-medium">단가</th>
+                    <th className="py-2 px-3 text-right font-medium">배송비(개당)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(product.activeLots ?? []).map((lot) => (
+                    <tr
+                      key={lot.id}
+                      className={`border-b border-border ${
+                        lot.isCurrentlyConsuming ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <td className="px-3 py-2.5">
+                        {lot.isCurrentlyConsuming ? (
+                          <Badge variant="default" className="text-[10px]">사용 중</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">대기</Badge>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground tabular-nums">
+                        {new Date(lot.receivedAt).toLocaleDateString("ko-KR")}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {lot.incomingNo && lot.incomingId ? (
+                          <Link
+                            href={`/inventory/incoming?incomingId=${lot.incomingId}`}
+                            className="text-foreground hover:text-primary underline-offset-4 hover:underline"
+                          >
+                            {lot.incomingNo}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground text-xs">
+                        {lot.product?.name ?? <span className="text-yellow-500">미매핑(오르판)</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {parseFloat(lot.receivedQty).toLocaleString("ko-KR")}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-medium">
+                        {parseFloat(lot.remainingQty).toLocaleString("ko-KR")}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        ₩{Math.round(parseFloat(lot.unitCost)).toLocaleString("ko-KR")}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {lot.shippingPerUnit > 0 ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>₩{Math.round(lot.shippingPerUnit).toLocaleString("ko-KR")}</span>
+                            <span
+                              className={`text-[10px] px-1 py-0.5 rounded ${
+                                lot.shippingSource === "ITEM"
+                                  ? "bg-primary/10 text-primary"
+                                  : lot.shippingSource === "DEDUCTED"
+                                    ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                                    : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {lot.shippingSource === "ITEM"
+                                ? "직접"
+                                : lot.shippingSource === "DEDUCTED"
+                                  ? "차감"
+                                  : lot.shippingSource === "ALLOCATED"
+                                    ? "분배"
+                                    : "0원"}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 입고 배송비 이력 */}
+        <ShippingHistoryCard supplierProductId={product.id} />
+
+        {/* 입고 부대비용 */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">입고 부대비용</CardTitle>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              ※ 배송비/택배비는 여기에 등록할 수 없습니다. 입고 전표의 배송비 또는 품목별 배송비를 사용하세요.
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              ※ 이전에 등록된 배송 성격 항목(택배비/배송비/운임)이 보이면 이중계상 방지를 위해 휴지통 아이콘으로 삭제하세요.
+            </p>
           </CardHeader>
           <CardContent className="p-0">
             {/* 추가 폼 */}
@@ -474,7 +660,7 @@ export default function SupplierProductDetailPage() {
               </div>
             </div>
 
-            {product.incomingCosts.length === 0 && product.avgShippingCost === null ? (
+            {product.incomingCosts.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">등록된 비용이 없습니다</p>
             ) : (
               <table className="w-full text-[13px]">
@@ -489,19 +675,6 @@ export default function SupplierProductDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {product.avgShippingCost !== null && (
-                    <tr className="border-b border-border">
-                      <td className="px-3 py-2.5 font-medium text-primary">
-                        평균 배송비
-                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground uppercase tracking-wide">자동</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">고정</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-primary">₩{Math.round(product.avgShippingCost).toLocaleString("ko-KR")}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">개당</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{product.avgShippingIsTaxable ? <span className="text-foreground">과세</span> : "면세"}</td>
-                      <td className="py-2 text-center text-muted-foreground">—</td>
-                    </tr>
-                  )}
                   {product.incomingCosts.map((c) => (
                     <tr key={c.id} className="border-b border-border hover:bg-muted/50">
                       <td className="px-3 py-2.5 font-medium">{c.name}</td>
@@ -563,11 +736,14 @@ export default function SupplierProductDetailPage() {
                         <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                           {hasShipping ? (
                             <span className="inline-flex items-center gap-1.5">
-                              <span className={item.incoming.shippingDeducted ? "line-through" : ""}>
+                              <span className={item.incoming.shippingDeducted && !item.hasItemOverride ? "line-through" : ""}>
                                 ₩{Math.round(item.shippingAllocation).toLocaleString("ko-KR")}
                               </span>
-                              {item.incoming.shippingDeducted && (
+                              {item.incoming.shippingDeducted && item.hasAllocated && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">거래처 차감</span>
+                              )}
+                              {item.hasItemOverride && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">품목 직접</span>
                               )}
                             </span>
                           ) : "-"}

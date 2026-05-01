@@ -11,8 +11,107 @@ import {
 } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, ChevronsUpDown, Plus } from "lucide-react";
-import type { Supplier, SupplierProduct } from "./_types";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { CalendarIcon, Plus, Truck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatComma, parseComma } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileInlineCellProductSearch } from "@/components/inline-cell-product-search-mobile";
+import type { SupplierProduct } from "./_types";
+
+// ─── 품목별 배송비 입력 popover ───
+// 입고 작성 폼/후기입 다이얼로그에서 행 단위 배송비 override 입력에 사용.
+// value=빈문자열 → 분배 적용, 값 입력 → 그 품목 한정 운임 (분배 무시)
+export function ItemShippingPopover({
+  value,
+  isTaxable,
+  onChange,
+  onTaxableChange,
+  disabled,
+}: {
+  value: string;
+  isTaxable: boolean;
+  onChange: (v: string) => void;
+  onTaxableChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [draftTaxable, setDraftTaxable] = useState(isTaxable);
+  const has = value.trim() !== "" && value.trim() !== "0";
+
+  const handleOpen = (next: boolean) => {
+    if (next) {
+      setDraft(value);
+      setDraftTaxable(isTaxable);
+    }
+    setOpen(next);
+  };
+
+  const apply = () => {
+    onChange(draft.trim());
+    onTaxableChange(draftTaxable);
+    setOpen(false);
+  };
+
+  const clear = () => {
+    onChange("");
+    onTaxableChange(true);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger
+        disabled={disabled}
+        className={`p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+          has
+            ? "text-primary hover:bg-primary/10"
+            : "text-muted-foreground/50 hover:text-foreground hover:bg-muted"
+        }`}
+        title={has ? `이 품목 운임: ₩${formatComma(value)}` : "이 품목만 다른 운임 입력"}
+      >
+        <Truck className="size-3.5" />
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" align="end">
+        <div className="space-y-3">
+          <div className="text-sm font-medium">이 품목만 다른 배송비</div>
+          <div className="text-xs text-muted-foreground">
+            입력하면 전표 운임 분배에서 빠지고 이 값(VAT포함 합계)이 적용됩니다.
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">운임 (₩, VAT포함)</label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={formatComma(draft)}
+              onChange={(e) => setDraft(parseComma(e.target.value))}
+              onFocus={(e) => e.currentTarget.select()}
+              placeholder="비우면 분배 적용"
+              className="h-8"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <Checkbox
+              checked={draftTaxable}
+              onCheckedChange={(c) => setDraftTaxable(c === true)}
+            />
+            <span>과세</span>
+          </label>
+          <div className="flex justify-between gap-2 pt-1">
+            <Button type="button" variant="ghost" size="sm" className="text-xs h-7" onClick={clear}>
+              비우기
+            </Button>
+            <Button type="button" size="sm" className="text-xs h-7" onClick={apply}>
+              적용
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 // ─── 날짜 입력 (캘린더 + 직접 입력) ───
 export function DateInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
@@ -90,112 +189,6 @@ export function DateInput({ label, value, onChange }: { label: string; value: st
   );
 }
 
-// ─── Combobox 컴포넌트 ───
-export function SupplierCombobox({
-  suppliers,
-  value,
-  onChange,
-  onCreateNew,
-}: {
-  suppliers: Supplier[];
-  value: string;
-  onChange: (id: string, name: string) => void;
-  onCreateNew: (name: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const selected = suppliers.find((s) => s.id === value);
-
-  const filtered = suppliers.filter((s) => {
-    const q = search.toLowerCase();
-    return s.name.toLowerCase().includes(q) || (s.businessNumber?.toLowerCase().includes(q) ?? false);
-  });
-
-  const hasExactMatch = suppliers.some(
-    (s) => s.name.toLowerCase() === search.toLowerCase()
-  );
-
-  return (
-    <div className="relative h-9">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          className="relative flex h-9 max-h-9 box-border w-full items-center overflow-hidden rounded-lg border border-input bg-transparent pl-3 pr-9 text-sm cursor-pointer hover:bg-accent/50 focus:outline-none focus-visible:outline-none"
-        >
-          <span className={`truncate ${selected ? "" : "text-muted-foreground"}`}>
-            {selected ? selected.name : "거래처 선택..."}
-          </span>
-          <span className="absolute inset-y-0 right-2 flex items-center">
-            <ChevronsUpDown className="h-4 w-4 opacity-50" />
-          </span>
-        </PopoverTrigger>
-        <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="거래처 검색..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>
-              {search.trim() ? (
-                <button
-                  type="button"
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-primary hover:bg-accent rounded cursor-pointer"
-                  onClick={() => {
-                    onCreateNew(search.trim());
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  <Plus className="size-4" />
-                  &quot;{search.trim()}&quot; 새로 등록
-                </button>
-              ) : (
-                "결과 없음"
-              )}
-            </CommandEmpty>
-            <CommandGroup>
-              {filtered.map((s) => (
-                <CommandItem
-                  key={s.id}
-                  value={s.id}
-                  onSelect={() => {
-                    onChange(s.id, s.name);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                  data-checked={s.id === value ? "true" : undefined}
-                >
-                  <span>{s.name}</span>
-                  {s.businessNumber && (
-                    <span className="ml-auto text-xs text-muted-foreground">{s.businessNumber}</span>
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            {search.trim() && !hasExactMatch && filtered.length > 0 && (
-              <CommandGroup>
-                <CommandItem
-                  onSelect={() => {
-                    onCreateNew(search.trim());
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                  className="text-primary"
-                >
-                  <Plus className="size-4" />
-                  &quot;{search.trim()}&quot; 새로 등록
-                </CommandItem>
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
-
 // ─── 테이블 셀 내 품명 검색 ───
 export function InlineCellProductSearch({
   rowIndex,
@@ -205,6 +198,7 @@ export function InlineCellProductSearch({
   existingIds,
   selectedName = "",
   isNew = false,
+  pendingSourceRow,
   pendingNewProducts,
   onSelectPending,
 }: {
@@ -215,11 +209,30 @@ export function InlineCellProductSearch({
   existingIds: string[];
   selectedName?: string;
   isNew?: boolean;
+  pendingSourceRow?: number;
   pendingNewProducts?: Array<{ name: string; spec: string; supplierCode: string; rowIndex: number }>;
   onSelectPending?: (p: { name: string; spec: string; supplierCode: string; rowIndex: number }) => void;
 }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+
+  if (isMobile) {
+    return (
+      <MobileInlineCellProductSearch
+        rowIndex={rowIndex}
+        products={products}
+        onSelect={onSelect}
+        onCreateNew={onCreateNewInline}
+        existingIds={existingIds}
+        selectedName={selectedName}
+        isNew={isNew}
+        pendingSourceRow={pendingSourceRow}
+        pendingNewProducts={pendingNewProducts}
+        onSelectPending={onSelectPending}
+      />
+    );
+  }
 
   const filtered = products.filter((p) => {
     const q = search.toLowerCase();
@@ -240,7 +253,14 @@ export function InlineCellProductSearch({
           {selectedName ? (
             <span className="flex items-center gap-1.5 truncate">
               <span className="font-medium truncate">{selectedName}</span>
-              {isNew && <Badge variant="outline" className="text-[10px] text-primary border-[#3ECF8E]/40 shrink-0">신규</Badge>}
+              {isNew && pendingSourceRow !== undefined && (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed shrink-0">
+                  행 {pendingSourceRow + 1} 재사용
+                </Badge>
+              )}
+              {isNew && pendingSourceRow === undefined && (
+                <Badge variant="outline" className="text-[10px] text-primary border-[#3ECF8E]/40 shrink-0">신규</Badge>
+              )}
             </span>
           ) : (
             <span className="flex items-center gap-1.5"><Plus className="size-3.5 shrink-0" />품명 검색...</span>

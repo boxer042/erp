@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronLeft, Loader2, Plus, Trash2, Copy, Link as LinkIcon } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ExtraItem {
   productId: string;
@@ -118,7 +119,16 @@ export default function RepairDetailPage() {
   }, [load]);
 
   if (loading || !ticket) {
-    return <div className="p-8 text-center text-muted-foreground">로딩 중...</div>;
+    return (
+      <div className="p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <Skeleton className="h-32 w-full rounded-md" />
+        <Skeleton className="h-48 w-full rounded-md" />
+      </div>
+    );
   }
 
   const saveDiagnosis = async () => {

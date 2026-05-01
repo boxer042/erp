@@ -15,6 +15,7 @@ export interface SlotRow {
   order: number;
   defaultProductId: string | null;
   defaultQuantity: string;
+  isVariable: boolean;
 }
 
 export interface SlotLabelRow {

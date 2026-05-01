@@ -97,17 +97,27 @@ export async function POST(request: NextRequest) {
   });
 
   const result = await prisma.$transaction(async (tx) => {
-    // 교환 입고 사전 생성 (PENDING)
+    // 교환 입고 사전 생성 (PENDING) — 반품 품목을 그대로 교환 입고 품목으로 복사
     let exchangeIncomingId: string | null = null;
     if (data.isExchange) {
+      const exchangeTotal = items.reduce((sum, it) => sum + it.totalPrice, 0);
       const exchangeIncoming = await tx.incoming.create({
         data: {
           incomingNo: generateIncomingNo(),
           supplierId: data.supplierId,
           incomingDate: new Date(data.returnDate),
-          totalAmount: 0,
+          totalAmount: exchangeTotal,
           memo: `반품 ${returnNo} 교환 입고`,
           createdById: user.id,
+          items: {
+            create: items.map((it) => ({
+              supplierProductId: it.supplierProductId,
+              quantity: it.quantity,
+              unitPrice: it.unitPrice,
+              totalPrice: it.totalPrice,
+              memo: it.memo,
+            })),
+          },
         },
       });
       exchangeIncomingId = exchangeIncoming.id;

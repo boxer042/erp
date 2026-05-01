@@ -14,6 +14,7 @@ import {
   ProductMediaGallery,
 } from "@/components/product";
 import type { ProductDetail } from "@/components/product/types";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   calcDiscountPerUnit,
   formatDiscountDisplay,
@@ -35,6 +36,7 @@ interface ProductLite {
   taxType: string;
   isBulk?: boolean;
   unitOfMeasure?: string;
+  isCanonical?: boolean;
 }
 
 interface CustomerLite {
@@ -154,8 +156,12 @@ export default function SalesPage() {
   };
 
   const handleQuickAdd = (p: ProductLite) => {
-    add({ productId: p.id, itemType: "product", name: p.name, sku: p.sku, imageUrl: p.imageUrl, unitPrice: parseFloat(p.sellingPrice), taxType: p.taxType as CartItem["taxType"], isBulk: p.isBulk, unitOfMeasure: p.unitOfMeasure });
-    toast.success(`${p.name} 담음`);
+    add({ productId: p.id, itemType: "product", name: p.name, sku: p.sku, imageUrl: p.imageUrl, unitPrice: parseFloat(p.sellingPrice), taxType: p.taxType as CartItem["taxType"], isBulk: p.isBulk, unitOfMeasure: p.unitOfMeasure, isCanonical: p.isCanonical });
+    if (p.isCanonical) {
+      toast.success(`${p.name} 담음 (결제 시 변형 선택 필요)`);
+    } else {
+      toast.success(`${p.name} 담음`);
+    }
   };
 
   const openRepairSheet = (name: string, unitPrice: number, isFreeForm = false) => {
@@ -737,7 +743,17 @@ function ProductDetailModal({
         </div>
 
         {showLoading || !detail ? (
-          <div className="flex flex-1 items-center justify-center py-20 text-muted-foreground">불러오는 중...</div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Skeleton className="aspect-square w-full rounded-md" />
+              <div className="space-y-3">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-20 w-full rounded-md" />
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
             <div className="grid gap-6 p-6 md:grid-cols-2">

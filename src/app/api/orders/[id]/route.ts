@@ -293,6 +293,13 @@ export async function PUT(
             Number(item.unitPrice),
           );
 
+          if (unitCostSnapshot == null) {
+            console.warn(
+              `[orders/confirm] unitCostSnapshot 누락: orderItemId=${item.id}, productId=${item.product?.id}. ` +
+                `LotConsumption 도 없을 가능성 → 마진 리포트 부정확.`
+            );
+          }
+
           await tx.orderItem.update({
             where: { id: item.id },
             data: {

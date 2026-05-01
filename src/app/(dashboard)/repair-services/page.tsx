@@ -14,6 +14,39 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { formatComma, parseComma } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function RepairPresetsSkeletonRows({ rows = 6 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><div className="flex justify-end gap-1"><Skeleton className="h-7 w-7 rounded-md" /><Skeleton className="h-7 w-7 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+function RepairPackagesSkeletonRows({ rows = 6 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><div className="flex justify-end gap-1"><Skeleton className="h-7 w-7 rounded-md" /><Skeleton className="h-7 w-7 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 // ─── 타입 ────────────────────────────────────────────────────
 
@@ -323,7 +356,7 @@ export default function RepairServicesPage() {
               </TableHeader>
               <TableBody>
                 {presetLoading ? (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center">로딩 중...</TableCell></TableRow>
+                  <RepairPresetsSkeletonRows />
                 ) : presets.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">등록된 공임 프리셋이 없습니다</TableCell></TableRow>
                 ) : presets.map((p) => (
@@ -373,7 +406,7 @@ export default function RepairServicesPage() {
               </TableHeader>
               <TableBody>
                 {pkgLoading ? (
-                  <TableRow><TableCell colSpan={5} className="py-8 text-center">로딩 중...</TableCell></TableRow>
+                  <RepairPackagesSkeletonRows />
                 ) : packages.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">등록된 수리 패키지가 없습니다</TableCell></TableRow>
                 ) : packages.map((pkg) => (

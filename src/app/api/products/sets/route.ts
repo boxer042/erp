@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { productId, components } = body as {
     productId: string;
-    components: { componentId: string; quantity: string; label?: string | null }[];
+    components: { componentId: string; quantity: string; label?: string | null; slotLabelId?: string | null; slotId?: string | null }[];
   };
 
   if (!productId || !components?.length) {
@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
           componentId: c.componentId,
           quantity: parseFloat(c.quantity),
           label: c.label?.trim() ? c.label.trim() : null,
+          slotLabelId: c.slotLabelId || null,
+          slotId: c.slotId || null,
         },
       })
     ),

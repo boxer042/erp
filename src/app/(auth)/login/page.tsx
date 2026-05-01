@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,10 +85,7 @@ export default function LoginPage() {
             {loading ? "로그인 중..." : "로그인"}
           </Button>
           <p className="text-sm text-muted-foreground">
-            계정이 없으신가요?{" "}
-            <Link href="/register" className="text-brand hover:underline">
-              회원가입
-            </Link>
+            계정이 필요하신가요? 관리자에게 문의해 주세요.
           </p>
         </CardFooter>
       </form>

@@ -1032,15 +1032,17 @@ export default function ExpensesPage() {
                       disabled={incomingLocked}
                     >
                       <SelectTrigger className="h-9 flex-1">
-                        <span className="truncate">
-                          {loadingIncomings
-                            ? "로딩 중..."
-                            : (() => {
-                                const inc = incomings.find((i) => i.id === selectedIncomingId);
-                                if (!inc) return "입고 선택...";
-                                return `${inc.incomingNo} — ${inc.supplierName} (${format(new Date(inc.incomingDate), "yy.MM.dd", { locale: ko })})`;
-                              })()}
-                        </span>
+                        {loadingIncomings ? (
+                          <Skeleton className="h-4 w-40" />
+                        ) : (
+                          <span className="truncate">
+                            {(() => {
+                              const inc = incomings.find((i) => i.id === selectedIncomingId);
+                              if (!inc) return "입고 선택...";
+                              return `${inc.incomingNo} — ${inc.supplierName} (${format(new Date(inc.incomingDate), "yy.MM.dd", { locale: ko })})`;
+                            })()}
+                          </span>
+                        )}
                       </SelectTrigger>
                       <SelectContent>
                         {incomings.map((i) => {

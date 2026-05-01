@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { guardAdmin } from "@/lib/api-auth";
 
 const createSchema = z.object({
   name: z.string().min(1, "이름은 필수입니다"),
@@ -28,6 +29,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {

@@ -12,6 +12,24 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon } from "lucide-react";
 import { extractYoutubeId } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function MediaSkeletonRows({ rows = 4 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+          <TableCell><Skeleton className="h-12 w-12 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 type MediaType = "IMAGE" | "YOUTUBE";
 
@@ -283,11 +301,7 @@ export function ProductMediaManager({ productId }: { productId: string }) {
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableRow>
-              <TableCell colSpan={6} className="text-center py-8">
-                로딩 중...
-              </TableCell>
-            </TableRow>
+            <MediaSkeletonRows />
           ) : items.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">

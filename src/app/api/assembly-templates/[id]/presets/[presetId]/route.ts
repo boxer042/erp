@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assemblyPresetSchema } from "@/lib/validators/assembly-template";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; presetId: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { presetId } = await params;
   const body = await request.json();
   const parsed = assemblyPresetSchema.safeParse(body);
@@ -57,6 +60,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; presetId: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { presetId } = await params;
   try {
     await prisma.assemblyPreset.delete({ where: { id: presetId } });

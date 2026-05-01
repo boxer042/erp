@@ -58,6 +58,13 @@ export async function POST(request: NextRequest) {
   const rate = parseFloat(data.conversionRate);
 
   const mapping = await prisma.$transaction(async (tx) => {
+    if (data.isProvisional) {
+      await tx.supplierProduct.update({
+        where: { id: data.supplierProductId },
+        data: { isProvisional: true },
+      });
+    }
+
     const created = await tx.productMapping.create({
       data: {
         supplierProductId: data.supplierProductId,

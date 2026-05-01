@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,26 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Pencil, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Store, Trash2, Upload, X } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function ChannelsSkeletonRows({ rows = 6 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><div className="flex gap-1"><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 import { toast } from "sonner";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -33,6 +52,8 @@ interface SalesChannel {
   commissionRate: string;
   isActive: boolean;
   memo: string | null;
+  logoUrl: string | null;
+  logoPath: string | null;
 }
 
 export default function ChannelsPage() {
@@ -47,7 +68,11 @@ export default function ChannelsPage() {
     code: "",
     commissionRate: "0",
     memo: "",
+    logoUrl: null as string | null,
+    logoPath: null as string | null,
   });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchChannels = async () => {
     const res = await fetch("/api/channels");
@@ -61,7 +86,7 @@ export default function ChannelsPage() {
   }, []);
 
   const resetForm = () => {
-    setForm({ name: "", code: "", commissionRate: "0", memo: "" });
+    setForm({ name: "", code: "", commissionRate: "0", memo: "", logoUrl: null, logoPath: null });
     setEditingChannel(null);
   };
 
@@ -72,8 +97,48 @@ export default function ChannelsPage() {
       code: channel.code,
       commissionRate: (parseFloat(channel.commissionRate) * 100).toString(),
       memo: channel.memo || "",
+      logoUrl: channel.logoUrl,
+      logoPath: channel.logoPath,
     });
     setDialogOpen(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/channels/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || "업로드 실패");
+        return;
+      }
+      if (form.logoPath) {
+        await fetch("/api/channels/upload", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: form.logoPath }),
+        });
+      }
+      setForm((prev) => ({ ...prev, logoUrl: json.url, logoPath: json.path }));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (form.logoPath) {
+      await fetch("/api/channels/upload", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: form.logoPath }),
+      });
+    }
+    setForm((prev) => ({ ...prev, logoUrl: null, logoPath: null }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,6 +192,7 @@ export default function ChannelsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]">로고</TableHead>
                 <TableHead>채널명</TableHead>
                 <TableHead>코드</TableHead>
                 <TableHead>수수료율</TableHead>
@@ -137,20 +203,30 @@ export default function ChannelsPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    로딩 중...
-                  </TableCell>
-                </TableRow>
+                <ChannelsSkeletonRows />
               ) : channels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     등록된 채널이 없습니다
                   </TableCell>
                 </TableRow>
               ) : (
                 channels.map((channel) => (
                   <TableRow key={channel.id}>
+                    <TableCell>
+                      {channel.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={channel.logoUrl}
+                          alt=""
+                          className="h-8 w-8 rounded object-contain bg-card border border-border"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded border border-border bg-muted flex items-center justify-center">
+                          <Store className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{channel.name}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{channel.code}</Badge>
@@ -208,6 +284,55 @@ export default function ChannelsPage() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>로고</Label>
+              <div className="flex items-center gap-3">
+                {form.logoUrl ? (
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={form.logoUrl}
+                      alt=""
+                      className="h-16 w-16 rounded object-contain bg-card border border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground inline-flex items-center justify-center"
+                      aria-label="로고 제거"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-16 w-16 rounded border-2 border-dashed border-border flex items-center justify-center text-muted-foreground">
+                    <Store className="h-5 w-5" />
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  {form.logoUrl ? "교체" : "업로드"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">JPG/PNG/WebP/SVG · 최대 5MB</p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="name">채널명</Label>
               <Input

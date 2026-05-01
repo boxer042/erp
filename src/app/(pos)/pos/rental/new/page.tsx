@@ -8,6 +8,7 @@ import { ChevronLeft, Loader2 } from "lucide-react";
 import { CustomerCombobox } from "@/components/customer-combobox";
 import { QuickCustomerSheet } from "@/components/quick-register-sheets";
 import { formatComma, parseComma } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Asset {
   id: string;
@@ -116,14 +117,18 @@ export default function NewRentalPage() {
       <div className="space-y-5 rounded-xl border border-border bg-background p-6">
         <div>
           <label className="mb-1 block text-sm font-medium">자산 *</label>
-          <select className="input h-11" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
-            <option value="">선택...</option>
-            {assets.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.assetNo} · {a.name}{a.brand ? ` (${a.brand})` : ""}
-              </option>
-            ))}
-          </select>
+          <Select value={assetId} onValueChange={(v) => setAssetId(v ?? "")}>
+            <SelectTrigger className="h-11">
+              <SelectValue placeholder="선택..." />
+            </SelectTrigger>
+            <SelectContent>
+              {assets.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.assetNo} · {a.name}{a.brand ? ` (${a.brand})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
@@ -153,10 +158,15 @@ export default function NewRentalPage() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium">요율 타입</label>
-            <select className="input h-11" value={form.rateType} onChange={(e) => setForm({ ...form, rateType: e.target.value as "DAILY" | "MONTHLY" })}>
-              <option value="DAILY">일별</option>
-              <option value="MONTHLY">월별</option>
-            </select>
+            <Select value={form.rateType} onValueChange={(v) => setForm({ ...form, rateType: (v ?? "DAILY") as "DAILY" | "MONTHLY" })}>
+              <SelectTrigger className="h-11">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DAILY">일별</SelectItem>
+                <SelectItem value="MONTHLY">월별</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">단가</label>

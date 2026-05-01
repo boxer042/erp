@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useSessions, type CartItem } from "@/components/pos/sessions-context";
 import { calcDiscountPerUnit } from "@/lib/utils";
 import { Banknote, CreditCard, ArrowLeftRight, FileText, Clock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Payment = "CASH" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID";
 const PAYMENT_OPTIONS: { value: Payment; label: string; icon: React.ReactNode }[] = [
@@ -23,8 +24,16 @@ interface CustomerLite {
   phone: string | null;
 }
 
+interface VariantOption {
+  id: string;
+  name: string;
+  sku: string;
+  sellingPrice: string;
+  inventory: { quantity: string } | null;
+}
+
 export default function CheckoutPage() {
-  const { active: cart, clear: clearCart, updateRentalDates } = useSessions();
+  const { active: cart, clear: clearCart, updateRentalDates, assignVariant } = useSessions();
   const router = useRouter();
   const params = useSearchParams();
   const customerId = params.get("customerId") ?? "";
@@ -32,6 +41,44 @@ export default function CheckoutPage() {
   const [payment, setPayment] = useState<Payment>("CARD");
   const [taxInvoice, setTaxInvoice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // 변형 선택 다이얼로그
+  const [variantPickerFor, setVariantPickerFor] = useState<CartItem | null>(null);
+  const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
+  const [variantLoading, setVariantLoading] = useState(false);
+
+  const openVariantPicker = async (item: CartItem) => {
+    if (!item.productId) return;
+    setVariantPickerFor(item);
+    setVariantOptions([]);
+    setVariantLoading(true);
+    try {
+      const res = await fetch(`/api/products/${item.productId}`);
+      if (res.ok) {
+        const detail = await res.json();
+        setVariantOptions(detail.variants ?? []);
+      }
+    } finally {
+      setVariantLoading(false);
+    }
+  };
+
+  const pickVariant = (v: VariantOption) => {
+    if (!variantPickerFor) return;
+    assignVariant(variantPickerFor.cartItemId, {
+      productId: v.id,
+      name: v.name,
+      sku: v.sku,
+      unitPrice: parseFloat(v.sellingPrice),
+    });
+    setVariantPickerFor(null);
+    setVariantOptions([]);
+  };
+
+  const unsetCanonicalItems = cart.items.filter(
+    (i) => i.itemType === "product" && i.isCanonical,
+  );
+  const hasUnsetVariants = unsetCanonicalItems.length > 0;
 
   useEffect(() => {
     if (!customerId) return;
@@ -60,6 +107,10 @@ export default function CheckoutPage() {
     if (cart.items.length === 0) return;
     if (action === "order" && hasUnsetRentalDates) {
       toast.error("임대 항목의 날짜를 모두 설정해주세요");
+      return;
+    }
+    if (hasUnsetVariants) {
+      toast.error("변형이 확정되지 않은 항목이 있습니다");
       return;
     }
     setSubmitting(true);
@@ -253,10 +304,32 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* 변형 미확정 항목 */}
+          {hasUnsetVariants && (
+            <div className="rounded-xl border border-orange-500/40 bg-orange-500/5 p-4 space-y-2">
+              <div className="text-sm font-medium text-orange-700">
+                변형 확정이 필요한 항목 ({unsetCanonicalItems.length}개)
+              </div>
+              <div className="space-y-1.5">
+                {unsetCanonicalItems.map((it) => (
+                  <div key={it.cartItemId} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="truncate">{it.name}</span>
+                    <button
+                      onClick={() => openVariantPicker(it)}
+                      className="rounded-md bg-orange-500 px-3 py-1 text-xs text-white hover:bg-orange-600"
+                    >
+                      변형 선택
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <button
               onClick={() => submit("order")}
-              disabled={submitting || cart.items.length === 0 || hasUnsetRentalDates}
+              disabled={submitting || cart.items.length === 0 || hasUnsetRentalDates || hasUnsetVariants}
               className="h-14 w-full rounded-lg bg-primary text-lg font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
             >
               주문 확정 + 결제
@@ -264,16 +337,19 @@ export default function CheckoutPage() {
             {hasUnsetRentalDates && (
               <div className="text-center text-xs text-orange-500">임대 날짜를 모두 설정해주세요</div>
             )}
+            {hasUnsetVariants && (
+              <div className="text-center text-xs text-orange-500">변형 확정이 필요합니다</div>
+            )}
             <button
               onClick={() => submit("statement")}
-              disabled={submitting || cart.items.length === 0}
+              disabled={submitting || cart.items.length === 0 || hasUnsetVariants}
               className="h-12 w-full rounded-lg border border-border text-base font-medium hover:bg-muted/50 disabled:opacity-50"
             >
               거래명세표로 저장 + 출력
             </button>
             <button
               onClick={() => submit("quotation")}
-              disabled={submitting || cart.items.length === 0}
+              disabled={submitting || cart.items.length === 0 || hasUnsetVariants}
               className="h-12 w-full rounded-lg border border-border text-base font-medium hover:bg-muted/50 disabled:opacity-50"
             >
               견적서로 저장 + 출력
@@ -281,6 +357,62 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* 변형 선택 다이얼로그 */}
+      {variantPickerFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setVariantPickerFor(null)}>
+          <div
+            className="w-full max-w-md rounded-xl bg-background p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 text-lg font-semibold">{variantPickerFor.name} — 변형 선택</div>
+            {variantLoading ? (
+              <div className="space-y-2 py-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full rounded-md" />
+                ))}
+              </div>
+            ) : variantOptions.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                등록된 변형이 없습니다. 조립실적을 먼저 등록해 변형을 만들어주세요.
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
+                {variantOptions.map((v) => {
+                  const qty = v.inventory ? Number(v.inventory.quantity) : 0;
+                  const outOfStock = qty <= 0;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => pickVariant(v)}
+                      disabled={outOfStock}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border p-3 text-left hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{v.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {v.sku} · 재고 {qty.toLocaleString("ko-KR")}
+                        </div>
+                      </div>
+                      <div className="text-sm tabular-nums">
+                        ₩{Math.round(parseFloat(v.sellingPrice)).toLocaleString("ko-KR")}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setVariantPickerFor(null)}
+                className="rounded-md border border-border px-4 py-2 text-sm hover:bg-muted/50"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

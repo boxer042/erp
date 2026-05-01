@@ -17,6 +17,26 @@ import {
 } from "@/components/ui/dialog";
 import { Printer, FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function QuotationsSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-20" /></div></TableCell>
+          <TableCell><div className="flex gap-1"><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 type QuotationType = "SALES" | "PURCHASE";
 type QuotationStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CONVERTED";
@@ -179,7 +199,7 @@ export default function QuotationsPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">로딩 중...</TableCell></TableRow>
+                <QuotationsSkeletonRows />
               ) : quotations.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8">등록된 견적서가 없습니다</TableCell></TableRow>
               ) : (

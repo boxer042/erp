@@ -2,23 +2,34 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DocumentPdf } from "@/components/document-pdf";
 
-// 공급자(우리) 정보는 환경변수/설정에서 읽을 수 있도록 추후 확장. 지금은 placeholder.
-const OUR_COMPANY = {
-  name: process.env.COMPANY_NAME || "우리 회사",
-  businessNumber: process.env.COMPANY_BIZ_NO || null,
-  ceo: process.env.COMPANY_CEO || null,
-  phone: process.env.COMPANY_PHONE || null,
-  email: process.env.COMPANY_EMAIL || null,
-  address: process.env.COMPANY_ADDRESS || null,
-  businessType: process.env.COMPANY_BUSINESS_TYPE || null,   // 업태
-  businessItem: process.env.COMPANY_BUSINESS_ITEM || null,   // 종목
-};
-
-const BANK_INFO = {
-  name: process.env.COMPANY_BANK_NAME || null,        // 은행명
-  holder: process.env.COMPANY_BANK_HOLDER || null,    // 예금주
-  account: process.env.COMPANY_BANK_ACCOUNT || null,  // 계좌번호
-};
+async function loadOurCompany() {
+  const company = await prisma.companyInfo.findUnique({
+    where: { id: "singleton" },
+    include: {
+      bankAccounts: {
+        orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  });
+  const our = {
+    name: company?.name || "우리 회사",
+    businessNumber: company?.businessNumber ?? null,
+    ceo: company?.ceo ?? null,
+    phone: company?.phone ?? null,
+    email: company?.email ?? null,
+    address: company?.address ?? null,
+    businessType: company?.businessType ?? null,
+    businessItem: company?.businessItem ?? null,
+  };
+  const primaryBank =
+    company?.bankAccounts.find((b) => b.isPrimary) ?? company?.bankAccounts[0] ?? null;
+  const bank = {
+    name: primaryBank?.bankName ?? null,
+    holder: primaryBank?.holder ?? null,
+    account: primaryBank?.account ?? null,
+  };
+  return { our, bank };
+}
 
 export default async function QuotationPrintPage({
   params,
@@ -29,6 +40,7 @@ export default async function QuotationPrintPage({
 }) {
   const { id } = await params;
   const { auto } = await searchParams;
+  const { our: OUR_COMPANY, bank: BANK_INFO } = await loadOurCompany();
   const q = await prisma.quotation.findUnique({
     where: { id },
     include: {

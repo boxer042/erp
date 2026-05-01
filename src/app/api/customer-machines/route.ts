@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const customerId = request.nextUrl.searchParams.get("customerId");
   if (!customerId) return NextResponse.json({ error: "customerId 필수" }, { status: 400 });
   const machines = await prisma.customerMachine.findMany({
@@ -13,6 +16,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const body = await request.json();
   const { customerId, name, brand, modelNo, serialNo, productId, purchasedAt, purchasedFrom, memo } = body ?? {};
   if (!customerId || !name?.trim()) {

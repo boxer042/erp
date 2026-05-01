@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { productSchema } from "@/lib/validators/product";
-import {
-  computeSupplierProductAvgShipping,
-  computeUnitCost,
-} from "@/lib/cost-utils";
+import { computeUnitCost, computeSupplierProductAvgShipping } from "@/lib/cost-utils";
+import { guardUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
   const isSet = searchParams.get("isSet");
@@ -60,14 +60,71 @@ export async function GET(request: NextRequest) {
               incomingItems: {
                 where: { incoming: { status: "CONFIRMED" } },
                 select: {
+                  id: true,
                   totalPrice: true,
                   quantity: true,
+                  itemShippingCost: true,
+                  itemShippingIsTaxable: true,
                   incoming: {
                     select: {
                       shippingCost: true,
                       shippingIsTaxable: true,
                       shippingDeducted: true,
-                      items: { select: { totalPrice: true } },
+                      items: {
+                        select: {
+                          id: true,
+                          totalPrice: true,
+                          quantity: true,
+                          itemShippingCost: true,
+                          itemShippingIsTaxable: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      // 벌크 SKU는 자체 매핑이 없으므로 부모 판매용기에서 단위 원가 환산
+      salesContainers: {
+        where: { isActive: true },
+        take: 1,
+        select: {
+          containerSize: true,
+          productMappings: {
+            include: {
+              supplierProduct: {
+                include: {
+                  incomingCosts: {
+                    where: { isActive: true },
+                    select: { costType: true, value: true, isTaxable: true },
+                  },
+                  incomingItems: {
+                    where: { incoming: { status: "CONFIRMED" } },
+                    select: {
+                      id: true,
+                      totalPrice: true,
+                      quantity: true,
+                      itemShippingCost: true,
+                      itemShippingIsTaxable: true,
+                      incoming: {
+                        select: {
+                          shippingCost: true,
+                          shippingIsTaxable: true,
+                          shippingDeducted: true,
+                          items: {
+                            select: {
+                              id: true,
+                              totalPrice: true,
+                              quantity: true,
+                              itemShippingCost: true,
+                              itemShippingIsTaxable: true,
+                            },
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -81,23 +138,59 @@ export async function GET(request: NextRequest) {
   });
 
   const productsWithUnitCost = products.map((p) => {
+    // 한 상품에 매핑이 여러 개면 첫 번째만 표시값(unitCost/공급단가/배송비/부대비용)에 반영
+    // 향후 정책 결정 필요: 정식(isProvisional=false) 우선 / createdAt asc 등
     const firstMapping = p.productMappings[0];
     let unitCost: number | null = null;
+    let supplierUnitPrice = 0;
+    let shippingPerUnit = 0;
+    let incomingCostPerUnit = 0;
     if (firstMapping) {
       const sp = firstMapping.supplierProduct;
-      const { avgShippingCost, avgShippingIsTaxable } =
-        computeSupplierProductAvgShipping(sp.incomingItems);
+      const conv = parseFloat(firstMapping.conversionRate.toString()) || 1;
       unitCost = computeUnitCost({
         unitPrice: parseFloat(sp.unitPrice.toString()),
-        conversionRate: parseFloat(firstMapping.conversionRate.toString()),
+        conversionRate: conv,
         incomingCosts: sp.incomingCosts.map((c) => ({
           costType: c.costType as "FIXED" | "PERCENTAGE",
           value: parseFloat(c.value.toString()),
           isTaxable: c.isTaxable,
         })),
-        avgShippingCost,
-        avgShippingIsTaxable,
       });
+      supplierUnitPrice = parseFloat(sp.unitPrice.toString()) / conv;
+      const { avgShippingCost, avgShippingIsTaxable } = computeSupplierProductAvgShipping(sp.incomingItems);
+      const avgShipRaw = avgShippingCost !== null ? avgShippingCost / conv : 0;
+      shippingPerUnit = avgShippingIsTaxable ? avgShipRaw / 1.1 : avgShipRaw;
+      incomingCostPerUnit = unitCost - supplierUnitPrice; // 부대비용 = 전체 - 공급단가
+      // 단, computeUnitCost 는 배송비 미포함이므로 unitCost 자체는 supplier+incomingCost 만 합산 → 분리 정확
+      // shippingPerUnit 는 unitCost 와 별개로 추가 비용
+    } else if (p.isBulk && p.salesContainers[0]) {
+      const container = p.salesContainers[0];
+      const cMapping = container.productMappings[0];
+      const containerSizeNum = container.containerSize
+        ? parseFloat(container.containerSize.toString())
+        : 0;
+      if (cMapping && containerSizeNum > 0) {
+        const sp = cMapping.supplierProduct;
+        const conv = parseFloat(cMapping.conversionRate.toString()) || 1;
+        const containerUnitCost = computeUnitCost({
+          unitPrice: parseFloat(sp.unitPrice.toString()),
+          conversionRate: conv,
+          incomingCosts: sp.incomingCosts.map((c) => ({
+            costType: c.costType as "FIXED" | "PERCENTAGE",
+            value: parseFloat(c.value.toString()),
+            isTaxable: c.isTaxable,
+          })),
+        });
+        unitCost = containerUnitCost / containerSizeNum;
+        const containerSupplierUnit = parseFloat(sp.unitPrice.toString()) / conv;
+        supplierUnitPrice = containerSupplierUnit / containerSizeNum;
+        incomingCostPerUnit = unitCost - supplierUnitPrice;
+        const { avgShippingCost, avgShippingIsTaxable } = computeSupplierProductAvgShipping(sp.incomingItems);
+        const avgShipRaw = avgShippingCost !== null ? avgShippingCost / conv : 0;
+        const containerShipping = avgShippingIsTaxable ? avgShipRaw / 1.1 : avgShipRaw;
+        shippingPerUnit = containerShipping / containerSizeNum;
+      }
     }
 
     const sanitizedMappings = p.productMappings.map((m) => {
@@ -105,13 +198,23 @@ export async function GET(request: NextRequest) {
       return { ...m, supplierProduct: spRest };
     });
 
-    return { ...p, productMappings: sanitizedMappings, unitCost };
+    const { salesContainers: _sc, ...rest } = p;
+    return {
+      ...rest,
+      productMappings: sanitizedMappings,
+      unitCost,
+      supplierUnitPrice,
+      shippingPerUnit,
+      incomingCostPerUnit,
+    };
   });
 
   return NextResponse.json(productsWithUnitCost);
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = productSchema.safeParse(body);
 
@@ -187,6 +290,7 @@ export async function POST(request: NextRequest) {
         bulkProductId: resolvedBulkProductId,
         memo: data.memo || null,
         categoryId: data.categoryId || null,
+        assemblyTemplateId: data.assemblyTemplateId || null,
         inventory: data.isCanonical
           ? undefined  // canonical은 자체 재고를 갖지 않음
           : { create: { quantity: 0, safetyStock: 1 } },

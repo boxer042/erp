@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assemblyPresetSchema } from "@/lib/validators/assembly-template";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function GET(
   _request: NextRequest,
@@ -26,6 +27,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id: templateId } = await params;
   const body = await request.json();
   const parsed = assemblyPresetSchema.safeParse(body);

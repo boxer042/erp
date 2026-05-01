@@ -33,6 +33,7 @@ import {
   Layers,
   Factory,
   FolderTree,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import {
@@ -104,6 +105,7 @@ const navGroups: NavGroup[] = [
       { id: "products", label: "상품", href: "/products", icon: Package },
       { id: "categories", label: "카테고리", href: "/products/categories", icon: FolderTree },
       { id: "brands", label: "브랜드", href: "/products/brands", icon: Tag },
+      { id: "spec-slots", label: "스펙 슬롯", href: "/products/spec-slots", icon: SlidersHorizontal },
       { id: "assembly-templates", label: "조립 템플릿", href: "/products/assembly-templates", icon: Layers },
     ],
   },

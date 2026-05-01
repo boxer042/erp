@@ -15,20 +15,47 @@ export function ProductKpiCards({ product }: ProductKpiCardsProps) {
   const sellingTax = Math.round(sellingNet * taxRate);
   const sellingTotal = Math.round(sellingNet + sellingTax);
 
-  // 입고가 (배송비·입고비용 포함된 unitCost — 잔여 로트 가중평균, 세전 기준)
-  const inboundNet = computeAvgInboundUnitCost(product);
+  // 입고가/평균 원가 (잔여 로트 가중평균)
+  // canonical 인 경우: 자기 lot 가 없으므로 자식 변형들의 가중평균을 사용
+  const ownInboundNet = computeAvgInboundUnitCost(product);
+  const inboundNet = product.isCanonical && (product.canonicalAggregatedUnitCost ?? 0) > 0
+    ? Number(product.canonicalAggregatedUnitCost)
+    : ownInboundNet;
   const inboundTax = Math.round(inboundNet * taxRate);
   const inboundTotal = Math.round(inboundNet + inboundTax);
 
-  // 마진 — 오프라인 가정 (카드수수료/판매비용 미반영).
-  // 판매 공급가액 − 입고 공급가액. 매입/매출 부가세 동일 세율이면 cash 차이와 일치.
+  // 마진 (실측)
   const marginAmount = Math.round(sellingNet - inboundNet);
   const marginRate = sellingNet > 0 ? (marginAmount / sellingNet) * 100 : 0;
 
-  // 재고
-  const qty = product.inventory ? parseFloat(product.inventory.quantity) : 0;
+  // 재고 — canonical 은 자식 변형들의 합
+  const qty = product.isCanonical
+    ? Number(product.canonicalAggregatedQty ?? 0)
+    : product.inventory
+      ? parseFloat(product.inventory.quantity)
+      : 0;
   const safety = product.inventory ? parseFloat(product.inventory.safetyStock) : 0;
   const isLow = safety > 0 && qty < safety;
+
+  // 조립/세트 여부 + 예상값
+  const isComposite = product.productType === "ASSEMBLED" || !!product.isSet;
+  const estUnitCost = product.estimatedUnitCost ?? null;
+  const estMargin = product.estimatedMargin ?? null;
+  const estMarginRate = product.estimatedMarginRate ?? null;
+  const missingCount = product.missingCostCount ?? 0;
+  const missingNames = (product.estimatedCostBreakdown ?? [])
+    .filter((b) => b.costSource === "NONE")
+    .map((b) => b.componentName);
+
+  // 분기 정책:
+  // - 일반 상품: 입고가 + 마진(오프라인)
+  // - 조립/세트:
+  //   · 실측 데이터 있음 (inboundNet > 0) → 평균 원가 + 평균 마진
+  //   · 실측 데이터 없음 → 예상 원가 + 예상 마진
+  const hasActuals = inboundNet > 0;
+  const showAverageForComposite = isComposite && hasActuals;
+  const showEstimateForComposite = isComposite && !hasActuals && estUnitCost !== null;
+  const showInboundLegacy = !isComposite; // 일반 상품에만 노출
 
   return (
     <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
@@ -42,24 +69,91 @@ export function ProductKpiCards({ product }: ProductKpiCardsProps) {
         <Line label="판매가" value={`₩${fmtPrice(sellingTotal)}`} emphasis />
       </KpiCard>
 
-      {/* 입고가 */}
-      <KpiCard
-        label="입고가"
-        description="매입가 + 배송비 + 입고비용 (잔여 재고 로트 가중평균)"
-      >
-        <Line label="공급가액" value={`₩${fmtPrice(inboundNet)}`} />
-        <Line label="세액" value={`₩${fmtPrice(inboundTax)}`} />
-        <Line label="입고가" value={`₩${fmtPrice(inboundTotal)}`} emphasis />
-      </KpiCard>
+      {/* 일반 상품: 입고가 */}
+      {showInboundLegacy && (
+        <KpiCard
+          label="입고가"
+          description="매입가 + 배송비 + 입고비용 (잔여 재고 로트 가중평균)"
+        >
+          <Line label="공급가액" value={`₩${fmtPrice(inboundNet)}`} />
+          <Line label="세액" value={`₩${fmtPrice(inboundTax)}`} />
+          <Line label="입고가" value={`₩${fmtPrice(inboundTotal)}`} emphasis />
+        </KpiCard>
+      )}
 
-      {/* 마진 */}
-      <KpiCard
-        label="마진 (오프라인)"
-        description="판매가 − 입고가. 카드수수료·판매비용 미반영"
-      >
-        <Line label="마진금액" value={`₩${fmtPrice(marginAmount)}`} emphasis tone={marginAmount < 0 ? "bad" : "good"} />
-        <Line label="마진율" value={`${marginRate.toFixed(1)}%`} tone={marginAmount < 0 ? "bad" : "good"} />
-      </KpiCard>
+      {/* 일반 상품: 마진(오프라인) */}
+      {showInboundLegacy && (
+        <KpiCard
+          label="마진 (오프라인)"
+          description="판매가 − 입고가. 카드수수료·판매비용 미반영"
+        >
+          <Line label="마진금액" value={`₩${fmtPrice(marginAmount)}`} emphasis tone={marginAmount < 0 ? "bad" : "good"} />
+          <Line label="마진율" value={`${marginRate.toFixed(1)}%`} tone={marginAmount < 0 ? "bad" : "good"} />
+        </KpiCard>
+      )}
+
+      {/* 조립/세트 — 실측: 평균 입고가 (lot 가중평균; 구성품 공급단가+배송비+부대비용 누적) */}
+      {showAverageForComposite && (
+        <KpiCard
+          label="평균 입고가"
+          description="조립실적 lot 가중평균 (구성품의 공급단가+배송비+부대비용 누적)"
+        >
+          <Line label="공급가액" value={`₩${fmtPrice(inboundNet)}`} />
+          <Line label="세액" value={`₩${fmtPrice(inboundTax)}`} />
+          <Line label="입고가" value={`₩${fmtPrice(inboundTotal)}`} emphasis />
+        </KpiCard>
+      )}
+
+      {/* 조립/세트 — 실측: 평균 마진 */}
+      {showAverageForComposite && (
+        <KpiCard
+          label="평균 마진"
+          description="판매가 − 평균 입고가. 카드수수료·판매비용 미반영"
+        >
+          <Line label="마진금액" value={`₩${fmtPrice(marginAmount)}`} emphasis tone={marginAmount < 0 ? "bad" : "good"} />
+          <Line label="마진율" value={`${marginRate.toFixed(1)}%`} tone={marginAmount < 0 ? "bad" : "good"} />
+        </KpiCard>
+      )}
+
+      {/* 조립/세트 — 예측: 예상 원가 */}
+      {showEstimateForComposite && (
+        <KpiCard
+          label="예상 원가"
+          description="구성품 잔여 로트·매입 단가 + 조립비 (조립실적 전 미리보기)"
+        >
+          <Line label="단위 원가" value={`₩${fmtPrice(Math.round(estUnitCost ?? 0))}`} emphasis />
+          {missingCount > 0 && (
+            <p className="text-[10px] text-destructive leading-snug">
+              ⚠️ {missingCount}개 부품 단가 미설정
+              {missingNames.length > 0 && (
+                <span className="block text-muted-foreground mt-0.5">
+                  {missingNames.join(", ")}
+                </span>
+              )}
+            </p>
+          )}
+        </KpiCard>
+      )}
+
+      {/* 조립/세트 — 예측: 예상 마진 */}
+      {showEstimateForComposite && (
+        <KpiCard
+          label="예상 마진"
+          description="판매가 − 예상 원가 − 판매비용"
+        >
+          <Line
+            label="마진금액"
+            value={`₩${fmtPrice(Math.round(estMargin ?? 0))}`}
+            emphasis
+            tone={(estMargin ?? 0) < 0 ? "bad" : "good"}
+          />
+          <Line
+            label="마진율"
+            value={estMarginRate !== null ? `${estMarginRate.toFixed(1)}%` : "-"}
+            tone={(estMargin ?? 0) < 0 ? "bad" : "good"}
+          />
+        </KpiCard>
+      )}
 
       {/* 재고 */}
       <KpiCard

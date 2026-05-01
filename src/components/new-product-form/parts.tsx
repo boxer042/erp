@@ -104,13 +104,91 @@ export function CostList({
   addLabel,
   avgShippingCost,
   avgShippingIsTaxable,
+  readOnly,
+  emptyLabel,
 }: {
   costs: CostRow[];
   onChange: React.Dispatch<React.SetStateAction<CostRow[]>>;
   addLabel: string;
   avgShippingCost?: number | null;
   avgShippingIsTaxable?: boolean;
+  readOnly?: boolean;
+  emptyLabel?: string;
 }) {
+  if (readOnly) {
+    const hasCosts = costs.length > 0;
+    const hasShipping = avgShippingCost != null && avgShippingCost > 0;
+    if (!hasCosts && !hasShipping) {
+      return (
+        <p className="text-[12px] text-muted-foreground py-4 text-center">
+          {emptyLabel ?? "등록된 입고 비용이 없습니다"}
+        </p>
+      );
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-muted text-muted-foreground text-xs">
+            <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">비용명</th>
+            <th className="border-r border-b border-border w-[80px] py-1.5 px-2 text-center font-medium">유형</th>
+            <th className="border-r border-b border-border w-[90px] py-1.5 px-2 text-center font-medium">공급가액</th>
+            <th className="border-r border-b border-border w-[80px] py-1.5 px-2 text-center font-medium">세액</th>
+            <th className="border-b border-border w-[90px] py-1.5 px-2 text-center font-medium">금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {hasShipping && (
+            <tr className="border-b border-border bg-card">
+              <td className="border-r border-border px-2 py-2 text-[12px] text-muted-foreground">
+                평균 배송비{avgShippingIsTaxable && <span className="ml-1 text-[10px]">(과세)</span>}
+              </td>
+              <td className="border-r border-border px-2 py-2 text-[12px] text-center text-muted-foreground">고정</td>
+              <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums">
+                ₩{Math.round(avgShippingIsTaxable ? avgShippingCost! / 1.1 : avgShippingCost!).toLocaleString("ko-KR")}
+              </td>
+              <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums">
+                {avgShippingIsTaxable ? `₩${Math.round(avgShippingCost! / 1.1 * 0.1).toLocaleString("ko-KR")}` : "—"}
+              </td>
+              <td className="px-2 py-2 text-[12px] text-right tabular-nums">
+                ₩{Math.round(avgShippingCost!).toLocaleString("ko-KR")}
+              </td>
+            </tr>
+          )}
+          {costs.map((cost) => {
+            const v = parseFloat(cost.value || "0");
+            const supply = cost.costType === "FIXED" && v
+              ? Math.round(cost.isTaxable ? v / 1.1 : v)
+              : null;
+            const tax = cost.costType === "FIXED" && v && cost.isTaxable
+              ? Math.round((v / 1.1) * 0.1)
+              : null;
+            return (
+              <tr key={cost.id} className="border-b border-border">
+                <td className="border-r border-border px-2 py-2 text-[12px]">{cost.name || "—"}</td>
+                <td className="border-r border-border px-2 py-2 text-[12px] text-center text-muted-foreground">
+                  {cost.costType === "FIXED" ? "고정" : "비율"}
+                </td>
+                <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums text-muted-foreground">
+                  {supply != null ? `₩${supply.toLocaleString("ko-KR")}` : "—"}
+                </td>
+                <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums text-muted-foreground">
+                  {tax != null ? `₩${tax.toLocaleString("ko-KR")}` : "—"}
+                </td>
+                <td className="px-2 py-2 text-[12px] text-right tabular-nums">
+                  {cost.costType === "FIXED" && v
+                    ? `₩${v.toLocaleString("ko-KR")}`
+                    : cost.value
+                      ? `${cost.value}%`
+                      : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  }
+
   return (
     <>
     {/* PC 테이블 */}

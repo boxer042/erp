@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Archive } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
 import {
   ProductBulkCard,
   ProductChannelPricingTable,
+  ProductSpecsTable,
   ProductDescriptionBlock,
   ProductHeaderBar,
   ProductInfoCard,
@@ -35,21 +36,23 @@ import {
   ProductMovementsTable,
   ProductSection,
   ProductSellingCostsTable,
-  ProductSetComponentsTable,
   ProductVariantsCard,
+  ProductCostBreakdownCard,
+  ProductChannelMarginCard,
+  ComponentIncomingInfoSections,
   computeAvgInboundUnitCost,
   computeCostSum,
-  fmtPrice,
   toVatPrice,
 } from "@/components/product";
 import { ProductInfoEditSheet } from "@/components/product/edit/product-info-edit-sheet";
 import { ProductMappingEditSheet } from "@/components/product/edit/product-mapping-edit-sheet";
 import { ProductCostsEditSheet } from "@/components/product/edit/product-costs-edit-sheet";
 import { ProductChannelPricingEditSheet } from "@/components/product/edit/product-channel-pricing-edit-sheet";
+import { ProductSpecsEditSheet } from "@/components/product/edit/product-specs-edit-sheet";
 import { ProductSetComponentsEditSheet } from "@/components/product/edit/product-set-components-edit-sheet";
-import { InlineTextEdit } from "@/components/product/edit/inline-text-edit";
 import { Pencil } from "lucide-react";
 import { ProductMediaManager } from "@/components/product-media-manager";
+import { ShippingHistoryCard } from "@/components/shipping-history-card";
 import type { ProductDetail } from "@/components/product/types";
 import type { Movement } from "./_types";
 
@@ -62,6 +65,7 @@ export default function ProductDetailPage() {
   const [mappingEditOpen, setMappingEditOpen] = useState(false);
   const [costsEditOpen, setCostsEditOpen] = useState(false);
   const [channelEditOpen, setChannelEditOpen] = useState(false);
+  const [specsEditOpen, setSpecsEditOpen] = useState(false);
   const [setComponentsEditOpen, setSetComponentsEditOpen] = useState(false);
 
   const productQuery = useQuery({
@@ -69,6 +73,13 @@ export default function ProductDetailPage() {
     queryFn: () => apiGet<ProductDetail>(`/api/products/${id}`),
   });
   const product = productQuery.data;
+
+  // 변형(variant) 진입 시 부모 상품으로 redirect — 변형 운영은 부모 상세에서
+  useEffect(() => {
+    if (product?.canonicalProductId) {
+      router.replace(`/products/${product.canonicalProductId}`);
+    }
+  }, [product?.canonicalProductId, router]);
 
   const movementsQuery = useQuery({
     queryKey: queryKeys.products.movements(id),
@@ -79,12 +90,12 @@ export default function ProductDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => apiMutate(`/api/products/${id}`, "DELETE"),
     onSuccess: () => {
-      toast.success("상품이 삭제되었습니다");
+      toast.success("상품이 비활성 처리되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       router.push("/products");
     },
     onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+      toast.error(err instanceof ApiError ? err.message : "비활성 처리 실패"),
   });
 
   if (productQuery.isPending) return null; // loading.tsx 가 처리
@@ -139,6 +150,7 @@ export default function ProductDetailPage() {
     imageUrl: product.imageUrl ?? null,
     memo: product.memo ?? null,
     categoryId: product.categoryId ?? null,
+    assemblyTemplateId: product.assemblyTemplateId ?? null,
   });
   const saveSingleField = (patch: Partial<ProductFieldsInput>) =>
     updateProductFields(product.id, { ...buildFieldsBase(), ...patch });
@@ -174,18 +186,44 @@ export default function ProductDetailPage() {
                 className="h-8"
                 onClick={() => setDeleteOpen(true)}
               >
-                <Trash2 className="h-3.5 w-3.5 mr-1.5" />삭제
+                <Archive className="h-3.5 w-3.5 mr-1.5" />비활성
               </Button>
             }
           />
 
           {/* 1. 개요 */}
           <ProductKpiCards product={product} />
+          <ProductCostBreakdownCard
+            product={product}
+            onEdit={
+              product.isSet || product.productType === "ASSEMBLED"
+                ? () => setSetComponentsEditOpen(true)
+                : undefined
+            }
+          />
+          {(product.isSet || product.productType === "ASSEMBLED") && (
+            <ComponentIncomingInfoSections
+              rows={(product.estimatedCostBreakdown ?? []).map((b) => ({
+                componentId: b.componentId,
+                componentName: b.componentName,
+                componentSku: b.componentSku,
+                label: b.label,
+                quantity: b.quantity,
+                shippingPerUnit: b.shippingPerUnit,
+                incomingCostPerUnit: b.incomingCostPerUnit,
+                supplierName: b.supplierName,
+                supplierProductName: b.supplierProductName,
+                incomingCostList: b.incomingCostList,
+              }))}
+            />
+          )}
+          <ProductChannelMarginCard product={product} />
           {product.isCanonical && (
             <ProductVariantsCard
               productId={product.id}
               taxType={product.taxType}
               variants={product.variants ?? []}
+              parentSetComponentsEmpty={(product.setComponents ?? []).length === 0}
             />
           )}
           <ProductInfoCard product={product} onEdit={() => setInfoEditOpen(true)} />
@@ -196,42 +234,6 @@ export default function ProductDetailPage() {
           />
 
           {/* 2. 가격·비용 */}
-          <ProductSection title="가격 요약">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-3 text-sm">
-              <div className="space-y-0.5">
-                <div className="text-[11px] font-medium text-muted-foreground">정가 (VAT 포함)</div>
-                <div className="text-base font-semibold tabular-nums">
-                  ₩
-                  <InlineTextEdit
-                    value={displayList != null ? String(displayList) : "0"}
-                    productId={product.id}
-                    onSave={saveListPriceFromVat}
-                    inputMode="numeric"
-                    commaFormat
-                  />
-                </div>
-              </div>
-              <div className="space-y-0.5">
-                <div className="text-[11px] font-medium text-muted-foreground">판매가 (VAT 포함)</div>
-                <div className="text-base font-semibold tabular-nums">
-                  ₩
-                  <InlineTextEdit
-                    value={String(displayVat)}
-                    productId={product.id}
-                    onSave={saveSellingPriceFromVat}
-                    inputMode="numeric"
-                    commaFormat
-                  />
-                </div>
-              </div>
-              <Stat label="할인율" value={discount > 0 ? `${discount}%` : "—"} />
-              <Stat
-                label="원가 / 전사비용"
-                value={`₩${fmtPrice(baseCost)} / ₩${fmtPrice(globalCostTotal)}`}
-              />
-            </div>
-          </ProductSection>
-
           <ProductSection
             title="전사 공통 판매비용"
             description="모든 채널에 공통으로 적용되는 비용"
@@ -275,7 +277,32 @@ export default function ProductDetailPage() {
               costsByChannel={costsByChannel}
               baseSellingPrice={parseFloat(product.sellingPrice || "0")}
               baseInboundCost={computeAvgInboundUnitCost(product)}
+              listPriceVat={displayList}
+              sellingPriceVat={displayVat}
+              discount={discount}
+              onSaveListPriceFromVat={saveListPriceFromVat}
+              onSaveSellingPriceFromVat={saveSellingPriceFromVat}
+              productId={product.id}
             />
+          </ProductSection>
+
+          <ProductSection
+            title="상세 스펙"
+            description="필터·검색용 구조화된 스펙 정보"
+            noPadding
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => setSpecsEditOpen(true)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                편집
+              </Button>
+            }
+          >
+            <ProductSpecsTable values={product.specValues ?? []} />
           </ProductSection>
 
           {/* 3. 공급·재고 */}
@@ -297,40 +324,31 @@ export default function ProductDetailPage() {
           >
             <ProductMappingsTable mappings={mappings} />
           </ProductSection>
+
+          {mappings.map((m) => (
+            <div key={`shipping-${m.id}`} className="space-y-2">
+              <div className="text-xs text-muted-foreground px-1">
+                {m.supplierProduct.name}
+                {m.supplierProduct.supplierCode ? ` · ${m.supplierProduct.supplierCode}` : ""}
+              </div>
+              <ShippingHistoryCard supplierProductId={m.supplierProduct.id} />
+            </div>
+          ))}
+
           <ProductInventoryCard product={product} />
           <ProductSection
             title="재고 로트 (잔여, 최근 5건)"
             description="FIFO 소진 순으로 표시"
             noPadding
           >
-            <ProductInventoryLotsTable lots={product.inventoryLots ?? []} limit={5} />
+            <ProductInventoryLotsTable
+              lots={product.inventoryLots ?? []}
+              limit={5}
+              showVariantColumn={!!product.isCanonical}
+            />
           </ProductSection>
 
-          {/* 4. 구성·관계 (조건부) */}
-          {(product.isSet || product.productType === "ASSEMBLED") && (
-            <ProductSection
-              title="세트 / 조립 구성품"
-              description={
-                product.productType === "ASSEMBLED"
-                  ? "조립상품의 구성 부품"
-                  : "세트 상품의 구성품"
-              }
-              noPadding
-              actions={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7"
-                  onClick={() => setSetComponentsEditOpen(true)}
-                >
-                  <Pencil className="h-3 w-3 mr-1" />
-                  편집
-                </Button>
-              }
-            >
-              <ProductSetComponentsTable components={product.setComponents ?? []} />
-            </ProductSection>
-          )}
+          {/* 4. 구성·관계 (조건부) — 세트/조립 구성품은 위쪽 "구성품 · 예상 원가 분해" 카드로 통합됨 */}
           {!product.isSet && product.productType !== "ASSEMBLED" && !product.isCanonical && (
             <ProductBulkCard product={product} />
           )}
@@ -353,6 +371,7 @@ export default function ProductDetailPage() {
             <ProductMovementsTable
               movements={movementsQuery.data}
               isLoading={movementsQuery.isPending}
+              showVariantColumn={!!product.isCanonical}
             />
           </ProductSection>
         </div>
@@ -361,9 +380,9 @@ export default function ProductDetailPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>상품을 삭제할까요?</DialogTitle>
+            <DialogTitle>상품을 비활성 처리할까요?</DialogTitle>
             <DialogDescription>
-              비활성 처리됩니다 (소프트 삭제). 매핑·비용·채널가격은 유지되지만 목록에서 사라집니다.
+              상품 데이터는 유지되며, 목록에서만 숨겨집니다 (매핑·비용·채널가격·이력 모두 보존). 필요 시 복구 가능합니다.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -375,7 +394,7 @@ export default function ProductDetailPage() {
               onClick={() => deleteMutation.mutate()}
               disabled={deleteMutation.isPending}
             >
-              삭제
+              비활성
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -402,6 +421,11 @@ export default function ProductDetailPage() {
         onOpenChange={setChannelEditOpen}
         product={product}
       />
+      <ProductSpecsEditSheet
+        open={specsEditOpen}
+        onOpenChange={setSpecsEditOpen}
+        product={product}
+      />
       <ProductSetComponentsEditSheet
         open={setComponentsEditOpen}
         onOpenChange={setSetComponentsEditOpen}
@@ -411,11 +435,3 @@ export default function ProductDetailPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
-      <div className="text-base font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}

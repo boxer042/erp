@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   const search = new URL(request.url).searchParams.get("search") ?? "";
@@ -14,6 +15,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const { name, description, unitRate, memo } = body ?? {};
   if (!name?.trim() || unitRate === undefined) {

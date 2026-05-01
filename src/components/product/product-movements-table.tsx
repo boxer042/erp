@@ -7,14 +7,20 @@ import type { InventoryMovementItem } from "./types";
 interface ProductMovementsTableProps {
   movements: InventoryMovementItem[] | undefined;
   isLoading?: boolean;
+  /** 대표(canonical) 상품일 때 자식 변형 movement 합산이라 "변형" 컬럼 노출 */
+  showVariantColumn?: boolean;
 }
 
-export function ProductMovementsTable({ movements, isLoading }: ProductMovementsTableProps) {
+export function ProductMovementsTable({ movements, isLoading, showVariantColumn }: ProductMovementsTableProps) {
+  const colCount = 6 + (showVariantColumn ? 1 : 0);
   return (
     <Table className="min-w-[820px]">
       <TableHeader>
         <TableRow>
           <TableHead className="h-9 px-3 text-xs">일시</TableHead>
+          {showVariantColumn && (
+            <TableHead className="h-9 px-3 text-xs">변형</TableHead>
+          )}
           <TableHead className="h-9 px-3 text-xs">유형</TableHead>
           <TableHead className="h-9 px-3 text-xs text-right">수량</TableHead>
           <TableHead className="h-9 px-3 text-xs text-right">잔량</TableHead>
@@ -27,6 +33,9 @@ export function ProductMovementsTable({ movements, isLoading }: ProductMovements
           Array.from({ length: 5 }).map((_, i) => (
             <TableRow key={i}>
               <TableCell className="px-3 py-2.5"><Skeleton className="h-3 w-28" /></TableCell>
+              {showVariantColumn && (
+                <TableCell className="px-3 py-2.5"><Skeleton className="h-3 w-20" /></TableCell>
+              )}
               <TableCell className="px-3 py-2.5"><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
               <TableCell className="px-3 py-2.5"><div className="flex justify-end"><Skeleton className="h-3 w-12" /></div></TableCell>
               <TableCell className="px-3 py-2.5"><div className="flex justify-end"><Skeleton className="h-3 w-12" /></div></TableCell>
@@ -36,7 +45,7 @@ export function ProductMovementsTable({ movements, isLoading }: ProductMovements
           ))
         ) : !movements || movements.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+            <TableCell colSpan={colCount} className="text-center py-8 text-muted-foreground text-sm">
               이동 이력이 없습니다
             </TableCell>
           </TableRow>
@@ -46,6 +55,15 @@ export function ProductMovementsTable({ movements, isLoading }: ProductMovements
               <TableCell className="px-3 py-2.5 text-muted-foreground text-xs whitespace-nowrap">
                 {formatDateKo(m.createdAt)}
               </TableCell>
+              {showVariantColumn && (
+                <TableCell className="px-3 py-2.5 text-xs">
+                  {m.inventory?.product ? (
+                    <span>{m.inventory.product.sku}</span>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell className="px-3 py-2.5">
                 <Badge variant="outline" className="text-[10px]">
                   {MOVEMENT_TYPE_LABELS[m.type] ?? m.type}

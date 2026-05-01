@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assemblySlotLabelSchema } from "@/lib/validators/assembly-template";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -19,6 +20,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = assemblySlotLabelSchema.safeParse(body);
   if (!parsed.success) {

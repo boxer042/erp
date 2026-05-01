@@ -6,14 +6,19 @@ import {
   type ItemsPdfRow,
 } from "@/components/supplier-items-pdf";
 
-const OUR_COMPANY = {
-  name: process.env.COMPANY_NAME || "우리 회사",
-  businessNumber: process.env.COMPANY_BIZ_NO || null,
-  ceo: process.env.COMPANY_CEO || null,
-  phone: process.env.COMPANY_PHONE || null,
-  email: process.env.COMPANY_EMAIL || null,
-  address: process.env.COMPANY_ADDRESS || null,
-};
+async function loadOurCompany() {
+  const company = await prisma.companyInfo.findUnique({
+    where: { id: "singleton" },
+  });
+  return {
+    name: company?.name || "우리 회사",
+    businessNumber: company?.businessNumber ?? null,
+    ceo: company?.ceo ?? null,
+    phone: company?.phone ?? null,
+    email: company?.email ?? null,
+    address: company?.address ?? null,
+  };
+}
 
 export default async function SupplierLedgerPrintPage({
   params,
@@ -24,6 +29,7 @@ export default async function SupplierLedgerPrintPage({
 }) {
   const { supplierId } = await params;
   const { from, to, auto, view } = await searchParams;
+  const OUR_COMPANY = await loadOurCompany();
 
   const supplier = await prisma.supplier.findUnique({
     where: { id: supplierId },

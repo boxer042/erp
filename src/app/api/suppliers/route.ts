@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supplierSchema } from "@/lib/validators/supplier";
+import { guardUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
 
@@ -23,6 +26,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = supplierSchema.safeParse(body);
 

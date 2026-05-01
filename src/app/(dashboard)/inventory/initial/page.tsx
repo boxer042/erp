@@ -23,13 +23,36 @@ import {
   QuickSupplierSheet,
 } from "@/components/quick-register-sheets";
 import { SupplierCombobox } from "@/components/supplier-combobox";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileInlineCellProductSearch } from "@/components/inline-cell-product-search-mobile";
 import {
   formatComma,
   parseComma,
+  formatCommaDecimal,
+  parseCommaDecimal,
   calcDiscountPerUnit,
   formatDiscountDisplay,
   normalizeDiscountInput,
 } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function InitialHistorySkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 // ─── Types ───
 
@@ -60,6 +83,7 @@ interface ItemForm {
   supplyAmount: string;
   memo: string;
   isNew?: boolean;
+  pendingSourceRow?: number;
 }
 
 const emptyItem = (): ItemForm => ({
@@ -78,7 +102,7 @@ const emptyItem = (): ItemForm => ({
 // ─── 품명 검색 (입고 페이지 InlineCellProductSearch 패턴) ───
 
 function InlineCellProductSearch({
-  rowIndex, products, onSelect, onCreateNewInline, onSelectPending, existingIds, pendingNewProducts, selectedName = "", isNew = false,
+  rowIndex, products, onSelect, onCreateNewInline, onSelectPending, existingIds, pendingNewProducts, selectedName = "", isNew = false, pendingSourceRow,
 }: {
   rowIndex: number;
   products: SupplierProduct[];
@@ -89,11 +113,30 @@ function InlineCellProductSearch({
   pendingNewProducts?: { name: string; spec: string; supplierCode: string; rowIndex: number }[];
   selectedName?: string;
   isNew?: boolean;
+  pendingSourceRow?: number;
 }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const searchRef = useRef(search);
-  searchRef.current = search;
+  useEffect(() => { searchRef.current = search; }, [search]);
+
+  if (isMobile) {
+    return (
+      <MobileInlineCellProductSearch
+        rowIndex={rowIndex}
+        products={products}
+        onSelect={onSelect}
+        onCreateNew={onCreateNewInline}
+        existingIds={existingIds}
+        selectedName={selectedName}
+        isNew={isNew}
+        pendingSourceRow={pendingSourceRow}
+        pendingNewProducts={pendingNewProducts}
+        onSelectPending={onSelectPending}
+      />
+    );
+  }
 
   const filtered = products.filter((p) => {
     const q = search.toLowerCase();
@@ -121,7 +164,14 @@ function InlineCellProductSearch({
         {selectedName ? (
           <span className="flex items-center gap-1.5 truncate">
             <span className="font-medium truncate">{selectedName}</span>
-            {isNew && <Badge variant="outline" className="text-[10px] text-primary border-[#3ECF8E]/40 shrink-0">신규</Badge>}
+            {isNew && pendingSourceRow !== undefined && (
+              <Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed shrink-0">
+                행 {pendingSourceRow + 1} 재사용
+              </Badge>
+            )}
+            {isNew && pendingSourceRow === undefined && (
+              <Badge variant="outline" className="text-[10px] text-primary border-[#3ECF8E]/40 shrink-0">신규</Badge>
+            )}
           </span>
         ) : (
           <span className="flex items-center gap-1.5"><Plus className="size-3.5 shrink-0" />품명 검색...</span>
@@ -232,6 +282,11 @@ export default function InitialInventoryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // 단가 VAT포함 입력 모드 + 원본 보관 (입고 페이지와 동일)
+  const [unitPriceVatIncluded, setUnitPriceVatIncluded] = useState(false);
+  const [vatInputBuffer, setVatInputBuffer] = useState<{ idx: number; text: string } | null>(null);
+  const [vatRawByIdx, setVatRawByIdx] = useState<Record<number, string>>({});
+
   // 이력 탭
   const [historyItems, setHistoryItems] = useState<InitialHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -276,6 +331,8 @@ export default function InitialInventoryPage() {
     setSelectedSupplierId(supplierId);
     setSelectedSupplierName(name);
     setItems([emptyItem()]);
+    setVatRawByIdx({});
+    setVatInputBuffer(null);
     if (!supplierId) { setSupplierProducts([]); return; }
     const res = await fetch(`/api/supplier-products?supplierId=${supplierId}`);
     setSupplierProducts(await res.json());
@@ -308,6 +365,7 @@ export default function InitialInventoryPage() {
         unitOfMeasure: sp.unitOfMeasure,
         unitPrice: sp.unitPrice,
         isNew: undefined,
+        pendingSourceRow: undefined,
       };
       return updated;
     });
@@ -326,6 +384,7 @@ export default function InitialInventoryPage() {
         spec: pending.spec,
         supplierCode: pending.supplierCode,
         isNew: true,
+        pendingSourceRow: pending.rowIndex,
       };
       return updated;
     });
@@ -354,7 +413,23 @@ export default function InitialInventoryPage() {
   const updateItem = (index: number, field: keyof ItemForm, value: string) => {
     setItems((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const next = { ...updated[index], [field]: value };
+      // 재사용으로 들어온 행이 원본과 다른 값으로 수정되면 분리 표시
+      if (
+        next.pendingSourceRow !== undefined &&
+        (field === "supplierProductName" || field === "spec" || field === "supplierCode")
+      ) {
+        const source = updated[next.pendingSourceRow];
+        if (
+          !source ||
+          source.supplierProductName !== next.supplierProductName ||
+          source.spec !== next.spec ||
+          source.supplierCode !== next.supplierCode
+        ) {
+          next.pendingSourceRow = undefined;
+        }
+      }
+      updated[index] = next;
       return updated;
     });
     // 수정하면 해당 행의 중복 표시 해제
@@ -368,7 +443,7 @@ export default function InitialInventoryPage() {
     }
   };
 
-  const recalcOnBlur = (index: number, field: string) => {
+  const recalcOnBlur = (index: number, field: string, vatRawOverride?: string) => {
     setItems((prev) => {
       const updated = [...prev];
       const item = { ...updated[index] };
@@ -378,7 +453,17 @@ export default function InitialInventoryPage() {
       const actualPrice = up - discPerUnit;
 
       if (field === "unitPrice" || field === "quantity" || field === "discount") {
-        const supply = actualPrice * qty;
+        // VAT포함 입력 원본이 있으면 그 값 기준으로 공급가액 산출 (단가 반올림 round-trip 오차 방지)
+        const rawStr = vatRawOverride !== undefined
+          ? vatRawOverride
+          : (unitPriceVatIncluded ? vatRawByIdx[index] : undefined);
+        const raw = parseFloat(rawStr || "0");
+        let supply: number;
+        if (raw > 0 && qty > 0) {
+          supply = Math.round((raw * qty) / 1.1) - discPerUnit * qty;
+        } else {
+          supply = actualPrice * qty;
+        }
         item.supplyAmount = supply > 0 ? String(Math.round(supply)) : "";
       }
       if (field === "supplyAmount") {
@@ -484,6 +569,8 @@ export default function InitialInventoryPage() {
       }
       // 행 초기화
       setItems([emptyItem()]);
+      setVatRawByIdx({});
+      setVatInputBuffer(null);
     } catch {
       toast.error("오류가 발생했습니다");
     } finally {
@@ -540,7 +627,8 @@ export default function InitialInventoryPage() {
           </div>
 
           {/* 품목 테이블 — 거래명세표 스타일 */}
-          <table className="w-full text-sm table-fixed">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[1040px] text-sm table-fixed">
             <thead>
               <tr className="bg-muted text-muted-foreground text-xs">
                 <th className="border-r border-b border-border w-[36px] py-2 text-center font-medium">번호</th>
@@ -549,7 +637,23 @@ export default function InitialInventoryPage() {
                 <th className="border-r border-b border-border w-[100px] py-2 px-2 text-left font-medium">규격</th>
                 <th className="border-r border-b border-border w-[50px] py-2 text-center font-medium">단위</th>
                 <th className="border-r border-b border-border w-[70px] py-2 text-center font-medium">수량</th>
-                <th className="border-r border-b border-border w-[90px] py-2 text-center font-medium">단가</th>
+                <th className="border-r border-b border-border w-[90px] py-1 text-center font-medium">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span>단가</span>
+                    <button
+                      type="button"
+                      onClick={() => setUnitPriceVatIncluded((v) => !v)}
+                      className={`text-[10px] leading-none px-1.5 py-0.5 rounded border ${
+                        unitPriceVatIncluded
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-border text-muted-foreground hover:bg-muted/70"
+                      }`}
+                      title="ON: VAT포함 금액으로 입력 → 자동 ÷1.1 저장"
+                    >
+                      VAT포함
+                    </button>
+                  </div>
+                </th>
                 <th className="border-r border-b border-border w-[80px] py-2 text-center font-medium">할인</th>
                 <th className="border-r border-b border-border w-[90px] py-2 text-center font-medium">실제단가</th>
                 <th className="border-r border-b border-border w-[100px] py-2 text-center font-medium">공급가액</th>
@@ -599,6 +703,7 @@ export default function InitialInventoryPage() {
                               pendingNewProducts={pendingNewProducts}
                               selectedName={item.supplierProductName}
                               isNew={item.isNew}
+                              pendingSourceRow={item.pendingSourceRow}
                             />
                           </div>
                           {isDuplicate && (
@@ -638,20 +743,56 @@ export default function InitialInventoryPage() {
                       />
                     </td>
 
-                    {/* 단가 */}
+                    {/* 단가 — VAT포함 ON이면 표시는 ×1.1, 저장은 round(input/1.1) */}
                     <td className="border-r border-border p-0.5">
                       <input
                         data-row={idx} data-field="unitPrice"
-                        value={formatComma(item.unitPrice)}
-                        onChange={(e) => updateItem(idx, "unitPrice", parseComma(e.target.value))}
-                        onBlur={() => recalcOnBlur(idx, "unitPrice")}
+                        inputMode="decimal"
+                        value={
+                          unitPriceVatIncluded
+                            ? (vatInputBuffer?.idx === idx
+                                ? vatInputBuffer.text
+                                : vatRawByIdx[idx] !== undefined
+                                  ? formatCommaDecimal(vatRawByIdx[idx])
+                                  : item.unitPrice
+                                    ? formatCommaDecimal(String(Math.round(parseFloat(item.unitPrice) * 1.1)))
+                                    : "")
+                            : formatComma(item.unitPrice)
+                        }
+                        onChange={(e) => {
+                          if (unitPriceVatIncluded) {
+                            setVatInputBuffer({ idx, text: e.target.value });
+                          } else {
+                            updateItem(idx, "unitPrice", parseComma(e.target.value));
+                            setVatRawByIdx((prev) => {
+                              if (prev[idx] === undefined) return prev;
+                              const { [idx]: _, ...rest } = prev;
+                              return rest;
+                            });
+                          }
+                        }}
+                        onBlur={() => {
+                          if (unitPriceVatIncluded && vatInputBuffer?.idx === idx) {
+                            const raw = parseCommaDecimal(vatInputBuffer.text);
+                            const stored = raw
+                              ? String(Math.round(parseFloat(raw) / 1.1))
+                              : "";
+                            updateItem(idx, "unitPrice", stored);
+                            setVatRawByIdx((prev) => ({ ...prev, [idx]: raw }));
+                            setVatInputBuffer(null);
+                            recalcOnBlur(idx, "unitPrice", raw);
+                            return;
+                          }
+                          recalcOnBlur(idx, "unitPrice");
+                        }}
                         onFocus={(e) => {
                           if (item.unitPrice === "0") updateItem(idx, "unitPrice", "");
                           else e.currentTarget.select();
                         }}
                         disabled={isEmptyRow}
-                        inputMode="numeric"
-                        className="w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30"
+                        className={`w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30 ${
+                          unitPriceVatIncluded ? "text-blue-600 dark:text-blue-400" : ""
+                        }`}
                       />
                     </td>
 
@@ -717,6 +858,7 @@ export default function InitialInventoryPage() {
               })}
             </tbody>
           </table>
+          </div>
 
           {/* 행 추가 */}
           <div className="flex items-center border-t border-border px-3 py-2">
@@ -786,7 +928,7 @@ export default function InitialInventoryPage() {
               </TableHeader>
               <TableBody>
                 {historyLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8">로딩 중...</TableCell></TableRow>
+                  <InitialHistorySkeletonRows />
                 ) : historyItems.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8">초기 등록 이력이 없습니다</TableCell></TableRow>
                 ) : (

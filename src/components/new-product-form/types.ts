@@ -66,6 +66,10 @@ export interface SetComponentRow {
   quantity: string;
   /** 템플릿/프리셋에서 채워진 슬롯 라벨 (표시 전용) */
   label?: string;
+  /** AssemblySlotLabel 마스터 ID (라벨 콤보박스 선택값) */
+  slotLabelId?: string | null;
+  /** AssemblyTemplateSlot ID — 템플릿의 어느 슬롯에서 왔는지 직접 매핑 */
+  slotId?: string | null;
   /** 변형 모드: 메인의 어느 setComponent 행에서 파생됐는지 추적 */
   mainId?: string;
   /** 변형 모드: 사용자가 product를 직접 수정했는지 여부 (override 보존용) */

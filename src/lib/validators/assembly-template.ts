@@ -7,6 +7,7 @@ export const assemblyTemplateSlotSchema = z.object({
   order: z.number().int(),
   defaultProductId: z.string().nullable().optional(),
   defaultQuantity: z.string().min(1, "기본 수량을 입력해주세요"),
+  isVariable: z.boolean().optional().default(false),
 });
 
 export const assemblySlotLabelSchema = z.object({

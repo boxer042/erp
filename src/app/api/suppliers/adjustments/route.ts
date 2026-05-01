@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
+import { guardAdmin } from "@/lib/api-auth";
 
 const schema = z.object({
   supplierId: z.string().min(1, "거래처를 선택해주세요"),
@@ -14,6 +15,8 @@ const schema = z.object({
 // 수동 조정(ADJUSTMENT) 등록
 // amount > 0 → debit (미지급금 증가), amount < 0 → credit (미지급금 감소)
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

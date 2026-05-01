@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function GET(
   _request: NextRequest,
@@ -18,6 +19,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { id } = await params;
   const body = await request.json();
   const { channelId, sellingPrice } = body as {
@@ -48,6 +51,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const pricingId = searchParams.get("pricingId");
 

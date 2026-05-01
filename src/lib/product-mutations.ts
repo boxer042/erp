@@ -45,6 +45,7 @@ export interface ProductFieldsInput {
   imageUrl?: string | null;
   memo?: string | null;
   categoryId?: string | null;
+  assemblyTemplateId?: string | null;
 }
 
 export async function updateProductFields(

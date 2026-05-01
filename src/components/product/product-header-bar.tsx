@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ImagePlus, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -43,8 +43,17 @@ export function ProductHeaderBar({
   onSaveName,
   onSaveImageUrl,
 }: ProductHeaderBarProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(backHref);
+    }
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -122,11 +131,15 @@ export function ProductHeaderBar({
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <Link href={backHref}>
-        <Button variant="ghost" size="icon" className="shrink-0" aria-label={backLabel}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-      </Link>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="shrink-0"
+        aria-label={backLabel}
+        onClick={handleBack}
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
       {renderThumb()}
       {onSaveName ? (
         <h2 className="text-lg font-semibold truncate">

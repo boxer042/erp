@@ -6,6 +6,8 @@ export const incomingItemSchema = z.object({
   unitPrice: z.string().min(1, "단가를 입력해주세요"),
   originalPrice: z.string().optional(),
   discountAmount: z.string().optional(),
+  itemShippingCost: z.string().nullable().optional(),
+  itemShippingIsTaxable: z.boolean().optional(),
 });
 
 export const incomingSchema = z.object({

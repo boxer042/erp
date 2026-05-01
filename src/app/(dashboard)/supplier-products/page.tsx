@@ -16,8 +16,29 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Link2, Plus } from "lucide-react";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { MappingSheet, IncomingCostSheet } from "@/components/mapping-sheet";
+import { MappingSheet } from "@/components/mapping-sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function SupplierProductsSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 interface MappingInfo {
   id: string;
@@ -75,8 +96,6 @@ export default function SupplierProductsPage() {
   const [defaultProductId, setDefaultProductId] = useState("");
 
   // 입고 비용 시트
-  const [costOpen, setCostOpen] = useState(false);
-  const [costTarget, setCostTarget] = useState<{ id: string; name: string } | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -116,11 +135,6 @@ export default function SupplierProductsPage() {
     setDefaultProductId(productId);
     setChoiceOpen(false);
     setDialogOpen(true);
-  };
-
-  const openCost = (sp: SupplierProduct) => {
-    setCostTarget({ id: sp.id, name: sp.name });
-    setCostOpen(true);
   };
 
   return (
@@ -181,23 +195,53 @@ export default function SupplierProductsPage() {
                 <TableHead>품명</TableHead>
                 <TableHead>규격</TableHead>
                 <TableHead>품번</TableHead>
+                <TableHead className="text-right">원가</TableHead>
+                <TableHead className="text-right">입고비용</TableHead>
                 <TableHead className="text-right">입고가</TableHead>
-                <TableHead className="text-right">입고 비용</TableHead>
                 <TableHead>매핑 상태</TableHead>
                 <TableHead className="text-right">입고 횟수</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">로딩 중...</TableCell>
-                </TableRow>
+                <SupplierProductsSkeletonRows />
               ) : filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">거래처 상품이 없습니다</TableCell>
+                  <TableCell colSpan={9} className="text-center py-8">거래처 상품이 없습니다</TableCell>
                 </TableRow>
               ) : (
-                filteredItems.map((sp) => (
+                filteredItems.map((sp) => {
+                  const unit = parseFloat(sp.unitPrice) || 0;
+                  const baseCost = unit * (sp.isTaxable ? 1.1 : 1); // 원가 (개당, VAT포함)
+
+                  // 입고비용 (개당, VAT포함 합계) = 부대비용 환산 + 평균 배송비
+                  const fixedSum = sp.incomingCosts
+                    .filter((c) => c.costType === "FIXED")
+                    .reduce((sum, c) => sum + parseFloat(c.value), 0);
+                  const pctSum = sp.incomingCosts
+                    .filter((c) => c.costType === "PERCENTAGE")
+                    .reduce((sum, c) => {
+                      const amount = (unit * parseFloat(c.value)) / 100;
+                      return sum + (c.isTaxable ? amount * 1.1 : amount);
+                    }, 0);
+                  const shipping = sp.avgShippingCost ?? 0;
+                  const incomingCost = fixedSum + pctSum + shipping;
+                  const hasIncomingCost =
+                    sp.incomingCosts.length > 0 || sp.avgShippingCost !== null;
+
+                  const totalIncomingPrice = baseCost + incomingCost;
+                  const hasBase = sp._count.incomingItems > 0 || sp.source === "INITIAL";
+
+                  const latest = sp.priceHistory[0];
+                  const priceDir = latest
+                    ? parseFloat(latest.newPrice) > parseFloat(latest.oldPrice)
+                      ? "up"
+                      : parseFloat(latest.newPrice) < parseFloat(latest.oldPrice)
+                        ? "down"
+                        : null
+                    : null;
+
+                  return (
                   <TableRow key={sp.id}>
                     <TableCell>{sp.supplier.name}</TableCell>
                     <TableCell className="font-medium">
@@ -212,77 +256,41 @@ export default function SupplierProductsPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{sp.spec || "-"}</TableCell>
                     <TableCell className="text-muted-foreground">{sp.supplierCode || "-"}</TableCell>
+
+                    {/* 원가 */}
                     <TableCell className="text-right tabular-nums">
-                      {sp._count.incomingItems > 0
-                        ? (() => {
-                            const displayPrice = `₩${Math.round(parseFloat(sp.unitPrice) * (sp.isTaxable ? 1.1 : 1)).toLocaleString("ko-KR")}`;
-                            const latest = sp.priceHistory[0];
-                            const priceDir = latest
-                              ? parseFloat(latest.newPrice) > parseFloat(latest.oldPrice) ? "up"
-                              : parseFloat(latest.newPrice) < parseFloat(latest.oldPrice) ? "down"
-                              : null
-                              : null;
-                            return (
-                              <span className="inline-flex items-center gap-1">
-                                {displayPrice}
-                                {priceDir === "up" && <span className="text-red-500">↑</span>}
-                                {priceDir === "down" && <span className="text-blue-500">↓</span>}
-                              </span>
-                            );
-                          })()
-                        : sp.source === "INITIAL"
-                          ? (
-                            <span className="text-muted-foreground">
-                              ₩{Math.round(parseFloat(sp.unitPrice) * (sp.isTaxable ? 1.1 : 1)).toLocaleString("ko-KR")}
-                              <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 text-muted-foreground border-muted-foreground/30">기초</Badge>
-                            </span>
-                          )
-                          : <span className="text-muted-foreground">-</span>
-                      }
+                      {hasBase ? (
+                        <span className="inline-flex items-center gap-1">
+                          ₩{Math.round(baseCost).toLocaleString("ko-KR")}
+                          {sp._count.incomingItems > 0 && priceDir === "up" && <span className="text-red-500">↑</span>}
+                          {sp._count.incomingItems > 0 && priceDir === "down" && <span className="text-blue-500">↓</span>}
+                          {sp._count.incomingItems === 0 && sp.source === "INITIAL" && (
+                            <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-muted-foreground border-muted-foreground/30">기초</Badge>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
-                    <TableCell
-                      className="text-right cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => openCost(sp)}
-                    >
-                      {(() => {
-                        const fixedTotal = sp.incomingCosts
-                          .filter((c) => c.costType === "FIXED")
-                          .reduce((sum, c) => sum + parseFloat(c.value), 0);
-                        const fixedSupply = sp.incomingCosts
-                          .filter((c) => c.costType === "FIXED")
-                          .reduce((sum, c) => sum + (c.isTaxable ? parseFloat(c.value) / 1.1 : parseFloat(c.value)), 0);
-                        const pctTotal = sp.incomingCosts
-                          .filter((c) => c.costType === "PERCENTAGE")
-                          .reduce((sum, c) => sum + parseFloat(c.value), 0);
-                        const hasTaxable = sp.incomingCosts.some((c) => c.costType === "FIXED" && c.isTaxable);
-                        const avgShipping = sp.avgShippingCost;
-                        if (sp.incomingCosts.length === 0 && avgShipping === null) {
-                          return <span className="text-muted-foreground text-xs">미등록</span>;
-                        }
-                        return (
-                          <div className="flex flex-col items-end gap-0.5">
-                            {sp.incomingCosts.length > 0 && (
-                              <>
-                                <span className="tabular-nums">
-                                  ₩{fixedTotal.toLocaleString("ko-KR")}
-                                  {pctTotal > 0 && ` +${pctTotal}%`}
-                                </span>
-                                {hasTaxable && (
-                                  <span className="text-xs text-muted-foreground tabular-nums">
-                                    공급가 ₩{Math.round(fixedSupply).toLocaleString("ko-KR")}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            {avgShipping !== null && (
-                              <span className={`tabular-nums ${sp.incomingCosts.length > 0 ? "text-xs text-muted-foreground" : ""}`}>
-                                ₩{Math.round(avgShipping).toLocaleString("ko-KR")}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()}
+
+                    {/* 입고비용 */}
+                    <TableCell className="text-right tabular-nums">
+                      {hasIncomingCost && incomingCost > 0 ? (
+                        <span>₩{Math.round(incomingCost).toLocaleString("ko-KR")}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">미등록</span>
+                      )}
                     </TableCell>
+
+                    {/* 입고가 */}
+                    <TableCell className="text-right tabular-nums">
+                      {hasBase && totalIncomingPrice > 0 ? (
+                        <span className="font-medium">₩{Math.round(totalIncomingPrice).toLocaleString("ko-KR")}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+
                     <TableCell
                       className="cursor-pointer hover:text-foreground transition-colors"
                       onClick={() => sp.productMappings.length > 0 ? openMapping({ id: sp.id, supplierId: sp.supplierId, name: sp.name, unit: sp.unitOfMeasure }) : openMappingChoice(sp)}
@@ -310,7 +318,8 @@ export default function SupplierProductsPage() {
                       {sp._count.incomingItems}
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -378,15 +387,6 @@ export default function SupplierProductsPage() {
         />
       )}
 
-      {costTarget && (
-        <IncomingCostSheet
-          open={costOpen}
-          onOpenChange={setCostOpen}
-          supplierProductId={costTarget.id}
-          supplierProductName={costTarget.name}
-          onCostChange={fetchItems}
-        />
-      )}
     </>
   );
 }

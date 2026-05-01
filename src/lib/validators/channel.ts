@@ -5,6 +5,8 @@ export const channelSchema = z.object({
   code: z.string().min(1, "채널 코드를 입력해주세요").toUpperCase(),
   commissionRate: z.string().default("0"),
   memo: z.string().optional(),
+  logoUrl: z.string().nullable().optional(),
+  logoPath: z.string().nullable().optional(),
 });
 
 export type ChannelInput = z.infer<typeof channelSchema>;

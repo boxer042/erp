@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { computeMovingAverage } from "@/lib/cost";
 import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
 import { incomingSchema } from "@/lib/validators/incoming";
+import { computeShippingNetPerUnit } from "@/lib/incoming-shipping";
+import { recalcIncomingExpense } from "@/lib/incoming-recalc";
 
 export async function GET(
   _request: NextRequest,
@@ -75,10 +77,11 @@ export async function PUT(
       return NextResponse.json({ error: "확인된 입고만 택배비를 수정할 수 있습니다" }, { status: 400 });
     }
 
-    const { shippingCost: rawCost, shippingIsTaxable, shippingDeducted } = body as {
+    const { shippingCost: rawCost, shippingIsTaxable, shippingDeducted, items: itemOverrides } = body as {
       shippingCost: string;
       shippingIsTaxable: boolean;
       shippingDeducted: boolean;
+      items?: Array<{ id: string; itemShippingCost: string | null; itemShippingIsTaxable?: boolean }>;
     };
     const newShippingCost = parseFloat(rawCost) || 0;
 
@@ -89,21 +92,57 @@ export async function PUT(
         data: { shippingCost: newShippingCost, shippingIsTaxable, shippingDeducted },
       });
 
+      // 1b. 품목별 itemShippingCost 업데이트 (있을 때만)
+      const overrideById = new Map<string, { value: number | null; taxable: boolean }>();
+      if (Array.isArray(itemOverrides)) {
+        for (const o of itemOverrides) {
+          const raw = o.itemShippingCost;
+          const value = raw === null || raw === "" || raw === undefined
+            ? null
+            : (parseFloat(raw) || 0);
+          overrideById.set(o.id, { value, taxable: o.itemShippingIsTaxable ?? true });
+        }
+        await Promise.all(
+          Array.from(overrideById.entries()).map(([itemId, ov]) =>
+            tx.incomingItem.update({
+              where: { id: itemId },
+              data: {
+                itemShippingCost: ov.value,
+                itemShippingIsTaxable: ov.taxable,
+              },
+            })
+          )
+        );
+      }
+
       // 2. 각 IncomingItem unitCostSnapshot 재계산 + InventoryLot unitCost 갱신
-      const incomingTotalPrice = incoming.items.reduce((sum, i) => sum + Number(i.totalPrice), 0);
+      const itemsForCalc = incoming.items.map((item) => {
+        const ov = overrideById.get(item.id);
+        const effItemShipping = ov
+          ? ov.value
+          : (item.itemShippingCost === null || item.itemShippingCost === undefined
+              ? null
+              : Number(item.itemShippingCost));
+        const effItemTaxable = ov ? ov.taxable : item.itemShippingIsTaxable;
+        return { ...item, _effItemShipping: effItemShipping, _effItemTaxable: effItemTaxable };
+      });
+
+      const shippingNetMap = computeShippingNetPerUnit(
+        itemsForCalc.map((i) => ({
+          id: i.id,
+          quantity: Number(i.quantity),
+          totalPrice: Number(i.totalPrice),
+          itemShippingCost: i._effItemShipping,
+          itemShippingIsTaxable: i._effItemTaxable,
+        })),
+        { shippingCost: newShippingCost, shippingIsTaxable, shippingDeducted }
+      );
 
       // Step A: 아이템별 기본 원가 계산
-      const baseCalcs = incoming.items.map((item) => {
+      const baseCalcs = itemsForCalc.map((item) => {
         const qty = Number(item.quantity);
         const unitPrice = Number(item.unitPrice);
-
-        const lineShipping = incomingTotalPrice > 0
-          ? (Number(item.totalPrice) / incomingTotalPrice) * newShippingCost
-          : 0;
-        const shippingPerUnit = qty > 0 ? lineShipping / qty : 0;
-        const shippingNetPerUnit = shippingDeducted
-          ? 0
-          : shippingIsTaxable ? shippingPerUnit / 1.1 : shippingPerUnit;
+        const shippingNetPerUnit = shippingNetMap.get(item.id) ?? 0;
 
         const incomingCostPerUnit = item.supplierProduct.incomingCosts
           .filter((c) => c.perUnit)
@@ -220,39 +259,8 @@ export async function PUT(
         await rebalanceSupplierLedger(tx, incoming.supplierId);
       }
 
-      // 4. 경비 레코드 업데이트 또는 생성
-      const existingExpense = await tx.expense.findFirst({
-        where: { referenceId: id, referenceType: "INCOMING", category: "SHIPPING" },
-      });
-
-      if (existingExpense) {
-        if (newShippingCost > 0) {
-          await tx.expense.update({
-            where: { id: existingExpense.id },
-            data: {
-              amount: newShippingCost,
-              memo: shippingDeducted ? "거래처 차감" : null,
-              recoverable: shippingDeducted,
-            },
-          });
-        } else {
-          await tx.expense.delete({ where: { id: existingExpense.id } });
-        }
-      } else if (newShippingCost > 0) {
-        await tx.expense.create({
-          data: {
-            date: incoming.incomingDate,
-            amount: newShippingCost,
-            category: "SHIPPING",
-            description: `택배비 (입고 ${incoming.incomingNo})`,
-            supplierId: incoming.supplierId,
-            referenceId: id,
-            referenceType: "INCOMING",
-            memo: shippingDeducted ? "거래처 차감" : null,
-            recoverable: shippingDeducted,
-          },
-        });
-      }
+      // 4. 경비 레코드 — 헤더 + 품목 직접 운임 합산 통합 헬퍼
+      await recalcIncomingExpense(tx, incoming.id);
     });
 
     const updated = await prisma.incoming.findUnique({
@@ -297,6 +305,10 @@ export async function PUT(
       const price = parseFloat(item.unitPrice);
       const originalPrice = item.originalPrice ? parseFloat(item.originalPrice) : undefined;
       const discountAmount = item.discountAmount ? parseFloat(item.discountAmount) : undefined;
+      const rawShipping = item.itemShippingCost;
+      const itemShippingCost = rawShipping === null || rawShipping === undefined || rawShipping === ""
+        ? null
+        : (parseFloat(rawShipping) || 0);
       return {
         supplierProductId: item.supplierProductId,
         quantity: qty,
@@ -304,6 +316,8 @@ export async function PUT(
         totalPrice: qty * price,
         originalPrice,
         discountAmount,
+        itemShippingCost,
+        itemShippingIsTaxable: item.itemShippingIsTaxable ?? true,
       };
     });
     const totalAmount = newItems.reduce((sum, i) => sum + i.totalPrice, 0);
@@ -333,6 +347,8 @@ export async function PUT(
           totalPrice: i.totalPrice,
           originalPrice: i.originalPrice ?? null,
           discountAmount: i.discountAmount ?? null,
+          itemShippingCost: i.itemShippingCost,
+          itemShippingIsTaxable: i.itemShippingIsTaxable,
         })),
       });
 
@@ -446,11 +462,23 @@ export async function PUT(
   }
 
   // === 입고 확인 트랜잭션 ===
-  // 배송비 배분을 위한 입고 전체 금액
-  const incomingTotalPrice = incoming.items.reduce((sum, i) => sum + Number(i.totalPrice), 0);
   const shippingCost = Number(incoming.shippingCost);
   const shippingIsTaxable = incoming.shippingIsTaxable;
   const shippingDeducted = incoming.shippingDeducted;
+
+  // 품목별 배송비(공급가액 기준 개당) — itemShippingCost override 우선, 나머지는 분배
+  const shippingNetMap = computeShippingNetPerUnit(
+    incoming.items.map((i) => ({
+      id: i.id,
+      quantity: Number(i.quantity),
+      totalPrice: Number(i.totalPrice),
+      itemShippingCost: i.itemShippingCost === null || i.itemShippingCost === undefined
+        ? null
+        : Number(i.itemShippingCost),
+      itemShippingIsTaxable: i.itemShippingIsTaxable,
+    })),
+    { shippingCost, shippingIsTaxable, shippingDeducted }
+  );
 
   await prisma.$transaction(async (tx) => {
     // 1. 상태 변경
@@ -464,14 +492,7 @@ export async function PUT(
     const itemCalcs = incoming.items.map((item) => {
       const qty = Number(item.quantity);
       const unitPrice = Number(item.unitPrice);
-
-      const lineShipping = incomingTotalPrice > 0
-        ? (Number(item.totalPrice) / incomingTotalPrice) * shippingCost
-        : 0;
-      const shippingPerUnit = qty > 0 ? lineShipping / qty : 0;
-      const shippingNetPerUnit = shippingDeducted
-        ? 0
-        : shippingIsTaxable ? shippingPerUnit / 1.1 : shippingPerUnit;
+      const shippingNetPerUnit = shippingNetMap.get(item.id) ?? 0;
 
       const incomingCostPerUnit = item.supplierProduct.incomingCosts
         .filter((c) => c.perUnit)
@@ -687,22 +708,8 @@ export async function PUT(
       await rebalanceSupplierLedger(tx, incoming.supplierId);
     }
 
-    // 4. 택배비 경비 자동 기록
-    if (shippingCost > 0) {
-      await tx.expense.create({
-        data: {
-          date: incoming.incomingDate,
-          amount: shippingCost,
-          category: "SHIPPING",
-          description: `택배비 (입고 ${incoming.incomingNo})`,
-          supplierId: incoming.supplierId,
-          referenceId: incoming.id,
-          referenceType: "INCOMING",
-          memo: incoming.shippingDeducted ? "거래처 차감" : null,
-          recoverable: incoming.shippingDeducted,
-        },
-      });
-    }
+    // 4. 택배비 경비 자동 기록 — 헤더 운임 + 품목 직접 운임 합산 통합 헬퍼 호출
+    await recalcIncomingExpense(tx, incoming.id);
   }, { timeout: 30000, maxWait: 10000 });
 
   const updated = await prisma.incoming.findUnique({

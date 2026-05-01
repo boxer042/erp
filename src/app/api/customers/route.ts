@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { customerSchema } from "@/lib/validators/customer";
+import { guardUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
   const includeInactive = searchParams.get("includeInactive") === "1";
@@ -27,6 +30,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = customerSchema.safeParse(body);
 

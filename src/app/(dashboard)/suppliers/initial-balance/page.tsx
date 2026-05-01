@@ -15,6 +15,23 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { formatComma, parseComma } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function InitialBalanceHistorySkeletonRows({ rows = 6 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-24" /></div></TableCell>
+          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 interface Supplier {
   id: string;
@@ -282,7 +299,7 @@ export default function InitialBalancePage() {
               </TableHeader>
               <TableBody>
                 {historyLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8">로딩 중...</TableCell></TableRow>
+                  <InitialBalanceHistorySkeletonRows />
                 ) : historyItems.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center py-8">기초 미지급금 이력이 없습니다</TableCell></TableRow>
                 ) : (

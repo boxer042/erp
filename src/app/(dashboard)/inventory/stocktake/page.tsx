@@ -18,6 +18,27 @@ import { toast } from "sonner";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { STOCKTAKE_REASONS, STOCKTAKE_REASON_LABELS } from "@/lib/validators/stocktake";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function StocktakeSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-8 w-20 rounded-md" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><Skeleton className="h-8 w-28 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-8 w-32 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-8 w-28 rounded-md" /></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 interface MappingOption {
   id: string;
@@ -217,7 +238,7 @@ export default function StocktakePage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">로딩 중...</TableCell></TableRow>
+                <StocktakeSkeletonRows />
               ) : filteredRows.length === 0 ? (
                 <TableRow><TableCell colSpan={9} className="text-center py-8">재고 데이터가 없습니다</TableCell></TableRow>
               ) : (

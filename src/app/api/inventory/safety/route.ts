@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function PUT(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const { productId, safetyStock } = body as {
     productId: string;

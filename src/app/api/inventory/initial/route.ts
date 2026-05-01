@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { initialInventorySchema } from "@/lib/validators/initial-inventory";
 import { computeMovingAverage } from "@/lib/cost";
+import { guardAdmin } from "@/lib/api-auth";
 
 // 초기 등록 이력 조회
 export async function GET(request: NextRequest) {
@@ -32,6 +33,8 @@ export async function GET(request: NextRequest) {
 
 // 초기 등록 일괄 처리 — 공급상품 마스터 + 기초재고 로트 생성
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = initialInventorySchema.safeParse(body);
 

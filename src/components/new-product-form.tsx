@@ -21,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { RefreshCw, Plus, X, Loader2, ChevronLeft, ChevronRight, Calculator, Info } from "lucide-react";
+import { ComponentIncomingInfoSections } from "@/components/product";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { UNITS_OF_MEASURE } from "@/lib/constants";
@@ -30,6 +31,10 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 import { AssemblyTemplateCombobox } from "@/components/assembly-template-combobox";
 import { AssemblyPresetCombobox } from "@/components/assembly-preset-combobox";
+import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import type { CategoryOption } from "@/components/new-product-form/types";
 import {
@@ -60,6 +65,7 @@ import {
   TypeSelectScreen,
   PRODUCT_TYPE_CARDS,
 } from "./new-product-form/parts";
+import { ShippingHistoryCard } from "@/components/shipping-history-card";
 export interface NewProductFormProps {
   suppliers: Supplier[];
   channels: Channel[];
@@ -130,6 +136,7 @@ export function NewProductForm({
     supplierProductId: presetSupplierProductId,
     conversionRate: "1",
     isProvisional: false,
+    syncName: false,
   });
   const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
   const [loadingSupplierProducts, setLoadingSupplierProducts] = useState(false);
@@ -170,6 +177,31 @@ export function NewProductForm({
   const [assemblyCosts, setAssemblyCosts] = useState<CostRow[]>([]);
   const [parentProducts, setParentProducts] = useState<ParentProductRow[]>([]);
 
+  // 조립 슬롯 라벨 마스터 — 구성상품 라벨 콤보박스에서 선택/생성
+  const queryClient = useQueryClient();
+  const slotLabelsQuery = useQuery({
+    queryKey: queryKeys.assemblySlotLabels.list(),
+    queryFn: () => apiGet<Array<{ id: string; name: string; isActive: boolean }>>("/api/assembly-slot-labels"),
+    enabled: productType === "ASSEMBLED",
+  });
+  const slotLabels = useMemo(
+    () => (slotLabelsQuery.data ?? []).filter((l) => l.isActive),
+    [slotLabelsQuery.data],
+  );
+  const createSlotLabelMutation = useMutation({
+    mutationFn: (payload: { name: string; rowIdx: number }) =>
+      apiMutate<{ id: string; name: string }>("/api/assembly-slot-labels", "POST", { name: payload.name }).then(
+        (label) => ({ label, rowIdx: payload.rowIdx }),
+      ),
+    onSuccess: ({ label, rowIdx }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assemblySlotLabels.all });
+      setSetComponents((prev) =>
+        prev.map((r, i) => (i === rowIdx ? { ...r, slotLabelId: label.id, label: label.name } : r)),
+      );
+    },
+    onError: () => toast.error("라벨 생성 실패"),
+  });
+
   // ── 변형 등록 (멀티 변형 모드) ──
   type VariantRow = {
     id: string;
@@ -196,6 +228,7 @@ export function NewProductForm({
             return {
               ...existing,
               label: mainRow.label,
+              slotLabelId: mainRow.slotLabelId ?? null,
               quantity: mainRow.quantity,
             };
           }
@@ -205,6 +238,7 @@ export function NewProductForm({
             product: mainRow.product,
             quantity: mainRow.quantity,
             label: mainRow.label,
+            slotLabelId: mainRow.slotLabelId ?? null,
             override: false,
           };
         });
@@ -217,6 +251,7 @@ export function NewProductForm({
   type TemplateSlot = {
     id: string;
     label: string;
+    slotLabelId: string | null;
     order: number;
     defaultProductId: string | null;
     defaultQuantity: string;
@@ -373,7 +408,7 @@ export function NewProductForm({
       vatIncluded: false,
       categoryId: "",
     });
-    setMapping({ supplierId: "", supplierProductId: "", conversionRate: "1", isProvisional: false });
+    setMapping({ supplierId: "", supplierProductId: "", conversionRate: "1", isProvisional: false, syncName: false });
     setSupplierProducts([]);
     setSkuManuallyEdited(false);
     setIncomingCosts([]);
@@ -499,6 +534,8 @@ export function NewProductForm({
             product,
             quantity: s.defaultQuantity?.toString() ?? "1",
             label: s.label,
+            slotLabelId: s.slotLabelId ?? null,
+            slotId: s.id,
           };
         }),
     );
@@ -538,6 +575,8 @@ export function NewProductForm({
             product,
             quantity: qty.toString(),
             label: s.label,
+            slotLabelId: s.slotLabelId ?? null,
+            slotId: s.id,
           };
         }),
     );
@@ -667,9 +706,25 @@ export function NewProductForm({
   const componentsTotalCost = setComponents.reduce((sum, row) => {
     if (!row.product) return sum;
     const cost = parseFloat(row.product.unitCost || "0");
+    const ship = Number(row.product.shippingPerUnit ?? 0);
     const qty = parseFloat(row.quantity || "1");
-    return sum + cost * qty;
+    return sum + (cost + ship) * qty;
   }, 0);
+
+  const componentsBreakdown = setComponents.reduce(
+    (acc, row) => {
+      if (!row.product) return acc;
+      const qty = parseFloat(row.quantity || "1");
+      const sup = Number(row.product.supplierUnitPrice ?? 0);
+      const ship = Number(row.product.shippingPerUnit ?? 0);
+      const inc = Number(row.product.incomingCostPerUnit ?? 0);
+      acc.supplier += sup * qty;
+      acc.shipping += ship * qty;
+      acc.incoming += inc * qty;
+      return acc;
+    },
+    { supplier: 0, shipping: 0, incoming: 0 },
+  );
 
   const assemblyFixedCost = assemblyCosts
     .filter((c) => c.costType === "FIXED" && c.value)
@@ -829,8 +884,8 @@ export function NewProductForm({
       }
     }
 
-    // 변형이 있으면 묶음(canonical+variants) 모드로 전환
-    if (productType === "ASSEMBLED" && variants.length > 0) {
+    // 변형이 있으면 묶음(canonical+variants) 모드 — 2026-04 부터 deprecated, variants 는 항상 빈 배열
+    if (false && productType === "ASSEMBLED" && variants.length > 0) {
       if (variants.some((v) => !v.name.trim() || !v.sku.trim())) {
         toast.error("모든 변형의 이름과 SKU를 입력해주세요");
         return;
@@ -870,6 +925,7 @@ export function NewProductForm({
                   componentId: c.product!.id,
                   quantity: c.quantity,
                   label: c.label ?? null,
+                  slotLabelId: c.slotLabelId ?? null,
                 })),
               initialAssemblyQty: v.initialQty || undefined,
               initialAssemblyDate: v.initialDate.toISOString(),
@@ -903,6 +959,7 @@ export function NewProductForm({
           sellingPrice: getSubmitPrice(),
           canonicalProductId: canonicalProductId || null,
           containerSize: bulkUsable ? containerSize || null : null,
+          assemblyTemplateId: productType === "ASSEMBLED" && templateId ? templateId : null,
           createBulk:
             bulkUsable && newBulkName.trim()
               ? { name: newBulkName.trim(), unitOfMeasure: newBulkUnit }
@@ -928,23 +985,12 @@ export function NewProductForm({
               productId,
               supplierProductId: mapping.supplierProductId,
               conversionRate: mapping.conversionRate || "1",
+              isProvisional: mapping.isProvisional,
             }),
           });
           if (!mapRes.ok) errors.push("거래처 매핑");
 
-          const existingCosts = incomingCosts.filter((c) => c.serverId);
-          for (const cost of existingCosts) {
-            const r = await fetch(`/api/supplier-products/${mapping.supplierProductId}/costs?costId=${cost.serverId}`, { method: "DELETE" });
-            if (!r.ok) errors.push(`기존 입고비용 삭제 (${cost.name || cost.serverId})`);
-          }
-          for (const cost of incomingCosts.filter((c) => c.name && c.value)) {
-            const r = await fetch(`/api/supplier-products/${mapping.supplierProductId}/costs`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name: cost.name, costType: cost.costType, value: cost.value, perUnit: cost.perUnit }),
-            });
-            if (!r.ok) errors.push(`입고비용 등록 (${cost.name})`);
-          }
+          // 입고 비용은 이 페이지에서 더 이상 등록·수정하지 않음 (거래처상품 상세에서만)
         }
 
         for (const cost of sellingCosts.filter((c) => c.name && c.value)) {
@@ -1035,7 +1081,7 @@ export function NewProductForm({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               productId,
-              components: validComponents.map((c) => ({ componentId: c.product!.id, quantity: c.quantity, label: c.label ?? null })),
+              components: validComponents.map((c) => ({ componentId: c.product!.id, quantity: c.quantity, label: c.label ?? null, slotLabelId: c.slotLabelId ?? null, slotId: c.slotId ?? null })),
             }),
           });
           if (!r.ok) errors.push("구성 상품 등록");
@@ -1122,8 +1168,16 @@ export function NewProductForm({
             {isSetOrAssembled ? (
               <>
                 <tr>
-                  <td className="px-3 py-2 text-muted-foreground">구성품 원가</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(componentsTotalCost).toLocaleString("ko-KR")}</td>
+                  <td className="px-3 py-2 text-muted-foreground">구성품 공급단가 합</td>
+                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(componentsBreakdown.supplier).toLocaleString("ko-KR")}</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 text-muted-foreground">구성품 입고 평균 배송비</td>
+                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(componentsBreakdown.shipping).toLocaleString("ko-KR")}</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 text-muted-foreground">구성품 입고 부대비용</td>
+                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(componentsBreakdown.incoming).toLocaleString("ko-KR")}</td>
                 </tr>
                 {productType === "ASSEMBLED" && (
                   <tr>
@@ -1172,8 +1226,12 @@ export function NewProductForm({
                   </tr>
                 )}
                 <tr>
-                  <td className="px-3 py-2 text-muted-foreground">입고비용</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.incomingTotal).toLocaleString("ko-KR")}</td>
+                  <td className="px-3 py-2 text-muted-foreground">입고 평균 배송비</td>
+                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.avgShippingNet).toLocaleString("ko-KR")}</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 text-muted-foreground">입고 부대비용</td>
+                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.incomingTotal - calcPrice.avgShippingNet).toLocaleString("ko-KR")}</td>
                 </tr>
                 <tr>
                   <td className="px-3 py-2 text-muted-foreground">판매비용</td>
@@ -1206,9 +1264,10 @@ export function NewProductForm({
                     {isSetOrAssembled ? (
                       <div className="space-y-1">
                         <div className="font-semibold">총원가 계산식</div>
-                        <div>= 구성품 원가{productType === "ASSEMBLED" ? " + 조립비용" : ""}{cardFeeRate > 0 && " + 카드수수료"}</div>
+                        <div>= 구성품 공급단가 + 입고 평균 배송비 + 입고 부대비용{productType === "ASSEMBLED" ? " + 조립비용" : ""}{cardFeeRate > 0 && " + 카드수수료"}</div>
                         <div className="pt-1 border-t border-border mt-1 space-y-0.5 text-[10px] text-muted-foreground">
-                          <div>• 구성품 원가 = Σ(구성상품 원가 × 수량)</div>
+                          <div>• 각 구성품의 공급단가/배송비/부대비용을 (수량 × 단위) 로 합산</div>
+                          <div>• 배송비/부대비용 과세분 ÷ 1.1 로 공급가액 환산</div>
                           {productType === "ASSEMBLED" && <div>• 조립비용(과세) ÷ 1.1 로 공급가액 환산</div>}
                           {cardFeeRate > 0 && <div>• 카드수수료 = 판매가(VAT포함) × {(cardFeeRate * 100).toFixed(2)}%</div>}
                         </div>
@@ -1216,11 +1275,11 @@ export function NewProductForm({
                     ) : (
                       <div className="space-y-1">
                         <div className="font-semibold">총원가 계산식</div>
-                        <div>= 원가 + 입고비용 + 판매비용{cardFeeRate > 0 && " + 카드수수료"}</div>
+                        <div>= 원가 + 입고 평균 배송비 + 입고 부대비용 + 판매비용{cardFeeRate > 0 && " + 카드수수료"}</div>
                         <div className="pt-1 border-t border-border mt-1 space-y-0.5 text-[10px] text-muted-foreground">
                           <div>• 원가 = 공급단가 ÷ 환산비율</div>
                           <div>• 과세 비용은 ÷ 1.1 로 공급가액 환산 후 합산</div>
-                          <div>• PERCENTAGE 입고비용은 원가의 %로 적용</div>
+                          <div>• PERCENTAGE 부대비용은 원가의 %로 적용</div>
                           {cardFeeRate > 0 && <div>• 카드수수료 = 판매가(VAT포함) × {(cardFeeRate * 100).toFixed(2)}%</div>}
                         </div>
                       </div>
@@ -1618,13 +1677,33 @@ export function NewProductForm({
                         </Field>
 
                         {mapping.supplierId && (
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <Checkbox
-                              checked={mapping.isProvisional}
-                              onCheckedChange={(checked) => setMapping((prev) => ({ ...prev, isProvisional: !!checked }))}
-                            />
-                            <span className="text-[13px] text-muted-foreground">임시 등록 <span className="text-[11px]">(실제 입고 전 어림잡은 정보)</span></span>
-                          </label>
+                          <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <Checkbox
+                                checked={mapping.isProvisional}
+                                onCheckedChange={(checked) => setMapping((prev) => ({ ...prev, isProvisional: !!checked }))}
+                              />
+                              <span className="text-[13px] text-muted-foreground">임시 등록 <span className="text-[11px]">(실제 입고 전 어림잡은 정보)</span></span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <Checkbox
+                                checked={mapping.syncName}
+                                onCheckedChange={(checked) => {
+                                  const next = !!checked;
+                                  setMapping((prev) => ({ ...prev, syncName: next }));
+                                  if (next) {
+                                    const sp = mapping.supplierProductId
+                                      ? supplierProducts.find((s) => s.id === mapping.supplierProductId)
+                                      : null;
+                                    if (sp) setForm((prev) => ({ ...prev, name: sp.name, spec: sp.spec || "" }));
+                                  } else {
+                                    setForm((prev) => ({ ...prev, name: "", spec: "" }));
+                                  }
+                                }}
+                              />
+                              <span className="text-[13px] text-muted-foreground">상품명 동일 <span className="text-[11px]">(공급상품명을 그대로 사용)</span></span>
+                            </label>
+                          </div>
                         )}
 
                         {mapping.supplierId && (
@@ -1634,6 +1713,9 @@ export function NewProductForm({
                               value={mapping.supplierProductId}
                               onChange={(sp) => {
                                 setMapping((prev) => ({ ...prev, supplierProductId: sp.id }));
+                                if (mapping.syncName) {
+                                  setForm((prev) => ({ ...prev, name: sp.name, spec: sp.spec || "" }));
+                                }
                                 fetchIncomingCosts(sp.id);
                               }}
                               onCreateNew={(name) => {
@@ -1641,7 +1723,7 @@ export function NewProductForm({
                                 setQuickSupplierProductOpen(true);
                               }}
                               disabled={loadingSupplierProducts}
-                              placeholder={loadingSupplierProducts ? "불러오는 중..." : "공급상품 선택..."}
+                              placeholder="공급상품 선택..."
                             />
                           </Field>
                         )}
@@ -2122,11 +2204,24 @@ export function NewProductForm({
                               <tr key={row.id} className="border-b border-border hover:bg-muted/50">
                                 {showLabel && (
                                   <td className="border-r border-border p-0.5">
-                                    <input
-                                      value={row.label ?? ""}
-                                      onChange={(e) => setSetComponents((prev) => prev.map((r, i) => i === idx ? { ...r, label: e.target.value } : r))}
-                                      placeholder="예: 모터"
-                                      className="w-full h-7 bg-transparent text-[12px] px-2 outline-none focus:bg-muted rounded"
+                                    <AssemblySlotLabelCombobox
+                                      labels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
+                                      value={row.slotLabelId ?? ""}
+                                      onChange={(id, name) =>
+                                        setSetComponents((prev) =>
+                                          prev.map((r, i) =>
+                                            i === idx ? { ...r, slotLabelId: id || null, label: name } : r,
+                                          ),
+                                        )
+                                      }
+                                      onCreateNew={(name) =>
+                                        createSlotLabelMutation.mutate({ name, rowIdx: idx })
+                                      }
+                                      placeholder={
+                                        row.label && !row.slotLabelId
+                                          ? `${row.label} (재선택 필요)`
+                                          : "라벨 선택..."
+                                      }
                                     />
                                   </td>
                                 )}
@@ -2193,8 +2288,8 @@ export function NewProductForm({
                     );
                   })()}
 
-                  {/* 변형 등록 (멀티 변형 모드) — ASSEMBLED 일 때만, edit 모드에서는 숨김 */}
-                  {productType === "ASSEMBLED" && true && (
+                  {/* 변형 등록 UI 제거됨 (2026-04) — 변형은 조립실적 등록 시점에 가변 슬롯 부품 조합에 따라 자동 생성됨 */}
+                  {false && productType === "ASSEMBLED" && (
                     <section>
                       <SectionTitle
                         title="변형 등록"
@@ -2477,23 +2572,66 @@ export function NewProductForm({
                     </section>
                   )}
 
+                  {/* 조립/세트 — 구성품 입고 배송비 + 부대비용 (read-only 집계) */}
+                  {isSetOrAssembled && setComponents.some((r) => r.product) && (
+                    <ComponentIncomingInfoSections
+                      rows={setComponents
+                        .filter((r) => r.product)
+                        .map((r) => ({
+                          componentId: r.product!.id,
+                          componentName: r.product!.name,
+                          componentSku: r.product!.sku,
+                          label: r.label ?? null,
+                          quantity: parseFloat(r.quantity || "1"),
+                          shippingPerUnit: Number(r.product!.shippingPerUnit ?? 0),
+                          incomingCostPerUnit: Number(r.product!.incomingCostPerUnit ?? 0),
+                          supplierName: r.product!.supplierName ?? null,
+                          supplierProductName: r.product!.supplierProductName ?? null,
+                          incomingCostList: r.product!.incomingCostList ?? [],
+                        }))}
+                    />
+                  )}
+
                   {/* 입고 비용 (완제품/부속) — 매핑 미선택 시에도 항상 표시 */}
-                  {(productType === "FINISHED" || productType === "PARTS") && (
-                    <section>
-                      <SectionTitle
-                        title="입고 비용"
-                        badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
-                      />
-                      <Card size="sm" className="py-0">
-                        <CostList
-                          costs={incomingCosts}
-                          onChange={setIncomingCosts}
-                          addLabel="입고 비용 추가"
-                          avgShippingCost={avgShippingCost}
-                          avgShippingIsTaxable={avgShippingIsTaxable}
+                  {(productType === "FINISHED" || productType === "PARTS") && mapping.supplierProductId && (
+                    <>
+                      <section>
+                        <SectionTitle
+                          title="입고 배송비"
+                          badge={
+                            <span className="text-[11px] text-muted-foreground">
+                              과거 입고 이력 기준. 평균값을 가격계산기에 반영
+                            </span>
+                          }
                         />
-                      </Card>
-                    </section>
+                        <ShippingHistoryCard
+                          supplierProductId={mapping.supplierProductId}
+                          readOnly
+                          limit={5}
+                          hideTitle
+                        />
+                      </section>
+
+                      <section>
+                        <SectionTitle
+                          title="입고 부대비용"
+                          badge={
+                            <span className="text-[11px] text-muted-foreground">
+                              거래처상품 상세에서 등록·수정 (이 화면 표시 전용)
+                            </span>
+                          }
+                        />
+                        <Card size="sm" className="py-0">
+                          <CostList
+                            costs={incomingCosts}
+                            onChange={setIncomingCosts}
+                            addLabel="입고 비용 추가"
+                            readOnly
+                            emptyLabel="해당 거래처 상품에 등록된 부대비용이 없습니다"
+                          />
+                        </Card>
+                      </section>
+                    </>
                   )}
 
                   {/* 판매 비용 (모든 유형) */}
@@ -2561,6 +2699,9 @@ export function NewProductForm({
         onCreated={(sp) => {
           fetchSupplierProducts(mapping.supplierId);
           setMapping((prev) => ({ ...prev, supplierProductId: sp.id }));
+          if (mapping.syncName) {
+            setForm((prev) => ({ ...prev, name: sp.name }));
+          }
         }}
       />
 

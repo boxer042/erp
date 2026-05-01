@@ -51,6 +51,8 @@ model SalesChannel {
   commissionRate Decimal  @default(0) @map("commission_rate") @db.Decimal(5, 4)
   isActive       Boolean  @default(true) @map("is_active")
   memo           String?
+  logoUrl        String?  @map("logo_url")
+  logoPath       String?  @map("logo_path")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -225,6 +227,8 @@ model Product {
   isActive           Boolean       @default(true) @map("is_active")
   imageUrl           String?       @map("image_url")
   memo               String?
+  assemblyTemplateId String?       @map("assembly_template_id")
+  assemblyTemplate   AssemblyTemplate? @relation("ProductDefaultTemplate", fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
 
@@ -249,7 +253,47 @@ model Product {
   assemblyTemplateSlotDefaults  AssemblyTemplateSlot[]
   assemblyPresetItems           AssemblyPresetItem[]
 
+  specValues ProductSpecValue[]
+
   @@map("products")
+}
+
+enum ProductSpecType {
+  TEXT
+  NUMBER
+  ENUM
+}
+
+model ProductSpecSlot {
+  id        String          @id @default(uuid())
+  name      String          @unique
+  type      ProductSpecType
+  unit      String?
+  options   String[]        @default([])
+  order     Int             @default(0)
+  isActive  Boolean         @default(true) @map("is_active")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  values ProductSpecValue[]
+
+  @@map("product_spec_slots")
+}
+
+model ProductSpecValue {
+  id        String          @id @default(uuid())
+  productId String          @map("product_id")
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  slotId    String          @map("slot_id")
+  slot      ProductSpecSlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  value     String
+  order     Int             @default(0)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@unique([productId, slotId])
+  @@index([productId])
+  @@map("product_spec_values")
 }
 
 model Brand {
@@ -375,9 +419,15 @@ model SetComponent {
   component    Product  @relation("SetChild", fields: [componentId], references: [id], onDelete: Restrict)
   quantity     Decimal  @db.Decimal(10, 4)
   label        String?
+  slotLabelId  String?            @map("slot_label_id")
+  slotLabel    AssemblySlotLabel? @relation(fields: [slotLabelId], references: [id], onDelete: SetNull)
+  slotId       String?               @map("slot_id")
+  slot         AssemblyTemplateSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@unique([setProductId, componentId])
+  @@index([slotLabelId])
+  @@index([slotId])
   @@map("set_components")
 }
 
@@ -547,12 +597,15 @@ model IncomingItem {
   incoming          Incoming        @relation(fields: [incomingId], references: [id], onDelete: Cascade)
   supplierProductId String          @map("supplier_product_id")
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id])
+  inventoryLots     InventoryLot[]
   quantity          Decimal         @db.Decimal(15, 4)
   originalPrice     Decimal?        @map("original_price") @db.Decimal(15, 2)
   discountAmount    Decimal?        @map("discount_amount") @db.Decimal(15, 2)
   unitPrice         Decimal         @map("unit_price") @db.Decimal(15, 2)
   totalPrice        Decimal         @map("total_price") @db.Decimal(15, 2)
   unitCostSnapshot  Decimal?        @map("unit_cost_snapshot") @db.Decimal(15, 4)
+  itemShippingCost      Decimal?    @map("item_shipping_cost") @db.Decimal(12, 2)
+  itemShippingIsTaxable Boolean     @default(true) @map("item_shipping_is_taxable")
   memo              String?
 
   @@map("incoming_items")
@@ -663,6 +716,7 @@ model InventoryLot {
   receivedAt        DateTime         @map("received_at")
   source            LotSource
   incomingItemId    String?          @map("incoming_item_id")
+  incomingItem      IncomingItem?    @relation(fields: [incomingItemId], references: [id])
   memo              String?
   createdAt         DateTime         @default(now()) @map("created_at")
 
@@ -754,6 +808,75 @@ model CardFeeRate {
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("card_fee_rates")
+}
+
+// ============================================================
+// 가맹점 카드사별 수수료 정보 (참고용 + 평균 산출 소스)
+// ============================================================
+
+model CardMerchantInfo {
+  id           String    @id @default("singleton")
+  merchantTier String?   @map("merchant_tier")
+  appliedFrom  DateTime? @map("applied_from")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("card_merchant_info")
+}
+
+model CardCompanyFee {
+  id                String   @id @default(uuid())
+  companyName       String   @map("company_name")
+  merchantNo        String?  @map("merchant_no")
+  settlementBank    String?  @map("settlement_bank")
+  settlementAccount String?  @map("settlement_account")
+  creditRate        Decimal  @map("credit_rate") @db.Decimal(5, 4)
+  checkBankRate     Decimal? @map("check_bank_rate") @db.Decimal(5, 4)
+  checkSpecialRate  Decimal? @map("check_special_rate") @db.Decimal(5, 4)
+  paymentDays       Int?     @map("payment_days")
+  sortOrder         Int      @default(0) @map("sort_order")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([sortOrder])
+  @@map("card_company_fees")
+}
+
+// ============================================================
+// 우리 사업자 정보 / 통장
+// ============================================================
+
+model CompanyInfo {
+  id             String   @id @default("singleton")
+  name           String
+  businessNumber String?  @map("business_number")
+  ceo            String?
+  phone          String?
+  email          String?
+  address        String?
+  businessType   String?  @map("business_type")
+  businessItem   String?  @map("business_item")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  bankAccounts CompanyBankAccount[]
+
+  @@map("company_info")
+}
+
+model CompanyBankAccount {
+  id        String   @id @default(uuid())
+  companyId String   @default("singleton") @map("company_id")
+  bankName  String   @map("bank_name")
+  holder    String
+  account   String
+  isPrimary Boolean  @default(false) @map("is_primary")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company CompanyInfo @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, sortOrder])
+  @@map("company_bank_accounts")
 }
 
 // ============================================================
@@ -1329,8 +1452,9 @@ model AssemblyTemplate {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  slots   AssemblyTemplateSlot[]
-  presets AssemblyPreset[]
+  slots          AssemblyTemplateSlot[]
+  presets        AssemblyPreset[]
+  defaultForProducts Product[] @relation("ProductDefaultTemplate")
 
   @@map("assembly_templates")
 }
@@ -1346,8 +1470,10 @@ model AssemblyTemplateSlot {
   defaultProductId String?            @map("default_product_id")
   defaultProduct   Product?           @relation(fields: [defaultProductId], references: [id], onDelete: SetNull)
   defaultQuantity  Decimal            @default(1) @map("default_quantity") @db.Decimal(10, 4)
+  isVariable       Boolean            @default(false) @map("is_variable")
 
-  presetItems AssemblyPresetItem[]
+  presetItems   AssemblyPresetItem[]
+  setComponents SetComponent[]
 
   @@index([templateId, order])
   @@index([slotLabelId])
@@ -1361,7 +1487,8 @@ model AssemblySlotLabel {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  slots AssemblyTemplateSlot[]
+  slots         AssemblyTemplateSlot[]
+  setComponents SetComponent[]
 
   @@map("assembly_slot_labels")
 }

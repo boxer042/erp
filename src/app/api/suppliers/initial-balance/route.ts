@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { initialBalanceSchema } from "@/lib/validators/initial-balance";
 import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
+import { guardAdmin } from "@/lib/api-auth";
 
 // 기초 미지급금 이력 조회
 export async function GET() {
@@ -16,6 +17,8 @@ export async function GET() {
 
 // 기초 미지급금 일괄 등록
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = initialBalanceSchema.safeParse(body);
 

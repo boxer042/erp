@@ -14,6 +14,7 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
 import { Plus, Search, SlidersHorizontal, Check, Printer, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
 import { SupplierAdjustmentDialog } from "@/components/supplier-adjustment-dialog";
@@ -711,7 +712,15 @@ export default function SupplierLedgerPage() {
           {/* 테이블 */}
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">로딩 중...</div>
+              <div className="space-y-3 px-5 py-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="ml-auto h-4 w-20" />
+                  </div>
+                ))}
+              </div>
             ) : viewMode === "ledger" ? (
               dateGroups.length === 0 ? (
                 <EmptyStateHint />

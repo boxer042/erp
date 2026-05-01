@@ -3,6 +3,9 @@ import { z } from "zod";
 export const assemblyComponentSchema = z.object({
   componentId: z.string().min(1, "구성품을 선택해주세요"),
   quantity: z.string().min(1, "수량을 입력해주세요"),
+  slotId: z.string().nullable().optional(),
+  slotLabelId: z.string().nullable().optional(),
+  slotLabel: z.string().nullable().optional(),
 });
 
 export const assemblySchema = z.object({

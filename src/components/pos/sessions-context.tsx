@@ -30,6 +30,7 @@ export interface CartItem {
   isZeroRate?: boolean;  // 이번 거래에 영세율 적용 여부 (ZERO_RATE 상품만 해당, 기본 false)
   isBulk?: boolean;          // 벌크 SKU 여부 (소수점 수량 입력 허용)
   unitOfMeasure?: string;    // "EA", "mL", "g" 등 — UI 표시용
+  isCanonical?: boolean;     // 대표 상품 여부 — true 면 결제 직전 변형 확정 필요
   repairMeta?: RepairMeta;
   rentalMeta?: RentalMeta;
 }
@@ -54,6 +55,7 @@ interface SessionsContextValue {
   updateQty: (cartItemId: string, qty: number) => void;
   updateDiscount: (cartItemId: string, discount: string) => void;
   updateRentalDates: (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number) => void;
+  assignVariant: (cartItemId: string, variant: { productId: string; name: string; sku?: string; unitPrice: number }) => void;
   toggleZeroRate: (cartItemId: string) => void;
   setCustomer: (id: string, name: string) => void;
   clearCustomer: () => void;
@@ -166,6 +168,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
                 isZeroRate: it.isZeroRate,
                 isBulk: it.isBulk,
                 unitOfMeasure: it.unitOfMeasure,
+                isCanonical: it.isCanonical,
                 repairMeta: it.repairMeta,
                 rentalMeta: it.rentalMeta,
               },
@@ -252,6 +255,32 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     [activeId]
   );
 
+  const assignVariant = useCallback(
+    (
+      cartItemId: string,
+      variant: { productId: string; name: string; sku?: string; unitPrice: number },
+    ) => {
+      setSessions((prev) =>
+        updateSession(prev, activeId, (s) => ({
+          ...s,
+          items: s.items.map((p) =>
+            p.cartItemId === cartItemId
+              ? {
+                  ...p,
+                  productId: variant.productId,
+                  name: variant.name,
+                  sku: variant.sku,
+                  unitPrice: variant.unitPrice,
+                  isCanonical: false,
+                }
+              : p,
+          ),
+        })),
+      );
+    },
+    [activeId],
+  );
+
   const setCustomer = useCallback(
     (id: string, name: string) => {
       setSessions((prev) =>
@@ -305,13 +334,14 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       updateQty,
       updateDiscount,
       updateRentalDates,
+      assignVariant,
       toggleZeroRate,
       setCustomer,
       clearCustomer,
       clear,
       totalItemCount,
     }),
-    [sessions, activeId, active, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, toggleZeroRate, setCustomer, clearCustomer, clear, totalItemCount]
+    [sessions, activeId, active, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, clear, totalItemCount]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

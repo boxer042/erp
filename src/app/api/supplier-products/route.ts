@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supplierProductSchema } from "@/lib/validators/product";
 import { computeSupplierProductAvgShipping } from "@/lib/cost-utils";
+import { guardUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const supplierId = searchParams.get("supplierId");
   const search = searchParams.get("search") || "";
@@ -36,14 +39,25 @@ export async function GET(request: NextRequest) {
       incomingItems: {
         where: { incoming: { status: "CONFIRMED" } },
         select: {
+          id: true,
           totalPrice: true,
           quantity: true,
+          itemShippingCost: true,
+          itemShippingIsTaxable: true,
           incoming: {
             select: {
               shippingCost: true,
               shippingIsTaxable: true,
               shippingDeducted: true,
-              items: { select: { totalPrice: true } },
+              items: {
+                select: {
+                  id: true,
+                  totalPrice: true,
+                  quantity: true,
+                  itemShippingCost: true,
+                  itemShippingIsTaxable: true,
+                },
+              },
             },
           },
         },
@@ -62,6 +76,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = supplierProductSchema.safeParse(body);
 

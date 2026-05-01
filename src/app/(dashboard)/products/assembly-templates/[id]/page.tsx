@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Slot {
   id: string;
@@ -40,6 +41,7 @@ interface Slot {
   defaultProductId: string | null;
   defaultProduct: { id: string; name: string; sku: string } | null;
   defaultQuantity: string;
+  isVariable: boolean;
 }
 
 interface PresetItem {
@@ -75,6 +77,14 @@ export default function TemplateDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/products/assembly-templates");
+    }
+  };
   const [template, setTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -248,7 +258,16 @@ export default function TemplateDetailPage({
   };
 
   if (loading && !template) {
-    return <div className="p-8 text-center">로딩 중...</div>;
+    return (
+      <div className="flex h-full flex-col p-5 gap-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <Skeleton className="h-32 w-full rounded-md" />
+        <Skeleton className="h-64 w-full rounded-md" />
+      </div>
+    );
   }
   if (!template) {
     return <div className="p-8 text-center">템플릿을 찾을 수 없습니다</div>;
@@ -257,12 +276,10 @@ export default function TemplateDetailPage({
   return (
     <div className="flex h-full flex-col overflow-auto p-5 gap-4">
       <div className="flex items-center gap-2">
-        <Link href="/products/assembly-templates">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft data-icon="inline-start" />
-            목록
-          </Button>
-        </Link>
+        <Button variant="ghost" size="sm" onClick={handleBack}>
+          <ArrowLeft data-icon="inline-start" />
+          목록
+        </Button>
       </div>
 
       <Card>
@@ -299,42 +316,52 @@ export default function TemplateDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>슬롯</CardTitle>
+          <CardTitle>슬롯 ({template.slots.length}개)</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted hover:bg-muted">
-                <TableHead className="h-9 px-3 text-xs text-muted-foreground w-12 text-right">순서</TableHead>
-                <TableHead className="h-9 px-3 text-xs text-muted-foreground">라벨</TableHead>
-                <TableHead className="h-9 px-3 text-xs text-muted-foreground text-right">기본 수량</TableHead>
-                <TableHead className="h-9 px-3 text-xs text-muted-foreground">기본 상품</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {template.slots.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="px-3 py-2.5 text-right">{s.order + 1}</TableCell>
-                  <TableCell className="px-3 py-2.5">{s.label}</TableCell>
-                  <TableCell className="px-3 py-2.5 text-right">
-                    {Number(s.defaultQuantity).toLocaleString("ko-KR")}
-                  </TableCell>
-                  <TableCell className="px-3 py-2.5">
-                    {s.defaultProduct ? (
-                      <div className="flex flex-col">
-                        <span>{s.defaultProduct.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {s.defaultProduct.sku}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
+          <div className="max-h-[420px] overflow-y-auto rounded-md border border-border">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableRow className="bg-muted hover:bg-muted">
+                  <TableHead className="h-9 px-3 text-xs text-muted-foreground w-12 text-right">순서</TableHead>
+                  <TableHead className="h-9 px-3 text-xs text-muted-foreground">라벨</TableHead>
+                  <TableHead className="h-9 px-3 text-xs text-muted-foreground text-right">기본 수량</TableHead>
+                  <TableHead className="h-9 px-3 text-xs text-muted-foreground">기본 상품</TableHead>
+                  <TableHead className="h-9 px-3 text-xs text-muted-foreground w-16 text-center">가변</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {template.slots.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="px-3 py-2.5 text-right">{s.order + 1}</TableCell>
+                    <TableCell className="px-3 py-2.5">{s.label}</TableCell>
+                    <TableCell className="px-3 py-2.5 text-right">
+                      {Number(s.defaultQuantity).toLocaleString("ko-KR")}
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5">
+                      {s.defaultProduct ? (
+                        <div className="flex flex-col">
+                          <span>{s.defaultProduct.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {s.defaultProduct.sku}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5 text-center">
+                      {s.isVariable ? (
+                        <Badge variant="default">가변</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">고정</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

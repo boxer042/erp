@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUser, handleAuthError } from "@/lib/api-auth";
+
+const updateSchema = z.object({
+  symptom: z.string().trim().nullable().optional(),
+  diagnosis: z.string().trim().nullable().optional(),
+  repairNotes: z.string().trim().nullable().optional(),
+  customerMachineId: z.string().nullable().optional(),
+  memo: z.string().trim().nullable().optional(),
+});
 
 export async function GET(
   _request: NextRequest,
@@ -25,18 +35,31 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const body = await request.json();
-  const { symptom, diagnosis, repairNotes, customerMachineId, memo } = body ?? {};
-  const ticket = await prisma.repairTicket.update({
-    where: { id },
-    data: {
-      ...(symptom !== undefined ? { symptom: symptom?.trim() || null } : {}),
-      ...(diagnosis !== undefined ? { diagnosis: diagnosis?.trim() || null } : {}),
-      ...(repairNotes !== undefined ? { repairNotes: repairNotes?.trim() || null } : {}),
-      ...(customerMachineId !== undefined ? { customerMachineId: customerMachineId || null } : {}),
-      ...(memo !== undefined ? { memo: memo?.trim() || null } : {}),
-    },
-  });
-  return NextResponse.json(ticket);
+  try {
+    await requireUser();
+    const { id } = await params;
+    const body = await request.json();
+    const parsed = updateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    const d = parsed.data;
+    const ticket = await prisma.repairTicket.update({
+      where: { id },
+      data: {
+        ...(d.symptom !== undefined ? { symptom: d.symptom?.trim() || null } : {}),
+        ...(d.diagnosis !== undefined ? { diagnosis: d.diagnosis?.trim() || null } : {}),
+        ...(d.repairNotes !== undefined ? { repairNotes: d.repairNotes?.trim() || null } : {}),
+        ...(d.customerMachineId !== undefined
+          ? { customerMachineId: d.customerMachineId || null }
+          : {}),
+        ...(d.memo !== undefined ? { memo: d.memo?.trim() || null } : {}),
+      },
+    });
+    return NextResponse.json(ticket);
+  } catch (e) {
+    const authResp = handleAuthError(e);
+    if (authResp) return authResp;
+    throw e;
+  }
 }

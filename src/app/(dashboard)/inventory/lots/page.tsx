@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Lot {
   id: string;
@@ -46,6 +48,27 @@ const sourceLabels: Record<string, string> = {
 
 const formatWon = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
 const formatQty = (v: string | number) => parseFloat(String(v)).toLocaleString("ko-KR");
+
+function LotsSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-20" /></div></TableCell>
+          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 export default function InventoryLotsPage() {
   const [lots, setLots] = useState<Lot[]>([]);
@@ -126,11 +149,9 @@ export default function InventoryLotsPage() {
               </SelectContent>
             </Select>
             <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={hasRemaining}
-                onChange={(e) => setHasRemaining(e.target.checked)}
-                className="accent-[#3ECF8E]"
+                onCheckedChange={(c) => setHasRemaining(c === true)}
               />
               잔량만
             </label>
@@ -176,9 +197,7 @@ export default function InventoryLotsPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">로딩 중...</TableCell>
-              </TableRow>
+              <LotsSkeletonRows />
             ) : lots.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center py-8">로트가 없습니다</TableCell>

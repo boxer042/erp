@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Approval {
   id: string;
@@ -72,7 +73,13 @@ export default function ApprovePage() {
   }
 
   if (!data) {
-    return <div className="p-8 text-center text-muted-foreground">불러오는 중...</div>;
+    return (
+      <div className="mx-auto max-w-md p-8 space-y-4">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-32 w-full rounded-md" />
+        <Skeleton className="h-10 w-full rounded-md" />
+      </div>
+    );
   }
 
   if (done || data.approvedAt) {

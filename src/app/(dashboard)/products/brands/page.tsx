@@ -21,6 +21,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Brand {
   id: string;
@@ -372,7 +373,7 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
               <Input id="edit-brand-memo" value={memo} onChange={(e) => setMemo(e.target.value)} />
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+              <Checkbox checked={isActive} onCheckedChange={(c) => setIsActive(c === true)} />
               활성
             </label>
           </div>

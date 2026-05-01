@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
     upsert: false,
   });
   if (error) {
-    return NextResponse.json({ error: `업로드 실패: ${error.message}` }, { status: 500 });
+    console.error("[categories/upload] supabase upload error", error);
+    return NextResponse.json({ error: "업로드에 실패했습니다" }, { status: 500 });
   }
 
   const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
@@ -53,9 +54,19 @@ export async function DELETE(request: NextRequest) {
   if (!path) return NextResponse.json({ error: "path 누락" }, { status: 400 });
 
   const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  if (!authUser) return NextResponse.json({ error: "세션 인증 실패" }, { status: 401 });
+
+  if (!path.startsWith(`${authUser.id}/`)) {
+    return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+  }
+
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
   if (error) {
-    return NextResponse.json({ error: `삭제 실패: ${error.message}` }, { status: 500 });
+    console.error("[categories/upload] supabase delete error", error);
+    return NextResponse.json({ error: "삭제에 실패했습니다" }, { status: 500 });
   }
   return NextResponse.json({ success: true });
 }

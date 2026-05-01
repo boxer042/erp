@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +25,7 @@ import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
 import { PAYMENT_METHODS, UNITS_OF_MEASURE } from "@/lib/constants";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface SupplierProduct {
   id: string;
@@ -97,6 +97,14 @@ const emptyProductForm = {
 
 export default function SupplierDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/suppliers");
+    }
+  };
   const [supplier, setSupplier] = useState<SupplierDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -185,7 +193,20 @@ export default function SupplierDetailPage() {
     fetchSupplier();
   };
 
-  if (loading) return <div className="p-6">로딩 중...</div>;
+  if (loading) return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-8 w-8 rounded-md" />
+        <Skeleton className="h-6 w-48" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-md" />
+        ))}
+      </div>
+      <Skeleton className="h-64 w-full rounded-md" />
+    </div>
+  );
   if (!supplier) return <div className="p-6">거래처를 찾을 수 없습니다</div>;
 
   const paymentLabel =
@@ -198,11 +219,9 @@ export default function SupplierDetailPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/suppliers">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
+        <Button variant="ghost" size="icon" onClick={handleBack} aria-label="뒤로가기">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <h2 className="text-lg font-semibold">{supplier.name}</h2>
         <Badge
           variant={

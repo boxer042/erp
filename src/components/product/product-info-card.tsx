@@ -24,11 +24,25 @@ interface FieldItem {
   full?: boolean;
 }
 
-function Field({ label, value, full }: FieldItem) {
+function CustomerField({ label, value, full }: FieldItem) {
   return (
     <div className={`space-y-1 ${full ? "sm:col-span-2" : ""}`}>
       <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
       <dd className="text-sm">{value || <span className="text-muted-foreground">-</span>}</dd>
+    </div>
+  );
+}
+
+function AdminField({ label, value, full }: FieldItem) {
+  const isEmpty = value == null || value === "" || value === false;
+  return (
+    <div className={`flex ${full ? "col-span-2 items-start" : "items-center"} gap-2`}>
+      <span className={`text-muted-foreground w-28 shrink-0 ${full ? "pt-0.5" : ""}`}>
+        {label}
+      </span>
+      <span className={isEmpty ? "text-muted-foreground" : ""}>
+        {isEmpty ? "-" : value}
+      </span>
     </div>
   );
 }
@@ -62,11 +76,17 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
     { label: "단위", value: product.unitOfMeasure },
     {
       label: "세금유형",
-      value: (
-        <Badge variant={product.taxType === "TAXABLE" ? "secondary" : "outline"}>
-          {TAX_TYPE_LABELS[product.taxType] ?? product.taxType}
-        </Badge>
-      ),
+      value:
+        product.taxType === "ZERO_RATE" ? (
+          <div className="flex items-center gap-1">
+            <Badge variant="secondary">과세</Badge>
+            <Badge variant="outline">영세율</Badge>
+          </div>
+        ) : (
+          <Badge variant={product.taxType === "TAXABLE" ? "secondary" : "outline"}>
+            {TAX_TYPE_LABELS[product.taxType] ?? product.taxType}
+          </Badge>
+        ),
     },
     { label: "모델명", value: product.modelName },
     { label: "규격", value: product.spec },
@@ -99,6 +119,7 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
           <Badge variant="secondary">활성</Badge>
         ),
     },
+    { label: "메모", value: product.memo, full: true },
   ];
 
   const customerFields: FieldItem[] = [
@@ -119,8 +140,6 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
     },
   ];
 
-  const fields = isCustomer ? customerFields : adminFields;
-
   return (
     <ProductSection
       title="기본 정보"
@@ -133,11 +152,19 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
         ) : undefined
       }
     >
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-        {fields.map((f) => (
-          <Field key={f.label} {...f} />
-        ))}
-      </dl>
+      {isCustomer ? (
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+          {customerFields.map((f) => (
+            <CustomerField key={f.label} {...f} />
+          ))}
+        </dl>
+      ) : (
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[13px]">
+          {adminFields.map((f) => (
+            <AdminField key={f.label} {...f} />
+          ))}
+        </div>
+      )}
     </ProductSection>
   );
 }

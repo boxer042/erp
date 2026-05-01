@@ -42,7 +42,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Loader2, ChevronRight, ChevronDown } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { MappingSheet } from "@/components/mapping-sheet";
@@ -126,7 +126,6 @@ export default function ProductsPage() {
   const [showLowStock, setShowLowStock] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [safetyTarget, setSafetyTarget] = useState<Product | null>(null);
@@ -310,7 +309,7 @@ export default function ProductsPage() {
                 );
               }
 
-              const renderProductRow = (product: Product, isVariant = false) => {
+              const renderProductRow = (product: Product) => {
                 const bd = calcBreakdown(
                   parseFloat(product.sellingPrice),
                   parseFloat(product.taxRate || "0.1"),
@@ -321,42 +320,14 @@ export default function ProductsPage() {
                 const isLow = safety > 0 && qty < safety;
                 const isCanonical = product.isCanonical;
                 const variantList = variantsByCanonical.get(product.id) ?? [];
-                const variantCount = variantList.length;
-                const isOpen = expanded.has(product.id);
                 const variantStockSum = isCanonical
                   ? variantList.reduce((s, v) => s + (v.inventory ? parseFloat(v.inventory.quantity) : 0), 0)
                   : 0;
 
                 return (
-                  <TableRow
-                    key={product.id}
-                    className={isVariant ? "bg-muted/30" : undefined}
-                  >
+                  <TableRow key={product.id}>
                     <TableCell className="font-medium">
-                      <div className={`flex items-start gap-1 ${isVariant ? "pl-7" : ""}`}>
-                        {isCanonical && variantCount > 0 && (
-                          <button
-                            type="button"
-                            className="mt-0.5 shrink-0 rounded p-0.5 hover:bg-muted"
-                            onClick={() =>
-                              setExpanded((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(product.id)) next.delete(product.id);
-                                else next.add(product.id);
-                                return next;
-                              })
-                            }
-                          >
-                            {isOpen ? (
-                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                          </button>
-                        )}
-                        {isVariant && (
-                          <span className="mt-1 shrink-0 text-muted-foreground text-[11px]">↳</span>
-                        )}
+                      <div className="flex items-start gap-1">
                         <div className="flex flex-col min-w-0">
                           <Link
                             href={`/products/${product.id}`}
@@ -364,17 +335,9 @@ export default function ProductsPage() {
                           >
                             {product.name}
                             {isCanonical && (
-                              <Badge variant="default" className="text-[10px] px-1 py-0">대표</Badge>
-                            )}
-                            {isVariant && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">변형</Badge>
+                              <Badge variant="default" className="text-[10px] px-1 py-0">그룹</Badge>
                             )}
                           </Link>
-                          {isCanonical && variantCount > 0 && (
-                            <span className="text-[11px] text-muted-foreground">
-                              변형 {variantCount}개
-                            </span>
-                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -456,17 +419,7 @@ export default function ProductsPage() {
                 );
               };
 
-              return filtered.flatMap((product) => {
-                const rows = [renderProductRow(product, false)];
-                if (product.isCanonical && expanded.has(product.id)) {
-                  const variants = variantsByCanonical.get(product.id) ?? [];
-                  const filteredVariants = showLowStock ? variants.filter(isProductLowStock) : variants;
-                  for (const v of filteredVariants) {
-                    rows.push(renderProductRow(v, true));
-                  }
-                }
-                return rows;
-              });
+              return filtered.map((product) => renderProductRow(product));
             })()}
           </TableBody>
         </Table>

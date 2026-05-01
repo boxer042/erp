@@ -55,6 +55,8 @@ export interface IncomingDetail {
     originalPrice: string | null;
     discountAmount: string | null;
     totalPrice: string;
+    itemShippingCost: string | null;
+    itemShippingIsTaxable: boolean;
     memo: string | null;
     supplierProduct: {
       id: string; name: string; supplierCode: string | null; spec: string | null; unitOfMeasure: string; unitPrice: string;
@@ -75,5 +77,8 @@ export interface IncomingItemForm {
   discount: string;
   originalPrice: string;
   memo: string;
+  itemShippingCost: string;        // VAT 포함 합계. 빈 문자열 = 미설정(분배 적용)
+  itemShippingIsTaxable: boolean;  // 품목 운임 과세 여부
   isNew?: boolean;
+  pendingSourceRow?: number;
 }

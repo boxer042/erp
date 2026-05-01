@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardUser } from "@/lib/api-auth";
 
 function genAssetNo() {
   const r = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -7,6 +8,8 @@ function genAssetNo() {
 }
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const status = request.nextUrl.searchParams.get("status");
   const assets = await prisma.rentalAsset.findMany({
     where: {
@@ -19,6 +22,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const body = await request.json();
   const { name, brand, modelNo, serialNo, productId, dailyRate, monthlyRate, depositAmount, memo } = body ?? {};
   if (!name?.trim()) return NextResponse.json({ error: "name 필수" }, { status: 400 });

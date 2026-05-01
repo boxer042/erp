@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assemblyTemplateSchema } from "@/lib/validators/assembly-template";
+import { guardAdmin } from "@/lib/api-auth";
 
 export async function GET() {
   const templates = await prisma.assemblyTemplate.findMany({
@@ -14,6 +15,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const body = await request.json();
   const parsed = assemblyTemplateSchema.safeParse(body);
   if (!parsed.success) {
@@ -34,6 +37,7 @@ export async function POST(request: NextRequest) {
           order: s.order ?? idx,
           defaultProductId: s.defaultProductId || null,
           defaultQuantity: parseFloat(s.defaultQuantity),
+          isVariable: s.isVariable ?? false,
         })),
       },
     },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardAdmin } from "@/lib/api-auth";
 
 // 매출 마진 리포트 — 기간/채널 기준 집계
 // 기준: 주문 status가 CONFIRMED, PREPARING, SHIPPED, DELIVERED 인 OrderItem
@@ -156,6 +157,10 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
   const productMap = new Map<string, ProductGroup>();
   const categoryMap = new Map<string, CategoryGroup>();
 
+  // 원가 정보 누락 추적 — LotConsumption 도 unitCostSnapshot 도 없는 케이스 (구주문 등)
+  let missingCostCount = 0;
+  const missingCostOrderIds = new Set<string>();
+
   for (const order of orders) {
     let oRevenue = 0,
       oSupply = 0,
@@ -196,12 +201,17 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
         (s, lc) => s + Number(lc.quantity) * Number(lc.unitCost),
         0,
       );
-      const cost =
-        item.lotConsumptions.length > 0
-          ? lotCost
-          : item.unitCostSnapshot != null
-            ? Number(item.unitCostSnapshot) * qty
-            : 0;
+      let cost: number;
+      if (item.lotConsumptions.length > 0) {
+        cost = lotCost;
+      } else if (item.unitCostSnapshot != null) {
+        cost = Number(item.unitCostSnapshot) * qty;
+      } else {
+        // 원가 정보 누락 — LotConsumption 도 unitCostSnapshot 도 없음 (구주문 또는 데이터 손상)
+        cost = 0;
+        missingCostCount += 1;
+        missingCostOrderIds.add(order.id);
+      }
       const commRate =
         item.channelCommissionRateSnapshot != null
           ? Number(item.channelCommissionRateSnapshot)
@@ -377,10 +387,20 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
     };
   }).sort((a, b) => b.revenue - a.revenue);
 
-  return { summary, orders: orderRows, channelGroups, productGroups, categoryGroups };
+  return {
+    summary,
+    orders: orderRows,
+    channelGroups,
+    productGroups,
+    categoryGroups,
+    missingCostCount,
+    missingCostOrderIds: Array.from(missingCostOrderIds),
+  };
 }
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");
@@ -412,5 +432,7 @@ export async function GET(request: NextRequest) {
     orders: current.orders,
     channelGroups: current.channelGroups,
     productGroups: current.productGroups,
+    missingCostCount: current.missingCostCount,
+    missingCostOrderIds: current.missingCostOrderIds,
   });
 }

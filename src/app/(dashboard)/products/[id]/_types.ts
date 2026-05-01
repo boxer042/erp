@@ -21,4 +21,8 @@ export interface Movement {
   referenceType: string | null;
   memo: string | null;
   createdAt: string;
+  /** canonical 합산 표시용 — 어느 변형/단일 상품의 movement 인지 */
+  inventory?: {
+    product: { id?: string; name: string; sku: string };
+  } | null;
 }

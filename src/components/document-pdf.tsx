@@ -658,7 +658,7 @@ export function DocumentPdf(props: DocumentPdfProps) {
       const url = await buildBlob();
       window.open(url, "_blank");
     } catch (e) {
-      console.error("PDF 생성 실패", e);
+      if (process.env.NODE_ENV !== "production") console.error("PDF 생성 실패", e);
       alert("PDF 생성에 실패했습니다");
     } finally {
       setGenerating(false);
@@ -673,7 +673,7 @@ export function DocumentPdf(props: DocumentPdfProps) {
         const url = await buildBlob();
         window.location.href = url;
       } catch (e) {
-        console.error("PDF 자동 생성 실패", e);
+        if (process.env.NODE_ENV !== "production") console.error("PDF 자동 생성 실패", e);
       }
     }, 300);
     return () => clearTimeout(t);

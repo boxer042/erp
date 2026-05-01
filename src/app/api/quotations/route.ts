@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { quotationSchema } from "@/lib/validators/quotation";
 import { requireAuth } from "@/lib/auth";
+import { guardUser } from "@/lib/api-auth";
 import { generateQuotationNo } from "@/lib/document-no";
 import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
   const status = searchParams.get("status");

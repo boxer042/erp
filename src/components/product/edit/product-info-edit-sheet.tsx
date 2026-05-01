@@ -232,7 +232,7 @@ function ProductInfoEditSheetContent({
                   onChange={(v) => setForm((p) => ({ ...p, taxType: v }))}
                   options={[
                     { value: "TAXABLE", label: "과세" },
-                    { value: "ZERO_RATE", label: "영세율" },
+                    { value: "ZERO_RATE", label: "과세, 영세율" },
                     { value: "TAX_FREE", label: "면세" },
                   ]}
                 />

@@ -6,6 +6,8 @@ async function getProducts(query?: string) {
   return prisma.product.findMany({
     where: {
       isActive: true,
+      // 변형(canonicalProductId 가 있는) 상품은 카탈로그에서 가림 — 대표만 노출
+      canonicalProductId: null,
       ...(query
         ? {
             OR: [

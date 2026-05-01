@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { statementSchema } from "@/lib/validators/statement";
 import { requireAuth } from "@/lib/auth";
+import { guardUser } from "@/lib/api-auth";
 import { generateStatementNo } from "@/lib/document-no";
 import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const search = searchParams.get("search") || "";

@@ -12,6 +12,25 @@ import { toast } from "sonner";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { QuickCustomerSheet, type CustomerFormData } from "@/components/quick-register-sheets";
 import { formatPhone, formatBusinessNumber } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function CustomersSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
+          <TableCell><div className="flex gap-1"><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 interface Customer {
   id: string;
@@ -104,9 +123,7 @@ export default function CustomersPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">로딩 중...</TableCell>
-                </TableRow>
+                <CustomersSkeletonRows />
               ) : customers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">등록된 고객이 없습니다</TableCell>

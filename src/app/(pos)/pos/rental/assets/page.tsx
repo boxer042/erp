@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Asset {
   id: string;
@@ -119,7 +120,11 @@ export default function RentalAssetsPage() {
       </div>
 
       {loading ? (
-        <div className="py-8 text-center text-muted-foreground">로딩 중...</div>
+        <div className="space-y-2 py-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-md" />
+          ))}
+        </div>
       ) : assets.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center text-muted-foreground">
           등록된 자산이 없습니다

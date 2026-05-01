@@ -15,6 +15,27 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { formatComma, parseComma } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function RentalAssetsSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
+          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 interface Asset {
   id: string;
@@ -173,7 +194,7 @@ export default function RentalAssetsPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="py-8 text-center">로딩 중...</TableCell></TableRow>
+              <RentalAssetsSkeletonRows />
             ) : assets.length === 0 ? (
               <TableRow><TableCell colSpan={9} className="py-8 text-center text-muted-foreground">등록된 임대 자산이 없습니다</TableCell></TableRow>
             ) : assets.map((a) => (

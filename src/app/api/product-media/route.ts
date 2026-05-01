@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const productId = request.nextUrl.searchParams.get("productId");
   if (!productId) {
     return NextResponse.json({ error: "productId가 필요합니다" }, { status: 400 });
@@ -14,6 +17,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
   const body = await request.json();
   const { productId, type, url, title, sortOrder } = body ?? {};
   if (!productId || !type || !url) {
