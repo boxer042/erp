@@ -43,8 +43,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "업로드에 실패했습니다" }, { status: 500 });
   }
 
-  const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return NextResponse.json({ url: pub.publicUrl, path, name: file.name });
+  const { data: signed, error: signErr } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, 60 * 60);
+  if (signErr || !signed?.signedUrl) {
+    console.error("[expenses/upload] signed url error", signErr);
+    return NextResponse.json({ error: "URL 생성 실패" }, { status: 500 });
+  }
+  return NextResponse.json({ url: signed.signedUrl, path, name: file.name });
 }
 
 export async function DELETE(request: NextRequest) {

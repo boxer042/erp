@@ -17,6 +17,15 @@ export async function GET(
     },
   });
   if (!expense) return NextResponse.json({ error: "경비를 찾을 수 없습니다" }, { status: 404 });
+  if (expense.attachmentPath) {
+    const supabase = await createClient();
+    const { data: signed } = await supabase.storage
+      .from("expense-receipts")
+      .createSignedUrl(expense.attachmentPath, 60 * 60);
+    if (signed?.signedUrl) {
+      return NextResponse.json({ ...expense, attachmentUrl: signed.signedUrl });
+    }
+  }
   return NextResponse.json(expense);
 }
 

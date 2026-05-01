@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import type { Prisma } from "@prisma/client";
 import { ExpenseCategory, OrderPaymentMethod } from "@prisma/client";
 
@@ -115,8 +116,31 @@ export async function GET(request: NextRequest) {
     net: v.total - v.recoverable,
   }));
 
+  // 영수증 첨부가 있는 항목은 signed URL 재발급 (private 버킷)
+  const pathsToSign = entries
+    .map((e) => e.attachmentPath)
+    .filter((p): p is string => Boolean(p));
+  let signedMap: Record<string, string> = {};
+  if (pathsToSign.length > 0) {
+    const supabase = await createClient();
+    const { data: signed } = await supabase.storage
+      .from("expense-receipts")
+      .createSignedUrls(pathsToSign, 60 * 60);
+    if (signed) {
+      signedMap = signed.reduce<Record<string, string>>((acc, s) => {
+        if (s.path && s.signedUrl) acc[s.path] = s.signedUrl;
+        return acc;
+      }, {});
+    }
+  }
+  const entriesWithSignedUrls = entries.map((e) =>
+    e.attachmentPath && signedMap[e.attachmentPath]
+      ? { ...e, attachmentUrl: signedMap[e.attachmentPath] }
+      : e,
+  );
+
   return NextResponse.json({
-    entries,
+    entries: entriesWithSignedUrls,
     summary,
     total,
     page,
