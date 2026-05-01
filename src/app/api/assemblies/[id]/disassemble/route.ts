@@ -12,11 +12,25 @@ function generateAssemblyNo() {
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const user = await getCurrentUser();
+
+  let memo = "";
+  try {
+    const body = await request.json();
+    memo = typeof body?.memo === "string" ? body.memo.trim() : "";
+  } catch {
+    memo = "";
+  }
+  if (!memo) {
+    return NextResponse.json(
+      { error: "역조립 사유를 입력해주세요" },
+      { status: 400 },
+    );
+  }
 
   const original = await prisma.assembly.findUnique({
     where: { id },
@@ -74,7 +88,7 @@ export async function POST(
           quantity: originalQty,
           type: "DISASSEMBLE",
           assembledAt: new Date(),
-          memo: `역조립: ${original.assemblyNo}`,
+          memo,
           reverseOfId: original.id,
           createdBy: user?.id,
         },
@@ -100,35 +114,43 @@ export async function POST(
       // 4. 원본 구성품 로트 remainingQty 복원 + 구성품 Inventory 증가
       const perComponent = new Map<string, number>();
       for (const c of original.consumptions) {
-        await tx.inventoryLot.update({
-          where: { id: c.lotId },
-          data: { remainingQty: { increment: c.quantity } },
-        });
         perComponent.set(
           c.componentId,
           (perComponent.get(c.componentId) ?? 0) + Number(c.quantity),
         );
       }
-      for (const [componentId, qty] of perComponent) {
-        const inv = await tx.inventory.update({
-          where: { productId: componentId },
-          data: { quantity: { increment: qty } },
-        });
-        await tx.inventoryMovement.create({
-          data: {
-            inventoryId: inv.id,
-            type: "ADJUSTMENT_PLUS",
-            quantity: qty,
-            balanceAfter: inv.quantity,
-            referenceId: reverse.id,
-            referenceType: "ASSEMBLY_DISASSEMBLE",
-            memo: `역조립 ${assemblyNo} 구성품 복원`,
-          },
-        });
-      }
+
+      await Promise.all(
+        original.consumptions.map((c) =>
+          tx.inventoryLot.update({
+            where: { id: c.lotId },
+            data: { remainingQty: { increment: c.quantity } },
+          }),
+        ),
+      );
+
+      await Promise.all(
+        Array.from(perComponent.entries()).map(async ([componentId, qty]) => {
+          const inv = await tx.inventory.update({
+            where: { productId: componentId },
+            data: { quantity: { increment: qty } },
+          });
+          await tx.inventoryMovement.create({
+            data: {
+              inventoryId: inv.id,
+              type: "ADJUSTMENT_PLUS",
+              quantity: qty,
+              balanceAfter: inv.quantity,
+              referenceId: reverse.id,
+              referenceType: "ASSEMBLY_DISASSEMBLE",
+              memo: `역조립 ${assemblyNo} 구성품 복원`,
+            },
+          });
+        }),
+      );
 
       return reverse;
-    });
+    }, { timeout: 15000 });
 
     return NextResponse.json(result, { status: 201 });
   } catch (e) {

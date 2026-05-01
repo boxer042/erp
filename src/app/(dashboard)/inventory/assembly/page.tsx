@@ -24,8 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { AssemblyRegisterSheet } from "@/components/assembly/assembly-register-sheet";
+import { AssemblyDetailSheet } from "@/components/assembly/assembly-detail-sheet";
 
 function AssembliesSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
@@ -81,6 +83,11 @@ export default function AssemblyPage() {
   const [disOpen, setDisOpen] = useState(false);
   const [disTarget, setDisTarget] = useState<AssemblyRow | null>(null);
   const [disSubmitting, setDisSubmitting] = useState(false);
+  const [disReason, setDisReason] = useState("");
+
+  // 상세 Sheet
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const fetchAssemblies = useCallback(async () => {
     setLoading(true);
@@ -114,9 +121,18 @@ export default function AssemblyPage() {
 
   const confirmDisassemble = async () => {
     if (!disTarget) return;
+    const reason = disReason.trim();
+    if (!reason) {
+      toast.error("역조립 사유를 입력해주세요");
+      return;
+    }
     setDisSubmitting(true);
     try {
-      const res = await fetch(`/api/assemblies/${disTarget.id}/disassemble`, { method: "POST" });
+      const res = await fetch(`/api/assemblies/${disTarget.id}/disassemble`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memo: reason }),
+      });
       if (!res.ok) {
         const err = await res.json();
         toast.error(typeof err.error === "string" ? err.error : "역조립 실패");
@@ -125,6 +141,7 @@ export default function AssemblyPage() {
       toast.success("역조립이 완료되었습니다");
       setDisOpen(false);
       setDisTarget(null);
+      setDisReason("");
       fetchAssemblies();
     } finally {
       setDisSubmitting(false);
@@ -166,7 +183,18 @@ export default function AssemblyPage() {
             ) : (
               rows.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs">{r.assemblyNo}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    <button
+                      type="button"
+                      className="text-primary hover:underline cursor-pointer"
+                      onClick={() => {
+                        setDetailId(r.id);
+                        setDetailOpen(true);
+                      }}
+                    >
+                      {r.assemblyNo}
+                    </button>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span>{r.product.name}</span>
@@ -220,7 +248,25 @@ export default function AssemblyPage() {
         onSuccess={fetchAssemblies}
       />
 
-      <Dialog open={disOpen} onOpenChange={setDisOpen}>
+      <AssemblyDetailSheet
+        assemblyId={detailId}
+        open={detailOpen}
+        onOpenChange={(o) => {
+          setDetailOpen(o);
+          if (!o) setDetailId(null);
+        }}
+      />
+
+      <Dialog
+        open={disOpen}
+        onOpenChange={(o) => {
+          setDisOpen(o);
+          if (!o) {
+            setDisTarget(null);
+            setDisReason("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>역조립 확인</DialogTitle>
@@ -231,16 +277,31 @@ export default function AssemblyPage() {
                     조립번호 {disTarget.assemblyNo} 을(를) 역조립하면 완제품 재고가
                     차감되고 구성품 재고가 원래 로트로 복원됩니다.
                   </span>
-                  <span className="block mt-2 font-medium">진행하시겠습니까?</span>
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium">
+              역조립 사유 <span className="text-destructive">*</span>
+            </label>
+            <Textarea
+              value={disReason}
+              onChange={(e) => setDisReason(e.target.value)}
+              placeholder="예: 부품 오선택, 수량 입력 오류 등"
+              rows={3}
+              autoFocus
+            />
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDisOpen(false)}>
               취소
             </Button>
-            <Button variant="destructive" onClick={confirmDisassemble} disabled={disSubmitting}>
+            <Button
+              variant="destructive"
+              onClick={confirmDisassemble}
+              disabled={disSubmitting || !disReason.trim()}
+            >
               {disSubmitting ? <Loader2 className="animate-spin" /> : null}
               역조립
             </Button>
