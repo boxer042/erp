@@ -84,7 +84,7 @@ async function migrateOrders() {
   });
   let itemsMigrated = 0;
   for (const it of items) {
-    if (it.product.taxType !== "TAXABLE") continue;
+    if (!it.product || it.product.taxType !== "TAXABLE") continue;
     const newUnit = round2(Number(it.unitPrice) / 1.1);
     const newTotal = round2(Number(it.totalPrice) / 1.1);
     await prisma.orderItem.update({
@@ -105,7 +105,7 @@ async function migrateOrders() {
   for (const o of orders) {
     const subtotal = o.items.reduce((s, it) => s + Number(it.totalPrice), 0);
     const tax = o.items.reduce((s, it) => {
-      if (it.product.taxType !== "TAXABLE") return s;
+      if (!it.product || it.product.taxType !== "TAXABLE") return s;
       return s + Number(it.totalPrice) * 0.1;
     }, 0);
     const total = round2(subtotal + tax - Number(o.discountAmount) + Number(o.shippingFee));
