@@ -36,6 +36,7 @@ interface ProductLite {
   sellingPrice: string;
   imageUrl: string | null;
   taxType: string;
+  zeroRateEligible?: boolean;
   isBulk?: boolean;
   unitOfMeasure?: string;
   isCanonical?: boolean;
@@ -158,7 +159,7 @@ export default function SalesPage() {
   };
 
   const handleQuickAdd = (p: ProductLite) => {
-    add({ productId: p.id, itemType: "product", name: p.name, sku: p.sku, imageUrl: p.imageUrl, unitPrice: parseFloat(p.sellingPrice), taxType: p.taxType as CartItem["taxType"], isBulk: p.isBulk, unitOfMeasure: p.unitOfMeasure, isCanonical: p.isCanonical });
+    add({ productId: p.id, itemType: "product", name: p.name, sku: p.sku, imageUrl: p.imageUrl, unitPrice: parseFloat(p.sellingPrice), taxType: p.taxType as CartItem["taxType"], zeroRateEligible: p.zeroRateEligible ?? false, isBulk: p.isBulk, unitOfMeasure: p.unitOfMeasure, isCanonical: p.isCanonical });
     if (p.isCanonical) {
       toast.success(`${p.name} 담음 (결제 시 변형 선택 필요)`);
     } else {
@@ -526,7 +527,7 @@ export default function SalesPage() {
                       onUpdateQty={(qty) => updateQty(item.cartItemId, qty)}
                       onUpdateDiscount={(d) => updateDiscount(item.cartItemId, d)}
                       onRemove={() => remove(item.cartItemId)}
-                      onToggleZeroRate={item.taxType === "ZERO_RATE" ? () => toggleZeroRate(item.cartItemId) : undefined}
+                      onToggleZeroRate={item.zeroRateEligible ? () => toggleZeroRate(item.cartItemId) : undefined}
                     />
                   ))}
                 </ul>
@@ -809,7 +810,7 @@ function CartRow({
             {item.itemType === "rental" && (
               <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">임대</span>
             )}
-            {item.taxType === "ZERO_RATE" && onToggleZeroRate && (
+            {item.zeroRateEligible && onToggleZeroRate && (
               <button
                 onClick={onToggleZeroRate}
                 className={cn(

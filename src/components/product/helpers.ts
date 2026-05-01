@@ -4,7 +4,6 @@ import type { ProductDetail, SellingCostItem } from "./types";
 export const TAX_TYPE_LABELS: Record<string, string> = {
   TAXABLE: "과세",
   TAX_FREE: "면세",
-  ZERO_RATE: "과세, 영세율",
 };
 
 export const PRODUCT_TYPE_LABELS: Record<string, string> = {

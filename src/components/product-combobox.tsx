@@ -26,6 +26,7 @@ export interface ProductOption {
   isCanonical?: boolean;
   canonicalProductId?: string | null;
   taxType?: string;
+  zeroRateEligible?: boolean;
 }
 
 interface ProductComboboxProps {

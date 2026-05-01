@@ -185,7 +185,6 @@ model SupplierPayment {
 enum TaxType {
   TAXABLE
   TAX_FREE
-  ZERO_RATE
 }
 
 enum ProductType {
@@ -210,6 +209,7 @@ model Product {
   productType        ProductType   @default(FINISHED) @map("product_type")
   taxType            TaxType       @default(TAXABLE) @map("tax_type")
   taxRate            Decimal       @default(0.1) @map("tax_rate") @db.Decimal(5, 4)
+  zeroRateEligible   Boolean       @default(false) @map("zero_rate_eligible")
   listPrice          Decimal       @default(0) @map("list_price") @db.Decimal(15, 2)
   sellingPrice       Decimal       @default(0) @map("selling_price") @db.Decimal(15, 2)
   isSet              Boolean       @default(false) @map("is_set")

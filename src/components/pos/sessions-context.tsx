@@ -26,8 +26,9 @@ export interface CartItem {
   unitPrice: number;
   quantity: number;
   discount: string; // "1000" 또는 "10%"
-  taxType?: "TAXABLE" | "TAX_FREE" | "ZERO_RATE";
-  isZeroRate?: boolean;  // 이번 거래에 영세율 적용 여부 (ZERO_RATE 상품만 해당, 기본 false)
+  taxType?: "TAXABLE" | "TAX_FREE";
+  zeroRateEligible?: boolean; // 영세율 적용 가능 상품 여부 (Product.zeroRateEligible 미러)
+  isZeroRate?: boolean;  // 이번 거래에 영세율 적용 여부 (zeroRateEligible 상품만 해당, 기본 false)
   isBulk?: boolean;          // 벌크 SKU 여부 (소수점 수량 입력 허용)
   unitOfMeasure?: string;    // "EA", "mL", "g" 등 — UI 표시용
   isCanonical?: boolean;     // 대표 상품 여부 — true 면 결제 직전 변형 확정 필요

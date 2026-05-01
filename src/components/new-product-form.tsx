@@ -119,7 +119,8 @@ export function NewProductForm({
     sku: generateSku(),
     modelName: "",
     unitOfMeasure: "EA",
-    taxType: "TAXABLE" as "TAXABLE" | "TAX_FREE" | "ZERO_RATE",
+    taxType: "TAXABLE" as "TAXABLE" | "TAX_FREE",
+    zeroRateEligible: false,
     taxRate: "0.1",
     listPrice: "0",
     sellingPrice: "0",
@@ -402,6 +403,7 @@ export function NewProductForm({
       modelName: "",
       unitOfMeasure: "EA",
       taxType: "TAXABLE",
+      zeroRateEligible: false,
       taxRate: "0.1",
       listPrice: "0",
       sellingPrice: "0",
@@ -767,7 +769,7 @@ export function NewProductForm({
       .reduce((sum, c) => sum + parseFloat(c.value) / 100, 0);
 
     const baseTotalCost = unitCost + incomingTotal + sellingFixed;
-    const taxRate = (form.taxType === "TAXABLE" || form.taxType === "ZERO_RATE") ? parseFloat(form.taxRate || "0.1") : 0;
+    const taxRate = (form.taxType !== "TAX_FREE") ? parseFloat(form.taxRate || "0.1") : 0;
 
     let vatPrice = 0;
     let sellingPrice = 0;
@@ -807,7 +809,7 @@ export function NewProductForm({
 
   const calcSetPrice = (() => {
     const baseTotalCost = componentsTotalCost + assemblyFixedCost;
-    const taxRate = (form.taxType === "TAXABLE" || form.taxType === "ZERO_RATE") ? parseFloat(form.taxRate || "0.1") : 0;
+    const taxRate = (form.taxType !== "TAX_FREE") ? parseFloat(form.taxRate || "0.1") : 0;
 
     const sellingPct = sellingCosts
       .filter((c) => c.costType === "PERCENTAGE" && c.value)
@@ -852,7 +854,7 @@ export function NewProductForm({
   const toNetPrice = (v: string) => {
     const price = parseFloat(v || "0");
     const rate = parseFloat(form.taxRate || "0");
-    if (form.vatIncluded && (form.taxType === "TAXABLE" || form.taxType === "ZERO_RATE") && rate > 0) {
+    if (form.vatIncluded && (form.taxType !== "TAX_FREE") && rate > 0) {
       return String(Math.round(price / (1 + rate)));
     }
     return v;
@@ -901,6 +903,7 @@ export function NewProductForm({
             productType: "ASSEMBLED",
             unitOfMeasure: form.unitOfMeasure,
             taxType: form.taxType,
+            zeroRateEligible: form.zeroRateEligible,
             taxRate: form.taxRate,
             listPrice: getSubmitListPrice(),
             sellingPrice: getSubmitPrice(),
@@ -1143,7 +1146,7 @@ export function NewProductForm({
 
   // ── 가격 계산기 ──
   const PricePanel = () => {
-    const taxRate = (form.taxType === "TAXABLE" || form.taxType === "ZERO_RATE") ? parseFloat(form.taxRate || "0.1") : 0;
+    const taxRate = (form.taxType !== "TAX_FREE") ? parseFloat(form.taxRate || "0.1") : 0;
     const totalCost = activeCalcPrice.totalCost;
     const supplyPrice = activeCalcPrice.sellingPrice; // 공급가액(VAT 별도)
     const vatPrice = activeCalcPrice.vatPrice;        // VAT 포함 판매가
@@ -1374,7 +1377,7 @@ export function NewProductForm({
 
   // ── 채널별 가격 ──
   const ChannelPricingPanel = () => {
-    const taxRate = (form.taxType === "TAXABLE" || form.taxType === "ZERO_RATE") ? parseFloat(form.taxRate || "0.1") : 0;
+    const taxRate = (form.taxType !== "TAX_FREE") ? parseFloat(form.taxRate || "0.1") : 0;
     // 카드수수료 제외한 base 원가 (채널수수료와 중복 방지)
     const baseTotalCost = activeCalcPrice.totalCost - activeCalcPrice.cardFeeAmount;
     const offlineVatPrice = activeCalcPrice.vatPrice;
@@ -2025,12 +2028,12 @@ export function NewProductForm({
                           onClick={() =>
                             setForm((prev) => ({
                               ...prev,
-                              taxType: prev.taxType === "ZERO_RATE" ? "TAXABLE" : "ZERO_RATE",
+                              zeroRateEligible: !prev.zeroRateEligible,
                             }))
                           }
                           className={cn(
                             "px-2 h-6 rounded text-[11px] border transition-colors",
-                            form.taxType === "ZERO_RATE"
+                            form.zeroRateEligible
                               ? "bg-primary/10 border-primary/40 text-primary"
                               : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                           )}

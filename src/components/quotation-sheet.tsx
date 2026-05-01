@@ -47,7 +47,7 @@ interface ItemForm {
   unitPrice: string;      // 할인 전 단가
   discount: string;       // "10%" | "3000"
   isTaxable: boolean;
-  isZeroRateEligible: boolean; // 영세율 선택 가능 상품 (ZERO_RATE) — UI 전용
+  isZeroRateEligible: boolean; // 영세율 선택 가능 상품 (zeroRateEligible) — UI 전용
   memo: string;
 }
 
@@ -409,7 +409,7 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
                                     productId: p.id,
                                     name: p.name,
                                     isTaxable: p.taxType !== "TAX_FREE",
-                                    isZeroRateEligible: p.taxType === "ZERO_RATE",
+                                    isZeroRateEligible: p.zeroRateEligible ?? false,
                                     unitOfMeasure: p.unitOfMeasure,
                                     unitPrice: p.sellingPrice,
                                   })}

@@ -837,6 +837,7 @@ export async function PUT(
         memo: data.memo || null,
         categoryId: data.categoryId || null,
         assemblyTemplateId: data.assemblyTemplateId || null,
+        zeroRateEligible: data.zeroRateEligible ?? false,
       },
     });
 

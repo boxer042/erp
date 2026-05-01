@@ -70,7 +70,8 @@ function ProductInfoEditSheetContent({
     modelName: product.modelName ?? "",
     spec: product.spec ?? "",
     unitOfMeasure: product.unitOfMeasure,
-    taxType: product.taxType as "TAXABLE" | "TAX_FREE" | "ZERO_RATE",
+    taxType: product.taxType as "TAXABLE" | "TAX_FREE",
+    zeroRateEligible: product.zeroRateEligible,
   });
 
   const brandsQuery = useQuery({
@@ -113,6 +114,7 @@ function ProductInfoEditSheetContent({
         memo: product.memo ?? null,
         categoryId: form.categoryId || null,
         assemblyTemplateId: product.assemblyTemplateId ?? null,
+        zeroRateEligible: form.zeroRateEligible,
       };
       return updateProductFields(product.id, fields);
     },
@@ -228,15 +230,30 @@ function ProductInfoEditSheetContent({
               </Field>
 
               <Field label="세금유형">
-                <ChipToggle<"TAXABLE" | "TAX_FREE" | "ZERO_RATE">
+                <ChipToggle<"TAXABLE" | "TAX_FREE">
                   value={form.taxType}
                   onChange={(v) => setForm((p) => ({ ...p, taxType: v }))}
                   options={[
                     { value: "TAXABLE", label: "과세" },
-                    { value: "ZERO_RATE", label: "과세, 영세율" },
                     { value: "TAX_FREE", label: "면세" },
                   ]}
                 />
+              </Field>
+
+              <Field label="영세율 적용 가능">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={form.zeroRateEligible}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, zeroRateEligible: e.target.checked }))
+                    }
+                  />
+                  <span className="text-muted-foreground">
+                    체크 시 판매·견적·거래명세표에서 라인별 영세율 적용 토글이 노출됩니다 (예: 수출 거래)
+                  </span>
+                </label>
               </Field>
             </div>
 

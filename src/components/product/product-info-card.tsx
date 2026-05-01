@@ -76,17 +76,16 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
     { label: "단위", value: product.unitOfMeasure },
     {
       label: "세금유형",
-      value:
-        product.taxType === "ZERO_RATE" ? (
-          <div className="flex items-center gap-1">
-            <Badge variant="secondary">과세</Badge>
-            <Badge variant="outline">영세율</Badge>
-          </div>
-        ) : (
+      value: (
+        <div className="flex items-center gap-1">
           <Badge variant={product.taxType === "TAXABLE" ? "secondary" : "outline"}>
             {TAX_TYPE_LABELS[product.taxType] ?? product.taxType}
           </Badge>
-        ),
+          {product.zeroRateEligible && (
+            <Badge variant="outline">영세율 가능</Badge>
+          )}
+        </div>
+      ),
     },
     { label: "모델명", value: product.modelName },
     { label: "규격", value: product.spec },

@@ -128,6 +128,7 @@ export interface ProductDetail {
   unitOfMeasure: string;
   taxType: string;
   taxRate?: string;
+  zeroRateEligible: boolean;
   sellingPrice: string;
   listPrice?: string;
   productType: string;

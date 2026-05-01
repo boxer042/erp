@@ -34,7 +34,8 @@ export interface ProductFieldsInput {
   description?: string | null;
   unitOfMeasure: string;
   productType: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED";
-  taxType: "TAXABLE" | "TAX_FREE" | "ZERO_RATE";
+  taxType: "TAXABLE" | "TAX_FREE";
+  zeroRateEligible: boolean;
   taxRate: string;
   listPrice: string;
   sellingPrice: string;

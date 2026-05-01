@@ -10,7 +10,8 @@ export const productSchema = z.object({
   description: z.string().nullable().optional(),
   unitOfMeasure: z.string().default("EA"),
   productType: z.enum(["FINISHED", "PARTS", "SET", "ASSEMBLED"]).default("FINISHED"),
-  taxType: z.enum(["TAXABLE", "TAX_FREE", "ZERO_RATE"]).default("TAXABLE"),
+  taxType: z.enum(["TAXABLE", "TAX_FREE"]).default("TAXABLE"),
+  zeroRateEligible: z.boolean().default(false),
   taxRate: z
     .string()
     .default("0.1")

@@ -160,14 +160,14 @@ export default function ProductDetailPage() {
     memo: product.memo ?? null,
     categoryId: product.categoryId ?? null,
     assemblyTemplateId: product.assemblyTemplateId ?? null,
+    zeroRateEligible: product.zeroRateEligible,
   });
   const saveSingleField = (patch: Partial<ProductFieldsInput>) =>
     updateProductFields(product.id, { ...buildFieldsBase(), ...patch });
 
   // 가격 인라인: VAT 포함 입력 → 세전 변환 후 저장
   const taxRate = parseFloat(product.taxRate ?? "0.1");
-  const isTaxablePrice =
-    product.taxType === "TAXABLE" || product.taxType === "ZERO_RATE";
+  const isTaxablePrice = product.taxType !== "TAX_FREE";
   const vatInputToNet = (vatStr: string): string => {
     const vat = parseInt(vatStr.replace(/,/g, ""), 10) || 0;
     if (isTaxablePrice && taxRate > 0) {

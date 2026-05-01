@@ -8,7 +8,7 @@ interface ProductKpiCardsProps {
 }
 
 export function ProductKpiCards({ product, cardFeeRate = 0 }: ProductKpiCardsProps) {
-  const isTaxable = product.taxType === "TAXABLE" || product.taxType === "ZERO_RATE";
+  const isTaxable = product.taxType !== "TAX_FREE";
   const taxRate = isTaxable ? parseFloat(product.taxRate ?? "0.1") : 0;
 
   // 판매가 (DB는 세전)

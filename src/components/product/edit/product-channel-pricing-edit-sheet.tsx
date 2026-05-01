@@ -67,7 +67,7 @@ function ProductChannelPricingEditSheetContent({
   });
 
   const taxRate = parseFloat(product.taxRate ?? "0.1");
-  const isTaxable = product.taxType === "TAXABLE" || product.taxType === "ZERO_RATE";
+  const isTaxable = product.taxType !== "TAX_FREE";
 
   // 초기값: 기존 channelPricings 에서 enabled/price 매핑
   const [rows, setRows] = useState<Map<string, RowState>>(() => {

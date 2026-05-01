@@ -291,6 +291,7 @@ export async function POST(request: NextRequest) {
         memo: data.memo || null,
         categoryId: data.categoryId || null,
         assemblyTemplateId: data.assemblyTemplateId || null,
+        zeroRateEligible: data.zeroRateEligible ?? false,
         inventory: data.isCanonical
           ? undefined  // canonical은 자체 재고를 갖지 않음
           : { create: { quantity: 0, safetyStock: 1 } },

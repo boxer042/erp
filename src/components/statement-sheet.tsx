@@ -345,7 +345,7 @@ export function StatementSheet({ open, onOpenChange, editData, onSaved }: Statem
                                   unitOfMeasure: pr.unitOfMeasure,
                                   unitPrice: pr.sellingPrice,
                                   isTaxable: pr.taxType !== "TAX_FREE",
-                                  isZeroRateEligible: pr.taxType === "ZERO_RATE",
+                                  isZeroRateEligible: pr.zeroRateEligible ?? false,
                                 })}
                                 placeholder="상품 선택..."
                               />
