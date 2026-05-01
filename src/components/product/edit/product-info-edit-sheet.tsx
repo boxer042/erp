@@ -112,6 +112,7 @@ function ProductInfoEditSheetContent({
         imageUrl: product.imageUrl ?? null,
         memo: product.memo ?? null,
         categoryId: form.categoryId || null,
+        assemblyTemplateId: product.assemblyTemplateId ?? null,
       };
       return updateProductFields(product.id, fields);
     },
