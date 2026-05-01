@@ -573,7 +573,7 @@ function SummaryCard({
   highlight?: boolean;
 }) {
   return (
-    <div className={`rounded-lg border p-3 space-y-1 ${highlight ? "border-[#3ECF8E]/40 bg-primary/5" : "border-border bg-card"}`}>
+    <div className={`rounded-lg border p-3 space-y-1 ${highlight ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
       <div className="text-[11px] text-muted-foreground">{title}</div>
       <div className={`text-[15px] font-bold tabular-nums ${highlight ? "text-primary" : "text-foreground"}`}>{value}</div>
       {sub && <div className="text-[11px] text-muted-foreground tabular-nums">{sub}</div>}

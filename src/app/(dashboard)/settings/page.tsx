@@ -564,9 +564,6 @@ function CardFeeSection() {
   const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
   const [feeForm, setFeeForm] = useState(emptyCardCompanyForm);
   const [deleteFeeId, setDeleteFeeId] = useState<string | null>(null);
-  const [applyOpen, setApplyOpen] = useState(false);
-  const [applyDate, setApplyDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [applyMemo, setApplyMemo] = useState("");
   const [showHistory, setShowHistory] = useState(false);
 
   const openCreate = () => {
@@ -610,6 +607,7 @@ function CardFeeSection() {
       toast.success(editingFeeId ? "수정되었습니다" : "추가되었습니다");
       setFeeDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.cardCompanyFees.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.cardFeeRate.all });
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "저장에 실패했습니다"),
   });
@@ -620,25 +618,9 @@ function CardFeeSection() {
       toast.success("삭제되었습니다");
       setDeleteFeeId(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.cardCompanyFees.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.cardFeeRate.all });
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
-  });
-
-  const applyAvg = useMutation({
-    mutationFn: () =>
-      apiMutate("/api/card-company-fees/apply", "POST", {
-        appliedFrom: applyDate,
-        memo: applyMemo || null,
-      }),
-    onSuccess: (res: unknown) => {
-      const r = res as { average: number; count: number };
-      toast.success(`평균 ${(r.average * 100).toFixed(2)}% 로 적용되었습니다 (카드사 ${r.count}개)`);
-      setApplyOpen(false);
-      setApplyMemo("");
-      queryClient.invalidateQueries({ queryKey: queryKeys.cardFeeRate.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cardCompanyFees.all });
-    },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "적용에 실패했습니다"),
   });
 
   const fmtDate = (s: string) => format(new Date(s), "yyyy-MM-dd", { locale: ko });
@@ -658,23 +640,13 @@ function CardFeeSection() {
           <div>
             <CardTitle>카드 가맹점 수수료</CardTitle>
             <CardDescription>
-              카드사별 수수료를 입력하면 신용카드율의 평균을 적용 카드수수료율로 사용합니다.
+              카드사를 추가/수정/삭제하면 신용카드율의 평균이 즉시 적용 카드수수료율로 반영됩니다.
             </CardDescription>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="h-8 text-[13px] gap-1.5" onClick={openCreate}>
-              <Plus className="h-3.5 w-3.5" />
-              카드사 추가
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 text-[13px] gap-1.5"
-              onClick={() => setApplyOpen(true)}
-              disabled={items.length === 0}
-            >
-              평균 적용
-            </Button>
-          </div>
+          <Button size="sm" variant="outline" className="h-8 text-[13px] gap-1.5" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" />
+            카드사 추가
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[13px]">
@@ -852,47 +824,6 @@ function CardFeeSection() {
             >
               {saveFee.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
               {editingFeeId ? "수정" : "추가"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>평균 수수료율 적용</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-[13px]">
-            <p className="text-muted-foreground">
-              현재 등록된 카드사 {items.length}개의 신용카드 수수료율 평균:{" "}
-              <span className="font-bold text-foreground">
-                {previewAvg != null ? `${(previewAvg * 100).toFixed(2)}%` : "—"}
-              </span>
-            </p>
-            <FeeField label="적용 시작일" required value={applyDate} onChange={setApplyDate} type="date" />
-            <FeeField label="메모 (선택)" value={applyMemo} onChange={setApplyMemo} placeholder="예: 2026 상반기 갱신" />
-            <p className="text-[11px] text-muted-foreground">
-              ※ 적용 후 등록되는 주문은 이 평균값을 스냅샷으로 저장합니다. 기존 주문에는 영향이 없습니다.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" size="sm" className="h-8 text-[13px]" onClick={() => setApplyOpen(false)}>
-              취소
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 text-[13px]"
-              onClick={() => {
-                if (!applyDate) {
-                  toast.error("적용 시작일을 입력하세요");
-                  return;
-                }
-                applyAvg.mutate();
-              }}
-              disabled={applyAvg.isPending}
-            >
-              {applyAvg.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
-              적용
             </Button>
           </DialogFooter>
         </DialogContent>

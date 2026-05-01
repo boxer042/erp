@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
 import { PAYMENT_METHODS, UNITS_OF_MEASURE } from "@/lib/constants";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import Loading from "./loading";
 
 interface SupplierProduct {
   id: string;
@@ -193,20 +193,7 @@ export default function SupplierDetailPage() {
     fetchSupplier();
   };
 
-  if (loading) return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-8 w-8 rounded-md" />
-        <Skeleton className="h-6 w-48" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-md" />
-        ))}
-      </div>
-      <Skeleton className="h-64 w-full rounded-md" />
-    </div>
-  );
+  if (loading) return <Loading />;
   if (!supplier) return <div className="p-6">거래처를 찾을 수 없습니다</div>;
 
   const paymentLabel =

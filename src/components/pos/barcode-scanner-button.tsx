@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ScanLine, X } from "lucide-react";
+import { ScanLine } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 // BarcodeDetector 타입 shim
 interface BarcodeDetectorLike {
@@ -82,22 +83,18 @@ export function BarcodeScannerButton({ onScan }: { onScan: (code: string) => voi
         <ScanLine className="h-5 w-5" />
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
-          <div className="relative w-full max-w-md overflow-hidden rounded-xl bg-black">
-            <video ref={videoRef} className="h-auto w-full" playsInline muted />
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-background/20 text-white hover:bg-background/30"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <div className="p-3 text-center text-sm text-white">
-              바코드를 화면 안쪽에 맞추세요
-            </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden bg-black border-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>바코드 스캔</DialogTitle>
+            <DialogDescription>바코드를 화면 안쪽에 맞추세요</DialogDescription>
+          </DialogHeader>
+          <video ref={videoRef} className="h-auto w-full" playsInline muted />
+          <div className="p-3 text-center text-sm text-white">
+            바코드를 화면 안쪽에 맞추세요
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

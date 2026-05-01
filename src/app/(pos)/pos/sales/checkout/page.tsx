@@ -8,6 +8,8 @@ import { useSessions, type CartItem } from "@/components/pos/sessions-context";
 import { calcDiscountPerUnit } from "@/lib/utils";
 import { Banknote, CreditCard, ArrowLeftRight, FileText, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 type Payment = "CASH" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID";
 const PAYMENT_OPTIONS: { value: Payment; label: string; icon: React.ReactNode }[] = [
@@ -358,61 +360,52 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* 변형 선택 다이얼로그 */}
-      {variantPickerFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setVariantPickerFor(null)}>
-          <div
-            className="w-full max-w-md rounded-xl bg-background p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 text-lg font-semibold">{variantPickerFor.name} — 변형 선택</div>
-            {variantLoading ? (
-              <div className="space-y-2 py-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full rounded-md" />
-                ))}
-              </div>
-            ) : variantOptions.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                등록된 변형이 없습니다. 조립실적을 먼저 등록해 변형을 만들어주세요.
-              </div>
-            ) : (
-              <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
-                {variantOptions.map((v) => {
-                  const qty = v.inventory ? Number(v.inventory.quantity) : 0;
-                  const outOfStock = qty <= 0;
-                  return (
-                    <button
-                      key={v.id}
-                      onClick={() => pickVariant(v)}
-                      disabled={outOfStock}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border p-3 text-left hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{v.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {v.sku} · 재고 {qty.toLocaleString("ko-KR")}
-                        </div>
-                      </div>
-                      <div className="text-sm tabular-nums">
-                        ₩{Math.round(parseFloat(v.sellingPrice)).toLocaleString("ko-KR")}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setVariantPickerFor(null)}
-                className="rounded-md border border-border px-4 py-2 text-sm hover:bg-muted/50"
-              >
-                취소
-              </button>
+      <Dialog open={!!variantPickerFor} onOpenChange={(o) => !o && setVariantPickerFor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{variantPickerFor?.name} — 변형 선택</DialogTitle>
+          </DialogHeader>
+          {variantLoading ? (
+            <div className="space-y-2 py-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-md" />
+              ))}
             </div>
-          </div>
-        </div>
-      )}
+          ) : variantOptions.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              등록된 변형이 없습니다. 조립실적을 먼저 등록해 변형을 만들어주세요.
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
+              {variantOptions.map((v) => {
+                const qty = v.inventory ? Number(v.inventory.quantity) : 0;
+                const outOfStock = qty <= 0;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => pickVariant(v)}
+                    disabled={outOfStock}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-border p-3 text-left hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{v.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {v.sku} · 재고 {qty.toLocaleString("ko-KR")}
+                      </div>
+                    </div>
+                    <div className="text-sm tabular-nums">
+                      ₩{Math.round(parseFloat(v.sellingPrice)).toLocaleString("ko-KR")}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVariantPickerFor(null)}>취소</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

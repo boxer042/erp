@@ -158,7 +158,8 @@ export function NewProductForm({
   const [targetMargin, setTargetMargin] = useState("20");
   const [targetMarginAmount, setTargetMarginAmount] = useState("");
   const [manualVatPrice, setManualVatPrice] = useState("");
-  const [lastEdited, setLastEdited] = useState<"rate" | "amount" | "price" | null>(null);
+  const [manualSupplyPrice, setManualSupplyPrice] = useState("");
+  const [lastEdited, setLastEdited] = useState<"rate" | "amount" | "price" | "supply" | null>(null);
 
   const [cardFeeRate, setCardFeeRate] = useState<number>(0);
 
@@ -463,6 +464,7 @@ export function NewProductForm({
       channelPrices.some((r) => r.enabled || r.price) ||
       baseCost !== "" ||
       manualVatPrice !== "" ||
+      manualSupplyPrice !== "" ||
       targetMarginAmount !== ""
     )
   );
@@ -782,24 +784,21 @@ export function NewProductForm({
       const divisor = 1 - margin - sellingPct - cardFeeRatio;
       sellingPrice = divisor > 0 && baseTotalCost > 0 ? baseTotalCost / divisor : 0;
       vatPrice = Math.round(sellingPrice * (1 + taxRate));
-      cardFeeAmount = vatPrice * cardFeeRate;
-      marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
-      marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
     } else if (lastEdited === "amount") {
       const mAmount = parseFloat(targetMarginAmount || "0");
       const divisor = 1 - sellingPct - cardFeeRatio;
       sellingPrice = divisor > 0 ? (baseTotalCost + mAmount) / divisor : 0;
       vatPrice = Math.round(sellingPrice * (1 + taxRate));
-      cardFeeAmount = vatPrice * cardFeeRate;
-      marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
-      marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
+    } else if (lastEdited === "supply") {
+      sellingPrice = parseFloat(manualSupplyPrice || "0");
+      vatPrice = Math.round(sellingPrice * (1 + taxRate));
     } else {
       vatPrice = parseFloat(manualVatPrice || "0");
       sellingPrice = taxRate > 0 ? vatPrice / (1 + taxRate) : vatPrice;
-      cardFeeAmount = vatPrice * cardFeeRate;
-      marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
-      marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
     }
+    cardFeeAmount = vatPrice * cardFeeRate;
+    marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
+    marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
 
     const totalCost = baseTotalCost + cardFeeAmount;
 
@@ -828,24 +827,21 @@ export function NewProductForm({
       const divisor = 1 - margin - sellingPct - cardFeeRatio;
       sellingPrice = divisor > 0 && baseTotalCost > 0 ? baseTotalCost / divisor : 0;
       vatPrice = Math.round(sellingPrice * (1 + taxRate));
-      cardFeeAmount = vatPrice * cardFeeRate;
-      marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
-      marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
     } else if (lastEdited === "amount") {
       const mAmount = parseFloat(targetMarginAmount || "0");
       const divisor = 1 - sellingPct - cardFeeRatio;
       sellingPrice = divisor > 0 ? (baseTotalCost + mAmount) / divisor : 0;
       vatPrice = Math.round(sellingPrice * (1 + taxRate));
-      cardFeeAmount = vatPrice * cardFeeRate;
-      marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
-      marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
+    } else if (lastEdited === "supply") {
+      sellingPrice = parseFloat(manualSupplyPrice || "0");
+      vatPrice = Math.round(sellingPrice * (1 + taxRate));
     } else {
       vatPrice = parseFloat(manualVatPrice || "0");
       sellingPrice = taxRate > 0 ? vatPrice / (1 + taxRate) : vatPrice;
-      cardFeeAmount = vatPrice * cardFeeRate;
-      marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
-      marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
     }
+    cardFeeAmount = vatPrice * cardFeeRate;
+    marginAmount = sellingPrice - baseTotalCost - cardFeeAmount;
+    marginRate = sellingPrice > 0 ? (marginAmount / sellingPrice) * 100 : 0;
 
     const totalCost = baseTotalCost + cardFeeAmount;
 
@@ -1336,11 +1332,17 @@ export function NewProductForm({
         {/* ── 가격 결과 (3컬럼 삼등분) ── */}
         <div className="grid grid-cols-3 rounded-lg border border-border overflow-hidden bg-card">
           {/* 공급가액 */}
-          <div className="px-2 py-3 text-center border-r border-border">
+          <div className="px-2 py-2 text-center border-r border-border">
             <div className="text-[10px] text-muted-foreground mb-1">공급가액</div>
-            <div className="text-[15px] font-bold tabular-nums">
-              {supplyPrice > 0 ? `₩${supplyPrice.toLocaleString("ko-KR")}` : "—"}
-            </div>
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="0"
+              value={formatComma(lastEdited === "supply" ? manualSupplyPrice : (supplyPrice > 0 ? supplyPrice.toString() : ""))}
+              onChange={(e) => { setManualSupplyPrice(parseComma(e.target.value)); setLastEdited("supply"); }}
+              onFocus={(e) => e.currentTarget.select()}
+              className="h-7 text-center text-[15px] font-bold border-0 bg-transparent focus-visible:ring-1 px-0"
+            />
           </div>
           {/* 세액 */}
           <div className="px-2 py-3 text-center border-r border-border">

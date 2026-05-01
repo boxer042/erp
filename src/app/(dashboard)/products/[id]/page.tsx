@@ -74,6 +74,15 @@ export default function ProductDetailPage() {
   });
   const product = productQuery.data;
 
+  const cardFeeQuery = useQuery({
+    queryKey: queryKeys.cardFeeRate.all,
+    queryFn: () =>
+      apiGet<{ current: { rate: string } | null }>("/api/card-fee-rate"),
+  });
+  const cardFeeRate = cardFeeQuery.data?.current
+    ? parseFloat(cardFeeQuery.data.current.rate)
+    : 0;
+
   // 변형(variant) 진입 시 부모 상품으로 redirect — 변형 운영은 부모 상세에서
   useEffect(() => {
     if (product?.canonicalProductId) {
@@ -192,7 +201,7 @@ export default function ProductDetailPage() {
           />
 
           {/* 1. 개요 */}
-          <ProductKpiCards product={product} />
+          <ProductKpiCards product={product} cardFeeRate={cardFeeRate} />
           <ProductCostBreakdownCard
             product={product}
             onEdit={
@@ -283,6 +292,7 @@ export default function ProductDetailPage() {
               onSaveListPriceFromVat={saveListPriceFromVat}
               onSaveSellingPriceFromVat={saveSellingPriceFromVat}
               productId={product.id}
+              cardFeeRate={cardFeeRate}
             />
           </ProductSection>
 

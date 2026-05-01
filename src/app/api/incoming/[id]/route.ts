@@ -303,6 +303,8 @@ export async function PUT(
     const newItems = data.items.map((item) => {
       const qty = parseFloat(item.quantity);
       const price = parseFloat(item.unitPrice);
+      const sentTotal = item.totalPrice ? parseFloat(item.totalPrice) : NaN;
+      const totalPrice = Number.isFinite(sentTotal) && sentTotal > 0 ? sentTotal : qty * price;
       const originalPrice = item.originalPrice ? parseFloat(item.originalPrice) : undefined;
       const discountAmount = item.discountAmount ? parseFloat(item.discountAmount) : undefined;
       const rawShipping = item.itemShippingCost;
@@ -313,7 +315,7 @@ export async function PUT(
         supplierProductId: item.supplierProductId,
         quantity: qty,
         unitPrice: price,
-        totalPrice: qty * price,
+        totalPrice,
         originalPrice,
         discountAmount,
         itemShippingCost,

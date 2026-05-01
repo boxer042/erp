@@ -307,7 +307,7 @@ export default function SupplierLedgerPage() {
           <button
             type="button"
             onClick={() => applyPreset("all")}
-            className="px-3 h-7 rounded-md border border-[#3ECF8E]/40 bg-primary/10 text-primary text-[11px] hover:bg-primary/20 transition-colors"
+            className="px-3 h-7 rounded-md border border-primary/40 bg-primary/10 text-primary text-[11px] hover:bg-primary/20 transition-colors"
           >
             전체 기간 보기
           </button>
@@ -448,7 +448,7 @@ export default function SupplierLedgerPage() {
                 className={cn(
                   "flex-1 h-7 rounded-md border text-[11px] flex items-center justify-center gap-1 transition-colors",
                   selectedSupplierId
-                    ? "bg-primary/10 border-[#3ECF8E]/40 text-primary hover:bg-primary/20"
+                    ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"
                     : "border-border bg-card opacity-40 cursor-not-allowed text-muted-foreground"
                 )}
                 title={
@@ -504,7 +504,7 @@ export default function SupplierLedgerPage() {
                   className={cn(
                     "px-2 h-6 rounded text-[11px] border transition-colors",
                     active
-                      ? "bg-primary/10 border-[#3ECF8E]/40 text-primary"
+                      ? "bg-primary/10 border-primary/40 text-primary"
                       : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
@@ -545,7 +545,7 @@ export default function SupplierLedgerPage() {
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-md border border-border shrink-0 transition-colors",
                   types.length < ALL_TYPES.length
-                    ? "bg-primary/10 text-primary border-[#3ECF8E]/30"
+                    ? "bg-primary/10 text-primary border-primary/30"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
@@ -564,7 +564,7 @@ export default function SupplierLedgerPage() {
                       )}
                       onClick={() => setTypes((prev) => checked ? prev.filter((x) => x !== t) : [...prev, t])}
                     >
-                      <div className={cn("h-3.5 w-3.5 rounded border flex items-center justify-center", checked ? "bg-primary border-[#3ECF8E]" : "border-[#555]")}>
+                      <div className={cn("h-3.5 w-3.5 rounded border flex items-center justify-center", checked ? "bg-primary border-primary" : "border-input")}>
                         {checked && <Check className="size-2.5 text-foreground" />}
                       </div>
                       <Badge variant={TYPE_VARIANTS[t]} className="text-[10px]">{TYPE_LABELS[t]}</Badge>

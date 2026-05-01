@@ -32,7 +32,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
-import { Skeleton } from "@/components/ui/skeleton";
+import Loading from "./loading";
 
 interface Slot {
   id: string;
@@ -257,18 +257,7 @@ export default function TemplateDetailPage({
     }
   };
 
-  if (loading && !template) {
-    return (
-      <div className="flex h-full flex-col p-5 gap-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8 rounded-md" />
-          <Skeleton className="h-6 w-48" />
-        </div>
-        <Skeleton className="h-32 w-full rounded-md" />
-        <Skeleton className="h-64 w-full rounded-md" />
-      </div>
-    );
-  }
+  if (loading && !template) return <Loading />;
   if (!template) {
     return <div className="p-8 text-center">템플릿을 찾을 수 없습니다</div>;
   }

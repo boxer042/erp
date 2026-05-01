@@ -840,7 +840,7 @@ export default function SupplierReturnsPage() {
                   type="button"
                   onClick={() => setIsExchange(!isExchange)}
                   disabled={!supplierId}
-                  className={`h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isExchange ? "bg-primary border-[#3ECF8E]" : "border-[#555] bg-transparent"}`}
+                  className={`h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isExchange ? "bg-primary border-primary" : "border-input bg-transparent"}`}
                 >
                   {isExchange && (
                     <svg className="size-2.5 text-black" viewBox="0 0 12 12" fill="none">

@@ -4,9 +4,10 @@ import type { ProductDetail } from "./types";
 
 interface ProductKpiCardsProps {
   product: ProductDetail;
+  cardFeeRate?: number;
 }
 
-export function ProductKpiCards({ product }: ProductKpiCardsProps) {
+export function ProductKpiCards({ product, cardFeeRate = 0 }: ProductKpiCardsProps) {
   const isTaxable = product.taxType === "TAXABLE" || product.taxType === "ZERO_RATE";
   const taxRate = isTaxable ? parseFloat(product.taxRate ?? "0.1") : 0;
 
@@ -24,8 +25,20 @@ export function ProductKpiCards({ product }: ProductKpiCardsProps) {
   const inboundTax = Math.round(inboundNet * taxRate);
   const inboundTotal = Math.round(inboundNet + inboundTax);
 
-  // 마진 (실측)
-  const marginAmount = Math.round(sellingNet - inboundNet);
+  // 전사 공통 판매비용 (channelId IS NULL) — 오프라인 마진에 반영
+  const sellingCostTotal = (product.sellingCosts ?? [])
+    .filter((sc) => sc.channelId == null)
+    .reduce((sum, sc) => {
+      const v = parseFloat(sc.value);
+      if (sc.costType === "FIXED") return sum + (sc.isTaxable ? v / 1.1 : v);
+      return sum + sellingNet * (v / 100);
+    }, 0);
+
+  // 카드수수료 (오프라인) — 판매가(VAT포함) × 카드수수료율
+  const cardFeeAmount = sellingTotal * cardFeeRate;
+
+  // 마진 (실측, 오프라인): 판매가 - 입고가 - 판매비용 - 카드수수료
+  const marginAmount = Math.round(sellingNet - inboundNet - sellingCostTotal - cardFeeAmount);
   const marginRate = sellingNet > 0 ? (marginAmount / sellingNet) * 100 : 0;
 
   // 재고 — canonical 은 자식 변형들의 합
@@ -85,7 +98,7 @@ export function ProductKpiCards({ product }: ProductKpiCardsProps) {
       {showInboundLegacy && (
         <KpiCard
           label="마진 (오프라인)"
-          description="판매가 − 입고가. 카드수수료·판매비용 미반영"
+          description="판매가 − 입고가 − 판매비용 − 카드수수료"
         >
           <Line label="마진금액" value={`₩${fmtPrice(marginAmount)}`} emphasis tone={marginAmount < 0 ? "bad" : "good"} />
           <Line label="마진율" value={`${marginRate.toFixed(1)}%`} tone={marginAmount < 0 ? "bad" : "good"} />
@@ -108,7 +121,7 @@ export function ProductKpiCards({ product }: ProductKpiCardsProps) {
       {showAverageForComposite && (
         <KpiCard
           label="평균 마진"
-          description="판매가 − 평균 입고가. 카드수수료·판매비용 미반영"
+          description="판매가 − 평균 입고가 − 판매비용 − 카드수수료"
         >
           <Line label="마진금액" value={`₩${fmtPrice(marginAmount)}`} emphasis tone={marginAmount < 0 ? "bad" : "good"} />
           <Line label="마진율" value={`${marginRate.toFixed(1)}%`} tone={marginAmount < 0 ? "bad" : "good"} />

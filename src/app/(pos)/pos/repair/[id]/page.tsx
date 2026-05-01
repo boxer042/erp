@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { ChevronLeft, Loader2, Plus, Trash2, Copy, Link as LinkIcon } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface ExtraItem {
   productId: string;
@@ -409,9 +411,9 @@ export default function RepairDetailPage() {
                   ₩{((parseFloat(partForm.quantity) || 0) * (parseFloat(parseComma(partForm.unitPrice)) || 0)).toLocaleString("ko-KR")}
                 </td>
                 <td colSpan={2}>
-                  <button onClick={addPart} className="flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-white">
+                  <Button onClick={addPart} size="sm">
                     <Plus className="h-3 w-3" /> 추가
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ) : null}
@@ -460,9 +462,9 @@ export default function RepairDetailPage() {
                   ₩{((parseFloat(laborForm.hours) || 0) * (parseFloat(parseComma(laborForm.unitRate)) || 0)).toLocaleString("ko-KR")}
                 </td>
                 <td>
-                  <button onClick={addLabor} className="flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-white">
+                  <Button onClick={addLabor} size="sm">
                     <Plus className="h-3 w-3" /> 추가
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ) : null}
@@ -529,9 +531,9 @@ export default function RepairDetailPage() {
                   ₩{((parseFloat(extraForm.quantity) || 0) * (parseFloat(parseComma(extraForm.unitPrice)) || 0)).toLocaleString("ko-KR")}
                 </td>
                 <td>
-                  <button onClick={addExtraItem} className="flex h-9 items-center gap-1 rounded-md border border-primary px-3 text-xs font-semibold text-primary hover:bg-primary/5">
+                  <Button onClick={addExtraItem} size="sm" variant="outline">
                     <Plus className="h-3 w-3" /> 담기
-                  </button>
+                  </Button>
                 </td>
               </tr>
             </tbody>
@@ -592,120 +594,108 @@ export default function RepairDetailPage() {
       {/* 상태 전이 버튼 */}
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-5">
         {["RECEIVED", "DIAGNOSING", "QUOTED"].includes(ticket.status) ? (
-          <button onClick={() => transition("quote")} className="h-11 rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-muted/50">
+          <Button variant="outline" onClick={() => transition("quote")}>
             견적 확정
-          </button>
+          </Button>
         ) : null}
 
         {ticket.status === "QUOTED" ? (
           <>
-            <button
-              onClick={() => { const name = prompt("승인자 이름(선택)") ?? ""; transition("approve", { approvedByName: name }); }}
-              className="h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-white"
-            >
+            <Button onClick={() => { const name = prompt("승인자 이름(선택)") ?? ""; transition("approve", { approvedByName: name }); }}>
               현장 승인
-            </button>
-            <button
-              onClick={requestApprovalLink}
-              className="flex h-11 items-center gap-1 rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-muted/50"
-            >
+            </Button>
+            <Button variant="outline" onClick={requestApprovalLink}>
               <LinkIcon className="h-4 w-4" /> 원격 승인 링크 생성·복사
-            </button>
+            </Button>
           </>
         ) : null}
 
         {ticket.status === "QUOTED" && ticket.approvalToken ? (
-          <button
+          <Button
+            variant="outline"
             onClick={async () => {
               const url = `${window.location.origin}/repair/approve/${ticket.approvalToken}`;
               await navigator.clipboard.writeText(url);
               toast.success("링크가 복사되었습니다");
             }}
-            className="flex h-11 items-center gap-1 rounded-lg border border-border bg-background px-4 text-sm text-muted-foreground hover:bg-muted/50"
           >
             <Copy className="h-4 w-4" /> 기존 링크 복사
-          </button>
+          </Button>
         ) : null}
 
         {ticket.status === "APPROVED" ? (
-          <button onClick={() => transition("start")} className="h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-white">
+          <Button onClick={() => transition("start")}>
             수리 착수 (부품 차감)
-          </button>
+          </Button>
         ) : null}
 
         {ticket.status === "REPAIRING" ? (
-          <button onClick={() => transition("ready")} className="h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-white">
+          <Button onClick={() => transition("ready")}>
             픽업 준비 완료
-          </button>
+          </Button>
         ) : null}
 
         {ticket.status === "READY" ? (
-          <button onClick={() => setPickupDialog(true)} className="h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-white">
+          <Button onClick={() => setPickupDialog(true)}>
             픽업 완료 + 결제
-          </button>
+          </Button>
         ) : null}
 
         {!["PICKED_UP", "CANCELLED"].includes(ticket.status) ? (
-          <button
+          <Button
+            variant="outline"
+            className="border-destructive/30 text-destructive hover:bg-destructive/5"
             onClick={() => { if (!confirm("취소하시겠습니까? (차감된 부품 재고는 복원됩니다)")) return; transition("cancel"); }}
-            className="h-11 rounded-lg border border-destructive/30 px-4 text-sm text-destructive hover:bg-destructive/5"
           >
             취소
-          </button>
+          </Button>
         ) : null}
       </div>
 
-      {/* 픽업 결제 다이얼로그 */}
-      {pickupDialog ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setPickupDialog(false)}>
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="mb-4 text-lg font-semibold">픽업 완료 + 결제</h2>
+      <Dialog open={pickupDialog} onOpenChange={setPickupDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>픽업 완료 + 결제</DialogTitle>
+          </DialogHeader>
 
-            <div className="mb-4 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">수리비</span><span>₩{total.toLocaleString("ko-KR")}</span></div>
-              {extraItems.length > 0 ? (
-                <div className="flex justify-between text-primary/80">
-                  <span>추가 판매 ({extraItems.length}건)</span>
-                  <span>₩{extraTotal.toLocaleString("ko-KR")}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                <span>합계</span>
-                <span className="text-xl">₩{(total + extraTotal).toLocaleString("ko-KR")}</span>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">수리비</span><span>₩{total.toLocaleString("ko-KR")}</span></div>
+            {extraItems.length > 0 ? (
+              <div className="flex justify-between text-primary/80">
+                <span>추가 판매 ({extraItems.length}건)</span>
+                <span>₩{extraTotal.toLocaleString("ko-KR")}</span>
               </div>
-            </div>
-
-            <div className="mb-5">
-              <div className="mb-2 text-sm font-medium">결제수단</div>
-              <div className="grid grid-cols-2 gap-2">
-                {PICKUP_PAYMENTS.map((pm) => (
-                  <button
-                    key={pm}
-                    onClick={() => setPickupPayment(pm)}
-                    className={`h-10 rounded-md border text-sm font-medium ${pickupPayment === pm ? "border-primary bg-primary/10 text-primary/80" : "border-border hover:bg-muted/50"}`}
-                  >
-                    {PAYMENT_LABEL[pm]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setPickupDialog(false)} className="h-10 rounded-md border border-border px-4 text-sm hover:bg-muted/50">
-                취소
-              </button>
-              <button
-                onClick={doPickup}
-                disabled={doingPickup}
-                className="flex h-10 items-center gap-1 rounded-md bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {doingPickup ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                확정
-              </button>
+            ) : null}
+            <div className="flex justify-between border-t border-border pt-2 font-semibold">
+              <span>합계</span>
+              <span className="text-xl">₩{(total + extraTotal).toLocaleString("ko-KR")}</span>
             </div>
           </div>
-        </div>
-      ) : null}
+
+          <div>
+            <div className="mb-2 text-sm font-medium">결제수단</div>
+            <div className="grid grid-cols-2 gap-2">
+              {PICKUP_PAYMENTS.map((pm) => (
+                <button
+                  key={pm}
+                  onClick={() => setPickupPayment(pm)}
+                  className={`h-10 rounded-md border text-sm font-medium ${pickupPayment === pm ? "border-primary bg-primary/10 text-primary/80" : "border-border hover:bg-muted/50"}`}
+                >
+                  {PAYMENT_LABEL[pm]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPickupDialog(false)}>취소</Button>
+            <Button onClick={doPickup} disabled={doingPickup}>
+              {doingPickup ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              확정
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <style jsx>{`
         :global(.input) {

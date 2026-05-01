@@ -467,13 +467,21 @@ function IncomingPageInner() {
 
       const resolvedItems = validItems.map((item) => {
         const up = parseFloat(item.unitPrice || "0");
+        const qty = parseFloat(item.quantity || "0");
         const discPerUnit = calcDiscountPerUnit(up, item.discount);
-        const actualPrice = String(up - discPerUnit);
+        const actualUnit = up - discPerUnit;
+        const actualPrice = String(actualUnit);
         const key = `${item.supplierProductName}||${item.spec || ""}||${item.supplierCode || ""}`;
+        // VAT포함 입력 시 폼이 round(VAT × qty / 1.1) 로 계산해 둔 supplyAmount 를 그대로 보낸다.
+        // 그러지 않으면 API가 qty × round(VAT/1.1) 로 1원씩 잃는다.
+        const totalPrice = item.supplyAmount && parseFloat(item.supplyAmount) > 0
+          ? item.supplyAmount
+          : String(actualUnit * qty);
         return {
           supplierProductId: item.isNew ? newProductCache.get(key)! : item.supplierProductId,
           quantity: item.quantity,
           unitPrice: actualPrice,
+          totalPrice,
           originalPrice: item.unitPrice,
           discountAmount: String(discPerUnit),
           itemShippingCost: item.itemShippingCost.trim() === "" ? null : item.itemShippingCost,
@@ -686,7 +694,7 @@ function IncomingPageInner() {
                   <PopoverTrigger
                     className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-md border border-border shrink-0 transition-colors",
-                      statusFilter.length < Object.keys(statusLabels).length ? "bg-primary/10 text-primary border-[#3ECF8E]/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      statusFilter.length < Object.keys(statusLabels).length ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
                   >
                     <SlidersHorizontal className="size-3.5" />
@@ -704,7 +712,7 @@ function IncomingPageInner() {
                           )}
                           onClick={() => setStatusFilter(prev => checked ? prev.filter((s) => s !== key) : [...prev, key])}
                         >
-                          <div className={cn("h-3.5 w-3.5 rounded border flex items-center justify-center", checked ? "bg-primary border-[#3ECF8E]" : "border-[#555]")}>
+                          <div className={cn("h-3.5 w-3.5 rounded border flex items-center justify-center", checked ? "bg-primary border-primary" : "border-input")}>
                             {checked && <Check className="size-2.5 text-foreground" />}
                           </div>
                           <Badge variant={statusVariants[key]} className="text-[10px]">{label}</Badge>

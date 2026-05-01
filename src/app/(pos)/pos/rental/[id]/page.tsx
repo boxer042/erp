@@ -8,6 +8,8 @@ import { ChevronLeft, Loader2, Plus, Trash2 } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface ExtraItem {
   productId: string;
@@ -300,9 +302,9 @@ export default function RentalDetailPage() {
                   ₩{((parseFloat(extraForm.quantity) || 0) * (parseFloat(parseComma(extraForm.unitPrice)) || 0)).toLocaleString("ko-KR")}
                 </td>
                 <td>
-                  <button onClick={addExtraItem} className="flex h-9 items-center gap-1 rounded-md border border-primary px-3 text-xs font-semibold text-primary hover:bg-primary/5">
+                  <Button onClick={addExtraItem} size="sm" variant="outline">
                     <Plus className="h-3 w-3" /> 담기
-                  </button>
+                  </Button>
                 </td>
               </tr>
             </tbody>
@@ -352,67 +354,60 @@ export default function RentalDetailPage() {
         </div>
       ) : null}
 
-      {/* 반납 다이얼로그 */}
-      {returnDialog ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setReturnDialog(false)}>
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="mb-4 text-lg font-semibold">반납 처리</h2>
+      <Dialog open={returnDialog} onOpenChange={setReturnDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>반납 처리</DialogTitle>
+          </DialogHeader>
 
-            <div className="mb-4 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">임대비</span><span>₩{Number(rental.finalAmount).toLocaleString("ko-KR")}</span></div>
-              {extraItems.length > 0 ? (
-                <div className="flex justify-between text-primary/80">
-                  <span>추가 판매 ({extraItems.length}건)</span>
-                  <span>₩{extraTotal.toLocaleString("ko-KR")}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                <span>합계</span>
-                <span className="text-xl">₩{(Number(rental.finalAmount) + extraTotal).toLocaleString("ko-KR")}</span>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">임대비</span><span>₩{Number(rental.finalAmount).toLocaleString("ko-KR")}</span></div>
+            {extraItems.length > 0 ? (
+              <div className="flex justify-between text-primary/80">
+                <span>추가 판매 ({extraItems.length}건)</span>
+                <span>₩{extraTotal.toLocaleString("ko-KR")}</span>
               </div>
-            </div>
-
-            <div className="mb-4">
-              <div className="mb-2 text-sm font-medium">결제수단</div>
-              <div className="grid grid-cols-2 gap-2">
-                {RETURN_PAYMENTS.map((pm) => (
-                  <button
-                    key={pm}
-                    onClick={() => setReturnPayment(pm)}
-                    className={`h-10 rounded-md border text-sm font-medium ${returnPayment === pm ? "border-primary bg-primary/10 text-primary/80" : "border-border hover:bg-muted/50"}`}
-                  >
-                    {PAYMENT_LABEL[pm]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {Number(rental.depositAmount) > 0 ? (
-              <label className="mb-5 flex cursor-pointer items-center gap-2 text-sm">
-                <Checkbox
-                  checked={depositReturned}
-                  onCheckedChange={(c) => setDepositReturned(c === true)}
-                />
-                보증금 환급 (₩{Number(rental.depositAmount).toLocaleString("ko-KR")})
-              </label>
             ) : null}
-
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setReturnDialog(false)} className="h-10 rounded-md border border-border px-4 text-sm hover:bg-muted/50">
-                취소
-              </button>
-              <button
-                onClick={doReturn}
-                disabled={doingReturn}
-                className="flex h-10 items-center gap-1 rounded-md bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {doingReturn ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                확정
-              </button>
+            <div className="flex justify-between border-t border-border pt-2 font-semibold">
+              <span>합계</span>
+              <span className="text-xl">₩{(Number(rental.finalAmount) + extraTotal).toLocaleString("ko-KR")}</span>
             </div>
           </div>
-        </div>
-      ) : null}
+
+          <div>
+            <div className="mb-2 text-sm font-medium">결제수단</div>
+            <div className="grid grid-cols-2 gap-2">
+              {RETURN_PAYMENTS.map((pm) => (
+                <button
+                  key={pm}
+                  onClick={() => setReturnPayment(pm)}
+                  className={`h-10 rounded-md border text-sm font-medium ${returnPayment === pm ? "border-primary bg-primary/10 text-primary/80" : "border-border hover:bg-muted/50"}`}
+                >
+                  {PAYMENT_LABEL[pm]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {Number(rental.depositAmount) > 0 ? (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                checked={depositReturned}
+                onCheckedChange={(c) => setDepositReturned(c === true)}
+              />
+              보증금 환급 (₩{Number(rental.depositAmount).toLocaleString("ko-KR")})
+            </label>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReturnDialog(false)}>취소</Button>
+            <Button onClick={doReturn} disabled={doingReturn}>
+              {doingReturn ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              확정
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <style jsx>{`
         :global(.input) {

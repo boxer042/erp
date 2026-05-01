@@ -659,7 +659,7 @@ export default function ExpensesPage() {
                   className={cn(
                     "px-2 h-6 rounded text-[11px] border transition-colors",
                     active
-                      ? "bg-primary/10 border-[#3ECF8E]/40 text-primary"
+                      ? "bg-primary/10 border-primary/40 text-primary"
                       : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >

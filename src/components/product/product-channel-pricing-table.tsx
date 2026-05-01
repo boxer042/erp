@@ -33,6 +33,8 @@ interface ProductChannelPricingTableProps {
   onSaveSellingPriceFromVat: (next: string) => Promise<void>;
   /** 캐시 invalidate 용 */
   productId: string;
+  /** 오프라인 카드수수료율 (예: 0.004) */
+  cardFeeRate?: number;
 }
 
 export function ProductChannelPricingTable({
@@ -49,9 +51,14 @@ export function ProductChannelPricingTable({
   onSaveListPriceFromVat,
   onSaveSellingPriceFromVat,
   productId,
+  cardFeeRate = 0,
 }: ProductChannelPricingTableProps) {
   // 오프라인 가상 행 — 항상 첫 행. baseSellingPrice 가 0 이면 행도 생략하지 않음 (베이스라인 의미).
-  const offlineMargin = Math.round(baseSellingPrice - baseInboundCost);
+  // 카드수수료 = 판매가(VAT포함) × 카드수수료율
+  const offlineCardFee = sellingPriceVat * cardFeeRate;
+  const offlineMargin = Math.round(
+    baseSellingPrice - baseInboundCost - globalCostTotal - offlineCardFee,
+  );
   const offlineMarginRate = baseSellingPrice > 0 ? (offlineMargin / baseSellingPrice) * 100 : null;
 
   return (
@@ -113,7 +120,11 @@ export function ProductChannelPricingTable({
                 commaFormat
               />
             </TableCell>
-            <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">—</TableCell>
+            <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">
+              {cardFeeRate > 0
+                ? `카드수수료 ₩${fmtPrice(Math.round(offlineCardFee))} (${(cardFeeRate * 100).toFixed(2)}%)`
+                : "—"}
+            </TableCell>
             <TableCell className="px-3 py-2.5 text-right">
               <div
                 className={`tabular-nums font-medium ${

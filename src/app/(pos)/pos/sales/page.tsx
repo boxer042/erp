@@ -15,6 +15,8 @@ import {
 } from "@/components/product";
 import type { ProductDetail } from "@/components/product/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   calcDiscountPerUnit,
   formatDiscountDisplay,
@@ -586,30 +588,20 @@ export default function SalesPage() {
         }}
       />
 
-      {/* 수리 기기 정보 입력 Sheet */}
-      {repairSheetOpen && pendingRepairItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setRepairSheetOpen(false)} />
-          <div className="relative z-10 w-full max-w-lg rounded-2xl bg-background shadow-2xl mx-4">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <div className="font-semibold">
-                  {pendingRepairItem.isFreeForm ? "수리 항목 직접 입력" : pendingRepairItem.name}
-                </div>
-                {!pendingRepairItem.isFreeForm && (
-                  <div className="text-sm text-muted-foreground">
-                    ₩{Math.round(pendingRepairItem.unitPrice * 1.1).toLocaleString("ko-KR")}
-                  </div>
-                )}
+      <Dialog open={repairSheetOpen && !!pendingRepairItem} onOpenChange={(o) => !o && setRepairSheetOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingRepairItem?.isFreeForm ? "수리 항목 직접 입력" : pendingRepairItem?.name}
+            </DialogTitle>
+            {pendingRepairItem && !pendingRepairItem.isFreeForm && (
+              <div className="text-sm text-muted-foreground">
+                ₩{Math.round(pendingRepairItem.unitPrice * 1.1).toLocaleString("ko-KR")}
               </div>
-              <button
-                onClick={() => setRepairSheetOpen(false)}
-                className="flex size-8 items-center justify-center rounded-full hover:bg-muted"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="space-y-4 p-5">
+            )}
+          </DialogHeader>
+          {pendingRepairItem && (
+            <div className="space-y-4">
               {pendingRepairItem.isFreeForm && (
                 <>
                   <div>
@@ -672,23 +664,13 @@ export default function SalesPage() {
                 />
               </div>
             </div>
-            <div className="flex gap-2 border-t border-border px-5 py-4">
-              <button
-                onClick={() => setRepairSheetOpen(false)}
-                className="h-11 flex-1 rounded-lg border border-border text-sm font-medium hover:bg-muted/50"
-              >
-                취소
-              </button>
-              <button
-                onClick={confirmRepairAdd}
-                className="h-11 flex-1 rounded-lg bg-primary text-sm font-semibold text-white hover:bg-primary/90"
-              >
-                장바구니 담기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRepairSheetOpen(false)}>취소</Button>
+            <Button onClick={confirmRepairAdd}>장바구니 담기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -729,18 +711,13 @@ function ProductDetailModal({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  if (!productId) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl bg-background shadow-2xl sm:mx-4 sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <span className="text-sm font-medium text-muted-foreground">상품 상세</span>
-          <button onClick={onClose} className="flex size-8 items-center justify-center rounded-full hover:bg-muted">
-            <X className="size-4" />
-          </button>
-        </div>
+    <Sheet open={!!productId} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="bottom" className="h-[92vh] p-0 flex flex-col">
+        <SheetHeader className="border-b border-border px-5 py-3 flex-shrink-0">
+          <SheetTitle className="text-sm font-medium text-muted-foreground">상품 상세</SheetTitle>
+          <SheetDescription className="sr-only">선택한 상품의 상세 정보</SheetDescription>
+        </SheetHeader>
 
         {showLoading || !detail ? (
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -781,8 +758,8 @@ function ProductDetailModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

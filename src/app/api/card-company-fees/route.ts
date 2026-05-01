@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guardAdmin } from "@/lib/api-auth";
 import { cardCompanyFeeSchema } from "@/lib/validators/card-company-fee";
+import { recomputeCurrentCardFeeRate } from "@/lib/card-fee-rate-helper";
 
 export async function GET() {
   const [merchant, items] = await Promise.all([
@@ -30,18 +31,22 @@ export async function POST(request: NextRequest) {
   });
   const nextSort = d.sortOrder ?? (last ? last.sortOrder + 1 : 0);
 
-  const created = await prisma.cardCompanyFee.create({
-    data: {
-      companyName: d.companyName,
-      merchantNo: d.merchantNo ?? null,
-      settlementBank: d.settlementBank ?? null,
-      settlementAccount: d.settlementAccount ?? null,
-      creditRate: d.creditRate,
-      checkBankRate: d.checkBankRate ?? null,
-      checkSpecialRate: d.checkSpecialRate ?? null,
-      paymentDays: d.paymentDays ?? null,
-      sortOrder: nextSort,
-    },
+  const created = await prisma.$transaction(async (tx) => {
+    const row = await tx.cardCompanyFee.create({
+      data: {
+        companyName: d.companyName,
+        merchantNo: d.merchantNo ?? null,
+        settlementBank: d.settlementBank ?? null,
+        settlementAccount: d.settlementAccount ?? null,
+        creditRate: d.creditRate,
+        checkBankRate: d.checkBankRate ?? null,
+        checkSpecialRate: d.checkSpecialRate ?? null,
+        paymentDays: d.paymentDays ?? null,
+        sortOrder: nextSort,
+      },
+    });
+    await recomputeCurrentCardFeeRate(tx);
+    return row;
   });
 
   return NextResponse.json(created, { status: 201 });

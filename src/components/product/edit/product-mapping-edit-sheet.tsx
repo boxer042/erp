@@ -162,7 +162,7 @@ function ProductMappingEditSheetContent({
 
   return (
     <>
-      <SheetContent side="right" className="w-full sm:max-w-3xl p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
         <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
           <SheetTitle>공급자 매핑 편집</SheetTitle>
           <SheetDescription className="text-xs">

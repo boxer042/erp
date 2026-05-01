@@ -122,7 +122,7 @@ function ProductSetComponentsEditSheetContent({
   const products = productsQuery.data ?? [];
 
   return (
-    <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+    <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
       <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
         <SheetTitle>
           {product.productType === "ASSEMBLED" ? "조립" : "세트"} 구성품 편집

@@ -129,7 +129,7 @@ function ProductCostsEditSheetContent({
   const title = channelId ? `${channelName ?? "채널"} 전용 판매비용` : "전사 판매비용";
 
   return (
-    <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+    <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
       <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
         <SheetTitle>{title} 편집</SheetTitle>
         <SheetDescription className="text-xs">

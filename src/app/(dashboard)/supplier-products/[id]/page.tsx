@@ -11,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
 import { ArrowLeft, Pencil, Plus, Trash2, Loader2 } from "lucide-react";
+import Loading from "./loading";
 import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
 import { computeUnitCost } from "@/lib/cost-utils";
@@ -226,13 +227,7 @@ export default function SupplierProductDetailPage() {
     await fetchProduct();
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (loading) return <Loading />;
 
   if (!product) {
     return (

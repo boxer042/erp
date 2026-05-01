@@ -85,7 +85,7 @@ export default function ApprovePage() {
   if (done || data.approvedAt) {
     return (
       <div className="mx-auto max-w-md p-8">
-        <div className="rounded-xl border border-[#3ECF8E] bg-primary/10 p-6 text-center text-primary/80">
+        <div className="rounded-xl border border-primary bg-primary/10 p-6 text-center text-primary/80">
           ✓ 승인이 완료되었습니다.
           <div className="mt-2 text-sm">수리 번호 {data.ticketNo}</div>
         </div>

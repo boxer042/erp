@@ -123,7 +123,7 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
               </Badge>
             )}
             {isNew && pendingSourceRow === undefined && (
-              <Badge variant="outline" className="text-[10px] text-primary border-[#3ECF8E]/40 shrink-0">신규</Badge>
+              <Badge variant="outline" className="text-[10px] text-primary border-primary/40 shrink-0">신규</Badge>
             )}
           </span>
         ) : (

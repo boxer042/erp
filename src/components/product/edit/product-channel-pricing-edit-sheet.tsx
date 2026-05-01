@@ -144,7 +144,7 @@ function ProductChannelPricingEditSheetContent({
 
   return (
     <>
-      <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
         <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
           <SheetTitle>채널별 가격 편집</SheetTitle>
           <SheetDescription className="text-xs">
