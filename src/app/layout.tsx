@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
@@ -27,12 +27,6 @@ const pretendard = localFont({
 export const metadata: Metadata = {
   title: "JAEWOOMADE ERP",
   description: "소규모 사업자를 위한 통합 JAEWOOMADE ERP",
-};
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({
