@@ -1312,7 +1312,7 @@ export default function ExpensesPage() {
 
       {/* ── 입고 상세 모달 ── */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-5xl max-h-[90dvh] flex flex-col p-0">
           <DialogHeader className="px-5 py-4 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-2">
               <DialogTitle>

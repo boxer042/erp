@@ -444,7 +444,7 @@ export default function RepairServicesPage() {
 
       {/* ── 공임 프리셋 Sheet ── */}
       <Sheet open={presetSheet} onOpenChange={setPresetSheet}>
-        <SheetContent side="bottom" className="flex h-[90vh] flex-col p-0">
+        <SheetContent side="bottom" className="flex h-[90dvh] flex-col p-0">
           <SheetHeader className="border-b border-border px-5 py-4">
             <SheetTitle>{presetEdit ? "공임 수정" : "공임 프리셋 추가"}</SheetTitle>
           </SheetHeader>
@@ -483,7 +483,7 @@ export default function RepairServicesPage() {
 
       {/* ── 수리 패키지 Sheet ── */}
       <Sheet open={pkgSheet} onOpenChange={setPkgSheet}>
-        <SheetContent side="bottom" className="flex h-[90vh] flex-col p-0">
+        <SheetContent side="bottom" className="flex h-[90dvh] flex-col p-0">
           <SheetHeader className="border-b border-border px-5 py-4">
             <SheetTitle>{pkgEdit ? "패키지 수정" : "수리 패키지 추가"}</SheetTitle>
           </SheetHeader>

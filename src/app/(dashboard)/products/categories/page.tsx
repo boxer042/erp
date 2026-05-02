@@ -350,7 +350,7 @@ export default function CategoriesPage() {
 
       {/* 등록/수정 Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
+        <SheetContent side="bottom" className="h-[90dvh] p-0 flex flex-col">
           <SheetHeader className="border-b border-border px-5 py-4 shrink-0">
             <SheetTitle>
               {editId ? "카테고리 수정" : editTarget.type === "child" ? "소분류 등록" : "대분류 등록"}

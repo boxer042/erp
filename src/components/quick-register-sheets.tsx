@@ -167,7 +167,7 @@ export function QuickSupplierSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90dvh]! p-0 flex flex-col">
         <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
           <SheetTitle>{isEdit ? "거래처 수정" : "거래처 등록"}</SheetTitle>
           <SheetDescription className="sr-only">{isEdit ? "거래처를 수정합니다" : "새 거래처를 등록합니다"}</SheetDescription>
@@ -380,7 +380,7 @@ export function QuickSupplierProductSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90dvh]! p-0 flex flex-col">
         <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
           <SheetTitle>공급상품 등록</SheetTitle>
           <SheetDescription>거래처: <strong>{supplierName}</strong></SheetDescription>
@@ -538,7 +538,7 @@ export function QuickCustomerSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90dvh]! p-0 flex flex-col">
         <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
           <SheetTitle>{isEdit ? "고객 수정" : "고객 등록"}</SheetTitle>
           <SheetDescription className="sr-only">{isEdit ? "고객 정보를 수정합니다" : "새 고객을 등록합니다"}</SheetDescription>
@@ -635,7 +635,7 @@ export function QuickBrandSheet({ open, onOpenChange, defaultName = "", onCreate
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90dvh]! p-0 flex flex-col">
         <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
           <SheetTitle>브랜드 등록</SheetTitle>
           <SheetDescription className="sr-only">새 브랜드를 등록합니다</SheetDescription>
