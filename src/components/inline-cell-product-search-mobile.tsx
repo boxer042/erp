@@ -135,7 +135,11 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
         )}
       </button>
 
-      <Drawer open={open} onOpenChange={(v) => { if (!v) setSearch(""); setOpen(v); }}>
+      <Drawer
+        open={open}
+        onOpenChange={(v) => { if (!v) setSearch(""); setOpen(v); }}
+        repositionInputs={isPhoneSize}
+      >
         <DrawerContent
           className={cn(
             "flex flex-col",
