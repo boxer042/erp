@@ -16,11 +16,18 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const supplierId = searchParams.get("supplierId");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+
+  const incomingDateFilter: { gte?: Date; lt?: Date } = {};
+  if (from) incomingDateFilter.gte = new Date(from);
+  if (to) incomingDateFilter.lt = new Date(to);
 
   const incomings = await prisma.incoming.findMany({
     where: {
       ...(status ? { status: status as "PENDING" | "CONFIRMED" | "CANCELLED" } : {}),
       ...(supplierId ? { supplierId } : {}),
+      ...(from || to ? { incomingDate: incomingDateFilter } : {}),
     },
     include: {
       supplier: { select: { name: true } },
@@ -29,17 +36,23 @@ export async function GET(request: NextRequest) {
       items: {
         select: {
           id: true,
+          quantity: true,
+          unitPrice: true,
+          memo: true,
           supplierProduct: {
             select: {
               id: true,
               name: true,
+              supplierCode: true,
+              unitPrice: true,
+              unitOfMeasure: true,
               _count: { select: { productMappings: true } },
             },
           },
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { incomingDate: "desc" },
   });
 
   return NextResponse.json(incomings);

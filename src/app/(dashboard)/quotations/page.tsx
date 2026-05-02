@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -73,26 +76,49 @@ const STATUS_VARIANT: Record<QuotationStatus, "default" | "secondary" | "destruc
   CONVERTED: "default",
 };
 
+interface QuotationDetail {
+  id: string;
+  type: QuotationType;
+  status: QuotationStatus;
+  issueDate: string;
+  validUntil: string | null;
+  customerId: string | null;
+  supplierId: string | null;
+  title: string | null;
+  memo: string | null;
+  terms: string | null;
+  items: Array<{
+    productId: string | null;
+    supplierProductId: string | null;
+    name: string;
+    spec: string | null;
+    unitOfMeasure: string;
+    quantity: string;
+    listPrice: string;
+    discountAmount: string;
+    unitPrice: string;
+    isTaxable: boolean;
+    isZeroRateEligible?: boolean;
+    memo: string | null;
+  }>;
+}
+
 export default function QuotationsPage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<QuotationType>("SALES");
-  const [quotations, setQuotations] = useState<QuotationRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editData, setEditData] = useState<QuotationFormData | null>(null);
   const [printDialogId, setPrintDialogId] = useState<string | null>(null);
 
-  const fetchQuotations = async (t: QuotationType = tab, q = search) => {
-    setLoading(true);
-    const res = await fetch(`/api/quotations?type=${t}&search=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    setQuotations(data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchQuotations(tab);
-  }, [tab]);
+  const quotationsQuery = useQuery({
+    queryKey: queryKeys.quotations.list({ type: tab, search: appliedSearch }),
+    queryFn: () => apiGet<QuotationRow[]>(`/api/quotations?type=${tab}&search=${encodeURIComponent(appliedSearch)}`),
+  });
+  const quotations = quotationsQuery.data ?? [];
+  const loading = quotationsQuery.isPending;
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.quotations.all });
 
   const openCreate = () => {
     setEditData(null);
@@ -100,9 +126,13 @@ export default function QuotationsPage() {
   };
 
   const openEdit = async (row: QuotationRow) => {
-    const res = await fetch(`/api/quotations/${row.id}`);
-    if (!res.ok) return toast.error("견적서 정보를 불러오지 못했습니다");
-    const q = await res.json();
+    let q: QuotationDetail;
+    try {
+      q = await apiGet<QuotationDetail>(`/api/quotations/${row.id}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "견적서 정보를 불러오지 못했습니다");
+      return;
+    }
     setEditData({
       id: q.id,
       type: q.type,
@@ -114,19 +144,7 @@ export default function QuotationsPage() {
       title: q.title || "",
       memo: q.memo || "",
       terms: q.terms || "",
-      items: q.items.map((it: {
-        productId: string | null;
-        supplierProductId: string | null;
-        name: string;
-        spec: string | null;
-        unitOfMeasure: string;
-        quantity: string;
-        listPrice: string;
-        discountAmount: string;
-        unitPrice: string;
-        isTaxable: boolean;
-        memo: string | null;
-      }) => ({
+      items: q.items.map((it) => ({
         rowType: (it.productId || it.supplierProductId) ? ("product" as const) : ("free" as const),
         productId: it.productId,
         supplierProductId: it.supplierProductId,
@@ -138,18 +156,25 @@ export default function QuotationsPage() {
         unitPrice: parseFloat(it.listPrice) > 0 ? it.listPrice : it.unitPrice,
         discount: parseFloat(it.discountAmount) > 0 ? it.discountAmount : "",
         isTaxable: it.isTaxable,
+        isZeroRateEligible: it.isZeroRateEligible ?? false,
         memo: it.memo || "",
       })),
     });
     setSheetOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/quotations/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("견적서가 삭제되었습니다");
+      refresh();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+  });
+
+  const handleDelete = (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-    const res = await fetch(`/api/quotations/${id}`, { method: "DELETE" });
-    if (!res.ok) return toast.error("삭제에 실패했습니다");
-    toast.success("견적서가 삭제되었습니다");
-    fetchQuotations();
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -175,10 +200,10 @@ export default function QuotationsPage() {
           search={{
             value: search,
             onChange: setSearch,
-            onSearch: () => fetchQuotations(tab, search),
+            onSearch: () => setAppliedSearch(search),
             placeholder: "견적번호 / 제목 / 상대방 검색",
           }}
-          onRefresh={() => fetchQuotations(tab, search)}
+          onRefresh={refresh}
           onAdd={openCreate}
           addLabel="견적서 작성"
           loading={loading}
@@ -243,7 +268,7 @@ export default function QuotationsPage() {
         type={tab}
         editData={editData}
         onSaved={(id) => {
-          fetchQuotations(tab, search);
+          refresh();
           if (id) setPrintDialogId(id);
         }}
       />

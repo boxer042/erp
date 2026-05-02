@@ -11,7 +11,7 @@ import {
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose,
 } from "@/components/ui/drawer";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsCompactDevice } from "@/hooks/use-mobile";
 import { ChevronsUpDown, CornerDownLeft, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +52,7 @@ export function ResponsiveCombobox<T>({
   onClear,
   disabled = false,
 }: ResponsiveComboboxProps<T>) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsCompactDevice();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const mobileInputRef = useRef<HTMLInputElement>(null);

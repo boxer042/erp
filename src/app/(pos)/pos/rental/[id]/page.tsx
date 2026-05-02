@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
@@ -10,6 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 interface ExtraItem {
   productId: string;
@@ -67,9 +74,7 @@ type ReturnPayment = typeof RETURN_PAYMENTS[number];
 export default function RentalDetailPage() {
   const params = useParams();
   const id = params?.id as string;
-  const [rental, setRental] = useState<Rental | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [products, setProducts] = useState<{ id: string; name: string; sku: string; sellingPrice: string }[]>([]);
+  const queryClient = useQueryClient();
 
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [extraForm, setExtraForm] = useState({ productId: "", quantity: "1", unitPrice: "0" });
@@ -79,29 +84,50 @@ export default function RentalDetailPage() {
   const [depositReturned, setDepositReturned] = useState(false);
   const [doingReturn, setDoingReturn] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch(`/api/rentals/${id}`);
-    if (res.ok) setRental(await res.json());
-    setLoading(false);
-  }, [id]);
+  const rentalQuery = useQuery({
+    queryKey: queryKeys.rentals.detail(id),
+    queryFn: () => apiGet<Rental>(`/api/rentals/${id}`),
+    enabled: !!id,
+  });
+  const rental = rentalQuery.data ?? null;
+  const loading = rentalQuery.isPending;
+  const load = () => queryClient.invalidateQueries({ queryKey: queryKeys.rentals.detail(id) });
 
-  useEffect(() => {
-    load();
-    fetch("/api/products").then((r) => r.ok ? r.json() : []).then((d) => {
-      setProducts(Array.isArray(d) ? d : d.items ?? []);
-    });
-  }, [load]);
+  type ProductLite = { id: string; name: string; sku: string; sellingPrice: string };
+  const productsQuery = useQuery({
+    queryKey: queryKeys.products.list({ scope: "rental-detail" }),
+    queryFn: async () => {
+      const d = await apiGet<ProductLite[] | { items: ProductLite[] }>("/api/products");
+      return Array.isArray(d) ? d : d.items ?? [];
+    },
+  });
+  const products = productsQuery.data ?? [];
 
   if (loading || !rental) {
     return (
-      <div className="p-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8 rounded-md" />
-          <Skeleton className="h-6 w-40" />
+      <div className="mx-auto max-w-3xl p-6">
+        <Skeleton className="mb-4 h-5 w-24" />
+        <div className="mb-6 rounded-xl border border-border bg-background p-5">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-5 w-12 rounded-md" />
+          </div>
+          <Skeleton className="mt-3 h-4 w-48" />
         </div>
-        <Skeleton className="h-32 w-full rounded-md" />
-        <Skeleton className="h-48 w-full rounded-md" />
+        {[
+          { titleW: "w-12", lines: 2 },
+          { titleW: "w-12", lines: 2 },
+          { titleW: "w-12", lines: 4 },
+        ].map((s, i) => (
+          <div key={i} className="mb-4 rounded-xl border border-border bg-background p-5">
+            <Skeleton className={`mb-3 h-4 ${s.titleW}`} />
+            <div className="space-y-2">
+              {Array.from({ length: s.lines }).map((_, j) => (
+                <Skeleton key={j} className="h-4 w-full" />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -119,13 +145,12 @@ export default function RentalDetailPage() {
   };
 
   const doReturn = async () => {
+    if (!rental) return;
     setDoingReturn(true);
     try {
       if (extraItems.length > 0) {
-        const res = await fetch("/api/pos/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          await apiMutate("/api/pos/checkout", "POST", {
             action: "order",
             rentalId: rental.id,
             customerId: rental.customer.id,
@@ -137,27 +162,22 @@ export default function RentalDetailPage() {
               unitPrice: i.unitPrice,
               discountPerUnit: 0,
             })),
-          }),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d?.error ?? "추가 상품 결제 실패");
+          });
+        } catch (err) {
+          throw new Error(err instanceof ApiError ? err.message : "추가 상품 결제 실패");
         }
       }
 
-      const res = await fetch(`/api/rentals/${id}/return`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: returnPayment, depositReturned }),
+      const data = await apiMutate<{ finalAmount: string }>(`/api/rentals/${id}/return`, "POST", {
+        paymentMethod: returnPayment,
+        depositReturned,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "반납 실패");
       toast.success(`반납 완료 (최종 ₩${Number(data.finalAmount).toLocaleString("ko-KR")})`);
       setReturnDialog(false);
       setExtraItems([]);
       load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "실패");
+      toast.error(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "실패");
     } finally {
       setDoingReturn(false);
     }
@@ -273,26 +293,32 @@ export default function RentalDetailPage() {
               ))}
               <tr>
                 <td className="p-2">
-                  <select
-                    className="input h-9"
-                    value={extraForm.productId}
-                    onChange={(e) => {
-                      const prod = products.find((p) => p.id === e.target.value);
-                      setExtraForm({ ...extraForm, productId: e.target.value, unitPrice: prod?.sellingPrice ?? "0" });
+                  <Select
+                    value={extraForm.productId || "__none"}
+                    onValueChange={(v) => {
+                      const id = !v || v === "__none" ? "" : v;
+                      const prod = products.find((p) => p.id === id);
+                      setExtraForm({ ...extraForm, productId: id, unitPrice: prod?.sellingPrice ?? "0" });
                     }}
                   >
-                    <option value="">상품 선택...</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="상품 선택..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">상품 선택...</SelectItem>
+                      {products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name} ({p.sku})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="p-2 text-right">
-                  <input className="input h-9 w-16 text-right" value={extraForm.quantity} onChange={(e) => setExtraForm({ ...extraForm, quantity: e.target.value })} />
+                  <Input className="h-9 w-16 text-right" inputMode="numeric" value={extraForm.quantity} onChange={(e) => setExtraForm({ ...extraForm, quantity: e.target.value })} />
                 </td>
                 <td className="p-2 text-right">
-                  <input
-                    className="input h-9 w-28 text-right"
+                  <Input
+                    className="h-9 w-28 text-right"
+                    inputMode="numeric"
                     value={formatComma(extraForm.unitPrice)}
                     onChange={(e) => setExtraForm({ ...extraForm, unitPrice: parseComma(e.target.value) })}
                     onFocus={(e) => e.currentTarget.select()}
@@ -408,23 +434,6 @@ export default function RentalDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <style jsx>{`
-        :global(.input) {
-          display: block;
-          width: 100%;
-          border-radius: 0.5rem;
-          border: 1px solid var(--border);
-          padding: 0.5rem 0.75rem;
-          font-size: 0.9rem;
-          outline: none;
-          background: var(--background);
-          color: var(--foreground);
-        }
-        :global(.input:focus) {
-          border-color: var(--primary);
-        }
-      `}</style>
     </div>
   );
 }

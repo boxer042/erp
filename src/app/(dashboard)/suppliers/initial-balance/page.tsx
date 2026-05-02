@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -65,30 +68,26 @@ function emptyRow(): EntryForm {
 }
 
 export default function InitialBalancePage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<"register" | "history">("register");
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [entries, setEntries] = useState<EntryForm[]>([emptyRow()]);
-  const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [duplicateIds, setDuplicateIds] = useState<Set<string>>(new Set());
 
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const suppliersQuery = useQuery({
+    queryKey: queryKeys.suppliers.list(),
+    queryFn: () => apiGet<Supplier[]>("/api/suppliers"),
+  });
+  const suppliers = suppliersQuery.data ?? [];
 
-  const fetchSuppliers = useCallback(async () => {
-    const res = await fetch("/api/suppliers");
-    if (res.ok) setSuppliers(await res.json());
-  }, []);
-
-  const fetchHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    const res = await fetch("/api/suppliers/initial-balance");
-    if (res.ok) setHistoryItems(await res.json());
-    setHistoryLoading(false);
-  }, []);
-
-  useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
-  useEffect(() => { if (tab === "history") fetchHistory(); }, [tab, fetchHistory]);
+  const historyQuery = useQuery({
+    queryKey: ["suppliers", "initial-balance"],
+    queryFn: () => apiGet<HistoryItem[]>("/api/suppliers/initial-balance"),
+    enabled: tab === "history",
+  });
+  const historyItems = historyQuery.data ?? [];
+  const historyLoading = historyQuery.isPending && tab === "history";
+  const refreshHistory = () => queryClient.invalidateQueries({ queryKey: ["suppliers", "initial-balance"] });
 
   const setEntry = (idx: number, updates: Partial<EntryForm>) => {
     setEntries((prev) => prev.map((e, i) => i === idx ? { ...e, ...updates } : e));
@@ -120,51 +119,40 @@ export default function InitialBalancePage() {
   const validEntries = entries.filter((e) => e.supplierId && parseFloat(e.amount || "0") > 0);
   const totalAmount = validEntries.reduce((s, e) => s + parseFloat(e.amount || "0"), 0);
 
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    try {
+  const submitMutation = useMutation({
+    mutationFn: () => {
       const payload = validEntries.map((e) => ({
         supplierId: e.supplierId,
         amount: e.amount,
         date: e.date || undefined,
         memo: e.memo || undefined,
       }));
-
-      if (payload.length === 0) {
-        toast.error("등록할 항목이 없습니다");
-        return;
-      }
-
-      const res = await fetch("/api/suppliers/initial-balance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries: payload }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        if (res.status === 409 && Array.isArray(err?.duplicates)) {
-          const ids = new Set<string>(err.duplicates.map((d: { supplierId: string }) => d.supplierId));
-          setDuplicateIds(ids);
-          setConfirmOpen(false);
-          toast.error(`${err.duplicates.length}건 중복 — 강조된 행을 제거해주세요`);
-          return;
-        }
-        toast.error(typeof err?.error === "string" ? err.error : "등록 실패");
-        return;
-      }
-
-      const result = await res.json();
+      if (payload.length === 0) throw new Error("등록할 항목이 없습니다");
+      return apiMutate<{ count: number }>("/api/suppliers/initial-balance", "POST", { entries: payload });
+    },
+    onSuccess: (result) => {
       toast.success(`기초 미지급금 ${result.count}건 등록 완료`);
       setConfirmOpen(false);
       setDuplicateIds(new Set());
       setEntries([emptyRow()]);
-    } catch {
-      toast.error("오류가 발생했습니다");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      refreshHistory();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        const body = err.details as { duplicates?: Array<{ supplierId: string }> } | undefined;
+        if (body?.duplicates && Array.isArray(body.duplicates)) {
+          const ids = new Set<string>(body.duplicates.map((d) => d.supplierId));
+          setDuplicateIds(ids);
+          setConfirmOpen(false);
+          toast.error(`${body.duplicates.length}건 중복 — 강조된 행을 제거해주세요`);
+          return;
+        }
+      }
+      toast.error(err instanceof ApiError ? err.message : err.message || "등록 실패");
+    },
+  });
+  const submitting = submitMutation.isPending;
+  const handleSubmit = () => submitMutation.mutate();
 
   return (
     <>

@@ -9,6 +9,11 @@ import { formatComma, parseComma } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 interface ExtraItem {
   productId: string;
@@ -103,32 +108,52 @@ export default function RepairDetailPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/repair-tickets/${id}`);
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const data = await apiGet<Ticket>(`/api/repair-tickets/${id}`);
       setTicket(data);
       setDiagnosis(data.diagnosis ?? "");
       setRepairNotes(data.repairNotes ?? "");
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [id]);
 
   useEffect(() => {
     load();
-    fetch("/api/products?isBulk=all").then((r) => r.ok ? r.json() : []).then((d) => {
+    type ProductLite = { id: string; name: string; sku: string; sellingPrice: string };
+    apiGet<ProductLite[] | { items: ProductLite[] }>("/api/products?isBulk=all").then((d) => {
       setProducts(Array.isArray(d) ? d : d.items ?? []);
-    });
+    }).catch(() => {});
   }, [load]);
 
   if (loading || !ticket) {
     return (
-      <div className="p-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8 rounded-md" />
-          <Skeleton className="h-6 w-40" />
+      <div className="mx-auto max-w-3xl p-6">
+        <Skeleton className="mb-4 h-5 w-24" />
+        <div className="mb-6 rounded-xl border border-border bg-background p-5">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-5 w-12 rounded-md" />
+          </div>
+          <Skeleton className="mt-3 h-4 w-48" />
         </div>
-        <Skeleton className="h-32 w-full rounded-md" />
-        <Skeleton className="h-48 w-full rounded-md" />
+        {[
+          { titleW: "w-16", lines: 2 },
+          { titleW: "w-12", lines: 3 },
+          { titleW: "w-16", lines: 4 },
+          { titleW: "w-16", lines: 3 },
+        ].map((s, i) => (
+          <div key={i} className="mb-4 rounded-xl border border-border bg-background p-5">
+            <Skeleton className={`mb-3 h-4 ${s.titleW}`} />
+            <div className="space-y-2">
+              {Array.from({ length: s.lines }).map((_, j) => (
+                <Skeleton key={j} className="h-4 w-full" />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -136,13 +161,11 @@ export default function RepairDetailPage() {
   const saveDiagnosis = async () => {
     setSaving(true);
     try {
-      await fetch(`/api/repair-tickets/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ diagnosis, repairNotes }),
-      });
+      await apiMutate(`/api/repair-tickets/${id}`, "PUT", { diagnosis, repairNotes });
       toast.success("저장됐습니다");
       load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "저장 실패");
     } finally {
       setSaving(false);
     }
@@ -150,72 +173,72 @@ export default function RepairDetailPage() {
 
   const addPart = async () => {
     if (!partForm.productId) { toast.error("부품을 선택하세요"); return; }
-    const res = await fetch(`/api/repair-tickets/${id}/parts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await apiMutate(`/api/repair-tickets/${id}/parts`, "POST", {
         productId: partForm.productId,
         quantity: parseFloat(partForm.quantity) || 1,
         unitPrice: parseFloat(parseComma(partForm.unitPrice)) || 0,
-      }),
-    });
-    if (res.ok) {
+      });
       setPartForm({ productId: "", name: "", quantity: "1", unitPrice: "0" });
       load();
-    } else {
-      toast.error("부품 추가 실패");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "부품 추가 실패");
     }
   };
 
   const removePart = async (pid: string) => {
-    const res = await fetch(`/api/repair-tickets/${id}/parts/${pid}`, { method: "DELETE" });
-    if (res.ok) load();
-    else {
-      const data = await res.json();
-      toast.error(data?.error ?? "삭제 실패");
+    try {
+      await apiMutate(`/api/repair-tickets/${id}/parts/${pid}`, "DELETE");
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패");
     }
   };
 
   const addLabor = async () => {
     if (!laborForm.name.trim()) { toast.error("공임 항목명 필수"); return; }
-    const res = await fetch(`/api/repair-tickets/${id}/labors`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await apiMutate(`/api/repair-tickets/${id}/labors`, "POST", {
         name: laborForm.name.trim(),
         hours: parseFloat(laborForm.hours) || 1,
         unitRate: parseFloat(parseComma(laborForm.unitRate)) || 0,
-      }),
-    });
-    if (res.ok) {
+      });
       setLaborForm({ name: "", hours: "1", unitRate: "0" });
       load();
-    } else {
-      toast.error("공임 추가 실패");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "공임 추가 실패");
     }
   };
 
   const removeLabor = async (lid: string) => {
-    await fetch(`/api/repair-tickets/${id}/labors/${lid}`, { method: "DELETE" });
+    try {
+      await apiMutate(`/api/repair-tickets/${id}/labors/${lid}`, "DELETE");
+    } catch {
+      // ignore
+    }
     load();
   };
 
   const transition = async (action: string, body?: Record<string, unknown>) => {
-    const res = await fetch(`/api/repair-tickets/${id}/transition?action=${action}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body ?? {}),
-    });
-    const data = await res.json();
-    if (!res.ok) { toast.error(data?.error ?? "실패"); return null; }
-    load();
-    return data;
+    try {
+      const data = await apiMutate<Record<string, unknown>>(
+        `/api/repair-tickets/${id}/transition?action=${action}`,
+        "POST",
+        body ?? {},
+      );
+      load();
+      return data;
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "실패");
+      return null;
+    }
   };
 
   const requestApprovalLink = async () => {
     const data = await transition("request-approval");
-    if (data?.approvalUrl) {
-      await navigator.clipboard.writeText(data.approvalUrl);
+    const approvalUrl = (data as { approvalUrl?: string } | null)?.approvalUrl;
+    if (approvalUrl) {
+      await navigator.clipboard.writeText(approvalUrl);
       toast.success("승인 링크가 복사되었습니다");
     }
   };
@@ -233,13 +256,12 @@ export default function RepairDetailPage() {
   };
 
   const doPickup = async () => {
+    if (!ticket) return;
     setDoingPickup(true);
     try {
       if (extraItems.length > 0) {
-        const res = await fetch("/api/pos/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          await apiMutate("/api/pos/checkout", "POST", {
             action: "order",
             repairTicketId: ticket.id,
             customerId: ticket.customer.id,
@@ -251,11 +273,9 @@ export default function RepairDetailPage() {
               unitPrice: i.unitPrice,
               discountPerUnit: 0,
             })),
-          }),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d?.error ?? "추가 상품 결제 실패");
+          });
+        } catch (err) {
+          throw new Error(err instanceof ApiError ? err.message : "추가 상품 결제 실패");
         }
       }
       await transition("pickup", { paymentMethod: pickupPayment, finalAmount: total });
@@ -375,33 +395,39 @@ export default function RepairDetailPage() {
             {canEdit ? (
               <tr>
                 <td className="p-2">
-                  <select
-                    className="input h-9"
-                    value={partForm.productId}
-                    onChange={(e) => {
-                      const prod = products.find((p) => p.id === e.target.value);
-                      setPartForm({ ...partForm, productId: e.target.value, name: prod?.name ?? "", unitPrice: prod?.sellingPrice ?? "0" });
+                  <Select
+                    value={partForm.productId || "__none"}
+                    onValueChange={(v) => {
+                      const id = !v || v === "__none" ? "" : v;
+                      const prod = products.find((p) => p.id === id);
+                      setPartForm({ ...partForm, productId: id, name: prod?.name ?? "", unitPrice: prod?.sellingPrice ?? "0" });
                     }}
                   >
-                    <option value="">부품 선택...</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.sku}){p.isBulk ? ` · ${p.unitOfMeasure ?? "벌크"}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="부품 선택..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">부품 선택...</SelectItem>
+                      {products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} ({p.sku}){p.isBulk ? ` · ${p.unitOfMeasure ?? "벌크"}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="p-2 text-right">
-                  <input
-                    className="input h-9 w-20 text-right"
+                  <Input
+                    className="h-9 w-20 text-right"
                     inputMode={products.find((p) => p.id === partForm.productId)?.isBulk ? "decimal" : "numeric"}
                     value={partForm.quantity}
                     onChange={(e) => setPartForm({ ...partForm, quantity: e.target.value })}
                   />
                 </td>
                 <td className="p-2 text-right">
-                  <input
-                    className="input h-9 w-28 text-right"
+                  <Input
+                    className="h-9 w-28 text-right"
+                    inputMode="numeric"
                     value={formatComma(partForm.unitPrice)}
                     onChange={(e) => setPartForm({ ...partForm, unitPrice: parseComma(e.target.value) })}
                     onFocus={(e) => e.currentTarget.select()}
@@ -450,13 +476,13 @@ export default function RepairDetailPage() {
             {canEdit ? (
               <tr>
                 <td className="p-2">
-                  <input className="input h-9" placeholder="항목명" value={laborForm.name} onChange={(e) => setLaborForm({ ...laborForm, name: e.target.value })} />
+                  <Input className="h-9" placeholder="항목명" value={laborForm.name} onChange={(e) => setLaborForm({ ...laborForm, name: e.target.value })} />
                 </td>
                 <td className="p-2 text-right">
-                  <input className="input h-9 w-16 text-right" value={laborForm.hours} onChange={(e) => setLaborForm({ ...laborForm, hours: e.target.value })} />
+                  <Input className="h-9 w-16 text-right" inputMode="decimal" value={laborForm.hours} onChange={(e) => setLaborForm({ ...laborForm, hours: e.target.value })} />
                 </td>
                 <td className="p-2 text-right">
-                  <input className="input h-9 w-28 text-right" value={formatComma(laborForm.unitRate)} onChange={(e) => setLaborForm({ ...laborForm, unitRate: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
+                  <Input className="h-9 w-28 text-right" inputMode="numeric" value={formatComma(laborForm.unitRate)} onChange={(e) => setLaborForm({ ...laborForm, unitRate: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
                 </td>
                 <td className="p-2 text-right text-xs text-muted-foreground">
                   ₩{((parseFloat(laborForm.hours) || 0) * (parseFloat(parseComma(laborForm.unitRate)) || 0)).toLocaleString("ko-KR")}
@@ -502,26 +528,32 @@ export default function RepairDetailPage() {
               ))}
               <tr>
                 <td className="p-2">
-                  <select
-                    className="input h-9"
-                    value={extraForm.productId}
-                    onChange={(e) => {
-                      const prod = products.find((p) => p.id === e.target.value);
-                      setExtraForm({ ...extraForm, productId: e.target.value, unitPrice: prod?.sellingPrice ?? "0" });
+                  <Select
+                    value={extraForm.productId || "__none"}
+                    onValueChange={(v) => {
+                      const id = !v || v === "__none" ? "" : v;
+                      const prod = products.find((p) => p.id === id);
+                      setExtraForm({ ...extraForm, productId: id, unitPrice: prod?.sellingPrice ?? "0" });
                     }}
                   >
-                    <option value="">상품 선택...</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="상품 선택..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">상품 선택...</SelectItem>
+                      {products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name} ({p.sku})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="p-2 text-right">
-                  <input className="input h-9 w-16 text-right" value={extraForm.quantity} onChange={(e) => setExtraForm({ ...extraForm, quantity: e.target.value })} />
+                  <Input className="h-9 w-16 text-right" inputMode="numeric" value={extraForm.quantity} onChange={(e) => setExtraForm({ ...extraForm, quantity: e.target.value })} />
                 </td>
                 <td className="p-2 text-right">
-                  <input
-                    className="input h-9 w-28 text-right"
+                  <Input
+                    className="h-9 w-28 text-right"
+                    inputMode="numeric"
                     value={formatComma(extraForm.unitPrice)}
                     onChange={(e) => setExtraForm({ ...extraForm, unitPrice: parseComma(e.target.value) })}
                     onFocus={(e) => e.currentTarget.select()}
@@ -696,23 +728,6 @@ export default function RepairDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <style jsx>{`
-        :global(.input) {
-          display: block;
-          width: 100%;
-          border-radius: 0.5rem;
-          border: 1px solid var(--border);
-          padding: 0.5rem 0.75rem;
-          font-size: 0.9rem;
-          outline: none;
-          background: var(--background);
-          color: var(--foreground);
-        }
-        :global(.input:focus) {
-          border-color: var(--primary);
-        }
-      `}</style>
     </div>
   );
 }

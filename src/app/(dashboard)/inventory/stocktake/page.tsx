@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -79,20 +82,23 @@ interface StocktakeRow {
 }
 
 export default function StocktakePage() {
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [rows, setRows] = useState<StocktakeRow[]>([]);
   const [search, setSearch] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showDiffOnly, setShowDiffOnly] = useState(false);
 
-  const fetchInventories = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/inventory/stocktake");
-    if (res.ok) {
-      const data: InventoryItem[] = await res.json();
+  const inventoriesQuery = useQuery({
+    queryKey: queryKeys.stocktake.list(),
+    queryFn: () => apiGet<InventoryItem[]>("/api/inventory/stocktake"),
+  });
+  const loading = inventoriesQuery.isPending;
+  const fetchInventories = () => queryClient.invalidateQueries({ queryKey: queryKeys.stocktake.all });
+
+  useEffect(() => {
+    if (inventoriesQuery.data) {
       setRows(
-        data.map((inv) => ({
+        inventoriesQuery.data.map((inv) => ({
           productId: inv.productId,
           productName: inv.product.name,
           sku: inv.product.sku,
@@ -107,10 +113,7 @@ export default function StocktakePage() {
         }))
       );
     }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { fetchInventories(); }, [fetchInventories]);
+  }, [inventoriesQuery.data]);
 
   const updateRow = (index: number, updates: Partial<StocktakeRow>) => {
     setRows((prev) => prev.map((r, i) => i === index ? { ...r, ...updates } : r));
@@ -130,19 +133,15 @@ export default function StocktakePage() {
     return Math.abs(diff) >= 0.0001;
   });
 
-  const handleSubmit = async () => {
-    // 증가 행인데 supplierProductId가 없는 경우 검증
-    const missingSupplier = changedRows.filter((r) => {
-      const diff = parseFloat(r.actualQty) - r.systemQty;
-      return diff > 0 && !r.supplierProductId;
-    });
-    if (missingSupplier.length > 0) {
-      toast.error(`재고 증가 행은 공급상품 선택 필수: ${missingSupplier.map((r) => r.productName).join(", ")}`);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
+  const submitMutation = useMutation({
+    mutationFn: () => {
+      const missingSupplier = changedRows.filter((r) => {
+        const diff = parseFloat(r.actualQty) - r.systemQty;
+        return diff > 0 && !r.supplierProductId;
+      });
+      if (missingSupplier.length > 0) {
+        throw new Error(`재고 증가 행은 공급상품 선택 필수: ${missingSupplier.map((r) => r.productName).join(", ")}`);
+      }
       const items = changedRows.map((r) => {
         const diff = parseFloat(r.actualQty) - r.systemQty;
         return {
@@ -153,36 +152,18 @@ export default function StocktakePage() {
           memo: r.memo || undefined,
         };
       });
-
-      if (items.length === 0) {
-        toast.error("보정할 항목이 없습니다");
-        return;
-      }
-
-      const res = await fetch("/api/inventory/stocktake", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(
-          (typeof err.error === "string" ? err.error : err.error?.formErrors?.[0]) || "보정 실패",
-        );
-        return;
-      }
-
-      const result = await res.json();
+      if (items.length === 0) throw new Error("보정할 항목이 없습니다");
+      return apiMutate<{ count: number }>("/api/inventory/stocktake", "POST", { items });
+    },
+    onSuccess: (result) => {
       toast.success(`${result.count}개 항목 실사 보정 완료`);
       setConfirmOpen(false);
       fetchInventories();
-    } catch {
-      toast.error("오류가 발생했습니다");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "보정 실패"),
+  });
+  const submitting = submitMutation.isPending;
+  const handleSubmit = () => submitMutation.mutate();
 
   return (
     <>

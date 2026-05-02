@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -82,29 +84,13 @@ export function AssemblyDetailSheet({
   open,
   onOpenChange,
 }: AssemblyDetailSheetProps) {
-  const [data, setData] = useState<AssemblyDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open || !assemblyId) {
-      setData(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setData(null);
-    fetch(`/api/assemblies/${assemblyId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [assemblyId, open]);
+  const detailQuery = useQuery({
+    queryKey: queryKeys.assembly.detail(assemblyId ?? ""),
+    queryFn: () => apiGet<AssemblyDetail>(`/api/assemblies/${assemblyId}`),
+    enabled: open && !!assemblyId,
+  });
+  const data = detailQuery.data ?? null;
+  const loading = detailQuery.isPending && open && !!assemblyId;
 
   const totalComponentCost = data
     ? data.consumptions.reduce(

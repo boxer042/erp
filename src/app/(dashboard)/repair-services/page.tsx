@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { Loader2, Pencil, Trash2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -95,56 +98,55 @@ interface ProductLite {
 // ─── 메인 ────────────────────────────────────────────────────
 
 export default function RepairServicesPage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<"presets" | "packages">("presets");
 
   // 공임 프리셋
-  const [presets, setPresets] = useState<LaborPreset[]>([]);
   const [presetSearch, setPresetSearch] = useState("");
-  const [presetLoading, setPresetLoading] = useState(false);
   const [presetSheet, setPresetSheet] = useState(false);
   const [presetEdit, setPresetEdit] = useState<LaborPreset | null>(null);
   const [presetForm, setPresetForm] = useState({ name: "", description: "", unitRate: "0", memo: "" });
-  const [presetSubmitting, setPresetSubmitting] = useState(false);
 
   // 수리 패키지
-  const [packages, setPackages] = useState<RepairPackage[]>([]);
   const [pkgSearch, setPkgSearch] = useState("");
-  const [pkgLoading, setPkgLoading] = useState(false);
   const [pkgSheet, setPkgSheet] = useState(false);
   const [pkgEdit, setPkgEdit] = useState<RepairPackage | null>(null);
   const [pkgForm, setPkgForm] = useState({ name: "", description: "", memo: "" });
   const [pkgLabors, setPkgLabors] = useState<PackageLaborItem[]>([]);
   const [pkgParts, setPkgParts] = useState<PackagePartItem[]>([]);
-  const [pkgSubmitting, setPkgSubmitting] = useState(false);
 
   // 패키지 Sheet 내 공임 추가 폼
   const [laborAddForm, setLaborAddForm] = useState({ laborPresetId: "", name: "", unitRate: "0", quantity: "1" });
   // 패키지 Sheet 내 부품 추가 폼
   const [partAddForm, setPartAddForm] = useState({ productId: "", quantity: "1", unitPrice: "0" });
 
-  const [products, setProducts] = useState<ProductLite[]>([]);
+  const presetsQuery = useQuery({
+    queryKey: queryKeys.repairServices.presets({ search: presetSearch }),
+    queryFn: () => apiGet<LaborPreset[]>(`/api/repair-labor-presets${presetSearch ? `?search=${encodeURIComponent(presetSearch)}` : ""}`),
+  });
+  const presets = presetsQuery.data ?? [];
+  const presetLoading = presetsQuery.isPending;
 
-  const loadPresets = useCallback(async () => {
-    setPresetLoading(true);
-    const res = await fetch(`/api/repair-labor-presets${presetSearch ? `?search=${encodeURIComponent(presetSearch)}` : ""}`);
-    if (res.ok) setPresets(await res.json());
-    setPresetLoading(false);
-  }, [presetSearch]);
+  const packagesQuery = useQuery({
+    queryKey: queryKeys.repairServices.packages({ search: pkgSearch }),
+    queryFn: () => apiGet<RepairPackage[]>(`/api/repair-packages${pkgSearch ? `?search=${encodeURIComponent(pkgSearch)}` : ""}`),
+  });
+  const packages = packagesQuery.data ?? [];
+  const pkgLoading = packagesQuery.isPending;
 
-  const loadPackages = useCallback(async () => {
-    setPkgLoading(true);
-    const res = await fetch(`/api/repair-packages${pkgSearch ? `?search=${encodeURIComponent(pkgSearch)}` : ""}`);
-    if (res.ok) setPackages(await res.json());
-    setPkgLoading(false);
-  }, [pkgSearch]);
+  const productsQuery = useQuery({
+    queryKey: queryKeys.products.list({ scope: "repair-services" }),
+    queryFn: async () => {
+      const d = await apiGet<ProductLite[] | { items: ProductLite[] }>("/api/products");
+      return Array.isArray(d) ? d : d.items ?? [];
+    },
+  });
+  const products = productsQuery.data ?? [];
 
-  useEffect(() => { loadPresets(); }, [loadPresets]);
-  useEffect(() => { loadPackages(); }, [loadPackages]);
-  useEffect(() => {
-    fetch("/api/products").then((r) => r.ok ? r.json() : []).then((d) => {
-      setProducts(Array.isArray(d) ? d : d.items ?? []);
-    });
-  }, []);
+  const refreshPresets = () => queryClient.invalidateQueries({ queryKey: ["repair-services", "presets"] });
+  const refreshPackages = () => queryClient.invalidateQueries({ queryKey: ["repair-services", "packages"] });
+  const loadPresets = refreshPresets;
+  const loadPackages = refreshPackages;
 
   // ── 공임 프리셋 CRUD ──────────────────────────────────────
 
@@ -160,35 +162,40 @@ export default function RepairServicesPage() {
     setPresetSheet(true);
   };
 
-  const savePreset = async () => {
-    if (!presetForm.name.trim()) { toast.error("이름을 입력하세요"); return; }
-    setPresetSubmitting(true);
-    try {
+  const savePresetMutation = useMutation({
+    mutationFn: () => {
+      if (!presetForm.name.trim()) throw new Error("이름을 입력하세요");
       const body = {
         name: presetForm.name.trim(),
         description: presetForm.description || undefined,
         unitRate: parseFloat(parseComma(presetForm.unitRate)) || 0,
         memo: presetForm.memo || undefined,
       };
-      const res = presetEdit
-        ? await fetch(`/api/repair-labor-presets/${presetEdit.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-        : await fetch("/api/repair-labor-presets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error();
+      return presetEdit
+        ? apiMutate(`/api/repair-labor-presets/${presetEdit.id}`, "PUT", body)
+        : apiMutate("/api/repair-labor-presets", "POST", body);
+    },
+    onSuccess: () => {
       toast.success(presetEdit ? "수정됐습니다" : "등록됐습니다");
       setPresetSheet(false);
-      loadPresets();
-    } catch {
-      toast.error("저장 실패");
-    } finally {
-      setPresetSubmitting(false);
-    }
-  };
+      refreshPresets();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "저장 실패"),
+  });
+  const presetSubmitting = savePresetMutation.isPending;
+  const savePreset = () => savePresetMutation.mutate();
 
-  const deletePreset = async (id: string) => {
+  const deletePresetMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/repair-labor-presets/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("삭제됐습니다");
+      refreshPresets();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+  const deletePreset = (id: string) => {
     if (!confirm("삭제하시겠습니까?")) return;
-    const res = await fetch(`/api/repair-labor-presets/${id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("삭제됐습니다"); loadPresets(); }
-    else toast.error("삭제 실패");
+    deletePresetMutation.mutate(id);
   };
 
   // ── 수리 패키지 CRUD ──────────────────────────────────────
@@ -249,71 +256,73 @@ export default function RepairServicesPage() {
     setPartAddForm({ productId: "", quantity: "1", unitPrice: "0" });
   };
 
-  const savePkg = async () => {
-    if (!pkgForm.name.trim()) { toast.error("패키지 이름을 입력하세요"); return; }
-    setPkgSubmitting(true);
-    try {
+  const savePkgMutation = useMutation({
+    mutationFn: async () => {
+      if (!pkgForm.name.trim()) throw new Error("패키지 이름을 입력하세요");
       const activeLabors = pkgLabors.filter((l) => !l._deleted);
       const activeParts = pkgParts.filter((p) => !p._deleted);
 
       if (pkgEdit) {
         // 기존 패키지 편집: 기본정보 PUT + 삭제된 항목 DELETE + 새 항목 POST
-        await fetch(`/api/repair-packages/${pkgEdit.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: pkgForm.name.trim(), description: pkgForm.description || null, memo: pkgForm.memo || null }),
+        await apiMutate(`/api/repair-packages/${pkgEdit.id}`, "PUT", {
+          name: pkgForm.name.trim(),
+          description: pkgForm.description || null,
+          memo: pkgForm.memo || null,
         });
 
         const deletedLaborIds = pkgLabors.filter((l) => l._deleted && l.id).map((l) => l.id!);
         const deletedPartIds = pkgParts.filter((p) => p._deleted && p.id).map((p) => p.id!);
         await Promise.all([
-          ...deletedLaborIds.map((lid) => fetch(`/api/repair-packages/${pkgEdit.id}/labors/${lid}`, { method: "DELETE" })),
-          ...deletedPartIds.map((pid) => fetch(`/api/repair-packages/${pkgEdit.id}/parts/${pid}`, { method: "DELETE" })),
+          ...deletedLaborIds.map((lid) => apiMutate(`/api/repair-packages/${pkgEdit.id}/labors/${lid}`, "DELETE")),
+          ...deletedPartIds.map((pid) => apiMutate(`/api/repair-packages/${pkgEdit.id}/parts/${pid}`, "DELETE")),
         ]);
 
         const newLabors = activeLabors.filter((l) => !l.id);
         const newParts = activeParts.filter((p) => !p.id);
         await Promise.all([
-          ...newLabors.map((l) => fetch(`/api/repair-packages/${pkgEdit.id}/labors`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ laborPresetId: l.laborPresetId || null, name: l.name, unitRate: parseFloat(parseComma(l.unitRate)) || 0, quantity: parseInt(l.quantity) || 1 }),
+          ...newLabors.map((l) => apiMutate(`/api/repair-packages/${pkgEdit.id}/labors`, "POST", {
+            laborPresetId: l.laborPresetId || null,
+            name: l.name,
+            unitRate: parseFloat(parseComma(l.unitRate)) || 0,
+            quantity: parseInt(l.quantity) || 1,
           })),
-          ...newParts.map((p) => fetch(`/api/repair-packages/${pkgEdit.id}/parts`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId: p.productId, quantity: parseFloat(p.quantity) || 1, unitPrice: parseFloat(parseComma(p.unitPrice)) || 0 }),
+          ...newParts.map((p) => apiMutate(`/api/repair-packages/${pkgEdit.id}/parts`, "POST", {
+            productId: p.productId,
+            quantity: parseFloat(p.quantity) || 1,
+            unitPrice: parseFloat(parseComma(p.unitPrice)) || 0,
           })),
         ]);
       } else {
-        await fetch("/api/repair-packages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: pkgForm.name.trim(),
-            description: pkgForm.description || null,
-            memo: pkgForm.memo || null,
-            labors: activeLabors.map((l) => ({ laborPresetId: l.laborPresetId || null, name: l.name, unitRate: parseFloat(parseComma(l.unitRate)) || 0, quantity: parseInt(l.quantity) || 1 })),
-            parts: activeParts.map((p) => ({ productId: p.productId, quantity: parseFloat(p.quantity) || 1, unitPrice: parseFloat(parseComma(p.unitPrice)) || 0 })),
-          }),
+        await apiMutate("/api/repair-packages", "POST", {
+          name: pkgForm.name.trim(),
+          description: pkgForm.description || null,
+          memo: pkgForm.memo || null,
+          labors: activeLabors.map((l) => ({ laborPresetId: l.laborPresetId || null, name: l.name, unitRate: parseFloat(parseComma(l.unitRate)) || 0, quantity: parseInt(l.quantity) || 1 })),
+          parts: activeParts.map((p) => ({ productId: p.productId, quantity: parseFloat(p.quantity) || 1, unitPrice: parseFloat(parseComma(p.unitPrice)) || 0 })),
         });
       }
-
+    },
+    onSuccess: () => {
       toast.success(pkgEdit ? "수정됐습니다" : "등록됐습니다");
       setPkgSheet(false);
-      loadPackages();
-    } catch {
-      toast.error("저장 실패");
-    } finally {
-      setPkgSubmitting(false);
-    }
-  };
+      refreshPackages();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "저장 실패"),
+  });
+  const pkgSubmitting = savePkgMutation.isPending;
+  const savePkg = () => savePkgMutation.mutate();
 
-  const deletePkg = async (id: string) => {
+  const deletePkgMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/repair-packages/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("삭제됐습니다");
+      refreshPackages();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+  const deletePkg = (id: string) => {
     if (!confirm("삭제하시겠습니까?")) return;
-    const res = await fetch(`/api/repair-packages/${id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("삭제됐습니다"); loadPackages(); }
-    else toast.error("삭제 실패");
+    deletePkgMutation.mutate(id);
   };
 
   // ── 렌더 ──────────────────────────────────────────────────

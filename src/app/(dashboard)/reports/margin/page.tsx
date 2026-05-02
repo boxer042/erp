@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -157,31 +160,32 @@ function DeltaBadge({ curr, prev }: { curr: number; prev: number }) {
 type TopProductSort = "revenue" | "netProfit";
 
 export default function MarginReportPage() {
+  const queryClient = useQueryClient();
   const [period, setPeriod] = useState<PeriodKey>("this-month");
   const [channelId, setChannelId] = useState<string>("all");
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [data, setData] = useState<ReportData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [topSort, setTopSort] = useState<TopProductSort>("revenue");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const { from, to } = getPeriodRange(period);
-    const qs = new URLSearchParams({
-      from: from.toISOString(),
-      to: to.toISOString(),
-    });
-    if (channelId !== "all") qs.set("channelId", channelId);
-    const res = await fetch(`/api/reports/margin?${qs}`);
-    if (res.ok) setData(await res.json());
-    setLoading(false);
-  }, [period, channelId]);
+  const channelsQuery = useQuery({
+    queryKey: queryKeys.channels.list(),
+    queryFn: () => apiGet<Channel[]>("/api/channels"),
+  });
+  const channels = channelsQuery.data ?? [];
 
-  useEffect(() => {
-    fetch("/api/channels").then((r) => r.json()).then(setChannels).catch(() => {});
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const reportQuery = useQuery({
+    queryKey: queryKeys.reports.margin({ period, channelId }),
+    queryFn: () => {
+      const { from, to } = getPeriodRange(period);
+      const qs = new URLSearchParams({
+        from: from.toISOString(),
+        to: to.toISOString(),
+      });
+      if (channelId !== "all") qs.set("channelId", channelId);
+      return apiGet<ReportData>(`/api/reports/margin?${qs}`);
+    },
+  });
+  const data = reportQuery.data ?? null;
+  const loading = reportQuery.isPending;
+  const fetchData = () => queryClient.invalidateQueries({ queryKey: ["reports", "margin"] });
 
   const handleExport = (kind: "orders" | "channels" | "products" | "categories") => {
     if (!data) return;
@@ -297,8 +301,32 @@ export default function MarginReportPage() {
               </div>
             ))}
           </div>
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-96 w-full" />
+          <Skeleton className="h-3 w-64" />
+          {[8, 6].map((rows, ci) => (
+            <Card key={ci}>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-16 rounded-md" />
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="border-b border-border bg-muted/40 grid grid-cols-8 gap-2 px-3 py-2">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <Skeleton key={i} className="h-3 w-full" />
+                  ))}
+                </div>
+                {Array.from({ length: rows }).map((_, r) => (
+                  <div key={r} className="border-b border-border grid grid-cols-8 gap-2 px-3 py-2 items-center">
+                    <Skeleton className="h-4 w-full col-span-1" />
+                    {Array.from({ length: 7 }).map((_, c) => (
+                      <div key={c} className="flex justify-end">
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : (
         <>

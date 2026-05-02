@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
@@ -11,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
-import { Plus, Search, SlidersHorizontal, Check, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, Check, FileEdit, PanelLeftClose, PanelLeftOpen, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomerPaymentDialog } from "@/components/customer-payment-dialog";
 import { CustomerAdjustmentDialog } from "@/components/customer-adjustment-dialog";
@@ -71,8 +74,7 @@ function formatAmount(n: number | string) {
 }
 
 export default function CustomerLedgerPage() {
-  const [data, setData] = useState<LedgerResponse>({ entries: [], customerSummaries: [] });
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   // 모바일/좁은 화면에서 좌측 패널 접기 토글 (기본: 펼침)
   const [panelOpen, setPanelOpen] = useState(true);
 
@@ -84,6 +86,7 @@ export default function CustomerLedgerPage() {
   const [types, setTypes] = useState<LedgerType[]>([...ALL_TYPES]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [typePopoverOpen, setTypePopoverOpen] = useState(false);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<{
@@ -104,25 +107,31 @@ export default function CustomerLedgerPage() {
     memo: string | null;
   } | null>(null);
 
-  const fetchLedger = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (from) params.set("from", from.toISOString());
-    if (to) {
-      const toInclusive = new Date(to);
-      toInclusive.setDate(toInclusive.getDate() + 1);
-      params.set("to", toInclusive.toISOString());
-    }
-    if (types.length < ALL_TYPES.length) params.set("types", types.join(","));
-    if (search && !selectedCustomerId) params.set("q", search);
-    if (selectedCustomerId) params.set("customerId", selectedCustomerId);
-
-    const res = await fetch(`/api/customers/ledger?${params}`);
-    if (res.ok) setData(await res.json());
-    setLoading(false);
-  }, [from, to, types, search, selectedCustomerId]);
-
-  useEffect(() => { fetchLedger(); }, [fetchLedger]);
+  const ledgerQuery = useQuery({
+    queryKey: queryKeys.ledger.customers({
+      from: from?.toISOString(),
+      to: to?.toISOString(),
+      types: types.join(","),
+      search,
+      selectedCustomerId,
+    }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from.toISOString());
+      if (to) {
+        const toInclusive = new Date(to);
+        toInclusive.setDate(toInclusive.getDate() + 1);
+        params.set("to", toInclusive.toISOString());
+      }
+      if (types.length < ALL_TYPES.length) params.set("types", types.join(","));
+      if (search && !selectedCustomerId) params.set("q", search);
+      if (selectedCustomerId) params.set("customerId", selectedCustomerId);
+      return apiGet<LedgerResponse>(`/api/customers/ledger?${params}`);
+    },
+  });
+  const data: LedgerResponse = ledgerQuery.data ?? { entries: [], customerSummaries: [] };
+  const loading = ledgerQuery.isPending;
+  const fetchLedger = () => queryClient.invalidateQueries({ queryKey: queryKeys.ledger.customers() });
 
   const applyPreset = (preset: "thisMonth" | "lastMonth" | "last3" | "all") => {
     if (preset === "thisMonth") {
@@ -166,19 +175,24 @@ export default function CustomerLedgerPage() {
 
   const onEntryDoubleClick = (e: LedgerEntry) => {
     if (e.type === "RECEIPT" && e.referenceType === "CUSTOMER_PAYMENT" && e.referenceId) {
-      fetch(`/api/customer-payments/${e.referenceId}`)
-        .then((r) => r.json())
-        .then((p) => {
-          setEditingPayment({
-            id: p.id,
-            customer: { id: p.customer.id, name: p.customer.name },
-            amount: p.amount,
-            paymentDate: p.paymentDate,
-            method: p.method as PaymentMethod,
-            memo: p.memo,
-          });
-          setPayDialogOpen(true);
+      apiGet<{
+        id: string;
+        customer: { id: string; name: string };
+        amount: string;
+        paymentDate: string;
+        method: string;
+        memo: string | null;
+      }>(`/api/customer-payments/${e.referenceId}`).then((p) => {
+        setEditingPayment({
+          id: p.id,
+          customer: { id: p.customer.id, name: p.customer.name },
+          amount: p.amount,
+          paymentDate: p.paymentDate,
+          method: p.method as PaymentMethod,
+          memo: p.memo,
         });
+        setPayDialogOpen(true);
+      });
       return;
     }
     if (e.type === "ADJUSTMENT" && e.referenceType === "MANUAL_ADJUSTMENT") {
@@ -273,18 +287,38 @@ export default function CustomerLedgerPage() {
             })}
           </div>
 
-          <div className="px-1 pt-1 shrink-0">
-            <Calendar
-              mode="range"
-              selected={{ from, to }}
-              onSelect={(range) => {
-                setFrom(range?.from);
-                setTo(range?.to);
-              }}
-              numberOfMonths={1}
-              locale={ko}
-              className="w-full"
-            />
+          <div className="px-3 pt-2 pb-2 shrink-0">
+            <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+              <PopoverTrigger
+                className={cn(
+                  "flex h-8 w-full items-center gap-2 rounded-md border border-border bg-card px-2.5 text-xs transition-colors hover:bg-muted",
+                  currentPresetLabel === "커스텀" && "border-primary/40 text-primary"
+                )}
+              >
+                <CalendarIcon className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="flex-1 truncate text-left tabular-nums">
+                  {from && to
+                    ? `${format(from, "yyyy-MM-dd")} ~ ${format(to, "yyyy-MM-dd")}`
+                    : from
+                    ? `${format(from, "yyyy-MM-dd")} 부터`
+                    : to
+                    ? `${format(to, "yyyy-MM-dd")} 까지`
+                    : "전체 기간"}
+                </span>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={{ from, to }}
+                  onSelect={(range) => {
+                    setFrom(range?.from);
+                    setTo(range?.to);
+                  }}
+                  numberOfMonths={1}
+                  locale={ko}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="px-3 pb-2 flex items-center gap-2 shrink-0">
@@ -452,15 +486,60 @@ export default function CustomerLedgerPage() {
 
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="space-y-3 px-5 py-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="ml-auto h-4 w-20" />
-                  </div>
-                ))}
-              </div>
+              <Table className="min-w-[900px] table-fixed">
+                <colgroup>
+                  {!selectedCustomerId && <col style={{ width: "14%" }} />}
+                  <col style={{ width: "70px" }} />
+                  <col />
+                  <col style={{ width: "130px" }} />
+                  <col style={{ width: "120px" }} />
+                  <col style={{ width: "120px" }} />
+                  <col style={{ width: "120px" }} />
+                </colgroup>
+                <TableHeader className="sticky top-0 z-10">
+                  <TableRow className="bg-muted text-muted-foreground text-xs hover:bg-muted">
+                    {!selectedCustomerId && <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">고객</TableHead>}
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">유형</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">설명</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">참조</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">차변 (매출)</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">대변 (수금)</TableHead>
+                    <TableHead className="border-b border-border h-auto py-1.5 px-2 text-right font-medium">미수 잔액</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 3 }).map((_, gi) => (
+                    <React.Fragment key={`sk-group-${gi}`}>
+                      <TableRow className="bg-card hover:bg-card">
+                        <TableCell colSpan={selectedCustomerId ? 6 : 7} className="px-3 py-1.5">
+                          <Skeleton className="h-3 w-24" />
+                        </TableCell>
+                      </TableRow>
+                      {Array.from({ length: 3 }).map((_, ri) => (
+                        <TableRow key={`sk-${gi}-${ri}`} className="hover:bg-transparent">
+                          {!selectedCustomerId && (
+                            <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-24" /></TableCell>
+                          )}
+                          <TableCell className="border-r border-border px-2 py-1.5 text-center">
+                            <Skeleton className="h-5 w-12 rounded-md mx-auto" />
+                          </TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-40" /></TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
+                          </TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><Skeleton className="h-4 w-24" /></div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </TableBody>
+              </Table>
             ) : dateGroups.length === 0 && !(from && selectedCustomerSummary) ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 거래 내역이 없습니다

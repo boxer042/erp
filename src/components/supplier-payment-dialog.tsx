@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,8 +57,7 @@ export function SupplierPaymentDialog({
   onSaved,
 }: SupplierPaymentDialogProps) {
   const editing = !!initialPayment;
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [submitting, setSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState<{
     supplierId: string;
@@ -105,19 +107,17 @@ export function SupplierPaymentDialog({
     }
   }, [open, initialPayment, fixedSupplier]);
 
-  useEffect(() => {
-    if (!open || fixedSupplier || initialPayment) return;
-    fetch("/api/suppliers")
-      .then((r) => r.json())
-      .then((d) => setSuppliers(d));
-  }, [open, fixedSupplier, initialPayment]);
+  const suppliersQuery = useQuery({
+    queryKey: queryKeys.suppliers.list(),
+    queryFn: () => apiGet<Supplier[]>("/api/suppliers"),
+    enabled: open && !fixedSupplier && !initialPayment,
+  });
+  const suppliers = suppliersQuery.data ?? [];
 
-  const handleSubmit = async () => {
-    if (!form.supplierId) { toast.error("거래처를 선택해주세요"); return; }
-    if (!form.amount || parseFloat(form.amount) <= 0) { toast.error("금액을 입력해주세요"); return; }
-
-    setSubmitting(true);
-    try {
+  const submitMutation = useMutation({
+    mutationFn: () => {
+      if (!form.supplierId) throw new Error("거래처를 선택해주세요");
+      if (!form.amount || parseFloat(form.amount) <= 0) throw new Error("금액을 입력해주세요");
       const url = editing
         ? `/api/supplier-payments/${initialPayment!.id}`
         : "/api/supplier-payments";
@@ -136,28 +136,18 @@ export function SupplierPaymentDialog({
             method: form.method,
             memo: form.memo || undefined,
           };
-
-      const res = await fetch(url, {
-        method: httpMethod,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        toast.error(typeof err?.error === "string" ? err.error : editing ? "수정 실패" : "등록 실패");
-        return;
-      }
-
+      return apiMutate(url, httpMethod, body);
+    },
+    onSuccess: () => {
       toast.success(editing ? "결제가 수정되었습니다" : "결제가 등록되었습니다");
+      queryClient.invalidateQueries({ queryKey: queryKeys.ledger.suppliers() });
       onOpenChange(false);
       onSaved?.();
-    } catch {
-      toast.error("오류가 발생했습니다");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || (editing ? "수정 실패" : "등록 실패")),
+  });
+  const submitting = submitMutation.isPending;
+  const handleSubmit = () => submitMutation.mutate();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

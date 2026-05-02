@@ -15,6 +15,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { digitsOnly, formatBusinessNumber, formatPhone, formatComma, parseComma } from "@/lib/utils";
+import { apiMutate, ApiError } from "@/lib/api-client";
 
 // ─── 공통 필드 행 ───
 
@@ -353,22 +354,28 @@ export function QuickSupplierProductSheet({
     if (!name.trim() || !supplierId) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/supplier-products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplierId, name: name.trim(), supplierCode: supplierCode || undefined, unitOfMeasure, listPrice: listPrice || unitPrice || "0", unitPrice: unitPrice || listPrice || "0", isTaxable, isProvisional }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        const msg = err?.error?.formErrors?.[0] || (typeof err?.error === "string" ? err.error : "공급상품 등록 실패");
-        toast.error(msg);
-        return;
-      }
-      const created = await res.json();
+      const created = await apiMutate<{ id: string; name: string; unitPrice: string }>(
+        "/api/supplier-products",
+        "POST",
+        {
+          supplierId,
+          name: name.trim(),
+          supplierCode: supplierCode || undefined,
+          unitOfMeasure,
+          listPrice: listPrice || unitPrice || "0",
+          unitPrice: unitPrice || listPrice || "0",
+          isTaxable,
+          isProvisional,
+        },
+      );
       toast.success(`공급상품 "${name.trim()}" 등록 완료`);
       onOpenChange(false);
       onCreated({ id: created.id, name: created.name, unitPrice: created.unitPrice });
-    } catch { toast.error("오류가 발생했습니다"); } finally { setSubmitting(false); }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "공급상품 등록 실패");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -381,7 +388,7 @@ export function QuickSupplierProductSheet({
         <ScrollArea className="flex-1 min-h-0">
           <div className="px-5 py-5 space-y-3">
           <FieldRow label="상품명" required>
-            <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) handleSubmit(); }} />
+            <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) handleSubmit(); }} />
           </FieldRow>
           <FieldRow label="품번">
             <Input value={supplierCode} onChange={(e) => setSupplierCode(e.target.value)} placeholder="공급자 코드" />
@@ -611,19 +618,16 @@ export function QuickBrandSheet({ open, onOpenChange, defaultName = "", onCreate
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/brands", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), memo: memo.trim() || null }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        toast.error(typeof json.error === "string" ? json.error : "등록 실패");
-        return;
-      }
+      const json = await apiMutate<{ id: string; name: string; logoUrl: string | null }>(
+        "/api/brands",
+        "POST",
+        { name: name.trim(), memo: memo.trim() || null },
+      );
       toast.success("브랜드가 등록되었습니다");
       onCreated({ id: json.id, name: json.name, logoUrl: json.logoUrl });
       onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "등록 실패");
     } finally {
       setSubmitting(false);
     }

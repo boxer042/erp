@@ -17,3 +17,18 @@ export function useIsMobile() {
 
   return !!isMobile
 }
+
+// 모바일 + 태블릿(터치 기기)을 모두 포함. 콤보박스 UI 분기에 사용.
+export function useIsCompactDevice() {
+  const [match, setMatch] = React.useState<boolean | undefined>(undefined)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1023px), (pointer: coarse)")
+    const onChange = () => setMatch(mql.matches)
+    mql.addEventListener("change", onChange)
+    setMatch(mql.matches)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+
+  return !!match
+}

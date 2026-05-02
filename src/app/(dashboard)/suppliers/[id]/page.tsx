@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +100,7 @@ const emptyProductForm = {
 
 export default function SupplierDetailPage() {
   const params = useParams();
+  const supplierId = String(params.id ?? "");
   const router = useRouter();
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -105,8 +109,7 @@ export default function SupplierDetailPage() {
       router.push("/suppliers");
     }
   };
-  const [supplier, setSupplier] = useState<SupplierDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SupplierProduct | null>(null);
   const [productForm, setProductForm] = useState(emptyProductForm);
@@ -114,15 +117,13 @@ export default function SupplierDetailPage() {
   // 결제 등록 Dialog (원장 탭에서 사용)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
-  const fetchSupplier = useCallback(async () => {
-    const res = await fetch(`/api/suppliers/${params.id}`);
-    if (res.ok) {
-      setSupplier(await res.json());
-    }
-    setLoading(false);
-  }, [params.id]);
-
-  useEffect(() => { fetchSupplier(); }, [fetchSupplier]);
+  const supplierQuery = useQuery({
+    queryKey: queryKeys.suppliers.detail(supplierId),
+    queryFn: () => apiGet<SupplierDetail>(`/api/suppliers/${supplierId}`),
+  });
+  const supplier = supplierQuery.data ?? null;
+  const loading = supplierQuery.isPending;
+  const fetchSupplier = () => queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(supplierId) });
 
   const openCreateProduct = () => {
     setEditingProduct(null);
@@ -168,7 +169,7 @@ export default function SupplierDetailPage() {
       body: JSON.stringify({
         ...productForm,
         unitPrice: getProductSubmitPrice(),
-        supplierId: params.id,
+        supplierId: supplierId,
         leadTimeDays: productForm.leadTimeDays ? parseInt(productForm.leadTimeDays) : undefined,
         minOrderQty: parseInt(productForm.minOrderQty),
       }),
@@ -185,12 +186,17 @@ export default function SupplierDetailPage() {
     fetchSupplier();
   };
 
-  const handleDeleteProduct = async (id: string) => {
+  const deleteProductMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/supplier-products/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("상품이 비활성화되었습니다");
+      fetchSupplier();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+  });
+  const handleDeleteProduct = (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-    const res = await fetch(`/api/supplier-products/${id}`, { method: "DELETE" });
-    if (!res.ok) { toast.error("삭제에 실패했습니다"); return; }
-    toast.success("상품이 비활성화되었습니다");
-    fetchSupplier();
+    deleteProductMutation.mutate(id);
   };
 
   if (loading) return <Loading />;

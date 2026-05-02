@@ -15,6 +15,7 @@ import {
 } from "@/components/product";
 import type { ProductDetail } from "@/components/product/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiGet } from "@/lib/api-client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
@@ -115,16 +116,17 @@ export default function SalesPage() {
   const [quickDefaultName, setQuickDefaultName] = useState("");
 
   useEffect(() => {
-    fetch("/api/customers").then((r) => r.json()).then(setCustomers);
+    apiGet<CustomerLite[]>("/api/customers").then(setCustomers).catch(() => {});
   }, []);
 
   // 상품 로드
   const loadProducts = useCallback(async (q: string) => {
     const url = q.trim() ? `/api/products?isBulk=all&search=${encodeURIComponent(q)}` : "/api/products?isBulk=all";
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const data = await apiGet<ProductLite[] | { items: ProductLite[] }>(url);
       setProducts(Array.isArray(data) ? data : data.items ?? []);
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -135,21 +137,21 @@ export default function SalesPage() {
     if (category !== "repair" || repairLoaded.current) return;
     repairLoaded.current = true;
     Promise.all([
-      fetch("/api/repair-packages").then((r) => r.json()),
-      fetch("/api/repair-labor-presets").then((r) => r.json()),
+      apiGet<RepairPackage[]>("/api/repair-packages"),
+      apiGet<LaborPreset[]>("/api/repair-labor-presets"),
     ]).then(([pkgs, lbrs]) => {
       setRepairPackages(Array.isArray(pkgs) ? pkgs : []);
       setLaborPresets(Array.isArray(lbrs) ? lbrs : []);
-    });
+    }).catch(() => {});
   }, [category]);
 
   // 임대 탭 진입 시 lazy 로드
   useEffect(() => {
     if (category !== "rental" || rentalLoaded.current) return;
     rentalLoaded.current = true;
-    fetch("/api/rental-assets").then((r) => r.json()).then((d) => {
+    apiGet<RentalAsset[]>("/api/rental-assets").then((d) => {
       setRentalAssets(Array.isArray(d) ? d : []);
-    });
+    }).catch(() => {});
   }, [category]);
 
   // ── 카트 추가 핸들러 ─────────────────────────────────────
@@ -582,7 +584,7 @@ export default function SalesPage() {
         onOpenChange={setQuickCustomerOpen}
         defaultName={quickDefaultName}
         onCreated={(c) => {
-          fetch("/api/customers").then((r) => r.json()).then((list) => {
+          apiGet<CustomerLite[]>("/api/customers").then((list) => {
             setCustomers(list);
             setCustomer(c.id, c.name);
           });
@@ -692,12 +694,12 @@ function ProductDetailModal({
   useEffect(() => {
     if (!productId) return;
     let cancelled = false;
-    fetch(`/api/products/${productId}`)
-      .then((r) => r.json())
+    apiGet<ProductDetail>(`/api/products/${productId}`)
       .then((prod) => {
         if (cancelled) return;
         setDetail(prod);
-      });
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

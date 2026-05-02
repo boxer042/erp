@@ -56,4 +56,69 @@ export const queryKeys = {
   cardCompanyFees: {
     all: ["card-company-fees"] as const,
   },
+  customers: {
+    all: ["customers"] as const,
+    list: (params?: Record<string, unknown>) => ["customers", "list", params ?? {}] as const,
+    detail: (id: string) => ["customers", "detail", id] as const,
+  },
+  brands: {
+    all: ["brands"] as const,
+    list: (params?: Record<string, unknown>) => ["brands", "list", params ?? {}] as const,
+  },
+  statements: {
+    all: ["statements"] as const,
+    list: (params?: Record<string, unknown>) => ["statements", "list", params ?? {}] as const,
+    detail: (id: string) => ["statements", "detail", id] as const,
+  },
+  quotations: {
+    all: ["quotations"] as const,
+    list: (params?: Record<string, unknown>) => ["quotations", "list", params ?? {}] as const,
+    detail: (id: string) => ["quotations", "detail", id] as const,
+  },
+  rentalAssets: {
+    all: ["rental-assets"] as const,
+    list: (params?: Record<string, unknown>) => ["rental-assets", "list", params ?? {}] as const,
+  },
+  rentals: {
+    all: ["rentals"] as const,
+    list: (params?: Record<string, unknown>) => ["rentals", "list", params ?? {}] as const,
+    detail: (id: string) => ["rentals", "detail", id] as const,
+  },
+  repairServices: {
+    all: ["repair-services"] as const,
+    presets: (params?: Record<string, unknown>) => ["repair-services", "presets", params ?? {}] as const,
+    packages: (params?: Record<string, unknown>) => ["repair-services", "packages", params ?? {}] as const,
+  },
+  repairTickets: {
+    all: ["repair-tickets"] as const,
+    list: (params?: Record<string, unknown>) => ["repair-tickets", "list", params ?? {}] as const,
+    detail: (id: string) => ["repair-tickets", "detail", id] as const,
+  },
+  lots: {
+    all: ["lots"] as const,
+    list: (params?: Record<string, unknown>) => ["lots", "list", params ?? {}] as const,
+  },
+  stocktake: {
+    all: ["stocktake"] as const,
+    list: (params?: Record<string, unknown>) => ["stocktake", "list", params ?? {}] as const,
+  },
+  returns: {
+    all: ["returns"] as const,
+    list: (params?: Record<string, unknown>) => ["returns", "list", params ?? {}] as const,
+    detail: (id: string) => ["returns", "detail", id] as const,
+  },
+  assembly: {
+    all: ["assembly"] as const,
+    list: (params?: Record<string, unknown>) => ["assembly", "list", params ?? {}] as const,
+    templates: (params?: Record<string, unknown>) => ["assembly", "templates", params ?? {}] as const,
+    detail: (id: string) => ["assembly", "detail", id] as const,
+  },
+  reports: {
+    all: ["reports"] as const,
+    margin: (params?: Record<string, unknown>) => ["reports", "margin", params ?? {}] as const,
+  },
+  ledger: {
+    suppliers: (params?: Record<string, unknown>) => ["ledger", "suppliers", params ?? {}] as const,
+    customers: (params?: Record<string, unknown>) => ["ledger", "customers", params ?? {}] as const,
+  },
 } as const;

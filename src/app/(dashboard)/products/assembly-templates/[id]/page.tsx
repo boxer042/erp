@@ -1,6 +1,9 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
@@ -85,9 +88,7 @@ export default function TemplateDetailPage({
       router.push("/products/assembly-templates");
     }
   };
-  const [template, setTemplate] = useState<Template | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<ProductOption[]>([]);
+  const queryClient = useQueryClient();
 
   const [presetSheetOpen, setPresetSheetOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
@@ -103,42 +104,34 @@ export default function TemplateDetailPage({
   const [deleteTarget, setDeleteTarget] = useState<Preset | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchTemplate = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/assembly-templates/${id}`);
-      if (res.ok) setTemplate(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const templateQuery = useQuery({
+    queryKey: queryKeys.assembly.detail(id),
+    queryFn: () => apiGet<Template>(`/api/assembly-templates/${id}`),
+  });
+  const template = templateQuery.data ?? null;
+  const loading = templateQuery.isPending;
+  const fetchTemplate = () => queryClient.invalidateQueries({ queryKey: queryKeys.assembly.detail(id) });
 
-  const fetchProducts = useCallback(async () => {
-    const res = await fetch("/api/products");
-    if (res.ok) {
-      const data = await res.json();
-      setProducts(
-        data.map((p: {
-          id: string; name: string; sku: string;
-          sellingPrice: string; unitCost: string | null;
-          unitOfMeasure: string; isSet: boolean;
-        }) => ({
-          id: p.id,
-          name: p.name,
-          sku: p.sku,
-          sellingPrice: p.sellingPrice,
-          unitCost: p.unitCost,
-          unitOfMeasure: p.unitOfMeasure,
-          isSet: p.isSet,
-        })),
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTemplate();
-    fetchProducts();
-  }, [fetchTemplate, fetchProducts]);
+  const productsQuery = useQuery({
+    queryKey: queryKeys.products.list({ scope: "assembly-templates" }),
+    queryFn: async () => {
+      const data = await apiGet<Array<{
+        id: string; name: string; sku: string;
+        sellingPrice: string; unitCost: string | null;
+        unitOfMeasure: string; isSet: boolean;
+      }>>("/api/products");
+      return data.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        sellingPrice: p.sellingPrice,
+        unitCost: p.unitCost,
+        unitOfMeasure: p.unitOfMeasure,
+        isSet: p.isSet,
+      })) as ProductOption[];
+    },
+  });
+  const products = productsQuery.data ?? [];
 
   const resetPresetForm = () => {
     setEditingPreset(null);

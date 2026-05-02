@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api-client";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { format, startOfMonth, endOfMonth, startOfDay, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -149,50 +149,51 @@ export default function ExpensesPage() {
   };
 
   const fetchSuppliers = useCallback(async () => {
-    const res = await fetch("/api/suppliers");
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const data = await apiGet<Array<{ id: string; name: string; businessNumber?: string | null }>>("/api/suppliers");
       setSuppliers(
-        data.map((s: { id: string; name: string; businessNumber?: string | null }) => ({
-          id: s.id,
-          name: s.name,
-          businessNumber: s.businessNumber ?? null,
-        })),
+        data.map((s) => ({ id: s.id, name: s.name, businessNumber: s.businessNumber ?? null })),
       );
+    } catch {
+      // ignore
     }
   }, []);
 
   useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
 
   const fetchProducts = useCallback(async () => {
-    const res = await fetch("/api/products");
-    if (!res.ok) return;
-    const data = await res.json();
-    setProducts(
-      data.map((p: { id: string; name: string; sku: string; sellingPrice: string; unitOfMeasure: string; isSet: boolean }) => ({
-        id: p.id,
-        name: p.name,
-        sku: p.sku,
-        sellingPrice: p.sellingPrice,
-        unitCost: null,
-        unitOfMeasure: p.unitOfMeasure,
-        isSet: p.isSet,
-      })),
-    );
+    try {
+      const data = await apiGet<Array<{ id: string; name: string; sku: string; sellingPrice: string; unitOfMeasure: string; isSet: boolean }>>("/api/products");
+      setProducts(
+        data.map((p) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          sellingPrice: p.sellingPrice,
+          unitCost: null,
+          unitOfMeasure: p.unitOfMeasure,
+          isSet: p.isSet,
+        })),
+      );
+    } catch {
+      // ignore
+    }
   }, []);
 
   const fetchCustomers = useCallback(async () => {
-    const res = await fetch("/api/customers");
-    if (!res.ok) return;
-    const data = await res.json();
-    setCustomers(
-      data.map((c: { id: string; name: string; phone?: string | null; businessNumber?: string | null }) => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone ?? null,
-        businessNumber: c.businessNumber ?? null,
-      })),
-    );
+    try {
+      const data = await apiGet<Array<{ id: string; name: string; phone?: string | null; businessNumber?: string | null }>>("/api/customers");
+      setCustomers(
+        data.map((c) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone ?? null,
+          businessNumber: c.businessNumber ?? null,
+        })),
+      );
+    } catch {
+      // ignore
+    }
   }, []);
 
   // INVENTORY_USAGE 카테고리 진입 시 상품/고객 목록 로드
@@ -211,16 +212,18 @@ export default function ExpensesPage() {
     if (!Number.isFinite(qty) || qty <= 0) { setUsagePreview(null); return; }
     let cancelled = false;
     setUsagePreviewLoading(true);
-    fetch(`/api/inventory/lot-preview?productId=${usageProductId}&quantity=${qty}`)
-      .then((r) => (r.ok ? r.json() : null))
+    apiGet<{ totalCost: number | string; available: number | string; sufficient: boolean }>(
+      `/api/inventory/lot-preview?productId=${usageProductId}&quantity=${qty}`,
+    )
       .then((data) => {
-        if (cancelled || !data) return;
+        if (cancelled) return;
         setUsagePreview({
           totalCost: Number(data.totalCost) || 0,
           available: Number(data.available) || 0,
           sufficient: !!data.sufficient,
         });
       })
+      .catch(() => {})
       .finally(() => { if (!cancelled) setUsagePreviewLoading(false); });
     return () => { cancelled = true; };
   }, [form.category, usageProductId, usageQuantity]);
@@ -291,16 +294,14 @@ export default function ExpensesPage() {
   const loadIncomings = useCallback(async () => {
     setLoadingIncomings(true);
     try {
-      const res = await fetch("/api/incoming");
-      if (!res.ok) return;
-      const data: Array<{
+      const data = await apiGet<Array<{
         id: string;
         incomingNo: string;
         incomingDate: string;
         status: string;
         shippingCost: string | null;
         supplier: { name: string };
-      }> = await res.json();
+      }>>("/api/incoming");
       setIncomings(
         data
           .filter((i) => i.status === "CONFIRMED")
@@ -312,6 +313,8 @@ export default function ExpensesPage() {
             shippingCost: i.shippingCost ?? "0",
           }))
       );
+    } catch {
+      // ignore
     } finally {
       setLoadingIncomings(false);
     }
@@ -328,8 +331,9 @@ export default function ExpensesPage() {
     setLoadingDetail(true);
     setIncomingDetail(null);
     try {
-      const res = await fetch(`/api/incoming/${incomingId}`);
-      if (res.ok) setIncomingDetail(await res.json());
+      setIncomingDetail(await apiGet(`/api/incoming/${incomingId}`));
+    } catch {
+      // ignore
     } finally {
       setLoadingDetail(false);
     }
@@ -382,12 +386,15 @@ export default function ExpensesPage() {
       setIncomingLocked(true);
       setShippingIsTaxable(true);
       setShippingDeducted(false);
-      const res = await fetch(`/api/incoming/${e.referenceId}`);
-      if (res.ok) {
-        const inc = await res.json();
+      try {
+        const inc = await apiGet<{ shippingCost: string; shippingIsTaxable: boolean; shippingDeducted: boolean }>(
+          `/api/incoming/${e.referenceId}`,
+        );
         setForm((prev) => ({ ...prev, amount: String(parseFloat(inc.shippingCost) || 0) }));
         setShippingIsTaxable(inc.shippingIsTaxable);
         setShippingDeducted(inc.shippingDeducted);
+      } catch {
+        // ignore
       }
     } else {
       setSelectedIncomingId("");
@@ -416,10 +423,8 @@ export default function ExpensesPage() {
           return;
         }
 
-        const res = await fetch("/api/expenses/inventory-usage", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          await apiMutate("/api/expenses/inventory-usage", "POST", {
             date: form.date,
             productId: usageProductId,
             quantity: Number(usageQuantity),
@@ -428,11 +433,9 @@ export default function ExpensesPage() {
             customerId,
             description: form.description || undefined,
             memo: form.memo || undefined,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          toast.error(typeof err.error === "string" ? err.error : "저장 실패");
+          });
+        } catch (err) {
+          toast.error(err instanceof ApiError ? err.message : "저장 실패");
           return;
         }
         toast.success("내 상품 사용이 기록되었습니다");
@@ -444,19 +447,15 @@ export default function ExpensesPage() {
       if (form.category === "SHIPPING") {
         if (!selectedIncomingId) { toast.error("입고 거래명세서를 선택하세요"); return; }
         if (!form.amount) { toast.error("택배비 금액을 입력하세요"); return; }
-        const res = await fetch(`/api/incoming/${selectedIncomingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          await apiMutate(`/api/incoming/${selectedIncomingId}`, "PUT", {
             action: "update-shipping",
             shippingCost: form.amount,
             shippingIsTaxable,
             shippingDeducted,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          toast.error(typeof err.error === "string" ? err.error : "저장 실패");
+          });
+        } catch (err) {
+          toast.error(err instanceof ApiError ? err.message : "저장 실패");
           return;
         }
         toast.success("택배비가 저장되었습니다");
@@ -474,11 +473,7 @@ export default function ExpensesPage() {
         // 1) 교체 또는 제거를 위해 기존 파일이 있으면 Storage에서 삭제
         const willReplaceOrRemove = pendingReceiptFile !== null || removeExistingReceipt;
         if (willReplaceOrRemove && form.attachmentPath) {
-          await fetch("/api/expenses/upload", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path: form.attachmentPath }),
-          });
+          await apiMutate("/api/expenses/upload", "DELETE", { path: form.attachmentPath });
           finalAttachmentUrl = "";
           finalAttachmentPath = "";
           finalAttachmentName = "";
@@ -502,10 +497,8 @@ export default function ExpensesPage() {
 
         const url = editingId ? `/api/expenses/${editingId}` : "/api/expenses";
         const method = editingId ? "PUT" : "POST";
-        const res = await fetch(url, {
-          method,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          await apiMutate(url, method, {
             date: form.date,
             amount: form.amount,
             category: form.category,
@@ -518,18 +511,12 @@ export default function ExpensesPage() {
             attachmentName: finalAttachmentName || null,
             paymentMethod: form.paymentMethod || null,
             recoverable: form.recoverable,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          toast.error(typeof err.error === "string" ? err.error : "저장 실패");
+          });
+        } catch (err) {
+          toast.error(err instanceof ApiError ? err.message : "저장 실패");
           // 방금 업로드한 파일이 있었다면 롤백
           if (pendingReceiptFile && finalAttachmentPath) {
-            await fetch("/api/expenses/upload", {
-              method: "DELETE",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ path: finalAttachmentPath }),
-            });
+            await apiMutate("/api/expenses/upload", "DELETE", { path: finalAttachmentPath });
           }
           return;
         }
@@ -546,15 +533,12 @@ export default function ExpensesPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/expenses/${deleteTarget}`, { method: "DELETE" });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "삭제 실패");
-        return;
-      }
+      await apiMutate(`/api/expenses/${deleteTarget}`, "DELETE");
       toast.success("경비가 삭제되었습니다");
       setDeleteTarget(null);
       fetchData();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패");
     } finally {
       setDeleting(false);
     }
@@ -590,10 +574,14 @@ export default function ExpensesPage() {
     if (search) params.set("q", search);
     if (categoryFilter !== "ALL") params.set("category", categoryFilter);
     params.set("pageSize", "500");
-    const res = await fetch(`/api/expenses?${params}`);
-    if (!res.ok) { toast.error("내보내기 실패"); return; }
-    const data = await res.json();
-    const rows = (data.entries as Expense[]).map((e) => ({
+    let data: { entries: Expense[] };
+    try {
+      data = await apiGet(`/api/expenses?${params}`);
+    } catch {
+      toast.error("내보내기 실패");
+      return;
+    }
+    const rows = data.entries.map((e) => ({
       date: format(new Date(e.date), "yyyy-MM-dd"),
       category: CATEGORY_LABELS[e.category] ?? e.category,
       description: e.description,

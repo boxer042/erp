@@ -4,6 +4,10 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface OrderItemComponent {
   id: string;
@@ -104,10 +108,14 @@ export function CustomerDetailTabs({
   const [rentals, setRentals] = useState<{ id: string; rentalNo: string; status: string; startDate: string; endDate: string; finalAmount: number }[]>([]);
 
   useEffect(() => {
-    fetch(`/api/customer-machines?customerId=${customerId}`).then((r) => r.ok ? r.json() : []).then(setMachines);
-    fetch(`/api/customer-notes?customerId=${customerId}`).then((r) => r.ok ? r.json() : []).then(setNotes);
-    fetch(`/api/repair-tickets?customerId=${customerId}`).then((r) => r.ok ? r.json() : []).then((d) => setRepairTickets(Array.isArray(d) ? d : []));
-    fetch(`/api/rentals?customerId=${customerId}`).then((r) => r.ok ? r.json() : []).then((d) => setRentals(Array.isArray(d) ? d : []));
+    apiGet<Machine[]>(`/api/customer-machines?customerId=${customerId}`).then(setMachines).catch(() => {});
+    apiGet<Note[]>(`/api/customer-notes?customerId=${customerId}`).then(setNotes).catch(() => {});
+    apiGet<typeof repairTickets>(`/api/repair-tickets?customerId=${customerId}`)
+      .then((d) => setRepairTickets(Array.isArray(d) ? d : []))
+      .catch(() => {});
+    apiGet<typeof rentals>(`/api/rentals?customerId=${customerId}`)
+      .then((d) => setRentals(Array.isArray(d) ? d : []))
+      .catch(() => {});
   }, [customerId]);
 
   return (
@@ -364,18 +372,12 @@ function MachinesPanel({
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/customer-machines", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, ...form }),
-      });
-      if (!res.ok) throw new Error();
-      const created = await res.json();
+      const created = await apiMutate<Machine>("/api/customer-machines", "POST", { customerId, ...form });
       onChange([created, ...machines]);
       setForm({ name: "", brand: "", modelNo: "", serialNo: "", purchasedFrom: "" });
       toast.success("등록되었습니다");
-    } catch {
-      toast.error("등록 실패");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "등록 실패");
     } finally {
       setSubmitting(false);
     }
@@ -383,24 +385,24 @@ function MachinesPanel({
 
   const remove = async (id: string) => {
     if (!confirm("삭제하시겠습니까?")) return;
-    await fetch(`/api/customer-machines/${id}`, { method: "DELETE" });
+    try {
+      await apiMutate(`/api/customer-machines/${id}`, "DELETE");
+    } catch {
+      // ignore
+    }
     onChange(machines.filter((m) => m.id !== id));
   };
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-5 gap-2">
-        <input className="h-10 rounded-md border border-border px-2 text-sm" placeholder="기계명*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input className="h-10 rounded-md border border-border px-2 text-sm" placeholder="브랜드" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
-        <input className="h-10 rounded-md border border-border px-2 text-sm" placeholder="모델번호" value={form.modelNo} onChange={(e) => setForm({ ...form, modelNo: e.target.value })} />
-        <input className="h-10 rounded-md border border-border px-2 text-sm" placeholder="시리얼" value={form.serialNo} onChange={(e) => setForm({ ...form, serialNo: e.target.value })} />
-        <button
-          onClick={add}
-          disabled={submitting}
-          className="flex h-10 items-center justify-center gap-1 rounded-md bg-primary text-sm font-semibold text-white disabled:opacity-50"
-        >
+        <Input className="h-10" placeholder="기계명*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <Input className="h-10" placeholder="브랜드" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+        <Input className="h-10" placeholder="모델번호" value={form.modelNo} onChange={(e) => setForm({ ...form, modelNo: e.target.value })} />
+        <Input className="h-10" placeholder="시리얼" value={form.serialNo} onChange={(e) => setForm({ ...form, serialNo: e.target.value })} />
+        <Button onClick={add} disabled={submitting} className="h-10">
           <Plus className="h-4 w-4" /> 추가
-        </button>
+        </Button>
       </div>
 
       {machines.length === 0 ? (
@@ -442,17 +444,11 @@ function NotesPanel({
     if (!content.trim()) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/customer-notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, content }),
-      });
-      if (!res.ok) throw new Error();
-      const created = await res.json();
+      const created = await apiMutate<Note>("/api/customer-notes", "POST", { customerId, content });
       onChange([created, ...notes]);
       setContent("");
-    } catch {
-      toast.error("저장 실패");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "저장 실패");
     } finally {
       setSubmitting(false);
     }
@@ -460,27 +456,27 @@ function NotesPanel({
 
   const remove = async (id: string) => {
     if (!confirm("삭제하시겠습니까?")) return;
-    await fetch(`/api/customer-notes/${id}`, { method: "DELETE" });
+    try {
+      await apiMutate(`/api/customer-notes/${id}`, "DELETE");
+    } catch {
+      // ignore
+    }
     onChange(notes.filter((n) => n.id !== id));
   };
 
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <textarea
+        <Textarea
           rows={2}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="방문·상담 메모 추가"
-          className="flex-1 rounded-md border border-border p-2 text-sm outline-none focus:border-primary"
+          className="flex-1"
         />
-        <button
-          onClick={add}
-          disabled={submitting || !content.trim()}
-          className="self-start rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
+        <Button onClick={add} disabled={submitting || !content.trim()} className="self-start">
           추가
-        </button>
+        </Button>
       </div>
       {notes.length === 0 ? (
         <Empty text="메모가 없습니다" />

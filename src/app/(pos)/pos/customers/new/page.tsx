@@ -1,14 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { digitsOnly, formatBusinessNumber, formatPhone } from "@/lib/utils";
 import { ChevronLeft, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 export default function NewCustomerPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -18,38 +25,31 @@ export default function NewCustomerPage() {
     address: "",
     memo: "",
   });
-  const [submitting, setSubmitting] = useState(false);
 
-  const submit = async () => {
-    if (!form.name.trim() || !form.phone.trim()) {
-      toast.error("이름과 전화번호는 필수입니다");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          phone: digitsOnly(form.phone),
-          businessNumber: digitsOnly(form.businessNumber) || undefined,
-          ceo: form.ceo || undefined,
-          email: form.email || undefined,
-          address: form.address || undefined,
-          memo: form.memo || undefined,
-        }),
+  const createMutation = useMutation({
+    mutationFn: () => {
+      if (!form.name.trim() || !form.phone.trim()) {
+        throw new Error("이름과 전화번호는 필수입니다");
+      }
+      return apiMutate<{ id: string }>("/api/customers", "POST", {
+        name: form.name.trim(),
+        phone: digitsOnly(form.phone),
+        businessNumber: digitsOnly(form.businessNumber) || undefined,
+        ceo: form.ceo || undefined,
+        email: form.email || undefined,
+        address: form.address || undefined,
+        memo: form.memo || undefined,
       });
-      if (!res.ok) throw new Error();
-      const created = await res.json();
+    },
+    onSuccess: (created) => {
       toast.success("등록 완료");
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       router.push(`/pos/customers/${created.id}`);
-    } catch {
-      toast.error("등록 실패");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "등록 실패"),
+  });
+  const submitting = createMutation.isPending;
+  const submit = () => createMutation.mutate();
 
   return (
     <div className="mx-auto max-w-xl p-6">
@@ -60,84 +60,49 @@ export default function NewCustomerPage() {
 
       <div className="space-y-4 rounded-xl border border-border bg-background p-6">
         <Field label="이름" required>
-          <input
-            className="input"
+          <Input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
         </Field>
         <Field label="전화번호" required>
-          <input
-            className="input"
+          <Input
             value={formatPhone(form.phone)}
             onChange={(e) => setForm({ ...form, phone: digitsOnly(e.target.value) })}
             placeholder="010-0000-0000"
           />
         </Field>
         <Field label="사업자번호">
-          <input
-            className="input"
+          <Input
             value={formatBusinessNumber(form.businessNumber)}
             onChange={(e) => setForm({ ...form, businessNumber: digitsOnly(e.target.value) })}
             placeholder="000-00-00000"
           />
         </Field>
         <Field label="대표자">
-          <input className="input" value={form.ceo} onChange={(e) => setForm({ ...form, ceo: e.target.value })} />
+          <Input value={form.ceo} onChange={(e) => setForm({ ...form, ceo: e.target.value })} />
         </Field>
         <Field label="이메일">
-          <input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </Field>
         <Field label="주소">
-          <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         </Field>
         <Field label="메모">
-          <textarea
+          <Textarea
             rows={3}
-            className="input"
             value={form.memo}
             onChange={(e) => setForm({ ...form, memo: e.target.value })}
           />
         </Field>
         <div className="flex justify-end gap-2 pt-2">
-          <Link
-            href="/pos/customers"
-            className="flex h-11 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted/50"
-          >
-            취소
-          </Link>
-          <button
-            onClick={submit}
-            disabled={submitting}
-            className="flex h-11 items-center gap-1 rounded-lg bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"
-          >
+          <Button variant="outline" onClick={() => router.push("/pos/customers")}>취소</Button>
+          <Button onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             등록
-          </button>
+          </Button>
         </div>
       </div>
-
-      <style jsx>{`
-        :global(.input) {
-          display: block;
-          width: 100%;
-          height: 2.5rem;
-          border-radius: 0.5rem;
-          border: 1px solid var(--border);
-          padding: 0 0.75rem;
-          font-size: 0.95rem;
-          outline: none;
-          background: var(--background);
-          color: var(--foreground);
-        }
-        :global(.input:focus) {
-          border-color: var(--primary);
-        }
-        :global(textarea.input) {
-          height: auto;
-          padding: 0.5rem 0.75rem;
-        }
-      `}</style>
     </div>
   );
 }

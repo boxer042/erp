@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -44,9 +47,7 @@ export function SupplierAdjustmentDialog({
   onSaved,
 }: SupplierAdjustmentDialogProps) {
   const editing = !!initialAdjustment;
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState<{
     supplierId: string;
@@ -97,22 +98,19 @@ export function SupplierAdjustmentDialog({
     }
   }, [open, initialAdjustment, fixedSupplier]);
 
-  useEffect(() => {
-    if (!open || fixedSupplier || initialAdjustment) return;
-    fetch("/api/suppliers")
-      .then((r) => r.json())
-      .then((d) => setSuppliers(d));
-  }, [open, fixedSupplier, initialAdjustment]);
+  const suppliersQuery = useQuery({
+    queryKey: queryKeys.suppliers.list(),
+    queryFn: () => apiGet<Supplier[]>("/api/suppliers"),
+    enabled: open && !fixedSupplier && !initialAdjustment,
+  });
+  const suppliers = suppliersQuery.data ?? [];
 
-  const handleSubmit = async () => {
-    if (!form.supplierId) { toast.error("거래처를 선택해주세요"); return; }
-    const abs = parseFloat(form.amount);
-    if (!abs || abs <= 0) { toast.error("금액을 입력해주세요"); return; }
-
-    const signedAmount = form.sign === "+" ? abs : -abs;
-
-    setSubmitting(true);
-    try {
+  const submitMutation = useMutation({
+    mutationFn: () => {
+      if (!form.supplierId) throw new Error("거래처를 선택해주세요");
+      const abs = parseFloat(form.amount);
+      if (!abs || abs <= 0) throw new Error("금액을 입력해주세요");
+      const signedAmount = form.sign === "+" ? abs : -abs;
       const url = editing
         ? `/api/suppliers/adjustments/${initialAdjustment!.id}`
         : "/api/suppliers/adjustments";
@@ -129,44 +127,34 @@ export function SupplierAdjustmentDialog({
             date: form.date,
             memo: form.memo || undefined,
           };
-
-      const res = await fetch(url, {
-        method: httpMethod,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        toast.error(typeof err?.error === "string" ? err.error : editing ? "수정 실패" : "등록 실패");
-        return;
-      }
-
+      return apiMutate(url, httpMethod, body);
+    },
+    onSuccess: () => {
       toast.success(editing ? "조정이 수정되었습니다" : "조정이 등록되었습니다");
+      queryClient.invalidateQueries({ queryKey: queryKeys.ledger.suppliers() });
       onOpenChange(false);
       onSaved?.();
-    } catch {
-      toast.error("오류가 발생했습니다");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || (editing ? "수정 실패" : "등록 실패")),
+  });
+  const submitting = submitMutation.isPending;
+  const handleSubmit = () => submitMutation.mutate();
 
-  const handleDelete = async () => {
+  const deleteMutation = useMutation({
+    mutationFn: () => apiMutate(`/api/suppliers/adjustments/${initialAdjustment!.id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("조정이 삭제되었습니다");
+      queryClient.invalidateQueries({ queryKey: queryKeys.ledger.suppliers() });
+      onOpenChange(false);
+      onSaved?.();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+  const deleting = deleteMutation.isPending;
+  const handleDelete = () => {
     if (!editing) return;
     if (!confirm("조정 항목을 삭제하시겠습니까?")) return;
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/suppliers/adjustments/${initialAdjustment!.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) { toast.error("삭제 실패"); return; }
-      toast.success("조정이 삭제되었습니다");
-      onOpenChange(false);
-      onSaved?.();
-    } finally {
-      setDeleting(false);
-    }
+    deleteMutation.mutate();
   };
 
   return (

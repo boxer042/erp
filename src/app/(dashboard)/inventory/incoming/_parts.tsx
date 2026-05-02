@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { CalendarIcon, Plus, Truck } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatComma, parseComma } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsCompactDevice } from "@/hooks/use-mobile";
 import { MobileInlineCellProductSearch } from "@/components/inline-cell-product-search-mobile";
 import type { SupplierProduct } from "./_types";
 
@@ -151,7 +151,7 @@ export function DateInput({ label, value, onChange }: { label: string; value: st
             value={text}
             onChange={(e) => setText(e.target.value)}
             onBlur={() => tryParse(text)}
-            onKeyDown={(e) => { if (e.key === "Enter") tryParse(text); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) tryParse(text); }}
             placeholder="20260329"
             className="h-8 flex-1 rounded-md border border-border bg-transparent px-3 text-sm outline-none focus:border-primary"
           />
@@ -213,7 +213,7 @@ export function InlineCellProductSearch({
   pendingNewProducts?: Array<{ name: string; spec: string; supplierCode: string; rowIndex: number }>;
   onSelectPending?: (p: { name: string; spec: string; supplierCode: string; rowIndex: number }) => void;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsCompactDevice();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 

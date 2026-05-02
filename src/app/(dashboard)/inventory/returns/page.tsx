@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { SupplierCombobox } from "@/components/supplier-combobox";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsCompactDevice } from "@/hooks/use-mobile";
 import { MobileInlineCellProductSearch } from "@/components/inline-cell-product-search-mobile";
 import {
   Plus, X, CalendarIcon, Loader2, FileText, ArrowUpRight, ChevronsUpDown,
@@ -195,7 +196,7 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
           value={text}
           onChange={(e) => setText(e.target.value)}
           onBlur={() => tryParse(text)}
-          onKeyDown={(e) => { if (e.key === "Enter") tryParse(text); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) tryParse(text); }}
           placeholder="20260329"
           className="h-9 flex-1 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus:border-primary"
         />
@@ -248,7 +249,7 @@ function InlineCellProductSearch({
   existingIds: string[];
   selectedName?: string;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsCompactDevice();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -479,17 +480,24 @@ export default function SupplierReturnsPage() {
 
   const fetchReturns = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (selectedSupplier !== "all") params.set("supplierId", selectedSupplier);
-    if (statusFilter !== "all") params.set("status", statusFilter);
-    const res = await fetch(`/api/supplier-returns?${params}`);
-    setReturns(await res.json());
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (selectedSupplier !== "all") params.set("supplierId", selectedSupplier);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      setReturns(await apiGet<SupplierReturn[]>(`/api/supplier-returns?${params}`));
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, [selectedSupplier, statusFilter]);
 
   const fetchSuppliers = useCallback(async () => {
-    const res = await fetch("/api/suppliers");
-    setSuppliers(await res.json());
+    try {
+      setSuppliers(await apiGet<Supplier[]>("/api/suppliers"));
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => { fetchReturns(); }, [fetchReturns]);
@@ -497,8 +505,11 @@ export default function SupplierReturnsPage() {
 
   const fetchSupplierProducts = useCallback(async (sid: string) => {
     if (!sid) return;
-    const res = await fetch(`/api/supplier-products?supplierId=${sid}`);
-    setSupplierProducts(await res.json());
+    try {
+      setSupplierProducts(await apiGet<SupplierProduct[]>(`/api/supplier-products?supplierId=${sid}`));
+    } catch {
+      // ignore
+    }
   }, []);
 
   const resetForm = () => {
@@ -524,8 +535,7 @@ export default function SupplierReturnsPage() {
     setIncomingOptions([]);
     fetchSupplierProducts(id);
     if (id) {
-      fetch(`/api/incoming?supplierId=${id}&status=CONFIRMED`)
-        .then((r) => r.json())
+      apiGet<IncomingOption[]>(`/api/incoming?supplierId=${id}&status=CONFIRMED`)
         .then(setIncomingOptions)
         .catch(() => {});
     }
@@ -535,8 +545,7 @@ export default function SupplierReturnsPage() {
     setSelectedIncomingId(incomingId);
     if (!incomingId) { setItems([emptyItem()]); return; }
     try {
-      const res = await fetch(`/api/incoming/${incomingId}`);
-      const data: IncomingDetail = await res.json();
+      const data = await apiGet<IncomingDetail>(`/api/incoming/${incomingId}`);
       setItems(data.items.map((item) => ({
         supplierProductId: item.supplierProduct.id,
         supplierProductName: item.supplierProduct.name,
@@ -600,39 +609,32 @@ export default function SupplierReturnsPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/supplier-returns", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          supplierId,
-          returnDate,
-          returnReason: returnReason || undefined,
-          memo: memo || undefined,
-          isExchange,
-          returnCost: (() => {
-            const total = Number(parseComma(returnCostSupply)) + Number(parseComma(returnCostTax));
-            return total > 0 ? String(total) : undefined;
-          })(),
-          returnCostIsTaxable: true,
-          returnCostType: (Number(parseComma(returnCostSupply)) > 0 && returnCostType) ? returnCostType : undefined,
-          returnCostNote: returnCostNote || undefined,
-          items: validItems.map((item) => ({
-            supplierProductId: item.supplierProductId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            memo: item.memo || undefined,
-          })),
-        }),
+      await apiMutate("/api/supplier-returns", "POST", {
+        supplierId,
+        returnDate,
+        returnReason: returnReason || undefined,
+        memo: memo || undefined,
+        isExchange,
+        returnCost: (() => {
+          const total = Number(parseComma(returnCostSupply)) + Number(parseComma(returnCostTax));
+          return total > 0 ? String(total) : undefined;
+        })(),
+        returnCostIsTaxable: true,
+        returnCostType: (Number(parseComma(returnCostSupply)) > 0 && returnCostType) ? returnCostType : undefined,
+        returnCostNote: returnCostNote || undefined,
+        items: validItems.map((item) => ({
+          supplierProductId: item.supplierProductId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          memo: item.memo || undefined,
+        })),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "반품 등록 실패");
-        return;
-      }
       toast.success("반품이 등록되었습니다");
       setCreateOpen(false);
       resetForm();
       fetchReturns();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "반품 등록 실패");
     } finally {
       setSubmitting(false);
     }
@@ -641,28 +643,25 @@ export default function SupplierReturnsPage() {
   const openDetail = async (id: string) => {
     setDetailOpen(true);
     setDetailLoading(true);
-    const res = await fetch(`/api/supplier-returns/${id}`);
-    setDetail(await res.json());
-    setDetailLoading(false);
+    try {
+      setDetail(await apiGet<ReturnDetail>(`/api/supplier-returns/${id}`));
+    } catch {
+      // ignore
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const handleAction = async (action: "confirm" | "cancel") => {
     if (!detail) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/supplier-returns/${detail.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "처리 실패");
-        return;
-      }
+      await apiMutate(`/api/supplier-returns/${detail.id}`, "PUT", { action });
       toast.success(action === "confirm" ? "반품이 확정되었습니다" : "반품이 취소되었습니다");
       setDetailOpen(false);
       fetchReturns();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "처리 실패");
     } finally {
       setActionLoading(false);
     }
@@ -672,15 +671,13 @@ export default function SupplierReturnsPage() {
     if (!detail) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/supplier-returns/${detail.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "삭제 실패");
-        return;
-      }
+      await apiMutate(`/api/supplier-returns/${detail.id}`, "DELETE");
       toast.success("반품이 삭제되었습니다");
       setDetailOpen(false);
       fetchReturns();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패");
+      return;
     } finally {
       setActionLoading(false);
     }

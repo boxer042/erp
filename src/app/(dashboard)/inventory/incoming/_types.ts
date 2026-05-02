@@ -27,9 +27,15 @@ export interface Incoming {
   _count: { items: number };
   items: Array<{
     id: string;
+    quantity: string;
+    unitPrice: string;
+    memo: string | null;
     supplierProduct: {
       id: string;
       name: string;
+      supplierCode: string | null;
+      unitPrice: string;
+      unitOfMeasure: string;
       _count: { productMappings: number };
     };
   }>;

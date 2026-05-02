@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { CustomerCombobox } from "@/components/customer-combobox";
 import { QuickCustomerSheet } from "@/components/quick-register-sheets";
 import { formatComma, parseComma } from "@/lib/utils";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────
@@ -123,22 +124,24 @@ export default function RepairEstimatePage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/customers").then((r) => r.json()),
-      fetch("/api/repair-packages").then((r) => r.json()),
-      fetch("/api/repair-labor-presets").then((r) => r.json()),
-      fetch("/api/products").then((r) => r.json()),
+      apiGet<CustomerLite[]>("/api/customers"),
+      apiGet<RepairPackage[]>("/api/repair-packages"),
+      apiGet<LaborPreset[]>("/api/repair-labor-presets"),
+      apiGet<ProductLite[] | { items: ProductLite[] }>("/api/products"),
     ]).then(([c, pkg, lbr, prd]) => {
       setCustomers(Array.isArray(c) ? c : []);
       setPackages(Array.isArray(pkg) ? pkg : []);
       setLabors(Array.isArray(lbr) ? lbr : []);
       const items = Array.isArray(prd) ? prd : (prd?.items ?? []);
       setProducts(items);
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!customerId) { setMachines([]); setMachineId(""); return; }
-    fetch(`/api/customer-machines?customerId=${customerId}`).then((r) => r.json()).then(setMachines);
+    apiGet<MachineLite[]>(`/api/customer-machines?customerId=${customerId}`)
+      .then(setMachines)
+      .catch(() => {});
   }, [customerId]);
 
   // ── Cart helpers ─────────────────────────────────────────
@@ -220,32 +223,26 @@ export default function RepairEstimatePage() {
     if (!customerId) { toast.error("고객을 선택하세요"); return; }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/repair-tickets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId,
-          customerMachineId: machineId || null,
-          symptom: symptom.trim() || null,
-          memo: memo.trim() || null,
-          labors: cartLabors.map((l) => ({
-            name: l.name,
-            hours: parseInt(l.quantity) || 1,
-            unitRate: parseFloat(parseComma(l.unitRate)) || 0,
-          })),
-          parts: cartParts.map((p) => ({
-            productId: p.productId,
-            quantity: parseFloat(p.quantity) || 1,
-            unitPrice: parseFloat(parseComma(p.unitPrice)) || 0,
-          })),
-        }),
+      const ticket = await apiMutate<{ id: string; ticketNo: string }>("/api/repair-tickets", "POST", {
+        customerId,
+        customerMachineId: machineId || null,
+        symptom: symptom.trim() || null,
+        memo: memo.trim() || null,
+        labors: cartLabors.map((l) => ({
+          name: l.name,
+          hours: parseInt(l.quantity) || 1,
+          unitRate: parseFloat(parseComma(l.unitRate)) || 0,
+        })),
+        parts: cartParts.map((p) => ({
+          productId: p.productId,
+          quantity: parseFloat(p.quantity) || 1,
+          unitPrice: parseFloat(parseComma(p.unitPrice)) || 0,
+        })),
       });
-      if (!res.ok) throw new Error();
-      const ticket = await res.json();
       toast.success(`수리 접수 완료 — ${ticket.ticketNo}`);
       router.push(`/pos/repair/${ticket.id}`);
-    } catch {
-      toast.error("접수 실패");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "접수 실패");
     } finally {
       setSubmitting(false);
     }

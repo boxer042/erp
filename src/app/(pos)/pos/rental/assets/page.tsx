@@ -1,11 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 
 interface Asset {
   id: string;
@@ -28,59 +36,51 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function RentalAssetsPage() {
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({
     name: "", brand: "", modelNo: "", serialNo: "",
     dailyRate: "0", monthlyRate: "0", depositAmount: "0", memo: "",
   });
-  const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/rental-assets");
-    if (res.ok) setAssets(await res.json());
-    setLoading(false);
-  }, []);
+  const assetsQuery = useQuery({
+    queryKey: queryKeys.rentalAssets.list(),
+    queryFn: () => apiGet<Asset[]>("/api/rental-assets"),
+  });
+  const assets = assetsQuery.data ?? [];
+  const loading = assetsQuery.isPending;
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.rentalAssets.all });
 
-  useEffect(() => { load(); }, [load]);
-
-  const add = async () => {
-    if (!form.name.trim()) {
-      toast.error("자산명 필수");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/rental-assets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          brand: form.brand,
-          modelNo: form.modelNo,
-          serialNo: form.serialNo,
-          dailyRate: parseFloat(parseComma(form.dailyRate)) || 0,
-          monthlyRate: parseFloat(parseComma(form.monthlyRate)) || 0,
-          depositAmount: parseFloat(parseComma(form.depositAmount)) || 0,
-          memo: form.memo,
-        }),
+  const addMutation = useMutation({
+    mutationFn: () => {
+      if (!form.name.trim()) throw new Error("자산명 필수");
+      return apiMutate("/api/rental-assets", "POST", {
+        name: form.name,
+        brand: form.brand,
+        modelNo: form.modelNo,
+        serialNo: form.serialNo,
+        dailyRate: parseFloat(parseComma(form.dailyRate)) || 0,
+        monthlyRate: parseFloat(parseComma(form.monthlyRate)) || 0,
+        depositAmount: parseFloat(parseComma(form.depositAmount)) || 0,
+        memo: form.memo,
       });
-      if (!res.ok) throw new Error();
+    },
+    onSuccess: () => {
       setForm({ name: "", brand: "", modelNo: "", serialNo: "", dailyRate: "0", monthlyRate: "0", depositAmount: "0", memo: "" });
-      load();
+      refresh();
       toast.success("등록되었습니다");
-    } catch {
-      toast.error("등록 실패");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "등록 실패"),
+  });
+  const submitting = addMutation.isPending;
+  const add = () => addMutation.mutate();
 
-  const remove = async (id: string) => {
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/rental-assets/${id}`, "DELETE"),
+    onSuccess: () => refresh(),
+  });
+  const remove = (id: string) => {
     if (!confirm("비활성화하시겠습니까?")) return;
-    await fetch(`/api/rental-assets/${id}`, { method: "DELETE" });
-    load();
+    removeMutation.mutate(id);
   };
 
   return (
@@ -93,29 +93,25 @@ export default function RentalAssetsPage() {
       <div className="mb-6 rounded-xl border border-border bg-background p-4">
         <div className="mb-2 text-sm font-semibold">신규 자산 등록</div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-          <input className="input h-10" placeholder="자산명*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input className="input h-10" placeholder="브랜드" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
-          <input className="input h-10" placeholder="모델번호" value={form.modelNo} onChange={(e) => setForm({ ...form, modelNo: e.target.value })} />
-          <input className="input h-10" placeholder="시리얼" value={form.serialNo} onChange={(e) => setForm({ ...form, serialNo: e.target.value })} />
+          <Input className="h-10" placeholder="자산명*" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Input className="h-10" placeholder="브랜드" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+          <Input className="h-10" placeholder="모델번호" value={form.modelNo} onChange={(e) => setForm({ ...form, modelNo: e.target.value })} />
+          <Input className="h-10" placeholder="시리얼" value={form.serialNo} onChange={(e) => setForm({ ...form, serialNo: e.target.value })} />
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">일 요율</label>
-            <input className="input h-10" value={formatComma(form.dailyRate)} onChange={(e) => setForm({ ...form, dailyRate: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
+            <Input className="h-10" inputMode="numeric" value={formatComma(form.dailyRate)} onChange={(e) => setForm({ ...form, dailyRate: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
           </div>
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">월 요율</label>
-            <input className="input h-10" value={formatComma(form.monthlyRate)} onChange={(e) => setForm({ ...form, monthlyRate: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
+            <Input className="h-10" inputMode="numeric" value={formatComma(form.monthlyRate)} onChange={(e) => setForm({ ...form, monthlyRate: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
           </div>
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">보증금</label>
-            <input className="input h-10" value={formatComma(form.depositAmount)} onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
+            <Input className="h-10" inputMode="numeric" value={formatComma(form.depositAmount)} onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })} onFocus={(e) => e.currentTarget.select()} />
           </div>
-          <button
-            onClick={add}
-            disabled={submitting}
-            className="self-end h-10 rounded-md bg-primary text-sm font-semibold text-white disabled:opacity-50"
-          >
-            <Plus className="mx-auto h-4 w-4" />
-          </button>
+          <Button onClick={add} disabled={submitting} className="self-end h-10">
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -130,54 +126,42 @@ export default function RentalAssetsPage() {
           등록된 자산이 없습니다
         </div>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
-              <th className="p-2">자산번호</th>
-              <th className="p-2">자산명</th>
-              <th className="p-2">브랜드</th>
-              <th className="p-2">모델/시리얼</th>
-              <th className="p-2 text-right">일 요율</th>
-              <th className="p-2 text-right">월 요율</th>
-              <th className="p-2 text-right">보증금</th>
-              <th className="p-2">상태</th>
-              <th className="p-2"></th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="min-w-[900px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>자산번호</TableHead>
+              <TableHead>자산명</TableHead>
+              <TableHead>브랜드</TableHead>
+              <TableHead>모델/시리얼</TableHead>
+              <TableHead className="text-right">일 요율</TableHead>
+              <TableHead className="text-right">월 요율</TableHead>
+              <TableHead className="text-right">보증금</TableHead>
+              <TableHead>상태</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {assets.map((a) => (
-              <tr key={a.id} className="border-b border-neutral-100">
-                <td className="p-2 font-mono text-xs">{a.assetNo}</td>
-                <td className="p-2 font-medium">{a.name}</td>
-                <td className="p-2">{a.brand ?? ""}</td>
-                <td className="p-2 text-xs">{[a.modelNo, a.serialNo].filter(Boolean).join(" / ")}</td>
-                <td className="p-2 text-right">₩{Number(a.dailyRate).toLocaleString("ko-KR")}</td>
-                <td className="p-2 text-right">₩{Number(a.monthlyRate).toLocaleString("ko-KR")}</td>
-                <td className="p-2 text-right">₩{Number(a.depositAmount).toLocaleString("ko-KR")}</td>
-                <td className="p-2">{STATUS_LABEL[a.status] ?? a.status}</td>
-                <td className="p-2 text-right">
-                  <button className="text-muted-foreground hover:text-red-500" onClick={() => remove(a.id)}>
+              <TableRow key={a.id}>
+                <TableCell className="font-mono text-xs">{a.assetNo}</TableCell>
+                <TableCell className="font-medium">{a.name}</TableCell>
+                <TableCell>{a.brand ?? ""}</TableCell>
+                <TableCell className="text-xs">{[a.modelNo, a.serialNo].filter(Boolean).join(" / ")}</TableCell>
+                <TableCell className="text-right">₩{Number(a.dailyRate).toLocaleString("ko-KR")}</TableCell>
+                <TableCell className="text-right">₩{Number(a.monthlyRate).toLocaleString("ko-KR")}</TableCell>
+                <TableCell className="text-right">₩{Number(a.depositAmount).toLocaleString("ko-KR")}</TableCell>
+                <TableCell>{STATUS_LABEL[a.status] ?? a.status}</TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => remove(a.id)}>
                     <Trash2 className="h-3 w-3" />
-                  </button>
-                </td>
-              </tr>
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
 
-      <style jsx>{`
-        :global(.input) {
-          display: block;
-          width: 100%;
-          border-radius: 0.5rem;
-          border: 1px solid rgb(229 229 229);
-          padding: 0.5rem 0.75rem;
-          font-size: 0.9rem;
-          outline: none;
-        }
-        :global(.input:focus) { border-color: #3ecf8e; }
-      `}</style>
     </div>
   );
 }

@@ -286,11 +286,7 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
       }
       // 기존 로고가 있으면 삭제
       if (logoPath) {
-        await fetch("/api/brands/upload", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: logoPath }),
-        });
+        await apiMutate("/api/brands/upload", "DELETE", { path: logoPath });
       }
       setLogoUrl(json.url);
       setLogoPath(json.path);
@@ -302,11 +298,7 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
 
   const handleRemoveLogo = async () => {
     if (logoPath) {
-      await fetch("/api/brands/upload", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: logoPath }),
-      });
+      await apiMutate("/api/brands/upload", "DELETE", { path: logoPath });
     }
     setLogoUrl(null);
     setLogoPath(null);

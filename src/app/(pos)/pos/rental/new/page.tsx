@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,6 +12,9 @@ import { CustomerCombobox } from "@/components/customer-combobox";
 import { QuickCustomerSheet } from "@/components/quick-register-sheets";
 import { formatComma, parseComma } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 interface Asset {
   id: string;
@@ -37,8 +43,7 @@ const PAYMENTS = [
 
 export default function NewRentalPage() {
   const router = useRouter();
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [customers, setCustomers] = useState<CustomerLite[]>([]);
+  const queryClient = useQueryClient();
   const [assetId, setAssetId] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
@@ -56,12 +61,18 @@ export default function NewRentalPage() {
     paymentMethod: "CARD" as "CASH" | "CARD" | "TRANSFER" | "UNPAID",
     memo: "",
   });
-  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/rental-assets?status=AVAILABLE").then((r) => r.json()).then(setAssets);
-    fetch("/api/customers").then((r) => r.json()).then(setCustomers);
-  }, []);
+  const assetsQuery = useQuery({
+    queryKey: queryKeys.rentalAssets.list({ status: "AVAILABLE" }),
+    queryFn: () => apiGet<Asset[]>("/api/rental-assets?status=AVAILABLE"),
+  });
+  const assets = assetsQuery.data ?? [];
+
+  const customersQuery = useQuery({
+    queryKey: queryKeys.customers.list(),
+    queryFn: () => apiGet<CustomerLite[]>("/api/customers"),
+  });
+  const customers = customersQuery.data ?? [];
 
   useEffect(() => {
     const asset = assets.find((a) => a.id === assetId);
@@ -74,38 +85,31 @@ export default function NewRentalPage() {
     }
   }, [assetId, assets]);
 
-  const submit = async () => {
-    if (!assetId || !customerId) {
-      toast.error("자산과 고객을 선택하세요");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/rentals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assetId,
-          customerId,
-          startDate: form.startDate,
-          endDate: form.endDate,
-          rateType: form.rateType,
-          unitRate: parseFloat(parseComma(form.unitRate)) || 0,
-          depositAmount: parseFloat(parseComma(form.depositAmount)) || 0,
-          paymentMethod: form.paymentMethod,
-          memo: form.memo,
-        }),
+  const submitMutation = useMutation({
+    mutationFn: () => {
+      if (!assetId || !customerId) throw new Error("자산과 고객을 선택하세요");
+      return apiMutate<{ id: string; rentalNo: string }>("/api/rentals", "POST", {
+        assetId,
+        customerId,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        rateType: form.rateType,
+        unitRate: parseFloat(parseComma(form.unitRate)) || 0,
+        depositAmount: parseFloat(parseComma(form.depositAmount)) || 0,
+        paymentMethod: form.paymentMethod,
+        memo: form.memo,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "임대 시작 실패");
+    },
+    onSuccess: (data) => {
       toast.success(`임대 시작 — ${data.rentalNo}`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.rentals.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rentalAssets.all });
       router.push(`/pos/rental/${data.id}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "실패");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "임대 시작 실패"),
+  });
+  const submitting = submitMutation.isPending;
+  const submit = () => submitMutation.mutate();
 
   return (
     <div className="mx-auto max-w-2xl p-6">
@@ -147,11 +151,11 @@ export default function NewRentalPage() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium">시작일</label>
-            <input type="date" className="input h-11" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+            <Input type="date" className="h-11" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">반납 예정일</label>
-            <input type="date" className="input h-11" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+            <Input type="date" className="h-11" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
           </div>
         </div>
 
@@ -170,8 +174,9 @@ export default function NewRentalPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">단가</label>
-            <input
-              className="input h-11 text-right"
+            <Input
+              className="h-11 text-right"
+              inputMode="numeric"
               value={formatComma(form.unitRate)}
               onChange={(e) => setForm({ ...form, unitRate: parseComma(e.target.value) })}
               onFocus={(e) => e.currentTarget.select()}
@@ -181,8 +186,9 @@ export default function NewRentalPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium">보증금</label>
-          <input
-            className="input h-11 text-right"
+          <Input
+            className="h-11 text-right"
+            inputMode="numeric"
             value={formatComma(form.depositAmount)}
             onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })}
             onFocus={(e) => e.currentTarget.select()}
@@ -210,21 +216,15 @@ export default function NewRentalPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium">메모</label>
-          <textarea className="input" rows={2} value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} />
+          <Textarea rows={2} value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Link href="/pos/rental" className="flex h-11 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted/50">
-            취소
-          </Link>
-          <button
-            onClick={submit}
-            disabled={submitting}
-            className="flex h-11 items-center gap-1 rounded-lg bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"
-          >
+          <Button variant="outline" onClick={() => router.push("/pos/rental")}>취소</Button>
+          <Button onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             임대 시작
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -233,27 +233,10 @@ export default function NewRentalPage() {
         onOpenChange={setQuickCustomerOpen}
         defaultName={quickDefaultName}
         onCreated={(c) => {
-          fetch("/api/customers").then((r) => r.json()).then((list) => {
-            setCustomers(list);
-            setCustomerId(c.id);
-          });
+          queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
+          setCustomerId(c.id);
         }}
       />
-
-      <style jsx>{`
-        :global(.input) {
-          display: block;
-          width: 100%;
-          border-radius: 0.5rem;
-          border: 1px solid var(--border);
-          padding: 0.5rem 0.75rem;
-          font-size: 0.95rem;
-          outline: none;
-          background: var(--background);
-          color: var(--foreground);
-        }
-        :global(.input:focus) { border-color: var(--primary); }
-      `}</style>
     </div>
   );
 }

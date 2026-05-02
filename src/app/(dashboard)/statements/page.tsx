@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -63,32 +66,61 @@ const STATUS_VARIANT: Record<StatementStatus, "default" | "secondary" | "destruc
 };
 
 export default function StatementsPage() {
-  const [statements, setStatements] = useState<StatementRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editData, setEditData] = useState<StatementFormData | null>(null);
   const [printDialogId, setPrintDialogId] = useState<string | null>(null);
 
-  const fetchStatements = async (q = search) => {
-    setLoading(true);
-    const res = await fetch(`/api/statements?search=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    setStatements(data);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchStatements(); }, []);
+  const statementsQuery = useQuery({
+    queryKey: queryKeys.statements.list({ search: appliedSearch }),
+    queryFn: () => apiGet<StatementRow[]>(`/api/statements?search=${encodeURIComponent(appliedSearch)}`),
+  });
+  const statements = statementsQuery.data ?? [];
+  const loading = statementsQuery.isPending;
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
 
   const openCreate = () => {
     setEditData(null);
     setSheetOpen(true);
   };
 
+  type StatementDetail = {
+    id: string;
+    status: StatementStatus;
+    issueDate: string;
+    customerId: string | null;
+    customerNameSnapshot: string | null;
+    customerPhoneSnapshot: string | null;
+    customerAddressSnapshot: string | null;
+    customerBusinessNumberSnapshot: string | null;
+    orderId: string | null;
+    quotationId: string | null;
+    memo: string | null;
+    items: Array<{
+      productId: string | null;
+      name: string;
+      spec: string | null;
+      unitOfMeasure: string;
+      quantity: string;
+      listPrice: string;
+      discountAmount: string;
+      unitPrice: string;
+      isTaxable: boolean;
+      isZeroRateEligible?: boolean;
+      memo: string | null;
+    }>;
+  };
+
   const openEdit = async (row: StatementRow) => {
-    const res = await fetch(`/api/statements/${row.id}`);
-    if (!res.ok) return toast.error("거래명세표를 불러오지 못했습니다");
-    const s = await res.json();
+    let s: StatementDetail;
+    try {
+      s = await apiGet<StatementDetail>(`/api/statements/${row.id}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "거래명세표를 불러오지 못했습니다");
+      return;
+    }
     setEditData({
       id: s.id,
       status: s.status,
@@ -101,18 +133,7 @@ export default function StatementsPage() {
       orderId: s.orderId || "",
       quotationId: s.quotationId || "",
       memo: s.memo || "",
-      items: s.items.map((it: {
-        productId: string | null;
-        name: string;
-        spec: string | null;
-        unitOfMeasure: string;
-        quantity: string;
-        listPrice: string;
-        discountAmount: string;
-        unitPrice: string;
-        isTaxable: boolean;
-        memo: string | null;
-      }) => ({
+      items: s.items.map((it) => ({
         rowType: it.productId ? ("product" as const) : ("free" as const),
         productId: it.productId,
         name: it.name,
@@ -122,18 +143,25 @@ export default function StatementsPage() {
         unitPrice: parseFloat(it.listPrice) > 0 ? it.listPrice : it.unitPrice,
         discount: parseFloat(it.discountAmount) > 0 ? it.discountAmount : "",
         isTaxable: it.isTaxable,
+        isZeroRateEligible: it.isZeroRateEligible ?? false,
         memo: it.memo || "",
       })),
     });
     setSheetOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/statements/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("거래명세표가 삭제되었습니다");
+      refresh();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+  });
+
+  const handleDelete = (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-    const res = await fetch(`/api/statements/${id}`, { method: "DELETE" });
-    if (!res.ok) return toast.error("삭제에 실패했습니다");
-    toast.success("거래명세표가 삭제되었습니다");
-    fetchStatements();
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -143,10 +171,10 @@ export default function StatementsPage() {
           search={{
             value: search,
             onChange: setSearch,
-            onSearch: () => fetchStatements(search),
+            onSearch: () => setAppliedSearch(search),
             placeholder: "명세표번호 / 고객 검색",
           }}
-          onRefresh={() => fetchStatements(search)}
+          onRefresh={refresh}
           onAdd={openCreate}
           addLabel="거래명세표 작성"
           loading={loading}
@@ -206,7 +234,7 @@ export default function StatementsPage() {
         onOpenChange={setSheetOpen}
         editData={editData}
         onSaved={(id) => {
-          fetchStatements(search);
+          refresh();
           if (id) setPrintDialogId(id);
         }}
       />

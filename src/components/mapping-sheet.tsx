@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
 import { Trash2, Loader2, Plus } from "lucide-react";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
@@ -158,17 +159,19 @@ export function MappingSheet(props: MappingSheetProps) {
   const fetchMappings = useCallback(async () => {
     if (!fixedId) return;
     setLoading(true);
-    const param = mode === "supplier-to-product" ? `supplierProductId=${fixedId}` : `productId=${fixedId}`;
-    const res = await fetch(`/api/products/mapping?${param}`);
-    setMappings(await res.json());
-    setLoading(false);
+    try {
+      const param = mode === "supplier-to-product" ? `supplierProductId=${fixedId}` : `productId=${fixedId}`;
+      setMappings(await apiGet<MappingEntry[]>(`/api/products/mapping?${param}`));
+    } finally {
+      setLoading(false);
+    }
   }, [fixedId, mode]);
 
   const fetchOptions = useCallback(async () => {
     if (mode === "supplier-to-product") {
-      setProducts(await fetch("/api/products").then((r) => r.json()));
+      setProducts(await apiGet<Product[]>("/api/products"));
     } else {
-      setSupplierProducts(await fetch("/api/supplier-products").then((r) => r.json()));
+      setSupplierProducts(await apiGet<SupplierProduct[]>("/api/supplier-products"));
     }
   }, [mode]);
 
@@ -213,24 +216,19 @@ export function MappingSheet(props: MappingSheetProps) {
     setSubmitting(true);
     try {
       for (const id of deletedIds) {
-        await fetch(`/api/products/mapping?id=${id}`, { method: "DELETE" });
+        await apiMutate(`/api/products/mapping?id=${id}`, "DELETE");
       }
       for (const pending of pendingMappings) {
         const body = mode === "supplier-to-product"
           ? { supplierProductId: fixedId, productId: pending.targetId, conversionRate: pending.conversionRate }
           : { supplierProductId: pending.targetId, productId: fixedId, conversionRate: pending.conversionRate };
-
-        const res = await fetch("/api/products/mapping", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          toast.error(typeof err.error === "string" ? err.error : `매핑 추가 실패: ${pending.targetLabel}`);
+        let created: { product?: { sellingPrice?: string }; productId?: string };
+        try {
+          created = await apiMutate<{ product?: { sellingPrice?: string }; productId?: string }>("/api/products/mapping", "POST", body);
+        } catch (err) {
+          toast.error(err instanceof ApiError ? err.message : `매핑 추가 실패: ${pending.targetLabel}`);
           continue;
         }
-        const created = await res.json();
         if (created.product?.sellingPrice !== undefined && parseFloat(created.product.sellingPrice) === 0) {
           const pid = created.productId || (mode === "product-to-supplier" ? fixedId : pending.targetId);
           toast.warning("판매가가 설정되지 않았습니다", {
@@ -427,14 +425,17 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
 
   const fetchCosts = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/supplier-products/${supplierProductId}/costs`);
-    setCosts(await res.json());
-    setLoading(false);
+    try {
+      setCosts(await apiGet<IncomingCost[]>(`/api/supplier-products/${supplierProductId}/costs`));
+    } finally {
+      setLoading(false);
+    }
   }, [supplierProductId]);
 
   const fetchAvgShipping = useCallback(async () => {
-    const res = await fetch(`/api/supplier-products/${supplierProductId}/avg-shipping`);
-    const data = await res.json();
+    const data = await apiGet<{ avgShippingCost: number | null; avgShippingIsTaxable: boolean | null }>(
+      `/api/supplier-products/${supplierProductId}/avg-shipping`,
+    );
     setAvgShippingCost(data.avgShippingCost ?? null);
     setAvgShippingIsTaxable(data.avgShippingIsTaxable ?? false);
   }, [supplierProductId]);
@@ -455,12 +456,13 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
     if (!name.trim() || !value) { toast.error("이름과 금액을 입력해주세요"); return; }
     setAdding(true);
     try {
-      const res = await fetch(`/api/supplier-products/${supplierProductId}/costs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), costType, value, perUnit, isTaxable }),
+      await apiMutate(`/api/supplier-products/${supplierProductId}/costs`, "POST", {
+        name: name.trim(),
+        costType,
+        value,
+        perUnit,
+        isTaxable,
       });
-      if (!res.ok) { toast.error("비용 추가에 실패했습니다"); return; }
       setName("");
       setValue("");
       setCostType("FIXED");
@@ -469,13 +471,15 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
       await fetchCosts();
       onCostChange?.();
       toast.success("비용이 추가되었습니다");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "비용 추가에 실패했습니다");
     } finally {
       setAdding(false);
     }
   };
 
   const handleDelete = async (costId: string) => {
-    await fetch(`/api/supplier-products/${supplierProductId}/costs?costId=${costId}`, { method: "DELETE" });
+    await apiMutate(`/api/supplier-products/${supplierProductId}/costs?costId=${costId}`, "DELETE");
     setCosts((prev) => prev.filter((c) => c.id !== costId));
     onCostChange?.();
   };
@@ -507,7 +511,7 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
                 placeholder="예: 택배비"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd(); }}
                 className="h-8 text-[13px]"
               />
               <Select value={costType} onValueChange={(v) => setCostType((v ?? "FIXED") as "FIXED" | "PERCENTAGE")}>
@@ -529,7 +533,7 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
                   setValue(v);
                 }}
                 onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd(); }}
                 className="h-8 text-[13px]"
               />
               <Select value={perUnit ? "unit" : "incoming"} onValueChange={(v) => setPerUnit(v === "unit")}>

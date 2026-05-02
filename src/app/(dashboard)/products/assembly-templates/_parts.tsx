@@ -80,9 +80,6 @@ function LabelsSkeletonRows({ rows = 5 }: { rows?: number }) {
 
 export function TemplatesView() {
   const queryClient = useQueryClient();
-  const [rows, setRows] = useState<TemplateRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<ProductOption[]>([]);
 
   const labelsQuery = useQuery({
     queryKey: queryKeys.assemblySlotLabels.list(),
@@ -101,45 +98,35 @@ export function TemplatesView() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TemplateRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  const fetchRows = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/assembly-templates");
-      if (res.ok) setRows(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const rowsQuery = useQuery({
+    queryKey: queryKeys.assembly.templates(),
+    queryFn: () => apiGet<TemplateRow[]>("/api/assembly-templates"),
+  });
+  const rows = rowsQuery.data ?? [];
+  const loading = rowsQuery.isPending;
+  const fetchRows = () => queryClient.invalidateQueries({ queryKey: queryKeys.assembly.all });
 
-  const fetchProducts = useCallback(async () => {
-    // 벌크 상품도 슬롯 기본 상품으로 선택 가능하도록 isBulk=all로 전체 조회
-    const res = await fetch("/api/products?isBulk=all");
-    if (res.ok) {
-      const data = await res.json();
-      setProducts(
-        data.map((p: {
-          id: string; name: string; sku: string;
-          sellingPrice: string; unitCost: string | null;
-          unitOfMeasure: string; isSet: boolean;
-        }) => ({
-          id: p.id,
-          name: p.name,
-          sku: p.sku,
-          sellingPrice: p.sellingPrice,
-          unitCost: p.unitCost,
-          unitOfMeasure: p.unitOfMeasure,
-          isSet: p.isSet,
-        })),
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRows();
-    fetchProducts();
-  }, [fetchRows, fetchProducts]);
+  const productsQuery = useQuery({
+    queryKey: queryKeys.products.list({ scope: "assembly-templates-all" }),
+    queryFn: async () => {
+      const data = await apiGet<Array<{
+        id: string; name: string; sku: string;
+        sellingPrice: string; unitCost: string | null;
+        unitOfMeasure: string; isSet: boolean;
+      }>>("/api/products?isBulk=all");
+      return data.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        sellingPrice: p.sellingPrice,
+        unitCost: p.unitCost,
+        unitOfMeasure: p.unitOfMeasure,
+        isSet: p.isSet,
+      })) as ProductOption[];
+    },
+  });
+  const products = productsQuery.data ?? [];
 
   const reset = () => {
     setEditingId(null);
@@ -156,28 +143,30 @@ export function TemplatesView() {
   };
 
   const openEdit = async (row: TemplateRow) => {
-    try {
-      const res = await fetch(`/api/assembly-templates/${row.id}`);
-      if (!res.ok) {
-        toast.error("템플릿을 불러오지 못했습니다");
-        return;
-      }
-      const t = (await res.json()) as {
+    type TemplateDetail = {
+      id: string;
+      name: string;
+      description: string | null;
+      defaultLaborCost: string | null;
+      isActive: boolean;
+      slots: Array<{
         id: string;
-        name: string;
-        description: string | null;
-        defaultLaborCost: string | null;
-        isActive: boolean;
-        slots: Array<{
-          id: string;
-          label: string;
-          slotLabelId: string | null;
-          order: number;
-          defaultProductId: string | null;
-          defaultQuantity: string;
-          isVariable: boolean;
-        }>;
-      };
+        label: string;
+        slotLabelId: string | null;
+        order: number;
+        defaultProductId: string | null;
+        defaultQuantity: string;
+        isVariable: boolean;
+      }>;
+    };
+    let t: TemplateDetail;
+    try {
+      t = await apiGet<TemplateDetail>(`/api/assembly-templates/${row.id}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "템플릿을 불러오지 못했습니다");
+      return;
+    }
+    try {
       setEditingId(t.id);
       setName(t.name);
       setDescription(t.description ?? "");
@@ -296,26 +285,21 @@ export function TemplatesView() {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/assembly-templates/${deleteTarget.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(typeof err.error === "string" ? err.error : "삭제 실패");
-        return;
-      }
+  const deleteMutation = useMutation({
+    mutationFn: () => {
+      if (!deleteTarget) throw new Error("대상이 없습니다");
+      return apiMutate(`/api/assembly-templates/${deleteTarget.id}`, "DELETE");
+    },
+    onSuccess: () => {
       toast.success("템플릿이 삭제되었습니다");
       setDeleteOpen(false);
       setDeleteTarget(null);
       fetchRows();
-    } finally {
-      setDeleting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "삭제 실패"),
+  });
+  const deleting = deleteMutation.isPending;
+  const confirmDelete = () => deleteMutation.mutate();
 
   return (
     <div className="flex h-full flex-col">

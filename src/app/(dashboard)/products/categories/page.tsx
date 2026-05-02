@@ -177,11 +177,7 @@ export default function CategoriesPage() {
       if (!res.ok) throw new Error((await res.json()).error ?? "업로드 실패");
       const data = await res.json() as { url: string; path: string };
       if (form.imagePath) {
-        fetch("/api/categories/upload", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: form.imagePath }),
-        }).catch(() => {});
+        apiMutate("/api/categories/upload", "DELETE", { path: form.imagePath }).catch(() => {});
       }
       setForm((f) => ({ ...f, imageUrl: data.url, imagePath: data.path }));
     } catch (e) {
@@ -193,11 +189,7 @@ export default function CategoriesPage() {
 
   const handleRemoveImage = async () => {
     if (form.imagePath) {
-      fetch("/api/categories/upload", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: form.imagePath }),
-      }).catch(() => {});
+      apiMutate("/api/categories/upload", "DELETE", { path: form.imagePath }).catch(() => {});
     }
     setForm((f) => ({ ...f, imageUrl: null, imagePath: null }));
   };

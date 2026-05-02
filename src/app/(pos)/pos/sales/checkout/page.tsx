@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -39,10 +41,15 @@ export default function CheckoutPage() {
   const router = useRouter();
   const params = useSearchParams();
   const customerId = params.get("customerId") ?? "";
-  const [customer, setCustomer] = useState<CustomerLite | null>(null);
   const [payment, setPayment] = useState<Payment>("CARD");
   const [taxInvoice, setTaxInvoice] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+
+  const customerQuery = useQuery({
+    queryKey: ["customers", "detail", customerId],
+    queryFn: () => apiGet<CustomerLite>(`/api/customers/${customerId}`),
+    enabled: !!customerId,
+  });
+  const customer = customerQuery.data ?? null;
 
   // 변형 선택 다이얼로그
   const [variantPickerFor, setVariantPickerFor] = useState<CartItem | null>(null);
@@ -55,11 +62,8 @@ export default function CheckoutPage() {
     setVariantOptions([]);
     setVariantLoading(true);
     try {
-      const res = await fetch(`/api/products/${item.productId}`);
-      if (res.ok) {
-        const detail = await res.json();
-        setVariantOptions(detail.variants ?? []);
-      }
+      const detail = await apiGet<{ variants?: VariantOption[] }>(`/api/products/${item.productId}`);
+      setVariantOptions(detail.variants ?? []);
     } finally {
       setVariantLoading(false);
     }
@@ -82,11 +86,6 @@ export default function CheckoutPage() {
   );
   const hasUnsetVariants = unsetCanonicalItems.length > 0;
 
-  useEffect(() => {
-    if (!customerId) return;
-    fetch(`/api/customers/${customerId}`).then((r) => (r.ok ? r.json() : null)).then(setCustomer);
-  }, [customerId]);
-
   const subtotalNet = cart.items.reduce((s: number, i: CartItem) => {
     const d = calcDiscountPerUnit(i.unitPrice, i.discount);
     return s + (i.unitPrice - d) * i.quantity;
@@ -105,18 +104,12 @@ export default function CheckoutPage() {
     (i) => !i.rentalMeta?.startDate || !i.rentalMeta?.endDate
   );
 
-  const submit = async (action: "order" | "quotation" | "statement") => {
-    if (cart.items.length === 0) return;
-    if (action === "order" && hasUnsetRentalDates) {
-      toast.error("임대 항목의 날짜를 모두 설정해주세요");
-      return;
-    }
-    if (hasUnsetVariants) {
-      toast.error("변형이 확정되지 않은 항목이 있습니다");
-      return;
-    }
-    setSubmitting(true);
-    try {
+  const submitMutation = useMutation({
+    mutationFn: (action: "order" | "quotation" | "statement") => {
+      if (cart.items.length === 0) throw new Error("카트가 비어있습니다");
+      if (action === "order" && hasUnsetRentalDates) throw new Error("임대 항목의 날짜를 모두 설정해주세요");
+      if (hasUnsetVariants) throw new Error("변형이 확정되지 않은 항목이 있습니다");
+
       // 수리 티켓 데이터
       const firstRepairMeta = repairItems[0]?.repairMeta;
       const repairTicketData =
@@ -155,32 +148,28 @@ export default function CheckoutPage() {
               })
           : undefined;
 
-      const res = await fetch("/api/pos/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          customerId: customerId || null,
-          customerName: customer?.name ?? null,
-          customerPhone: customer?.phone ?? null,
-          paymentMethod: action === "order" ? payment : null,
-          taxInvoiceRequested: action === "order" ? taxInvoice : false,
-          items: cart.items.map((i) => ({
-            productId: i.productId,
-            name: i.name,
-            sku: i.sku,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            discountPerUnit: calcDiscountPerUnit(i.unitPrice, i.discount),
-            taxType: i.taxType,
-            isZeroRate: i.isZeroRate ?? false,
-          })),
-          repairTicketData,
-          rentalRecords,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "처리 실패");
+      return apiMutate<{ id: string; no: string }>("/api/pos/checkout", "POST", {
+        action,
+        customerId: customerId || null,
+        customerName: customer?.name ?? null,
+        customerPhone: customer?.phone ?? null,
+        paymentMethod: action === "order" ? payment : null,
+        taxInvoiceRequested: action === "order" ? taxInvoice : false,
+        items: cart.items.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          sku: i.sku,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          discountPerUnit: calcDiscountPerUnit(i.unitPrice, i.discount),
+          taxType: i.taxType,
+          isZeroRate: i.isZeroRate ?? false,
+        })),
+        repairTicketData,
+        rentalRecords,
+      }).then((data) => ({ data, action }));
+    },
+    onSuccess: ({ data, action }) => {
       clearCart();
       toast.success(`${actionLabel(action)} 완료 — ${data.no}`);
       if (action === "statement") {
@@ -189,12 +178,11 @@ export default function CheckoutPage() {
         window.open(`/quotations/${data.id}/print?auto=1`, "_blank");
       }
       router.push("/pos");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "처리 실패");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "처리 실패"),
+  });
+  const submitting = submitMutation.isPending;
+  const submit = (action: "order" | "quotation" | "statement") => submitMutation.mutate(action);
 
   return (
     <div className="mx-auto max-w-4xl p-6">

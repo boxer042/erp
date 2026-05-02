@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,8 +60,7 @@ interface SalesChannel {
 }
 
 export default function ChannelsPage() {
-  const [channels, setChannels] = useState<SalesChannel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<SalesChannel | null>(
     null
@@ -74,16 +76,13 @@ export default function ChannelsPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchChannels = async () => {
-    const res = await fetch("/api/channels");
-    const data = await res.json();
-    setChannels(data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchChannels();
-  }, []);
+  const channelsQuery = useQuery({
+    queryKey: queryKeys.channels.list(),
+    queryFn: () => apiGet<SalesChannel[]>("/api/channels"),
+  });
+  const channels = channelsQuery.data ?? [];
+  const loading = channelsQuery.isPending;
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.channels.all });
 
   const resetForm = () => {
     setForm({ name: "", code: "", commissionRate: "0", memo: "", logoUrl: null, logoPath: null });
@@ -117,11 +116,7 @@ export default function ChannelsPage() {
         return;
       }
       if (form.logoPath) {
-        await fetch("/api/channels/upload", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: form.logoPath }),
-        });
+        await apiMutate("/api/channels/upload", "DELETE", { path: form.logoPath });
       }
       setForm((prev) => ({ ...prev, logoUrl: json.url, logoPath: json.path }));
     } finally {
@@ -132,58 +127,50 @@ export default function ChannelsPage() {
 
   const handleRemoveLogo = async () => {
     if (form.logoPath) {
-      await fetch("/api/channels/upload", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: form.logoPath }),
-      });
+      await apiMutate("/api/channels/upload", "DELETE", { path: form.logoPath });
     }
     setForm((prev) => ({ ...prev, logoUrl: null, logoPath: null }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const url = editingChannel ? `/api/channels/${editingChannel.id}` : "/api/channels";
+      const method = editingChannel ? "PUT" : "POST";
+      return apiMutate(url, method, form);
+    },
+    onSuccess: () => {
+      toast.success(editingChannel ? "채널이 수정되었습니다" : "채널이 추가되었습니다");
+      setDialogOpen(false);
+      resetForm();
+      refresh();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "저장에 실패했습니다"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/channels/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("채널이 삭제되었습니다");
+      refresh();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    const url = editingChannel
-      ? `/api/channels/${editingChannel.id}`
-      : "/api/channels";
-    const method = editingChannel ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    if (!res.ok) {
-      toast.error("저장에 실패했습니다");
-      return;
-    }
-
-    toast.success(editingChannel ? "채널이 수정되었습니다" : "채널이 추가되었습니다");
-    setDialogOpen(false);
-    resetForm();
-    fetchChannels();
+    saveMutation.mutate();
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-
-    const res = await fetch(`/api/channels/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("삭제에 실패했습니다");
-      return;
-    }
-
-    toast.success("채널이 삭제되었습니다");
-    fetchChannels();
+    deleteMutation.mutate(id);
   };
 
   return (
     <>
       <div className="flex h-full flex-col">
         <DataTableToolbar
-          onRefresh={fetchChannels}
+          onRefresh={refresh}
           onAdd={() => setDialogOpen(true)}
           addLabel="채널 추가"
           loading={loading}

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon } from "lucide-react";
 import { extractYoutubeId } from "@/lib/utils";
+import { apiGet, apiMutate } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function MediaSkeletonRows({ rows = 4 }: { rows?: number }) {
@@ -55,8 +56,9 @@ export function ProductMediaManager({ productId }: { productId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/product-media?productId=${productId}`);
-      if (res.ok) setItems(await res.json());
+      setItems(await apiGet<ProductMedia[]>(`/api/product-media?productId=${productId}`));
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -66,18 +68,12 @@ export function ProductMediaManager({ productId }: { productId: string }) {
     load();
   }, [load]);
 
-  const create = async (data: { type: MediaType; url: string; title: string | null }) => {
-    const res = await fetch("/api/product-media", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        productId,
-        ...data,
-        sortOrder: items.length,
-      }),
+  const create = (data: { type: MediaType; url: string; title: string | null }) =>
+    apiMutate("/api/product-media", "POST", {
+      productId,
+      ...data,
+      sortOrder: items.length,
     });
-    if (!res.ok) throw new Error();
-  };
 
   const add = async () => {
     const url = urlInput.trim();
@@ -138,11 +134,11 @@ export function ProductMediaManager({ productId }: { productId: string }) {
 
   const remove = async (id: string) => {
     if (!confirm("삭제하시겠습니까?")) return;
-    const res = await fetch(`/api/product-media/${id}`, { method: "DELETE" });
-    if (res.ok) {
+    try {
+      await apiMutate(`/api/product-media/${id}`, "DELETE");
       await load();
       toast.success("삭제되었습니다");
-    } else {
+    } catch {
       toast.error("삭제에 실패했습니다");
     }
   };
@@ -153,16 +149,8 @@ export function ProductMediaManager({ productId }: { productId: string }) {
     const a = items[index];
     const b = items[target];
     await Promise.all([
-      fetch(`/api/product-media/${a.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sortOrder: b.sortOrder }),
-      }),
-      fetch(`/api/product-media/${b.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sortOrder: a.sortOrder }),
-      }),
+      apiMutate(`/api/product-media/${a.id}`, "PUT", { sortOrder: b.sortOrder }),
+      apiMutate(`/api/product-media/${b.id}`, "PUT", { sortOrder: a.sortOrder }),
     ]);
     await load();
   };

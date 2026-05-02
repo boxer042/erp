@@ -35,7 +35,7 @@ export function DataTableToolbar({
             <Input
               value={search.value}
               onChange={(e) => search.onChange(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && search.onSearch()}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) search.onSearch(); }}
               placeholder={search.placeholder || "검색..."}
               className="h-[30px] pl-8 text-[13px]"
             />

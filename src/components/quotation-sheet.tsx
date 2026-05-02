@@ -23,6 +23,7 @@ import {
   QuickSupplierProductSheet,
 } from "@/components/quick-register-sheets";
 import { formatComma, parseComma, calcDiscountPerUnit, normalizeDiscountInput, formatDiscountDisplay } from "@/lib/utils";
+import { apiGet } from "@/lib/api-client";
 
 type QuotationType = "SALES" | "PURCHASE";
 type QuotationStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CONVERTED";
@@ -161,19 +162,19 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
     setForm(editData ? editData : emptyForm(type));
     (async () => {
       if (type === "SALES") {
-        const [cRes, pRes] = await Promise.all([
-          fetch("/api/customers"),
-          fetch("/api/products"),
+        const [c, p] = await Promise.all([
+          apiGet<CustomerOption[]>("/api/customers"),
+          apiGet<ProductOption[]>("/api/products"),
         ]);
-        setCustomers(await cRes.json());
-        setProducts(await pRes.json());
+        setCustomers(c);
+        setProducts(p);
       } else {
-        const [sRes, spRes] = await Promise.all([
-          fetch("/api/suppliers"),
-          fetch("/api/supplier-products"),
+        const [s, sp] = await Promise.all([
+          apiGet<SupplierOption[]>("/api/suppliers"),
+          apiGet<SupplierProductOption[]>("/api/supplier-products"),
         ]);
-        setSuppliers(await sRes.json());
-        setSupplierProducts(await spRes.json());
+        setSuppliers(s);
+        setSupplierProducts(sp);
       }
     })();
   }, [open, type, editData]);
@@ -586,8 +587,7 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
         onOpenChange={setQuickCustomerOpen}
         defaultName={quickCustomerName}
         onCreated={async (c) => {
-          const res = await fetch("/api/customers");
-          setCustomers(await res.json());
+          setCustomers(await apiGet<CustomerOption[]>("/api/customers"));
           setForm((p) => ({ ...p, customerId: c.id }));
         }}
       />
@@ -596,8 +596,7 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
         onOpenChange={setQuickSupplierOpen}
         defaultName={quickSupplierName}
         onCreated={async (s) => {
-          const res = await fetch("/api/suppliers");
-          setSuppliers(await res.json());
+          setSuppliers(await apiGet<SupplierOption[]>("/api/suppliers"));
           setForm((p) => ({ ...p, supplierId: s.id }));
         }}
       />
@@ -608,8 +607,7 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
         supplierId={form.supplierId}
         supplierName={suppliers.find((s) => s.id === form.supplierId)?.name || ""}
         onCreated={async (sp) => {
-          const res = await fetch("/api/supplier-products");
-          setSupplierProducts(await res.json());
+          setSupplierProducts(await apiGet<SupplierProductOption[]>("/api/supplier-products"));
           if (quickSpItemIdx !== null) {
             updateItem(quickSpItemIdx, {
               supplierProductId: sp.id,

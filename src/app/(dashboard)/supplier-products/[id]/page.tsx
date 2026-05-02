@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -130,13 +133,11 @@ export default function SupplierProductDetailPage() {
       router.push("/supplier-products");
     }
   };
-  const [product, setProduct] = useState<SupplierProductDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // 수정 상태
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<SupplierProductDetail>>({});
-  const [saving, setSaving] = useState(false);
 
   // 매핑 Sheet
   const [mappingOpen, setMappingOpen] = useState(false);
@@ -147,18 +148,14 @@ export default function SupplierProductDetailPage() {
   const [costValue, setCostValue] = useState("");
   const [costPerUnit, setCostPerUnit] = useState(true);
   const [costIsTaxable, setCostIsTaxable] = useState(true);
-  const [addingCost, setAddingCost] = useState(false);
 
-  const fetchProduct = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch(`/api/supplier-products/${id}`);
-    if (!res.ok) { setLoading(false); return; }
-    const data = await res.json();
-    setProduct(data);
-    setLoading(false);
-  }, [id]);
-
-  useEffect(() => { fetchProduct(); }, [fetchProduct]);
+  const productQuery = useQuery({
+    queryKey: queryKeys.supplierProducts.detail(id),
+    queryFn: () => apiGet<SupplierProductDetail>(`/api/supplier-products/${id}`),
+  });
+  const product = productQuery.data ?? null;
+  const loading = productQuery.isPending;
+  const fetchProduct = () => queryClient.invalidateQueries({ queryKey: queryKeys.supplierProducts.detail(id) });
 
   const startEdit = () => {
     if (!product) return;
@@ -177,55 +174,60 @@ export default function SupplierProductDetailPage() {
     setEditing(true);
   };
 
-  const handleSave = async () => {
-    if (!product) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/supplier-products/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          supplierId: product.supplier.id,
-          name: editForm.name,
-          spec: editForm.spec ?? "",
-          supplierCode: editForm.supplierCode ?? "",
-          unitOfMeasure: editForm.unitOfMeasure,
-          listPrice: editForm.listPrice ?? editForm.unitPrice ?? "0",
-          unitPrice: editForm.unitPrice,
-          isTaxable: editForm.isTaxable,
-          currency: product.currency,
-          leadTimeDays: editForm.leadTimeDays,
-          minOrderQty: editForm.minOrderQty,
-          memo: editForm.memo ?? "",
-        }),
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      if (!product) throw new Error("상품 정보가 없습니다");
+      return apiMutate(`/api/supplier-products/${id}`, "PUT", {
+        supplierId: product.supplier.id,
+        name: editForm.name,
+        spec: editForm.spec ?? "",
+        supplierCode: editForm.supplierCode ?? "",
+        unitOfMeasure: editForm.unitOfMeasure,
+        listPrice: editForm.listPrice ?? editForm.unitPrice ?? "0",
+        unitPrice: editForm.unitPrice,
+        isTaxable: editForm.isTaxable,
+        currency: product.currency,
+        leadTimeDays: editForm.leadTimeDays,
+        minOrderQty: editForm.minOrderQty,
+        memo: editForm.memo ?? "",
       });
-      if (!res.ok) { toast.error("저장에 실패했습니다"); return; }
+    },
+    onSuccess: () => {
       toast.success("저장되었습니다");
       setEditing(false);
-      await fetchProduct();
-    } finally { setSaving(false); }
-  };
+      fetchProduct();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "저장에 실패했습니다"),
+  });
+  const saving = saveMutation.isPending;
+  const handleSave = () => saveMutation.mutate();
 
-  const handleAddCost = async () => {
-    if (!costName.trim() || !costValue) { toast.error("이름과 금액을 입력해주세요"); return; }
-    setAddingCost(true);
-    try {
-      const res = await fetch(`/api/supplier-products/${id}/costs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: costName.trim(), costType, value: costValue, perUnit: costPerUnit, isTaxable: costIsTaxable }),
+  const addCostMutation = useMutation({
+    mutationFn: () => {
+      if (!costName.trim() || !costValue) throw new Error("이름과 금액을 입력해주세요");
+      return apiMutate(`/api/supplier-products/${id}/costs`, "POST", {
+        name: costName.trim(),
+        costType,
+        value: costValue,
+        perUnit: costPerUnit,
+        isTaxable: costIsTaxable,
       });
-      if (!res.ok) { toast.error("비용 추가에 실패했습니다"); return; }
+    },
+    onSuccess: () => {
       setCostName(""); setCostValue(""); setCostType("FIXED"); setCostPerUnit(true); setCostIsTaxable(true);
-      await fetchProduct();
+      fetchProduct();
       toast.success("비용이 추가되었습니다");
-    } finally { setAddingCost(false); }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "비용 추가에 실패했습니다"),
+  });
+  const addingCost = addCostMutation.isPending;
+  const handleAddCost = () => addCostMutation.mutate();
 
-  const handleDeleteCost = async (costId: string) => {
-    await fetch(`/api/supplier-products/${id}/costs?costId=${costId}`, { method: "DELETE" });
-    await fetchProduct();
-  };
+  const deleteCostMutation = useMutation({
+    mutationFn: (costId: string) => apiMutate(`/api/supplier-products/${id}/costs?costId=${costId}`, "DELETE"),
+    onSuccess: () => fetchProduct(),
+  });
+  const handleDeleteCost = (costId: string) => deleteCostMutation.mutate(costId);
 
   if (loading) return <Loading />;
 

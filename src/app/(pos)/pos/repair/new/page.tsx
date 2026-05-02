@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { CustomerCombobox } from "@/components/customer-combobox";
 import { QuickCustomerSheet } from "@/components/quick-register-sheets";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 interface CustomerLite {
   id: string;
@@ -24,9 +32,7 @@ interface MachineLite {
 
 export default function NewRepairPage() {
   const router = useRouter();
-  const [customers, setCustomers] = useState<CustomerLite[]>([]);
   const [customerId, setCustomerId] = useState("");
-  const [machines, setMachines] = useState<MachineLite[]>([]);
   const [machineId, setMachineId] = useState("");
   const [newMachine, setNewMachine] = useState({ name: "", brand: "", modelNo: "", serialNo: "" });
   const [useNewMachine, setUseNewMachine] = useState(false);
@@ -36,13 +42,21 @@ export default function NewRepairPage() {
   const [quickDefaultName, setQuickDefaultName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/customers").then((r) => r.json()).then(setCustomers);
-  }, []);
+  const customersQuery = useQuery({
+    queryKey: ["customers", "list-pos"],
+    queryFn: () => apiGet<CustomerLite[]>("/api/customers"),
+  });
+  const customers = customersQuery.data ?? [];
+
+  const machinesQuery = useQuery({
+    queryKey: ["customer-machines", customerId],
+    queryFn: () => apiGet<MachineLite[]>(`/api/customer-machines?customerId=${customerId}`),
+    enabled: !!customerId,
+  });
+  const machines = machinesQuery.data ?? [];
 
   useEffect(() => {
-    if (!customerId) { setMachines([]); setMachineId(""); return; }
-    fetch(`/api/customer-machines?customerId=${customerId}`).then((r) => r.json()).then(setMachines);
+    if (!customerId) setMachineId("");
   }, [customerId]);
 
   const submit = async () => {
@@ -54,32 +68,26 @@ export default function NewRepairPage() {
     try {
       let finalMachineId = machineId || null;
       if (useNewMachine && newMachine.name.trim()) {
-        const mres = await fetch("/api/customer-machines", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customerId, ...newMachine }),
-        });
-        if (mres.ok) {
-          const m = await mres.json();
+        try {
+          const m = await apiMutate<{ id: string }>("/api/customer-machines", "POST", {
+            customerId,
+            ...newMachine,
+          });
           finalMachineId = m.id;
+        } catch {
+          // ignore — proceed without machine
         }
       }
-      const res = await fetch("/api/repair-tickets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId,
-          customerMachineId: finalMachineId,
-          symptom,
-          memo,
-        }),
+      const ticket = await apiMutate<{ id: string; ticketNo: string }>("/api/repair-tickets", "POST", {
+        customerId,
+        customerMachineId: finalMachineId,
+        symptom,
+        memo,
       });
-      if (!res.ok) throw new Error();
-      const ticket = await res.json();
       toast.success(`수리 접수 완료 — ${ticket.ticketNo}`);
       router.push(`/pos/repair/${ticket.id}`);
-    } catch {
-      toast.error("접수 실패");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "접수 실패");
     } finally {
       setSubmitting(false);
     }
@@ -119,32 +127,32 @@ export default function NewRepairPage() {
             </div>
             {useNewMachine ? (
               <div className="grid grid-cols-2 gap-2">
-                <input className="input h-10" placeholder="기계명*" value={newMachine.name} onChange={(e) => setNewMachine({ ...newMachine, name: e.target.value })} />
-                <input className="input h-10" placeholder="브랜드" value={newMachine.brand} onChange={(e) => setNewMachine({ ...newMachine, brand: e.target.value })} />
-                <input className="input h-10" placeholder="모델번호" value={newMachine.modelNo} onChange={(e) => setNewMachine({ ...newMachine, modelNo: e.target.value })} />
-                <input className="input h-10" placeholder="시리얼" value={newMachine.serialNo} onChange={(e) => setNewMachine({ ...newMachine, serialNo: e.target.value })} />
+                <Input className="h-10" placeholder="기계명*" value={newMachine.name} onChange={(e) => setNewMachine({ ...newMachine, name: e.target.value })} />
+                <Input className="h-10" placeholder="브랜드" value={newMachine.brand} onChange={(e) => setNewMachine({ ...newMachine, brand: e.target.value })} />
+                <Input className="h-10" placeholder="모델번호" value={newMachine.modelNo} onChange={(e) => setNewMachine({ ...newMachine, modelNo: e.target.value })} />
+                <Input className="h-10" placeholder="시리얼" value={newMachine.serialNo} onChange={(e) => setNewMachine({ ...newMachine, serialNo: e.target.value })} />
               </div>
             ) : (
-              <select
-                className="input h-11"
-                value={machineId}
-                onChange={(e) => setMachineId(e.target.value)}
-              >
-                <option value="">선택 안 함</option>
-                {machines.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}{m.brand ? ` (${m.brand}${m.modelNo ? ` ${m.modelNo}` : ""})` : ""}
-                  </option>
-                ))}
-              </select>
+              <Select value={machineId || "__none"} onValueChange={(v) => setMachineId(!v || v === "__none" ? "" : v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="선택 안 함" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">선택 안 함</SelectItem>
+                  {machines.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}{m.brand ? ` (${m.brand}${m.modelNo ? ` ${m.modelNo}` : ""})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
         ) : null}
 
         <div>
           <label className="mb-1 block text-sm font-medium">증상</label>
-          <textarea
-            className="input"
+          <Textarea
             rows={3}
             value={symptom}
             onChange={(e) => setSymptom(e.target.value)}
@@ -154,26 +162,15 @@ export default function NewRepairPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium">메모</label>
-          <textarea
-            className="input"
-            rows={2}
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-          />
+          <Textarea rows={2} value={memo} onChange={(e) => setMemo(e.target.value)} />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Link href="/pos/repair" className="flex h-11 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted/50">
-            취소
-          </Link>
-          <button
-            onClick={submit}
-            disabled={submitting}
-            className="flex h-11 items-center gap-1 rounded-lg bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"
-          >
+          <Button variant="outline" onClick={() => router.push("/pos/repair")}>취소</Button>
+          <Button onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             접수
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -182,29 +179,10 @@ export default function NewRepairPage() {
         onOpenChange={setQuickCustomerOpen}
         defaultName={quickDefaultName}
         onCreated={(c) => {
-          fetch("/api/customers").then((r) => r.json()).then((list) => {
-            setCustomers(list);
-            setCustomerId(c.id);
-          });
+          customersQuery.refetch();
+          setCustomerId(c.id);
         }}
       />
-
-      <style jsx>{`
-        :global(.input) {
-          display: block;
-          width: 100%;
-          border-radius: 0.5rem;
-          border: 1px solid var(--border);
-          padding: 0.5rem 0.75rem;
-          font-size: 0.95rem;
-          outline: none;
-          background: var(--background);
-          color: var(--foreground);
-        }
-        :global(.input:focus) {
-          border-color: var(--primary);
-        }
-      `}</style>
     </div>
   );
 }

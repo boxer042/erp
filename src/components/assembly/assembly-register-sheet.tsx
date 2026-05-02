@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Loader2, Plus } from "lucide-react";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -104,15 +105,14 @@ export function AssemblyRegisterSheet({
   const [newVariantSavingSku, setNewVariantSavingSku] = useState(false);
 
   const fetchProducts = useCallback(async () => {
-    const res = await fetch("/api/products?isBulk=all");
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const data = await apiGet<Array<{
+        id: string; name: string; sku: string;
+        sellingPrice: string; unitCost: string | null;
+        unitOfMeasure: string; isSet: boolean;
+      }>>("/api/products?isBulk=all");
       setProducts(
-        data.map((p: {
-          id: string; name: string; sku: string;
-          sellingPrice: string; unitCost: string | null;
-          unitOfMeasure: string; isSet: boolean;
-        }) => ({
+        data.map((p) => ({
           id: p.id,
           name: p.name,
           sku: p.sku,
@@ -122,6 +122,8 @@ export function AssemblyRegisterSheet({
           isSet: p.isSet,
         })),
       );
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -161,9 +163,23 @@ export function AssemblyRegisterSheet({
     setComponents([]);
     setComponentsLoading(true);
     try {
-      const res = await fetch(`/api/products/${p.id}`);
-      if (!res.ok) return;
-      const detail = await res.json();
+      let detail: {
+        setComponents?: Array<{
+          componentId: string;
+          quantity: string;
+          label?: string | null;
+          slotLabelId?: string | null;
+          slotId?: string | null;
+        }>;
+        assemblyTemplate?: {
+          slots?: Array<{ id: string; slotLabelId: string | null; label: string; isVariable: boolean }>;
+        };
+      };
+      try {
+        detail = await apiGet(`/api/products/${p.id}`);
+      } catch {
+        return;
+      }
       const setComps: Array<{
         componentId: string;
         quantity: string;
@@ -224,10 +240,10 @@ export function AssemblyRegisterSheet({
   const performAssemblySubmit = async (filteredComponents: ComponentRow[]) => {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/assemblies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const data = await apiMutate<{ newVariant?: { id: string; name: string; sku: string } | null }>(
+        "/api/assemblies",
+        "POST",
+        {
           productId,
           quantity,
           assembledAt: assembledAt.toISOString(),
@@ -240,14 +256,8 @@ export function AssemblyRegisterSheet({
             slotLabelId: c.slotLabelId ?? null,
             slotLabel: c.slotLabel ?? null,
           })),
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "등록 실패");
-        return;
-      }
-      const data: { newVariant?: { id: string; name: string; sku: string } | null } = await res.json();
+        },
+      );
       toast.success("조립 실적이 등록되었습니다");
       onOpenChange(false);
       setEmptySlotConfirmOpen(false);
@@ -257,6 +267,8 @@ export function AssemblyRegisterSheet({
         setNewVariantSku(data.newVariant.sku);
         setNewVariantOpen(true);
       }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "등록 실패");
     } finally {
       setSubmitting(false);
     }
@@ -271,20 +283,13 @@ export function AssemblyRegisterSheet({
     }
     setNewVariantSavingSku(true);
     try {
-      const res = await fetch(`/api/products/${newVariantData.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: newVariantSku.trim() }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(typeof err.error === "string" ? err.error : "SKU 변경 실패");
-        return;
-      }
+      await apiMutate(`/api/products/${newVariantData.id}`, "PATCH", { sku: newVariantSku.trim() });
       toast.success("변형 SKU 가 변경되었습니다");
       setNewVariantOpen(false);
       setNewVariantData(null);
       onSuccess?.();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "SKU 변경 실패");
     } finally {
       setNewVariantSavingSku(false);
     }

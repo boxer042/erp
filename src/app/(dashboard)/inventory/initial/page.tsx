@@ -23,7 +23,7 @@ import {
   QuickSupplierSheet,
 } from "@/components/quick-register-sheets";
 import { SupplierCombobox } from "@/components/supplier-combobox";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsCompactDevice } from "@/hooks/use-mobile";
 import { MobileInlineCellProductSearch } from "@/components/inline-cell-product-search-mobile";
 import {
   formatComma,
@@ -35,6 +35,7 @@ import {
   normalizeDiscountInput,
 } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 
 function InitialHistorySkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
@@ -115,7 +116,7 @@ function InlineCellProductSearch({
   isNew?: boolean;
   pendingSourceRow?: number;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsCompactDevice();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const searchRef = useRef(search);
@@ -300,17 +301,24 @@ export default function InitialInventoryPage() {
   const [duplicateIds, setDuplicateIds] = useState<Set<string>>(new Set());
 
   const fetchSuppliers = useCallback(async () => {
-    const res = await fetch("/api/suppliers");
-    if (res.ok) setSuppliers(await res.json());
+    try {
+      setSuppliers(await apiGet<Supplier[]>("/api/suppliers"));
+    } catch {
+      // ignore
+    }
   }, []);
 
   const fetchHistory = useCallback(async (search = "") => {
     setHistoryLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    const res = await fetch(`/api/inventory/initial?${params}`);
-    if (res.ok) setHistoryItems(await res.json());
-    setHistoryLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      setHistoryItems(await apiGet(`/api/inventory/initial?${params}`));
+    } catch {
+      // ignore
+    } finally {
+      setHistoryLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
@@ -334,8 +342,7 @@ export default function InitialInventoryPage() {
     setVatRawByIdx({});
     setVatInputBuffer(null);
     if (!supplierId) { setSupplierProducts([]); return; }
-    const res = await fetch(`/api/supplier-products?supplierId=${supplierId}`);
-    setSupplierProducts(await res.json());
+    setSupplierProducts(await apiGet<SupplierProduct[]>(`/api/supplier-products?supplierId=${supplierId}`));
   };
 
   const handleCreateSupplier = (name: string) => {
@@ -538,34 +545,34 @@ export default function InitialInventoryPage() {
 
       if (payload.length === 0) { toast.error("등록할 항목이 없습니다"); return; }
 
-      const res = await fetch("/api/inventory/initial", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: payload }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        if (res.status === 409 && Array.isArray(err?.duplicates)) {
-          const ids = new Set<string>(err.duplicates.map((d: { supplierProductId: string }) => d.supplierProductId));
-          setDuplicateIds(ids);
-          setConfirmOpen(false);
-          toast.error(`${err.duplicates.length}건 중복 — 강조된 행을 제거해주세요`);
-          return;
+      let result: { count: number; lotsCreated: number };
+      try {
+        result = await apiMutate("/api/inventory/initial", "POST", { items: payload });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 409) {
+          const body = err.details as { duplicates?: Array<{ supplierProductId: string }> } | undefined;
+          if (body?.duplicates && Array.isArray(body.duplicates)) {
+            const ids = new Set<string>(body.duplicates.map((d) => d.supplierProductId));
+            setDuplicateIds(ids);
+            setConfirmOpen(false);
+            toast.error(`${body.duplicates.length}건 중복 — 강조된 행을 제거해주세요`);
+            return;
+          }
         }
-        toast.error(err?.error?.formErrors?.[0] || (typeof err?.error === "string" ? err.error : "등록 실패"));
+        toast.error(err instanceof ApiError ? err.message : "등록 실패");
         return;
       }
-
-      const result = await res.json();
       toast.success(`${result.count}개 등록 완료 (로트 ${result.lotsCreated}건 생성)`);
       setConfirmOpen(false);
       setDuplicateIds(new Set());
 
       // 공급상품 목록 새로고침
       if (selectedSupplierId) {
-        const spRes = await fetch(`/api/supplier-products?supplierId=${selectedSupplierId}`);
-        if (spRes.ok) setSupplierProducts(await spRes.json());
+        try {
+          setSupplierProducts(await apiGet<SupplierProduct[]>(`/api/supplier-products?supplierId=${selectedSupplierId}`));
+        } catch {
+          // ignore
+        }
       }
       // 행 초기화
       setItems([emptyItem()]);
@@ -909,7 +916,7 @@ export default function InitialInventoryPage() {
               <input
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") fetchHistory(historySearch); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) fetchHistory(historySearch); }}
                 placeholder="품명 또는 품번 검색..."
                 className="h-[30px] w-full max-w-[320px] rounded-md border border-border bg-card px-3 text-[13px] outline-none focus:border-primary"
               />

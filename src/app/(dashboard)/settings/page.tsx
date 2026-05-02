@@ -158,22 +158,29 @@ export default function SettingsPage() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
   });
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/products").then((r) => r.json()),
-      fetch("/api/suppliers").then((r) => r.json()),
-      fetch("/api/channels").then((r) => r.json()),
-      fetch("/api/orders").then((r) => r.json()),
-    ]).then(([p, s, c, o]) => {
-      setStats({
+  const statsQuery = useQuery({
+    queryKey: ["settings", "stats"],
+    queryFn: async () => {
+      type ProductLite = { inventory?: unknown };
+      const [p, s, c, o] = await Promise.all([
+        apiGet<ProductLite[]>("/api/products"),
+        apiGet<unknown[]>("/api/suppliers"),
+        apiGet<unknown[]>("/api/channels"),
+        apiGet<unknown[]>("/api/orders"),
+      ]);
+      return {
         products: p.length,
         suppliers: s.length,
         channels: c.length,
         orders: o.length,
-        inventoryItems: p.filter((x: { inventory?: unknown }) => x.inventory).length,
-      });
-    });
-  }, []);
+        inventoryItems: p.filter((x) => x.inventory).length,
+      } as Stats;
+    },
+  });
+
+  useEffect(() => {
+    if (statsQuery.data) setStats(statsQuery.data);
+  }, [statsQuery.data]);
 
   const setCompanyField = (key: keyof typeof companyForm, value: string) => {
     setCompanyForm((p) => ({ ...p, [key]: value }));

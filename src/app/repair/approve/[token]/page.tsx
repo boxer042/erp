@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { useParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,50 +25,37 @@ interface Approval {
 export default function ApprovePage() {
   const params = useParams();
   const token = params?.token as string;
-  const [data, setData] = useState<Approval | null>(null);
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [approvedName, setApprovedName] = useState("");
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/public/repair/approve/${token}`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const j = await r.json();
-          throw new Error(j?.error ?? "오류");
-        }
-        return r.json();
-      })
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, [token]);
+  const dataQuery = useQuery({
+    queryKey: ["public-repair-approve", token],
+    queryFn: () => apiGet<Approval>(`/api/public/repair/approve/${token}`),
+    enabled: !!token,
+  });
+  const data = dataQuery.data ?? null;
 
-  const approve = async () => {
-    setSubmitting(true);
-    try {
-      const res = await fetch(`/api/public/repair/approve/${token}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: approvedName.trim() || null }),
-      });
-      if (!res.ok) {
-        const j = await res.json();
-        throw new Error(j?.error ?? "승인 실패");
-      }
+  const queryError = dataQuery.error instanceof ApiError ? dataQuery.error.message : dataQuery.error?.message;
+  const displayError = error || queryError;
+
+  const approveMutation = useMutation({
+    mutationFn: () => apiMutate(`/api/public/repair/approve/${token}`, "POST", { name: approvedName.trim() || null }),
+    onSuccess: () => {
       setDone(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "오류");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: ["public-repair-approve", token] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : err.message || "승인 실패"),
+  });
+  const submitting = approveMutation.isPending;
+  const approve = () => approveMutation.mutate();
 
-  if (error) {
+  if (displayError) {
     return (
       <div className="mx-auto max-w-md p-8">
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-700">
-          {error}
+          {displayError}
         </div>
       </div>
     );

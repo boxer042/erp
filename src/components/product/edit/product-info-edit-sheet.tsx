@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChipToggle } from "@/components/ui/chip-toggle";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import { QuickBrandSheet } from "@/components/quick-register-sheets";
@@ -242,12 +243,10 @@ function ProductInfoEditSheetContent({
 
               <Field label="영세율 적용 가능">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
+                  <Checkbox
                     checked={form.zeroRateEligible}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, zeroRateEligible: e.target.checked }))
+                    onCheckedChange={(c) =>
+                      setForm((p) => ({ ...p, zeroRateEligible: c === true }))
                     }
                   />
                   <span className="text-muted-foreground">

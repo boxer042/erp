@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -45,23 +48,28 @@ interface Customer {
 }
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editData, setEditData] = useState<CustomerFormData | null>(null);
 
-  const fetchCustomers = async (query = "") => {
-    setLoading(true);
-    const res = await fetch(`/api/customers?search=${encodeURIComponent(query)}`);
-    const data = await res.json();
-    setCustomers(data);
-    setLoading(false);
-  };
+  const customersQuery = useQuery({
+    queryKey: queryKeys.customers.list({ search: appliedSearch }),
+    queryFn: () => apiGet<Customer[]>(`/api/customers?search=${encodeURIComponent(appliedSearch)}`),
+  });
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
+  const customers = customersQuery.data ?? [];
+  const loading = customersQuery.isPending;
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/customers/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("고객이 비활성화되었습니다");
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+  });
 
   const openCreate = () => {
     setEditData(null);
@@ -82,16 +90,12 @@ export default function CustomersPage() {
     setSheetOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-    const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("삭제에 실패했습니다");
-      return;
-    }
-    toast.success("고객이 비활성화되었습니다");
-    fetchCustomers(search);
+    deleteMutation.mutate(id);
   };
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
 
   return (
     <>
@@ -100,10 +104,10 @@ export default function CustomersPage() {
           search={{
             value: search,
             onChange: setSearch,
-            onSearch: () => fetchCustomers(search),
+            onSearch: () => setAppliedSearch(search),
             placeholder: "고객명 / 연락처 / 사업자번호 검색",
           }}
-          onRefresh={() => fetchCustomers(search)}
+          onRefresh={refresh}
           onAdd={openCreate}
           addLabel="고객 추가"
           loading={loading}
@@ -163,8 +167,8 @@ export default function CustomersPage() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         editData={editData}
-        onCreated={() => fetchCustomers(search)}
-        onUpdated={() => fetchCustomers(search)}
+        onCreated={refresh}
+        onUpdated={refresh}
       />
     </>
   );

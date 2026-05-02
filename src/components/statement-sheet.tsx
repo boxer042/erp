@@ -17,6 +17,7 @@ import { CustomerCombobox } from "@/components/customer-combobox";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 import { QuickCustomerSheet } from "@/components/quick-register-sheets";
 import { formatComma, parseComma, calcDiscountPerUnit, normalizeDiscountInput, formatDiscountDisplay } from "@/lib/utils";
+import { apiGet } from "@/lib/api-client";
 
 type StatementStatus = "DRAFT" | "ISSUED" | "CANCELLED";
 
@@ -119,12 +120,12 @@ export function StatementSheet({ open, onOpenChange, editData, onSaved }: Statem
     if (!open) return;
     setForm(editData ? editData : emptyForm());
     (async () => {
-      const [cRes, pRes] = await Promise.all([
-        fetch("/api/customers"),
-        fetch("/api/products"),
+      const [c, p] = await Promise.all([
+        apiGet<CustomerOption[]>("/api/customers"),
+        apiGet<ProductOption[]>("/api/products"),
       ]);
-      setCustomers(await cRes.json());
-      setProducts(await pRes.json());
+      setCustomers(c);
+      setProducts(p);
     })();
   }, [open, editData]);
 
@@ -474,8 +475,7 @@ export function StatementSheet({ open, onOpenChange, editData, onSaved }: Statem
         onOpenChange={setQuickCustomerOpen}
         defaultName={quickCustomerName}
         onCreated={async (c) => {
-          const res = await fetch("/api/customers");
-          const list: CustomerOption[] = await res.json();
+          const list = await apiGet<CustomerOption[]>("/api/customers");
           setCustomers(list);
           const full = list.find((x) => x.id === c.id);
           setForm((p) => ({

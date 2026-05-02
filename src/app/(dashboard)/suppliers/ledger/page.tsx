@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,7 +16,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
-import { Plus, Search, SlidersHorizontal, Check, Printer, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, Check, Printer, FileEdit, PanelLeftClose, PanelLeftOpen, CalendarIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
@@ -100,14 +103,10 @@ type ViewMode = "ledger" | "items";
 
 export default function SupplierLedgerPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>("ledger");
   // 모바일/좁은 화면에서 좌측 패널 접기 토글 (기본: 펼침)
   const [panelOpen, setPanelOpen] = useState(true);
-  const [data, setData] = useState<LedgerResponse>({ entries: [], supplierSummaries: [] });
-  const [items, setItems] = useState<LedgerItem[]>([]);
-  const [paymentsInItems, setPaymentsInItems] = useState<LedgerEntry[]>([]);
-  const [purchasesInItems, setPurchasesInItems] = useState<LedgerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const now = useMemo(() => new Date(), []);
   const [from, setFrom] = useState<Date | undefined>(startOfMonth(now));
@@ -117,6 +116,7 @@ export default function SupplierLedgerPage() {
   const [types, setTypes] = useState<LedgerType[]>([...ALL_TYPES]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [typePopoverOpen, setTypePopoverOpen] = useState(false);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   // 결제 등록/수정 Dialog
   const [payDialogOpen, setPayDialogOpen] = useState(false);
@@ -139,62 +139,67 @@ export default function SupplierLedgerPage() {
     memo: string | null;
   } | null>(null);
 
-  const fetchLedger = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (from) params.set("from", from.toISOString());
-    if (to) {
-      const toInclusive = new Date(to);
-      toInclusive.setDate(toInclusive.getDate() + 1);
-      params.set("to", toInclusive.toISOString());
-    }
-    if (types.length < ALL_TYPES.length) params.set("types", types.join(","));
-    if (search && !selectedSupplierId) params.set("q", search);
-    if (selectedSupplierId) params.set("supplierId", selectedSupplierId);
-    // 거래처 요약은 항상 원장 엔드포인트로 (좌측 잔액 표시용)
-    const ledgerRes = await fetch(`/api/suppliers/ledger?${params}`);
-    if (ledgerRes.ok) setData(await ledgerRes.json());
-
-    if (viewMode === "items") {
-      // 품목 뷰에서는 유형 필터와 무관하게 PAYMENT도 함께 표시
-      const payParams = new URLSearchParams();
-      if (from) payParams.set("from", from.toISOString());
+  const ledgerQuery = useQuery({
+    queryKey: queryKeys.ledger.suppliers({
+      from: from?.toISOString(),
+      to: to?.toISOString(),
+      types: types.join(","),
+      search,
+      selectedSupplierId,
+      viewMode,
+    }),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from.toISOString());
       if (to) {
-        const toInc = new Date(to);
-        toInc.setDate(toInc.getDate() + 1);
-        payParams.set("to", toInc.toISOString());
+        const toInclusive = new Date(to);
+        toInclusive.setDate(toInclusive.getDate() + 1);
+        params.set("to", toInclusive.toISOString());
       }
-      if (selectedSupplierId) payParams.set("supplierId", selectedSupplierId);
-      else if (search) payParams.set("q", search);
-      // 결제 + 배송비 차감/조정/환급까지 함께 (PURCHASE는 /items에서 옴)
-      payParams.set("types", "PAYMENT,ADJUSTMENT,REFUND");
+      if (types.length < ALL_TYPES.length) params.set("types", types.join(","));
+      if (search && !selectedSupplierId) params.set("q", search);
+      if (selectedSupplierId) params.set("supplierId", selectedSupplierId);
 
-      // 매입 잔액 조회용 (유형 필터와 무관하게 PURCHASE도 항상 가져옴)
-      const purParams = new URLSearchParams(payParams);
-      purParams.set("types", "PURCHASE");
+      const ledger = await apiGet<LedgerResponse>(`/api/suppliers/ledger?${params}`);
 
-      const [itemsRes, paysRes, pursRes] = await Promise.all([
-        fetch(`/api/suppliers/ledger/items?${params}`),
-        fetch(`/api/suppliers/ledger?${payParams}`),
-        fetch(`/api/suppliers/ledger?${purParams}`),
-      ]);
-      if (itemsRes.ok) {
-        const payload = await itemsRes.json();
-        setItems(payload.items);
-      }
-      if (paysRes.ok) {
-        const payload = await paysRes.json();
-        setPaymentsInItems(payload.entries);
-      }
-      if (pursRes.ok) {
-        const payload = await pursRes.json();
-        setPurchasesInItems(payload.entries);
-      }
-    }
-    setLoading(false);
-  }, [from, to, types, search, selectedSupplierId, viewMode]);
+      let items: LedgerItem[] = [];
+      let paymentsInItems: LedgerEntry[] = [];
+      let purchasesInItems: LedgerEntry[] = [];
 
-  useEffect(() => { fetchLedger(); }, [fetchLedger]);
+      if (viewMode === "items") {
+        const payParams = new URLSearchParams();
+        if (from) payParams.set("from", from.toISOString());
+        if (to) {
+          const toInc = new Date(to);
+          toInc.setDate(toInc.getDate() + 1);
+          payParams.set("to", toInc.toISOString());
+        }
+        if (selectedSupplierId) payParams.set("supplierId", selectedSupplierId);
+        else if (search) payParams.set("q", search);
+        payParams.set("types", "PAYMENT,ADJUSTMENT,REFUND");
+
+        const purParams = new URLSearchParams(payParams);
+        purParams.set("types", "PURCHASE");
+
+        const [itemsPayload, paysPayload, pursPayload] = await Promise.all([
+          apiGet<{ items: LedgerItem[] }>(`/api/suppliers/ledger/items?${params}`),
+          apiGet<{ entries: LedgerEntry[] }>(`/api/suppliers/ledger?${payParams}`),
+          apiGet<{ entries: LedgerEntry[] }>(`/api/suppliers/ledger?${purParams}`),
+        ]);
+        items = itemsPayload.items;
+        paymentsInItems = paysPayload.entries;
+        purchasesInItems = pursPayload.entries;
+      }
+
+      return { ledger, items, paymentsInItems, purchasesInItems };
+    },
+  });
+  const data: LedgerResponse = ledgerQuery.data?.ledger ?? { entries: [], supplierSummaries: [] };
+  const items: LedgerItem[] = ledgerQuery.data?.items ?? [];
+  const paymentsInItems: LedgerEntry[] = ledgerQuery.data?.paymentsInItems ?? [];
+  const purchasesInItems: LedgerEntry[] = ledgerQuery.data?.purchasesInItems ?? [];
+  const loading = ledgerQuery.isPending;
+  const fetchLedger = () => queryClient.invalidateQueries({ queryKey: ["ledger", "suppliers"] });
 
   const applyPreset = (preset: "thisMonth" | "lastMonth" | "last3" | "all") => {
     if (preset === "thisMonth") {
@@ -238,20 +243,24 @@ export default function SupplierLedgerPage() {
 
   const onEntryDoubleClick = (e: LedgerEntry) => {
     if (e.type === "PAYMENT" && e.referenceType === "SUPPLIER_PAYMENT" && e.referenceId) {
-      // 결제 수정 Dialog 열기
-      fetch(`/api/supplier-payments/${e.referenceId}`)
-        .then((r) => r.json())
-        .then((p) => {
-          setEditingPayment({
-            id: p.id,
-            supplier: { id: p.supplier.id, name: p.supplier.name },
-            amount: p.amount,
-            paymentDate: p.paymentDate,
-            method: p.method as PaymentMethod,
-            memo: p.memo,
-          });
-          setPayDialogOpen(true);
+      apiGet<{
+        id: string;
+        supplier: { id: string; name: string };
+        amount: string;
+        paymentDate: string;
+        method: string;
+        memo: string | null;
+      }>(`/api/supplier-payments/${e.referenceId}`).then((p) => {
+        setEditingPayment({
+          id: p.id,
+          supplier: { id: p.supplier.id, name: p.supplier.name },
+          amount: p.amount,
+          paymentDate: p.paymentDate,
+          method: p.method as PaymentMethod,
+          memo: p.memo,
         });
+        setPayDialogOpen(true);
+      });
       return;
     }
     if (e.type === "ADJUSTMENT" && e.referenceType === "MANUAL_ADJUSTMENT") {
@@ -514,19 +523,39 @@ export default function SupplierLedgerPage() {
             })}
           </div>
 
-          {/* 달력 */}
-          <div className="px-1 pt-1 shrink-0">
-            <Calendar
-              mode="range"
-              selected={{ from, to }}
-              onSelect={(range) => {
-                setFrom(range?.from);
-                setTo(range?.to);
-              }}
-              numberOfMonths={1}
-              locale={ko}
-              className="w-full"
-            />
+          {/* 기간 선택 (Popover) */}
+          <div className="px-3 pt-2 pb-2 shrink-0">
+            <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+              <PopoverTrigger
+                className={cn(
+                  "flex h-8 w-full items-center gap-2 rounded-md border border-border bg-card px-2.5 text-xs transition-colors hover:bg-muted",
+                  currentPresetLabel === "커스텀" && "border-primary/40 text-primary"
+                )}
+              >
+                <CalendarIcon className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="flex-1 truncate text-left tabular-nums">
+                  {from && to
+                    ? `${format(from, "yyyy-MM-dd")} ~ ${format(to, "yyyy-MM-dd")}`
+                    : from
+                    ? `${format(from, "yyyy-MM-dd")} 부터`
+                    : to
+                    ? `${format(to, "yyyy-MM-dd")} 까지`
+                    : "전체 기간"}
+                </span>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={{ from, to }}
+                  onSelect={(range) => {
+                    setFrom(range?.from);
+                    setTo(range?.to);
+                  }}
+                  numberOfMonths={1}
+                  locale={ko}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* 검색 + 유형 필터 */}
@@ -712,15 +741,60 @@ export default function SupplierLedgerPage() {
           {/* 테이블 */}
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="space-y-3 px-5 py-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="ml-auto h-4 w-20" />
-                  </div>
-                ))}
-              </div>
+              <Table className="min-w-[900px] table-fixed">
+                <colgroup>
+                  {!selectedSupplierId && <col style={{ width: "14%" }} />}
+                  <col style={{ width: "70px" }} />
+                  <col />
+                  <col style={{ width: "130px" }} />
+                  <col style={{ width: "120px" }} />
+                  <col style={{ width: "120px" }} />
+                  <col style={{ width: "120px" }} />
+                </colgroup>
+                <TableHeader className="sticky top-0 z-10">
+                  <TableRow className="bg-muted text-muted-foreground text-xs hover:bg-muted">
+                    {!selectedSupplierId && <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">거래처</TableHead>}
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">유형</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">설명</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">참조</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">차변 (매입)</TableHead>
+                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">대변 (결제)</TableHead>
+                    <TableHead className="border-b border-border h-auto py-1.5 px-2 text-right font-medium">잔액</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 3 }).map((_, gi) => (
+                    <React.Fragment key={`sk-group-${gi}`}>
+                      <TableRow className="bg-card hover:bg-card">
+                        <TableCell colSpan={selectedSupplierId ? 6 : 7} className="px-3 py-1.5">
+                          <Skeleton className="h-3 w-24" />
+                        </TableCell>
+                      </TableRow>
+                      {Array.from({ length: 3 }).map((_, ri) => (
+                        <TableRow key={`sk-${gi}-${ri}`} className="hover:bg-transparent">
+                          {!selectedSupplierId && (
+                            <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-24" /></TableCell>
+                          )}
+                          <TableCell className="border-r border-border px-2 py-1.5 text-center">
+                            <Skeleton className="h-5 w-12 rounded-md mx-auto" />
+                          </TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-40" /></TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
+                          </TableCell>
+                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><Skeleton className="h-4 w-24" /></div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </TableBody>
+              </Table>
             ) : viewMode === "ledger" ? (
               dateGroups.length === 0 ? (
                 <EmptyStateHint />

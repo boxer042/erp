@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import React, { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -21,11 +21,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar } from "@/components/ui/calendar";
 
 import {
   Plus, Check, X, Trash2, FileText, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, Search, ChevronDown,
-  Loader2, Pencil, Truck,
+  Loader2, Pencil, Truck, CalendarIcon,
 } from "lucide-react";
+import { startOfMonth, endOfMonth, startOfDay, subMonths, format } from "date-fns";
+import { ko } from "date-fns/locale";
 import { toast } from "sonner";
 import { QuickSupplierSheet } from "@/components/quick-register-sheets";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,6 +65,44 @@ function IncomingPageInner() {
   const [statusFilter, setStatusFilter] = useState<string[]>(Object.keys(statusLabels));
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string | null>(null);
   const [viewPopoverOpen, setViewPopoverOpen] = useState(false);
+
+  // 기간 필터 (기본: 이번달)
+  const now = useMemo(() => new Date(), []);
+  const [from, setFrom] = useState<Date | undefined>(startOfMonth(now));
+  const [to, setTo] = useState<Date | undefined>(endOfMonth(now));
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+
+  const applyPreset = (preset: "thisMonth" | "lastMonth" | "last3" | "all") => {
+    if (preset === "thisMonth") {
+      setFrom(startOfMonth(now));
+      setTo(endOfMonth(now));
+    } else if (preset === "lastMonth") {
+      const last = subMonths(now, 1);
+      setFrom(startOfMonth(last));
+      setTo(endOfMonth(last));
+    } else if (preset === "last3") {
+      setFrom(startOfDay(subMonths(now, 3)));
+      setTo(endOfMonth(now));
+    } else {
+      setFrom(undefined);
+      setTo(undefined);
+    }
+  };
+
+  const currentPresetLabel = (() => {
+    if (!from && !to) return "전체";
+    if (from && to) {
+      const thisF = startOfMonth(now).getTime();
+      const thisT = endOfMonth(now).getTime();
+      if (from.getTime() === thisF && to.getTime() === thisT) return "이번달";
+      const last = subMonths(now, 1);
+      if (from.getTime() === startOfMonth(last).getTime() && to.getTime() === endOfMonth(last).getTime())
+        return "지난달";
+      if (from.getTime() === startOfDay(subMonths(now, 3)).getTime() && to.getTime() === endOfMonth(now).getTime())
+        return "최근3개월";
+    }
+    return "커스텀";
+  })();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
@@ -130,24 +171,24 @@ function IncomingPageInner() {
   const detailLoading = detailQuery.isFetching;
 
   const incomingsQuery = useQuery({
-    queryKey: queryKeys.incoming.list(),
-    queryFn: async () => {
-      const list = await apiGet<Incoming[]>("/api/incoming");
-      const details = await Promise.all(
-        list.map(async (inc) => {
-          try {
-            return await apiGet<IncomingDetail>(`/api/incoming/${inc.id}`);
-          } catch {
-            return null;
-          }
-        })
-      );
-      return { list, details: details.filter((d): d is IncomingDetail => !!d) };
+    queryKey: queryKeys.incoming.list({
+      from: from?.toISOString(),
+      to: to?.toISOString(),
+    }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from.toISOString());
+      if (to) {
+        const toInclusive = new Date(to);
+        toInclusive.setDate(toInclusive.getDate() + 1);
+        params.set("to", toInclusive.toISOString());
+      }
+      const qs = params.toString();
+      return apiGet<Incoming[]>(`/api/incoming${qs ? `?${qs}` : ""}`);
     },
   });
 
-  const incomings = incomingsQuery.data?.list ?? [];
-  const allDetails = incomingsQuery.data?.details ?? [];
+  const incomings = incomingsQuery.data ?? [];
   const loading = incomingsQuery.isPending;
 
   // ─── 거래처 관련 ───
@@ -679,6 +720,63 @@ function IncomingPageInner() {
                 </Popover>
               </div>
 
+              {/* 기간 프리셋 */}
+              <div className="px-3 flex flex-wrap gap-1 shrink-0">
+                {(["thisMonth", "lastMonth", "last3", "all"] as const).map((p) => {
+                  const labels = { thisMonth: "이번달", lastMonth: "지난달", last3: "최근3개월", all: "전체" };
+                  const active = currentPresetLabel === labels[p];
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => applyPreset(p)}
+                      className={cn(
+                        "px-2 h-6 rounded text-[11px] border transition-colors",
+                        active
+                          ? "bg-primary/10 border-primary/40 text-primary"
+                          : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      {labels[p]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 기간 선택 (Popover) */}
+              <div className="px-3 pt-2 pb-2 shrink-0">
+                <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                  <PopoverTrigger
+                    className={cn(
+                      "flex h-8 w-full items-center gap-2 rounded-md border border-border bg-card px-2.5 text-xs transition-colors hover:bg-muted",
+                      currentPresetLabel === "커스텀" && "border-primary/40 text-primary"
+                    )}
+                  >
+                    <CalendarIcon className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className="flex-1 truncate text-left tabular-nums">
+                      {from && to
+                        ? `${format(from, "yyyy-MM-dd")} ~ ${format(to, "yyyy-MM-dd")}`
+                        : from
+                        ? `${format(from, "yyyy-MM-dd")} 부터`
+                        : to
+                        ? `${format(to, "yyyy-MM-dd")} 까지`
+                        : "전체 기간"}
+                    </span>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={{ from, to }}
+                      onSelect={(range) => {
+                        setFrom(range?.from);
+                        setTo(range?.to);
+                      }}
+                      numberOfMonths={1}
+                      locale={ko}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
               {/* 검색 + 필터 */}
               <div className="px-3 pb-2 flex items-center gap-2 shrink-0">
                 <div className="flex-1 flex items-center gap-1.5 h-8 rounded-md border border-border bg-card px-2.5">
@@ -732,19 +830,11 @@ function IncomingPageInner() {
               <ScrollArea className="flex-1 min-h-0">
                 {loading ? (
                   <>
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className="px-3 py-2.5 border-b border-border space-y-1">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} className="px-3 py-2.5 border-b border-border">
                         <div className="flex items-center justify-between">
                           <Skeleton className="h-4 w-28" />
-                          <Skeleton className="h-5 w-10 rounded-full" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Skeleton className="h-3 w-20" />
                           <Skeleton className="h-3 w-8" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Skeleton className="h-3 w-24" />
-                          <Skeleton className="h-3 w-16" />
                         </div>
                       </div>
                     ))}
@@ -885,7 +975,7 @@ function IncomingPageInner() {
 
           {viewMode === "items" ? (() => {
             // 품목별 뷰 — 날짜별 그룹핑
-            const filteredDetails = allDetails.filter((d) => {
+            const filteredDetails = incomings.filter((d) => {
               if (!statusFilter.includes(d.status)) return false;
               if (selectedSupplierFilter && d.supplier.name !== selectedSupplierFilter) return false;
               if (searchQuery) {
@@ -898,7 +988,7 @@ function IncomingPageInner() {
             });
 
             // 날짜별 그룹핑
-            const dateGroups = new Map<string, Array<{ detail: IncomingDetail; item: IncomingDetail["items"][0] }>>();
+            const dateGroups = new Map<string, Array<{ detail: Incoming; item: Incoming["items"][0] }>>();
             filteredDetails.forEach((d) => {
               const dateKey = new Date(d.incomingDate).toLocaleDateString("ko-KR");
               d.items.forEach((item) => {
@@ -917,12 +1007,66 @@ function IncomingPageInner() {
 
             return (
               <div className="flex-1 min-h-0 overflow-auto">
-                {allDetails.length === 0 && loading ? (
-                  <div className="p-4 space-y-3">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                  </div>
+                {incomings.length === 0 && loading ? (
+                  <table className="w-full min-w-[1000px] text-sm table-fixed">
+                    <colgroup>
+                      <col style={{ width: "12%" }} />
+                      <col />
+                      <col style={{ width: "8%" }} />
+                      <col style={{ width: "50px" }} />
+                      <col style={{ width: "70px" }} />
+                      <col style={{ width: "100px" }} />
+                      <col style={{ width: "80px" }} />
+                      <col style={{ width: "100px" }} />
+                      <col style={{ width: "110px" }} />
+                      <col style={{ width: "90px" }} />
+                      <col style={{ width: "80px" }} />
+                      <col style={{ width: "70px" }} />
+                    </colgroup>
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-muted text-muted-foreground text-xs">
+                        <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">거래처</th>
+                        <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">품명</th>
+                        <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">규격</th>
+                        <th className="border-r border-b border-border py-1.5 text-center font-medium">단위</th>
+                        <th className="border-r border-b border-border py-1.5 text-center font-medium">수량</th>
+                        <th className="border-r border-b border-border py-1.5 text-center font-medium">단가</th>
+                        <th className="border-r border-b border-border py-1.5 text-center font-medium">할인</th>
+                        <th className="border-r border-b border-border py-1.5 text-center font-medium">실제단가</th>
+                        <th className="border-r border-b border-border py-1.5 text-center font-medium">공급가액</th>
+                        <th className="border-r border-b border-border py-1.5 text-center font-medium">세액</th>
+                        <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">비고</th>
+                        <th className="border-b border-border py-1.5 text-center font-medium">매핑</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 3 }).map((_, gi) => (
+                        <React.Fragment key={`sk-g-${gi}`}>
+                          <tr className="bg-card">
+                            <td colSpan={12} className="px-3 py-1.5 border-b border-border">
+                              <Skeleton className="h-3 w-24" />
+                            </td>
+                          </tr>
+                          {Array.from({ length: 3 }).map((_, ri) => (
+                            <tr key={`sk-${gi}-${ri}`} className="border-b border-border">
+                              <td className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-24" /></td>
+                              <td className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-32" /></td>
+                              <td className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-16" /></td>
+                              <td className="border-r border-border py-1.5"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                              <td className="border-r border-border py-1.5"><Skeleton className="h-4 w-12 mx-auto" /></td>
+                              <td className="border-r border-border py-1.5"><Skeleton className="h-4 w-16 mx-auto" /></td>
+                              <td className="border-r border-border py-1.5"><Skeleton className="h-4 w-12 mx-auto" /></td>
+                              <td className="border-r border-border py-1.5"><Skeleton className="h-4 w-16 mx-auto" /></td>
+                              <td className="border-r border-border py-1.5"><Skeleton className="h-4 w-20 mx-auto" /></td>
+                              <td className="border-r border-border py-1.5"><Skeleton className="h-4 w-16 mx-auto" /></td>
+                              <td className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-12" /></td>
+                              <td className="py-1.5"><Skeleton className="h-5 w-12 rounded-md mx-auto" /></td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
                 ) : sortedDates.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">입고 내역이 없습니다</div>
                 ) : (
@@ -994,7 +1138,7 @@ function IncomingPageInner() {
                                 <td className="border-r border-border text-right px-2 py-1.5 text-muted-foreground tabular-nums">{formatPrice(taxLine)}</td>
                                 <td className="border-r border-border px-2 py-1.5 text-muted-foreground truncate">{item.memo || ""}</td>
                                 <td className="text-center py-1.5">
-                                  {item.supplierProduct.productMappings && item.supplierProduct.productMappings.length > 0 ? (
+                                  {item.supplierProduct._count.productMappings > 0 ? (
                                     <span className="text-xs text-brand">&#10003;</span>
                                   ) : (
                                     <span className="text-xs text-yellow-400">&#9888;</span>

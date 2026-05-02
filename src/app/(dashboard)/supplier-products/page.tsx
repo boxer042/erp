@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -78,11 +81,9 @@ interface Supplier {
 
 export default function SupplierProductsPage() {
   const router = useRouter();
-  const [items, setItems] = useState<SupplierProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [mappingFilter, setMappingFilter] = useState<"all" | "mapped" | "unmapped">("all");
 
@@ -95,25 +96,24 @@ export default function SupplierProductsPage() {
   const [dialogTarget, setDialogTarget] = useState<{ id: string; name: string; unit: string } | null>(null);
   const [defaultProductId, setDefaultProductId] = useState("");
 
-  // 입고 비용 시트
+  const itemsQuery = useQuery({
+    queryKey: queryKeys.supplierProducts.list({ supplierId: selectedSupplier, search: searchQuery }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (selectedSupplier !== "all") params.set("supplierId", selectedSupplier);
+      if (searchQuery) params.set("search", searchQuery);
+      return apiGet<SupplierProduct[]>(`/api/supplier-products?${params}`);
+    },
+  });
+  const items = itemsQuery.data ?? [];
+  const loading = itemsQuery.isPending;
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.supplierProducts.all });
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (selectedSupplier !== "all") params.set("supplierId", selectedSupplier);
-    if (searchQuery) params.set("search", searchQuery);
-    const res = await fetch(`/api/supplier-products?${params}`);
-    setItems(await res.json());
-    setLoading(false);
-  }, [selectedSupplier, searchQuery]);
-
-  const fetchSuppliers = useCallback(async () => {
-    const res = await fetch("/api/suppliers");
-    setSuppliers(await res.json());
-  }, []);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
-  useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
+  const suppliersQuery = useQuery({
+    queryKey: queryKeys.suppliers.list(),
+    queryFn: () => apiGet<Supplier[]>("/api/suppliers"),
+  });
+  const suppliers = suppliersQuery.data ?? [];
 
   const filteredItems = items.filter((item) => {
     if (mappingFilter === "mapped") return item.productMappings.length > 0;
@@ -147,7 +147,7 @@ export default function SupplierProductsPage() {
             onSearch: () => setSearchQuery(search),
             placeholder: "품명 / 품번 검색...",
           }}
-          onRefresh={fetchItems}
+          onRefresh={refresh}
           loading={loading}
           filters={
             <div className="flex items-center gap-1.5">
@@ -383,7 +383,7 @@ export default function SupplierProductsPage() {
           supplierProductName={dialogTarget.name}
           supplierProductUnit={dialogTarget.unit}
           defaultProductId={defaultProductId}
-          onMappingChange={fetchItems}
+          onMappingChange={refresh}
         />
       )}
 

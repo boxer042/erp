@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -71,34 +74,32 @@ function LotsSkeletonRows({ rows = 8 }: { rows?: number }) {
 }
 
 export default function InventoryLotsPage() {
-  const [lots, setLots] = useState<Lot[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
-
+  const queryClient = useQueryClient();
   const [supplierId, setSupplierId] = useState("");
   const [mapped, setMapped] = useState<"all" | "mapped" | "orphan">("all");
   const [source, setSource] = useState<"all" | "INCOMING" | "INITIAL" | "ADJUSTMENT">("all");
   const [hasRemaining, setHasRemaining] = useState(false);
 
-  const fetchLots = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (supplierId) params.set("supplierId", supplierId);
-    if (mapped !== "all") params.set("mapped", mapped);
-    if (source !== "all") params.set("source", source);
-    if (hasRemaining) params.set("hasRemaining", "true");
-    const res = await fetch(`/api/inventory/lots?${params}`);
-    if (res.ok) setLots(await res.json());
-    setLoading(false);
-  }, [supplierId, mapped, source, hasRemaining]);
+  const lotsQuery = useQuery({
+    queryKey: queryKeys.lots.list({ supplierId, mapped, source, hasRemaining }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (supplierId) params.set("supplierId", supplierId);
+      if (mapped !== "all") params.set("mapped", mapped);
+      if (source !== "all") params.set("source", source);
+      if (hasRemaining) params.set("hasRemaining", "true");
+      return apiGet<Lot[]>(`/api/inventory/lots?${params}`);
+    },
+  });
+  const lots = lotsQuery.data ?? [];
+  const loading = lotsQuery.isPending;
+  const fetchLots = () => queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
 
-  const fetchSuppliers = useCallback(async () => {
-    const res = await fetch("/api/suppliers");
-    if (res.ok) setSuppliers(await res.json());
-  }, []);
-
-  useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
-  useEffect(() => { fetchLots(); }, [fetchLots]);
+  const suppliersQuery = useQuery({
+    queryKey: queryKeys.suppliers.list(),
+    queryFn: () => apiGet<Supplier[]>("/api/suppliers"),
+  });
+  const suppliers = suppliersQuery.data ?? [];
 
   const totalRemainingValue = lots.reduce(
     (sum, l) => sum + parseFloat(l.remainingQty) * parseFloat(l.unitCost),

@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -82,30 +85,28 @@ const emptyForm = {
 };
 
 export default function RentalAssetsPage() {
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [editAsset, setEditAsset] = useState<Asset | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/rental-assets");
-    if (res.ok) {
-      const data: Asset[] = await res.json();
-      const q = search.trim().toLowerCase();
-      setAssets(q ? data.filter((a) =>
-        a.name.toLowerCase().includes(q) ||
-        (a.brand ?? "").toLowerCase().includes(q) ||
-        (a.assetNo ?? "").toLowerCase().includes(q)
-      ) : data);
-    }
-    setLoading(false);
-  }, [search]);
-
-  useEffect(() => { load(); }, [load]);
+  const assetsQuery = useQuery({
+    queryKey: queryKeys.rentalAssets.list(),
+    queryFn: () => apiGet<Asset[]>("/api/rental-assets"),
+  });
+  const loading = assetsQuery.isPending;
+  const assets = useMemo(() => {
+    const data = assetsQuery.data ?? [];
+    const q = search.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter((a) =>
+      a.name.toLowerCase().includes(q) ||
+      (a.brand ?? "").toLowerCase().includes(q) ||
+      (a.assetNo ?? "").toLowerCase().includes(q)
+    );
+  }, [assetsQuery.data, search]);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.rentalAssets.all });
 
   const openCreate = () => {
     setEditAsset(null);
@@ -130,10 +131,9 @@ export default function RentalAssetsPage() {
     setSheet(true);
   };
 
-  const save = async () => {
-    if (!form.name.trim()) { toast.error("자산명을 입력하세요"); return; }
-    setSubmitting(true);
-    try {
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      if (!form.name.trim()) throw new Error("자산명을 입력하세요");
       const body = {
         name: form.name.trim(),
         brand: form.brand.trim() || null,
@@ -146,32 +146,38 @@ export default function RentalAssetsPage() {
         status: form.status,
         acquiredAt: form.acquiredAt || null,
       };
-      const res = editAsset
-        ? await fetch(`/api/rental-assets/${editAsset.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-        : await fetch("/api/rental-assets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error();
+      return editAsset
+        ? apiMutate(`/api/rental-assets/${editAsset.id}`, "PUT", body)
+        : apiMutate("/api/rental-assets", "POST", body);
+    },
+    onSuccess: () => {
       toast.success(editAsset ? "수정됐습니다" : "등록됐습니다");
       setSheet(false);
-      load();
-    } catch {
-      toast.error("저장 실패");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      refresh();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "저장 실패"),
+  });
+  const submitting = saveMutation.isPending;
+  const save = () => saveMutation.mutate();
 
-  const remove = async (id: string) => {
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/rental-assets/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("비활성화됐습니다");
+      refresh();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+  const remove = (id: string) => {
     if (!confirm("비활성화하시겠습니까?")) return;
-    const res = await fetch(`/api/rental-assets/${id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("비활성화됐습니다"); load(); }
-    else toast.error("삭제 실패");
+    removeMutation.mutate(id);
   };
 
   return (
     <div className="flex h-full flex-col">
       <DataTableToolbar
-        search={{ value: search, onChange: setSearch, onSearch: load, placeholder: "자산명, 브랜드, 자산번호 검색..." }}
-        onRefresh={load}
+        search={{ value: search, onChange: setSearch, onSearch: () => {}, placeholder: "자산명, 브랜드, 자산번호 검색..." }}
+        onRefresh={refresh}
         onAdd={openCreate}
         addLabel="자산 추가"
         loading={loading}

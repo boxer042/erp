@@ -432,8 +432,7 @@ export function NewProductForm({
   }, [channels]);
 
   useEffect(() => {
-    fetch("/api/card-fee-rate")
-      .then((r) => r.json())
+    apiGet<{ current?: { rate: string } | null }>("/api/card-fee-rate")
       .then((d) => setCardFeeRate(d?.current ? parseFloat(d.current.rate) : 0))
       .catch(() => {});
   }, []);
@@ -498,14 +497,15 @@ export function NewProductForm({
     let cancelled = false;
     (async () => {
       try {
-        const listRes = await fetch("/api/assembly-templates");
-        if (!listRes.ok) return;
-        const list = (await listRes.json()) as Array<{ id: string; isActive: boolean }>;
+        const list = await apiGet<Array<{ id: string; isActive: boolean }>>("/api/assembly-templates");
         const actives = list.filter((t) => t.isActive);
         const details = await Promise.all(
           actives.map(async (t) => {
-            const r = await fetch(`/api/assembly-templates/${t.id}`);
-            return r.ok ? (await r.json() as TemplateDetail) : null;
+            try {
+              return await apiGet<TemplateDetail>(`/api/assembly-templates/${t.id}`);
+            } catch {
+              return null;
+            }
           }),
         );
         if (!cancelled) {
@@ -617,21 +617,17 @@ export function NewProductForm({
     }
     setSavePresetSubmitting(true);
     try {
-      const res = await fetch(`/api/assembly-templates/${templateId}/presets`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: savePresetName,
-          isActive: true,
-          items,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(typeof err.error === "string" ? err.error : "저장 실패");
+      let newPreset: TemplatePreset;
+      try {
+        newPreset = await apiMutate<TemplatePreset>(
+          `/api/assembly-templates/${templateId}/presets`,
+          "POST",
+          { name: savePresetName, isActive: true, items },
+        );
+      } catch (err) {
+        toast.error((err as Error)?.message || "저장 실패");
         return;
       }
-      const newPreset = (await res.json()) as TemplatePreset;
       // 메모리 templates에 새 프리셋 추가
       setTemplates((prev) =>
         prev.map((x) =>
@@ -650,20 +646,23 @@ export function NewProductForm({
   const fetchSupplierProducts = useCallback(async (supplierId: string) => {
     if (!supplierId) { setSupplierProducts([]); return; }
     setLoadingSupplierProducts(true);
-    const res = await fetch(`/api/supplier-products?supplierId=${supplierId}`);
-    if (res.ok) setSupplierProducts(await res.json());
-    setLoadingSupplierProducts(false);
+    try {
+      setSupplierProducts(await apiGet(`/api/supplier-products?supplierId=${supplierId}`));
+    } catch {
+      // ignore
+    } finally {
+      setLoadingSupplierProducts(false);
+    }
   }, []);
 
   const fetchIncomingCosts = useCallback(async (supplierProductId: string) => {
-    const [costsRes, shippingRes, avgCostRes] = await Promise.all([
-      fetch(`/api/supplier-products/${supplierProductId}/costs`),
-      fetch(`/api/supplier-products/${supplierProductId}/avg-shipping`),
-      fetch(`/api/supplier-products/${supplierProductId}/avg-cost`),
+    const [costs, shipping, avgCost] = await Promise.allSettled([
+      apiGet<SupplierProductCostItem[]>(`/api/supplier-products/${supplierProductId}/costs`),
+      apiGet<{ avgShippingCost: number | null; avgShippingIsTaxable: boolean | null }>(`/api/supplier-products/${supplierProductId}/avg-shipping`),
+      apiGet<{ avgUnitCost: number | null }>(`/api/supplier-products/${supplierProductId}/avg-cost`),
     ]);
-    if (costsRes.ok) {
-      const data = await costsRes.json();
-      const fromServer: CostRow[] = data.map((c: SupplierProductCostItem) => ({
+    if (costs.status === "fulfilled") {
+      const fromServer: CostRow[] = costs.value.map((c) => ({
         id: Math.random().toString(36).slice(2),
         serverId: c.id,
         name: c.name,
@@ -672,23 +671,20 @@ export function NewProductForm({
         perUnit: c.perUnit,
         isTaxable: c.isTaxable,
       }));
-      // 매핑 선택 전에 사용자가 수동 추가한 행(serverId 없음)은 보존하여 머지
       setIncomingCosts((prev) => {
         const manual = prev.filter((c) => !c.serverId && (c.name || c.value));
         return [...fromServer, ...manual];
       });
     }
-    if (shippingRes.ok) {
-      const data = await shippingRes.json();
-      setAvgShippingCost(data.avgShippingCost ?? null);
-      setAvgShippingIsTaxable(data.avgShippingIsTaxable ?? false);
+    if (shipping.status === "fulfilled") {
+      setAvgShippingCost(shipping.value.avgShippingCost ?? null);
+      setAvgShippingIsTaxable(shipping.value.avgShippingIsTaxable ?? false);
     } else {
       setAvgShippingCost(null);
       setAvgShippingIsTaxable(false);
     }
-    if (avgCostRes.ok) {
-      const data = await avgCostRes.json();
-      setAvgIncomingCost(data.avgUnitCost ?? null);
+    if (avgCost.status === "fulfilled") {
+      setAvgIncomingCost(avgCost.value.avgUnitCost ?? null);
     } else {
       setAvgIncomingCost(null);
     }
@@ -894,10 +890,8 @@ export function NewProductForm({
       }
       setSubmitting(true);
       try {
-        const res = await fetch("/api/products/grouped", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          await apiMutate("/api/products/grouped", "POST", {
             canonicalName: form.name,
             canonicalSku: form.sku,
             productType: "ASSEMBLED",
@@ -930,11 +924,10 @@ export function NewProductForm({
               initialAssemblyDate: v.initialDate.toISOString(),
               initialAssemblyLaborCost: v.initialLabor || undefined,
             })),
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          toast.error(typeof err.error === "string" ? err.error : "묶음 등록 실패");
+          });
+        } catch (err) {
+          const message = (err as Error)?.message || "묶음 등록 실패";
+          toast.error(message);
           return;
         }
         toast.success(`대표 + 변형 ${variants.length}개가 등록되었습니다`);
@@ -948,10 +941,9 @@ export function NewProductForm({
     setSubmitting(true);
     const errors: string[] = [];
     try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let product: { id: string };
+      try {
+        product = await apiMutate<{ id: string }>("/api/products", "POST", {
           ...form,
           productType,
           listPrice: getSubmitListPrice(),
@@ -963,58 +955,49 @@ export function NewProductForm({
             bulkUsable && newBulkName.trim()
               ? { name: newBulkName.trim(), unitOfMeasure: newBulkUnit }
               : null,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "저장에 실패했습니다");
+        });
+      } catch (err) {
+        toast.error((err as Error)?.message || "저장에 실패했습니다");
         return;
       }
-
-      const product = await res.json();
       const productId = product.id;
 
       if (productType === "FINISHED" || productType === "PARTS") {
         if (mapping.supplierId && mapping.supplierProductId) {
-          const mapRes = await fetch("/api/products/mapping", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+          try {
+            await apiMutate("/api/products/mapping", "POST", {
               productId,
               supplierProductId: mapping.supplierProductId,
               conversionRate: mapping.conversionRate || "1",
               isProvisional: mapping.isProvisional,
-            }),
-          });
-          if (!mapRes.ok) errors.push("거래처 매핑");
-
-          // 입고 비용은 이 페이지에서 더 이상 등록·수정하지 않음 (거래처상품 상세에서만)
+            });
+          } catch {
+            errors.push("거래처 매핑");
+          }
         }
 
         for (const cost of sellingCosts.filter((c) => c.name && c.value)) {
-          const r = await fetch(`/api/products/${productId}/costs`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+          try {
+            await apiMutate(`/api/products/${productId}/costs`, "POST", {
               name: cost.name,
               costType: cost.costType,
               value: cost.value,
               perUnit: cost.perUnit,
               isTaxable: cost.isTaxable,
               channelId: null,
-            }),
-          });
-          if (!r.ok) errors.push(`판매비용 등록 (${cost.name})`);
+            });
+          } catch {
+            errors.push(`판매비용 등록 (${cost.name})`);
+          }
         }
 
         for (const row of channelPrices.filter((r) => r.enabled && r.price)) {
-          const r = await fetch(`/api/products/${productId}/channel-pricing`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ channelId: row.channelId, sellingPrice: row.price }),
-          });
-          if (!r.ok) {
+          try {
+            await apiMutate(`/api/products/${productId}/channel-pricing`, "POST", {
+              channelId: row.channelId,
+              sellingPrice: row.price,
+            });
+          } catch {
             const ch = channels.find((c) => c.id === row.channelId);
             errors.push(`채널 가격 등록 (${ch?.name ?? row.channelId})`);
           }
@@ -1024,19 +1007,16 @@ export function NewProductForm({
         for (const row of channelPrices.filter((r) => r.enabled)) {
           const costs = channelSellingCosts[row.channelId] ?? [];
           for (const cost of costs.filter((c) => c.name && c.value)) {
-            const r = await fetch(`/api/products/${productId}/costs`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
+            try {
+              await apiMutate(`/api/products/${productId}/costs`, "POST", {
                 name: cost.name,
                 costType: cost.costType,
                 value: cost.value,
                 perUnit: cost.perUnit,
                 isTaxable: cost.isTaxable,
                 channelId: row.channelId,
-              }),
-            });
-            if (!r.ok) {
+              });
+            } catch {
               const ch = channels.find((c) => c.id === row.channelId);
               errors.push(`채널 판매비용 등록 (${ch?.name ?? row.channelId} · ${cost.name})`);
             }
@@ -1045,65 +1025,68 @@ export function NewProductForm({
 
         if (productType === "PARTS" && parentProducts.length > 0) {
           for (const row of parentProducts.filter((r) => r.product)) {
-            const parentRes = await fetch(`/api/products/${row.product!.id}?include=setComponents`);
             let existingComponents: { componentId: string; quantity: string; label: string | null }[] = [];
-            if (parentRes.ok) {
-              const parentData = await parentRes.json();
-              existingComponents = (parentData.setComponents || []).map((sc: { componentId: string; quantity: string; label?: string | null }) => ({
+            try {
+              const parentData = await apiGet<{ setComponents?: Array<{ componentId: string; quantity: string; label?: string | null }> }>(
+                `/api/products/${row.product!.id}?include=setComponents`,
+              );
+              existingComponents = (parentData.setComponents || []).map((sc) => ({
                 componentId: sc.componentId,
                 quantity: sc.quantity,
                 label: sc.label ?? null,
               }));
-            } else {
+            } catch {
               errors.push(`상위 상품 조회 (${row.product!.name})`);
               continue;
             }
             const alreadyIn = existingComponents.some((c) => c.componentId === productId);
             if (!alreadyIn) {
-              const r = await fetch("/api/products/sets", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+              try {
+                await apiMutate("/api/products/sets", "POST", {
                   productId: row.product!.id,
                   components: [...existingComponents, { componentId: productId, quantity: row.quantity, label: null }],
-                }),
-              });
-              if (!r.ok) errors.push(`상위 상품 연결 (${row.product!.name})`);
+                });
+              } catch {
+                errors.push(`상위 상품 연결 (${row.product!.name})`);
+              }
             }
           }
         }
       } else {
         const validComponents = setComponents.filter((c) => c.product);
         if (validComponents.length > 0) {
-          const r = await fetch("/api/products/sets", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+          try {
+            await apiMutate("/api/products/sets", "POST", {
               productId,
               components: validComponents.map((c) => ({ componentId: c.product!.id, quantity: c.quantity, label: c.label ?? null, slotLabelId: c.slotLabelId ?? null, slotId: c.slotId ?? null })),
-            }),
-          });
-          if (!r.ok) errors.push("구성 상품 등록");
+            });
+          } catch {
+            errors.push("구성 상품 등록");
+          }
         }
 
         if (productType === "ASSEMBLED") {
           for (const cost of assemblyCosts.filter((c) => c.name && c.value)) {
-            const r = await fetch(`/api/products/${productId}/costs`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name: cost.name, costType: cost.costType, value: cost.value, perUnit: cost.perUnit }),
-            });
-            if (!r.ok) errors.push(`조립비용 등록 (${cost.name})`);
+            try {
+              await apiMutate(`/api/products/${productId}/costs`, "POST", {
+                name: cost.name,
+                costType: cost.costType,
+                value: cost.value,
+                perUnit: cost.perUnit,
+              });
+            } catch {
+              errors.push(`조립비용 등록 (${cost.name})`);
+            }
           }
         }
 
         for (const row of channelPrices.filter((r) => r.enabled && r.price)) {
-          const r = await fetch(`/api/products/${productId}/channel-pricing`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ channelId: row.channelId, sellingPrice: row.price }),
-          });
-          if (!r.ok) {
+          try {
+            await apiMutate(`/api/products/${productId}/channel-pricing`, "POST", {
+              channelId: row.channelId,
+              sellingPrice: row.price,
+            });
+          } catch {
             const ch = channels.find((c) => c.id === row.channelId);
             errors.push(`채널 가격 등록 (${ch?.name ?? row.channelId})`);
           }

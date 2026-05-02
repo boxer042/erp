@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -74,34 +77,26 @@ interface AssemblyRow {
 }
 
 export default function AssemblyPage() {
-  const [rows, setRows] = useState<AssemblyRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [initialProductId, setInitialProductId] = useState<string | undefined>(undefined);
 
   // 역조립 다이얼로그
   const [disOpen, setDisOpen] = useState(false);
   const [disTarget, setDisTarget] = useState<AssemblyRow | null>(null);
-  const [disSubmitting, setDisSubmitting] = useState(false);
   const [disReason, setDisReason] = useState("");
 
   // 상세 Sheet
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  const fetchAssemblies = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/assemblies");
-      if (res.ok) setRows(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAssemblies();
-  }, [fetchAssemblies]);
+  const assembliesQuery = useQuery({
+    queryKey: queryKeys.assembly.list(),
+    queryFn: () => apiGet<AssemblyRow[]>("/api/assemblies"),
+  });
+  const rows = assembliesQuery.data ?? [];
+  const loading = assembliesQuery.isPending;
+  const fetchAssemblies = () => queryClient.invalidateQueries({ queryKey: queryKeys.assembly.all });
 
   // ?productId=X 쿼리로 진입 → 자동으로 sheet 열기 (한 번만)
   const searchParams = useSearchParams();
@@ -119,34 +114,24 @@ export default function AssemblyPage() {
     setSheetOpen(true);
   };
 
-  const confirmDisassemble = async () => {
-    if (!disTarget) return;
-    const reason = disReason.trim();
-    if (!reason) {
-      toast.error("역조립 사유를 입력해주세요");
-      return;
-    }
-    setDisSubmitting(true);
-    try {
-      const res = await fetch(`/api/assemblies/${disTarget.id}/disassemble`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memo: reason }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(typeof err.error === "string" ? err.error : "역조립 실패");
-        return;
-      }
+  const disassembleMutation = useMutation({
+    mutationFn: () => {
+      if (!disTarget) throw new Error("대상이 없습니다");
+      const reason = disReason.trim();
+      if (!reason) throw new Error("역조립 사유를 입력해주세요");
+      return apiMutate(`/api/assemblies/${disTarget.id}/disassemble`, "POST", { memo: reason });
+    },
+    onSuccess: () => {
       toast.success("역조립이 완료되었습니다");
       setDisOpen(false);
       setDisTarget(null);
       setDisReason("");
       fetchAssemblies();
-    } finally {
-      setDisSubmitting(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "역조립 실패"),
+  });
+  const disSubmitting = disassembleMutation.isPending;
+  const confirmDisassemble = () => disassembleMutation.mutate();
 
   return (
     <div className="flex h-full flex-col">
