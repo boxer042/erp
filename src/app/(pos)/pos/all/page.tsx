@@ -17,7 +17,7 @@ export default function PosAllCustomersPage() {
   };
 
   return (
-    <div className="mx-auto h-full max-w-6xl overflow-y-auto p-4 sm:p-6">
+    <div className="h-full overflow-y-auto p-3 sm:p-4">
       <div className="mb-4 flex items-end justify-between sm:mb-6">
         <div>
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">손님</h1>

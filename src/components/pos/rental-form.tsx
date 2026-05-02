@@ -104,7 +104,7 @@ export function RentalForm({ sessionId, enabled = true }: Props) {
   };
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-5 p-4 sm:p-6">
+    <div className="flex flex-col gap-5 p-3 sm:p-4">
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">임대 자산</h2>
         {assetsQuery.isPending ? (

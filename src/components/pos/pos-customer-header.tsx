@@ -41,6 +41,9 @@ export function PosCustomerHeader() {
     return <div className="h-[92px] shrink-0 border-b border-border bg-background" />;
   }
 
+  // 전체보기(손님 그리드) 화면에서는 상단 손님 탭 숨김
+  if (isAll) return null;
+
   return (
     <>
       <div className="shrink-0 bg-background">

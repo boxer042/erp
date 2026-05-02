@@ -290,7 +290,8 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
                 className="text-destructive"
               />
             )}
-            <div className="mt-1 flex items-baseline justify-between border-t border-border pt-2">
+            <div className="-mx-4 mt-1 h-px bg-border sm:-mx-5" />
+            <div className="flex items-baseline justify-between pt-2">
               <span className="text-base font-semibold">판매가격</span>
               <span className="text-2xl font-bold tabular-nums underline-offset-4 group-hover:underline">
                 ₩{(netOnly ? totals.net : totals.total).toLocaleString("ko-KR")}
