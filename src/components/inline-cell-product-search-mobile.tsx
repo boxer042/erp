@@ -7,6 +7,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CornerDownLeft, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface SupplierProductLike {
   id: string;
@@ -50,6 +51,7 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
   onSelectPending,
   disableAlreadyAdded = false,
 }: Props<T>) {
+  const isPhoneSize = useIsMobile();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -134,7 +136,14 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
       </button>
 
       <Drawer open={open} onOpenChange={(v) => { if (!v) setSearch(""); setOpen(v); }}>
-        <DrawerContent className="flex h-[85dvh] max-h-[85dvh] flex-col data-[vaul-drawer-direction=bottom]:max-h-[85dvh]">
+        <DrawerContent
+          className={cn(
+            "flex flex-col",
+            isPhoneSize
+              ? "h-[85dvh] max-h-[85dvh] data-[vaul-drawer-direction=bottom]:max-h-[85dvh]"
+              : "h-[85vh] max-h-[85vh] data-[vaul-drawer-direction=bottom]:max-h-[85vh]"
+          )}
+        >
           <DrawerHeader className="flex shrink-0 flex-row items-center justify-between border-b border-border pt-4 pb-3">
             <DrawerTitle>품명 검색</DrawerTitle>
             <DrawerDescription className="sr-only">품명 또는 품번으로 검색</DrawerDescription>

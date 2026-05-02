@@ -41,27 +41,36 @@ export interface CartSession {
   label: string;
   customerId?: string;
   customerName?: string;
+  customerPhone?: string;
   items: CartItem[];
+  totalDiscount: string; // "1000" 또는 "10%" — 세션 전체 할인
+}
+
+interface AddOptions {
+  sessionId?: string; // 명시 시 active 무시하고 해당 세션에 추가
 }
 
 interface SessionsContextValue {
   sessions: CartSession[];
   activeId: string;
   active: CartSession;
-  addSession: () => void;
+  hydrated: boolean;
+  addSession: () => string; // 생성된 새 세션 id 반환
   removeSession: (id: string) => void;
   switchSession: (id: string) => void;
-  add: (item: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number }) => void;
-  remove: (cartItemId: string) => void;
-  updateQty: (cartItemId: string, qty: number) => void;
-  updateDiscount: (cartItemId: string, discount: string) => void;
-  updateRentalDates: (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number) => void;
-  assignVariant: (cartItemId: string, variant: { productId: string; name: string; sku?: string; unitPrice: number }) => void;
-  toggleZeroRate: (cartItemId: string) => void;
-  setCustomer: (id: string, name: string) => void;
-  clearCustomer: () => void;
-  clear: () => void;
+  add: (item: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number }, opts?: AddOptions) => void;
+  remove: (cartItemId: string, sessionId?: string) => void;
+  updateQty: (cartItemId: string, qty: number, sessionId?: string) => void;
+  updateDiscount: (cartItemId: string, discount: string, sessionId?: string) => void;
+  updateRentalDates: (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number, sessionId?: string) => void;
+  assignVariant: (cartItemId: string, variant: { productId: string; name: string; sku?: string; unitPrice: number }, sessionId?: string) => void;
+  toggleZeroRate: (cartItemId: string, sessionId?: string) => void;
+  setCustomer: (id: string, name: string, phone?: string, sessionId?: string) => void;
+  clearCustomer: (sessionId?: string) => void;
+  setSessionDiscount: (discount: string, sessionId?: string) => void;
+  clear: (sessionId?: string) => void;
   totalItemCount: number;
+  getSession: (id: string) => CartSession | undefined;
 }
 
 const SessionsContext = createContext<SessionsContextValue | null>(null);
@@ -69,10 +78,15 @@ const STORAGE_KEY = "pos.sessions.v1";
 
 function makeSession(index: number): CartSession {
   return {
-    id: `${Date.now()}-${index}`,
+    id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
     label: `손님 ${index}`,
     items: [],
+    totalDiscount: "0",
   };
+}
+
+function migrateSession(s: CartSession): CartSession {
+  return { ...s, totalDiscount: s.totalDiscount ?? "0" };
 }
 
 function updateSession(
@@ -84,8 +98,9 @@ function updateSession(
 }
 
 export function SessionsProvider({ children }: { children: React.ReactNode }) {
-  const [sessions, setSessions] = useState<CartSession[]>(() => [makeSession(1)]);
-  const [activeId, setActiveId] = useState<string>(() => "");
+  // SSR/CSR 일치를 위해 초기엔 빈 배열. 클라이언트 마운트 후 sessionStorage 또는 신규 세션 생성.
+  const [sessions, setSessions] = useState<CartSession[]>([]);
+  const [activeId, setActiveId] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -94,7 +109,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         const parsed: { sessions: CartSession[]; activeId: string } = JSON.parse(raw);
         if (parsed.sessions?.length) {
-          setSessions(parsed.sessions);
+          setSessions(parsed.sessions.map(migrateSession));
           setActiveId(parsed.activeId || parsed.sessions[0].id);
           setHydrated(true);
           return;
@@ -115,16 +130,26 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   }, [sessions, activeId, hydrated]);
 
   const addSession = useCallback(() => {
+    let createdId = "";
     setSessions((prev) => {
       const next = makeSession(prev.length + 1);
+      createdId = next.id;
       setActiveId(next.id);
       return [...prev, next];
     });
+    return createdId;
   }, []);
 
   const removeSession = useCallback((id: string) => {
     setSessions((prev) => {
-      if (prev.length <= 1) return prev;
+      if (prev.length <= 1) {
+        // 마지막 세션이면 비우기만
+        return prev.map((s) =>
+          s.id === id
+            ? { ...s, items: [], customerId: undefined, customerName: undefined, customerPhone: undefined, totalDiscount: "0" }
+            : s
+        );
+      }
       const next = prev.filter((s) => s.id !== id);
       setActiveId((cur) => (cur === id ? next[Math.max(0, prev.findIndex((s) => s.id === id) - 1)].id : cur));
       return next;
@@ -134,10 +159,13 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const switchSession = useCallback((id: string) => setActiveId(id), []);
 
   const add = useCallback(
-    (it: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number }) => {
+    (
+      it: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number },
+      opts?: AddOptions
+    ) => {
+      const targetId = opts?.sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => {
-          // 상품 항목만 productId 기준으로 중복 체크해서 수량 증가
+        updateSession(prev, targetId, (s) => {
           if (it.productId && it.itemType === "product") {
             const existing = s.items.find((p) => p.productId === it.productId);
             if (existing) {
@@ -182,9 +210,10 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const remove = useCallback(
-    (cartItemId: string) => {
+    (cartItemId: string, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => ({
+        updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.filter((p) => p.cartItemId !== cartItemId),
         }))
@@ -194,13 +223,13 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateQty = useCallback(
-    (cartItemId: string, qty: number) => {
+    (cartItemId: string, qty: number, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => ({
+        updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) => {
             if (p.cartItemId !== cartItemId) return p;
-            // 벌크 SKU는 소수점 허용 (최소 0.0001), 일반은 정수 최소 1
             const min = p.isBulk ? 0.0001 : 1;
             return { ...p, quantity: Math.max(min, qty) };
           }),
@@ -211,9 +240,10 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateDiscount = useCallback(
-    (cartItemId: string, discount: string) => {
+    (cartItemId: string, discount: string, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => ({
+        updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) => (p.cartItemId === cartItemId ? { ...p, discount } : p)),
         }))
@@ -223,9 +253,10 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggleZeroRate = useCallback(
-    (cartItemId: string) => {
+    (cartItemId: string, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => ({
+        updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
             p.cartItemId === cartItemId ? { ...p, isZeroRate: !p.isZeroRate } : p
@@ -237,9 +268,10 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateRentalDates = useCallback(
-    (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number) => {
+    (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => ({
+        updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
             p.cartItemId === cartItemId
@@ -260,9 +292,11 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     (
       cartItemId: string,
       variant: { productId: string; name: string; sku?: string; unitPrice: number },
+      sessionId?: string
     ) => {
+      const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => ({
+        updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
             p.cartItemId === cartItemId
@@ -283,34 +317,66 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setCustomer = useCallback(
-    (id: string, name: string) => {
+    (id: string, name: string, phone?: string, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, activeId, (s) => ({ ...s, customerId: id, customerName: name }))
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          customerId: id,
+          customerName: name,
+          customerPhone: phone,
+        }))
       );
     },
     [activeId]
   );
 
-  const clearCustomer = useCallback(() => {
-    setSessions((prev) =>
-      updateSession(prev, activeId, (s) => ({
-        ...s,
-        customerId: undefined,
-        customerName: undefined,
-      }))
-    );
-  }, [activeId]);
+  const clearCustomer = useCallback(
+    (sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      setSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          customerId: undefined,
+          customerName: undefined,
+          customerPhone: undefined,
+        }))
+      );
+    },
+    [activeId]
+  );
 
-  const clear = useCallback(() => {
-    setSessions((prev) =>
-      updateSession(prev, activeId, (s) => ({
-        ...s,
-        items: [],
-        customerId: undefined,
-        customerName: undefined,
-      }))
-    );
-  }, [activeId]);
+  const setSessionDiscount = useCallback(
+    (discount: string, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      setSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({ ...s, totalDiscount: discount }))
+      );
+    },
+    [activeId]
+  );
+
+  const clear = useCallback(
+    (sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      setSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          items: [],
+          customerId: undefined,
+          customerName: undefined,
+          customerPhone: undefined,
+          totalDiscount: "0",
+        }))
+      );
+    },
+    [activeId]
+  );
+
+  const getSession = useCallback(
+    (id: string) => sessions.find((s) => s.id === id),
+    [sessions]
+  );
 
   const active = useMemo(
     () => sessions.find((s) => s.id === activeId) ?? sessions[0],
@@ -327,6 +393,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       sessions,
       activeId,
       active,
+      hydrated,
       addSession,
       removeSession,
       switchSession,
@@ -339,10 +406,12 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       toggleZeroRate,
       setCustomer,
       clearCustomer,
+      setSessionDiscount,
       clear,
       totalItemCount,
+      getSession,
     }),
-    [sessions, activeId, active, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, clear, totalItemCount]
+    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, clear, totalItemCount, getSession]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

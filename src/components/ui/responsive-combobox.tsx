@@ -11,7 +11,7 @@ import {
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose,
 } from "@/components/ui/drawer";
-import { useIsCompactDevice } from "@/hooks/use-mobile";
+import { useIsCompactDevice, useIsMobile } from "@/hooks/use-mobile";
 import { ChevronsUpDown, CornerDownLeft, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +53,7 @@ export function ResponsiveCombobox<T>({
   disabled = false,
 }: ResponsiveComboboxProps<T>) {
   const isMobile = useIsCompactDevice();
+  const isPhoneSize = useIsMobile();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const mobileInputRef = useRef<HTMLInputElement>(null);
@@ -138,7 +139,14 @@ export function ResponsiveCombobox<T>({
         </button>
 
         <Drawer open={open} onOpenChange={(v) => { if (!v) setSearch(""); setOpen(v); }}>
-          <DrawerContent className="flex h-[85dvh] max-h-[85dvh] flex-col data-[vaul-drawer-direction=bottom]:max-h-[85dvh]">
+          <DrawerContent
+            className={cn(
+              "flex flex-col",
+              isPhoneSize
+                ? "h-[85dvh] max-h-[85dvh] data-[vaul-drawer-direction=bottom]:max-h-[85dvh]"
+                : "h-[85vh] max-h-[85vh] data-[vaul-drawer-direction=bottom]:max-h-[85vh]"
+            )}
+          >
             <DrawerHeader className="flex shrink-0 flex-row items-center justify-between border-b border-border pt-4 pb-3">
               <DrawerTitle>{mobileTitle ?? placeholder}</DrawerTitle>
               <DrawerDescription className="sr-only">{searchPlaceholder}</DrawerDescription>
