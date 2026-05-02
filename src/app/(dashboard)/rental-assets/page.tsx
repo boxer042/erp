@@ -236,7 +236,7 @@ export default function RentalAssetsPage() {
       </div>
 
       <Sheet open={sheet} onOpenChange={setSheet}>
-        <SheetContent side="bottom" className="flex h-[90dvh] flex-col p-0">
+        <SheetContent side="bottom" className="flex h-[90vh] flex-col p-0">
           <SheetHeader className="border-b border-border px-5 py-4">
             <SheetTitle>{editAsset ? "임대 자산 수정" : "임대 자산 추가"}</SheetTitle>
           </SheetHeader>

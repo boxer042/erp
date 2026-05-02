@@ -306,7 +306,7 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <SheetContent side="bottom" className="h-[90dvh] p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle>브랜드 수정</SheetTitle>
           <SheetDescription className="sr-only">브랜드 정보와 모델을 관리합니다</SheetDescription>

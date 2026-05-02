@@ -438,7 +438,7 @@ export default function TemplateDetailPage({
       </Card>
 
       <Sheet open={presetSheetOpen} onOpenChange={setPresetSheetOpen}>
-        <SheetContent side="bottom" className="h-[90dvh] p-0 flex flex-col">
+        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
           <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
             <SheetTitle>
               {editingPreset ? "프리셋 수정" : "프리셋 등록"}

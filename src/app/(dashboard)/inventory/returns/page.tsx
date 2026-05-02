@@ -776,7 +776,7 @@ export default function SupplierReturnsPage() {
       {/* 반품 등록 Sheet (bottom) */}
       {/* ============================================================ */}
       <Sheet open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetForm(); }}>
-        <SheetContent side="bottom" className="h-[90dvh] p-0 flex flex-col">
+        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
           <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
             <SheetTitle>반품 등록</SheetTitle>
             <SheetDescription className="sr-only">거래처 반품 등록</SheetDescription>
@@ -1124,7 +1124,7 @@ export default function SupplierReturnsPage() {
 
       {/* 반품 상세 Sheet */}
       <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-        <SheetContent side="bottom" className="h-[85dvh] p-0 flex flex-col">
+        <SheetContent side="bottom" className="h-[85vh] p-0 flex flex-col">
           <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
             <SheetTitle>{detailLoading ? <Skeleton className="h-5 w-32" /> : detail?.returnNo}</SheetTitle>
             <SheetDescription className="sr-only">반품 상세</SheetDescription>

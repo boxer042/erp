@@ -530,7 +530,7 @@ export default function OrdersPage() {
 
       {/* 주문 등록 다이얼로그 */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>주문 등록</DialogTitle>
           </DialogHeader>

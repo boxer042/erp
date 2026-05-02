@@ -1586,7 +1586,7 @@ function IncomingPageInner() {
       {/* 입고 등록 — Sheet */}
       {/* ============================================================ */}
       <Sheet open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setEditingId(null); }}>
-        <SheetContent side="bottom" className="h-[90dvh] p-0 flex flex-col">
+        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
           <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
             <SheetTitle>{editingId ? "입고 수정" : "입고 등록"}</SheetTitle>
             <SheetDescription className="sr-only">입고 등록 거래명세표</SheetDescription>
