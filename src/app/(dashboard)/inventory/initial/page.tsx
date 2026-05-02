@@ -652,7 +652,7 @@ export default function InitialInventoryPage() {
                       onClick={() => setUnitPriceVatIncluded((v) => !v)}
                       className={`text-[10px] leading-none px-1.5 py-0.5 rounded border ${
                         unitPriceVatIncluded
-                          ? "bg-primary text-primary-foreground border-primary"
+                          ? "bg-brand-muted text-primary border-primary/40"
                           : "border-border text-muted-foreground hover:bg-muted/70"
                       }`}
                       title="ON: VAT포함 금액으로 입력 → 자동 ÷1.1 저장"

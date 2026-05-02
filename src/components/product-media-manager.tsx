@@ -10,16 +10,18 @@ import {
 import {
   Dialog, DialogContent, DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon } from "lucide-react";
+import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon, Star } from "lucide-react";
 import { extractYoutubeId } from "@/lib/utils";
 import { apiGet, apiMutate } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImageEditDialog } from "@/components/image-edit-dialog";
 
 function MediaSkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
         <TableRow key={i}>
+          <TableCell><Skeleton className="h-7 w-7 rounded-md" /></TableCell>
           <TableCell><Skeleton className="h-4 w-8" /></TableCell>
           <TableCell><Skeleton className="h-12 w-12 rounded-md" /></TableCell>
           <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
@@ -43,7 +45,15 @@ interface ProductMedia {
   sortOrder: number;
 }
 
-export function ProductMediaManager({ productId }: { productId: string }) {
+interface ProductMediaManagerProps {
+  productId: string;
+  /** 현재 대표 이미지 URL (Product.imageUrl). 별 아이콘 표시·"대표로 설정" 동작에 사용 */
+  imageUrl?: string | null;
+  /** 대표 이미지가 변경됐을 때 부모에 알림 (예: React Query invalidate) */
+  onImageUrlChange?: () => void;
+}
+
+export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: ProductMediaManagerProps) {
   const [items, setItems] = useState<ProductMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [urlInput, setUrlInput] = useState("");
@@ -51,7 +61,11 @@ export function ProductMediaManager({ productId }: { productId: string }) {
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [previewItem, setPreviewItem] = useState<ProductMedia | null>(null);
+  const [editQueue, setEditQueue] = useState<File[]>([]);
+  const [editIndex, setEditIndex] = useState(0);
+  const [batchSuccess, setBatchSuccess] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentEditFile = editQueue[editIndex] ?? null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,40 +110,69 @@ export function ProductMediaManager({ productId }: { productId: string }) {
     }
   };
 
-  const handleFiles = async (files: FileList | null) => {
+  const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    setEditQueue(Array.from(files));
+    setEditIndex(0);
+    setBatchSuccess(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const uploadOne = async (data: Blob | File, name: string) => {
     setUploading(true);
-    let successCount = 0;
     try {
-      for (const file of Array.from(files)) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const upRes = await fetch("/api/products/upload", { method: "POST", body: fd });
-        if (!upRes.ok) {
-          const err = await upRes.json().catch(() => ({}));
-          toast.error(err.error || `${file.name}: 업로드 실패`);
-          continue;
-        }
-        const { url } = (await upRes.json()) as { url: string };
-        try {
-          await create({
-            type: "IMAGE",
-            url,
-            title: file.name.replace(/\.[^.]+$/, "") || null,
-          });
-          successCount += 1;
-        } catch {
-          toast.error(`${file.name}: 미디어 등록 실패`);
-        }
+      const fd = new FormData();
+      // append 시 3번째 인자로 파일명 지정 (Blob이어도 정상 처리됨)
+      fd.append("file", data, name);
+      const upRes = await fetch("/api/products/upload", { method: "POST", body: fd });
+      if (!upRes.ok) {
+        const err = await upRes.json().catch(() => ({}));
+        toast.error(err.error || `${name}: 업로드 실패`);
+        return false;
       }
-      if (successCount > 0) {
-        toast.success(`${successCount}개 이미지를 추가했습니다`);
-        await load();
+      const { url } = (await upRes.json()) as { url: string };
+      try {
+        await create({
+          type: "IMAGE",
+          url,
+          title: name.replace(/\.[^.]+$/, "") || null,
+        });
+        return true;
+      } catch {
+        toast.error(`${name}: 미디어 등록 실패`);
+        return false;
       }
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const advanceQueue = async (incrementSuccess: boolean) => {
+    const nextSuccess = batchSuccess + (incrementSuccess ? 1 : 0);
+    const next = editIndex + 1;
+    if (next >= editQueue.length) {
+      if (nextSuccess > 0) {
+        toast.success(`${nextSuccess}개 이미지를 추가했습니다`);
+        await load();
+        // 서버 측에서 Product.imageUrl이 자동 동기화됐을 수 있어 부모 캐시 갱신 알림
+        onImageUrlChange?.();
+      }
+      setEditQueue([]);
+      setEditIndex(0);
+      setBatchSuccess(0);
+    } else {
+      setBatchSuccess(nextSuccess);
+      setEditIndex(next);
+    }
+  };
+
+  const handleEditConfirm = async (edited: Blob, name: string) => {
+    const ok = await uploadOne(edited, name);
+    await advanceQueue(ok);
+  };
+
+  const handleEditCancel = async () => {
+    await advanceQueue(false);
   };
 
   const remove = async (id: string) => {
@@ -153,6 +196,21 @@ export function ProductMediaManager({ productId }: { productId: string }) {
       apiMutate(`/api/product-media/${b.id}`, "PUT", { sortOrder: a.sortOrder }),
     ]);
     await load();
+  };
+
+  const setPrimary = async (m: ProductMedia) => {
+    if (m.type !== "IMAGE") {
+      toast.error("이미지만 대표로 설정할 수 있습니다");
+      return;
+    }
+    if (m.url === imageUrl) return;
+    try {
+      await apiMutate(`/api/products/${productId}`, "PATCH", { imageUrl: m.url });
+      toast.success("대표 이미지로 설정되었습니다");
+      onImageUrlChange?.();
+    } catch {
+      toast.error("대표 이미지 설정에 실패했습니다");
+    }
   };
 
   // URL 입력 미리 감지로 아이콘 토글
@@ -199,11 +257,15 @@ export function ProductMediaManager({ productId }: { productId: string }) {
             size="sm"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
+            disabled={uploading || editQueue.length > 0}
           >
             {uploading ? (
               <>
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> 업로드 중...
+              </>
+            ) : editQueue.length > 0 ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> 편집 중 ({editIndex + 1}/{editQueue.length})
               </>
             ) : (
               <>
@@ -279,6 +341,7 @@ export function ProductMediaManager({ productId }: { productId: string }) {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[60px]">대표</TableHead>
             <TableHead className="w-[80px]">순서</TableHead>
             <TableHead className="w-[80px]">미리보기</TableHead>
             <TableHead className="w-[100px]">타입</TableHead>
@@ -292,13 +355,34 @@ export function ProductMediaManager({ productId }: { productId: string }) {
             <MediaSkeletonRows />
           ) : items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                 등록된 미디어가 없습니다
               </TableCell>
             </TableRow>
           ) : (
-            items.map((m, i) => (
+            items.map((m, i) => {
+              const isPrimary = m.type === "IMAGE" && m.url === imageUrl;
+              return (
               <TableRow key={m.id}>
+                <TableCell>
+                  <Button
+                    size="icon"
+                    variant={isPrimary ? "default" : "ghost"}
+                    className="h-7 w-7"
+                    onClick={() => setPrimary(m)}
+                    disabled={m.type !== "IMAGE" || isPrimary}
+                    aria-label={isPrimary ? "현재 대표 이미지" : "대표 이미지로 설정"}
+                    title={
+                      m.type !== "IMAGE"
+                        ? "이미지만 대표로 설정 가능"
+                        : isPrimary
+                          ? "현재 대표 이미지"
+                          : "대표 이미지로 설정"
+                    }
+                  >
+                    <Star className={`h-3.5 w-3.5 ${isPrimary ? "fill-current" : ""}`} />
+                  </Button>
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => move(i, -1)} disabled={i === 0}>
@@ -353,10 +437,19 @@ export function ProductMediaManager({ productId }: { productId: string }) {
                   </Button>
                 </TableCell>
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>
+
+      {/* 업로드 직전 편집 다이얼로그 */}
+      <ImageEditDialog
+        open={currentEditFile !== null}
+        file={currentEditFile}
+        onConfirm={handleEditConfirm}
+        onCancel={handleEditCancel}
+      />
 
       {/* 라이트박스 — 클릭 시 큰 미리보기 */}
       <Dialog open={previewItem !== null} onOpenChange={(o) => { if (!o) setPreviewItem(null); }}>

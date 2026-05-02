@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
 import { PAYMENT_METHODS, UNITS_OF_MEASURE } from "@/lib/constants";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
+import { NameAutocomplete } from "@/components/new-product-form/parts";
 import Loading from "./loading";
 
 interface SupplierProduct {
@@ -124,6 +125,14 @@ export default function SupplierDetailPage() {
   const supplier = supplierQuery.data ?? null;
   const loading = supplierQuery.isPending;
   const fetchSupplier = () => queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(supplierId) });
+
+  const productNameItems = useMemo(
+    () =>
+      (supplier?.supplierProducts ?? [])
+        .filter((sp) => sp.id !== editingProduct?.id)
+        .map((sp) => ({ id: sp.id, name: sp.name, badge: sp.supplierCode })),
+    [supplier?.supplierProducts, editingProduct?.id],
+  );
 
   const openCreateProduct = () => {
     setEditingProduct(null);
@@ -486,7 +495,14 @@ export default function SupplierDetailPage() {
           <form onSubmit={handleProductSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>상품명 *</Label>
-              <Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required />
+              <NameAutocomplete
+                value={productForm.name}
+                onChange={(name) => setProductForm({ ...productForm, name })}
+                items={productNameItems}
+                placeholder="공급상품명을 입력하세요"
+                warningLabel="이미 등록된 공급상품"
+                inputClassName=""
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

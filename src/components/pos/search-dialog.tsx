@@ -42,6 +42,7 @@ export function SearchDialog() {
     queryFn: () => {
       const params = new URLSearchParams();
       if (debounced) params.set("search", debounced);
+      params.set("excludeVariants", "true");
       return apiGet<ProductLite[]>(`/api/products?${params}`);
     },
     enabled: searchOpen,

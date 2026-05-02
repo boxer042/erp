@@ -36,7 +36,7 @@ export default async function PosCustomersPage({
           <CustomerSearchInput initial={q ?? ""} />
           <Link
             href="/pos/customers/new"
-            className="flex h-11 items-center gap-1 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary/90"
+            className="inline-flex h-11 items-center gap-1 rounded-pill border border-brand bg-brand px-6 text-sm font-medium text-brand-foreground hover:bg-brand/85"
           >
             <Plus className="h-4 w-4" /> 신규
           </Link>

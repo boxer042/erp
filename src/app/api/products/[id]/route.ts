@@ -866,12 +866,15 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const data: { sku?: string; name?: string } = {};
+  const data: { sku?: string; name?: string; imageUrl?: string | null } = {};
   if (typeof body.sku === "string" && body.sku.trim().length > 0) {
     data.sku = body.sku.trim();
   }
   if (typeof body.name === "string" && body.name.trim().length > 0) {
     data.name = body.name.trim();
+  }
+  if (typeof body.imageUrl === "string" || body.imageUrl === null) {
+    data.imageUrl = body.imageUrl;
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "수정할 필드가 없습니다" }, { status: 400 });

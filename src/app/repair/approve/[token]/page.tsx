@@ -170,7 +170,7 @@ export default function ApprovePage() {
         <button
           onClick={approve}
           disabled={submitting}
-          className="h-12 w-full rounded-lg bg-primary text-base font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+          className="h-12 w-full rounded-pill border border-brand bg-brand text-base font-medium text-brand-foreground hover:bg-brand/85 disabled:opacity-50"
         >
           {submitting ? "처리 중..." : "견적 승인"}
         </button>

@@ -187,7 +187,14 @@ export default function ProductDetailPage() {
           <ProductHeaderBar
             product={product}
             onSaveName={(name) => saveSingleField({ name })}
-            onSaveImageUrl={(imageUrl) => saveSingleField({ imageUrl })}
+            onSaveImageUrl={(imageUrl) =>
+              apiMutate("/api/product-media", "POST", {
+                productId: product.id,
+                type: "IMAGE",
+                url: imageUrl,
+                setPrimary: true,
+              }).then(() => undefined)
+            }
             actions={
               <Button
                 size="sm"
@@ -369,7 +376,13 @@ export default function ProductDetailPage() {
             description="POS 카탈로그·판매 화면에 함께 노출됩니다"
             noPadding
           >
-            <ProductMediaManager productId={product.id} />
+            <ProductMediaManager
+              productId={product.id}
+              imageUrl={product.imageUrl}
+              onImageUrlChange={() =>
+                queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(id) })
+              }
+            />
           </ProductSection>
 
           {/* 6. 이력 */}

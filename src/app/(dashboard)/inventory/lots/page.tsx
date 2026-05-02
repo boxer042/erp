@@ -28,12 +28,12 @@ interface Lot {
     spec: string | null;
     unitOfMeasure: string;
     supplier: { id: string; name: string };
-  };
+  } | null;
   receivedQty: string;
   remainingQty: string;
   unitCost: string;
   receivedAt: string;
-  source: "INCOMING" | "INITIAL" | "ADJUSTMENT";
+  source: "INCOMING" | "INITIAL" | "ADJUSTMENT" | "SET_PRODUCE";
   memo: string | null;
 }
 
@@ -47,6 +47,7 @@ const sourceLabels: Record<string, string> = {
   INCOMING: "입고",
   INITIAL: "기초",
   ADJUSTMENT: "조정",
+  SET_PRODUCE: "세트조립",
 };
 
 const formatWon = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -77,7 +78,7 @@ export default function InventoryLotsPage() {
   const queryClient = useQueryClient();
   const [supplierId, setSupplierId] = useState("");
   const [mapped, setMapped] = useState<"all" | "mapped" | "orphan">("all");
-  const [source, setSource] = useState<"all" | "INCOMING" | "INITIAL" | "ADJUSTMENT">("all");
+  const [source, setSource] = useState<"all" | "INCOMING" | "INITIAL" | "ADJUSTMENT" | "SET_PRODUCE">("all");
   const [hasRemaining, setHasRemaining] = useState(false);
 
   const lotsQuery = useQuery({
@@ -147,6 +148,7 @@ export default function InventoryLotsPage() {
                 <SelectItem value="INCOMING">입고</SelectItem>
                 <SelectItem value="INITIAL">기초</SelectItem>
                 <SelectItem value="ADJUSTMENT">조정</SelectItem>
+                <SelectItem value="SET_PRODUCE">세트조립</SelectItem>
               </SelectContent>
             </Select>
             <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
@@ -211,16 +213,26 @@ export default function InventoryLotsPage() {
                     <TableCell className="text-muted-foreground">
                       {new Date(lot.receivedAt).toLocaleDateString("ko-KR")}
                     </TableCell>
-                    <TableCell>{lot.supplierProduct.supplier.name}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium">{lot.supplierProduct.name}</span>
-                        {lot.supplierProduct.supplierCode && (
-                          <span className="text-xs text-muted-foreground">
-                            {lot.supplierProduct.supplierCode}
-                          </span>
-                        )}
-                      </div>
+                      {lot.supplierProduct ? (
+                        lot.supplierProduct.supplier.name
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {lot.supplierProduct ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium">{lot.supplierProduct.name}</span>
+                          {lot.supplierProduct.supplierCode && (
+                            <span className="text-xs text-muted-foreground">
+                              {lot.supplierProduct.supplierCode}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {lot.product ? (

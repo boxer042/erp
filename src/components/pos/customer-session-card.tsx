@@ -24,7 +24,7 @@ export function CustomerSessionCard({ session }: Props) {
   return (
     <Card
       onClick={() => router.push(`/pos/cart/${session.id}`)}
-      className="group relative flex h-[220px] cursor-pointer flex-col gap-3 p-4 transition-shadow hover:shadow-md sm:h-[240px]"
+      className="group relative flex aspect-square cursor-pointer flex-col gap-3 p-4 transition-shadow hover:shadow-md"
     >
       <Button
         variant="ghost"
@@ -84,8 +84,8 @@ export function AddCustomerCard({ onAdd }: AddProps) {
     <Card
       onClick={onAdd}
       className={cn(
-        "group flex h-[220px] cursor-pointer flex-col items-center justify-center gap-2 p-4 text-muted-foreground transition-colors",
-        "hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground sm:h-[240px]"
+        "group flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 p-4 text-muted-foreground transition-colors",
+        "hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
       )}
     >
       <Plus className="size-8" />

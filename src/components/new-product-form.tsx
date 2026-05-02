@@ -64,6 +64,7 @@ import {
   CostList,
   TypeSelectScreen,
   PRODUCT_TYPE_CARDS,
+  NameAutocomplete,
 } from "./new-product-form/parts";
 import { ShippingHistoryCard } from "@/components/shipping-history-card";
 export interface NewProductFormProps {
@@ -189,6 +190,10 @@ export function NewProductForm({
   const slotLabels = useMemo(
     () => (slotLabelsQuery.data ?? []).filter((l) => l.isActive),
     [slotLabelsQuery.data],
+  );
+  const productNameItems = useMemo(
+    () => existingProducts.map((p) => ({ id: p.id, name: p.name, badge: p.sku })),
+    [existingProducts],
   );
   const createSlotLabelMutation = useMutation({
     mutationFn: (payload: { name: string; rowIdx: number }) =>
@@ -1804,11 +1809,10 @@ export function NewProductForm({
                     <Card size="sm"><CardContent className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Field label="상품명" required>
-                        <Input
-                          placeholder="상품명을 입력하세요"
+                        <NameAutocomplete
                           value={form.name}
-                          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                          className="h-9"
+                          onChange={(name) => setForm((prev) => ({ ...prev, name }))}
+                          items={productNameItems}
                         />
                       </Field>
                       <Field label="규격">

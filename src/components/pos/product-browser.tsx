@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Grid3x3 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
 import { useSessions } from "@/components/pos/sessions-context";
@@ -37,6 +38,7 @@ export function ProductBrowser({ sessionId, enabled = true }: Props) {
     queryFn: () => {
       const params = new URLSearchParams();
       if (categoryId) params.set("categoryId", categoryId);
+      params.set("excludeVariants", "true");
       return apiGet<ProductLite[]>(`/api/products?${params}`);
     },
     enabled,
@@ -66,16 +68,16 @@ export function ProductBrowser({ sessionId, enabled = true }: Props) {
     <div className="flex h-full flex-col">
       {/* 카테고리 서브탭 */}
       {categoriesQuery.data && categoriesQuery.data.length > 0 && (
-        <ScrollArea className="shrink-0 border-b border-border bg-background">
-          <div className="flex items-stretch gap-2 px-3 py-2">
-            <CategoryChip
+        <ScrollArea className="shrink-0 bg-background">
+          <div className="flex items-stretch gap-2 px-3 py-3 sm:px-4">
+            <CategoryCard
               active={categoryId === ""}
               onClick={() => setCategoryId("")}
               label="전체"
               imageUrl={null}
             />
             {categoriesQuery.data.map((c) => (
-              <CategoryChip
+              <CategoryCard
                 key={c.id}
                 active={categoryId === c.id}
                 onClick={() => setCategoryId(c.id)}
@@ -100,7 +102,7 @@ export function ProductBrowser({ sessionId, enabled = true }: Props) {
   );
 }
 
-function CategoryChip({
+function CategoryCard({
   active,
   onClick,
   label,
@@ -112,33 +114,45 @@ function CategoryChip({
   imageUrl: string | null;
 }) {
   return (
-    <button
+    <Card
       onClick={onClick}
-      className="flex w-[68px] shrink-0 flex-col items-center gap-1 px-2 py-1.5"
+      className={cn(
+        "group relative aspect-square w-25 shrink-0 cursor-pointer overflow-hidden p-0 transition-shadow hover:shadow-md",
+        active && "ring-2 ring-primary"
+      )}
     >
       {imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imageUrl}
-          alt={label}
-          className="size-10 rounded-md object-cover"
-        />
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl}
+            alt={label}
+            className="absolute inset-0 size-full object-cover"
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent px-2 py-1.5">
+            <div
+              className={cn(
+                "line-clamp-1 text-center text-xs text-white",
+                active ? "font-semibold" : "font-medium"
+              )}
+            >
+              {label}
+            </div>
+          </div>
+        </>
       ) : (
-        <Grid3x3
-          className={cn(
-            "size-10 p-2",
-            active ? "text-foreground" : "text-muted-foreground"
-          )}
-        />
+        <div className="flex size-full flex-col items-center justify-center gap-1 bg-muted">
+          <Grid3x3 className="size-7 text-muted-foreground" />
+          <div
+            className={cn(
+              "line-clamp-1 px-2 text-center text-xs text-foreground",
+              active && "font-semibold"
+            )}
+          >
+            {label}
+          </div>
+        </div>
       )}
-      <span
-        className={cn(
-          "line-clamp-1 text-xs",
-          active ? "font-semibold text-foreground" : "text-muted-foreground"
-        )}
-      >
-        {label}
-      </span>
-    </button>
+    </Card>
   );
 }

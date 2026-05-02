@@ -26,6 +26,8 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
@@ -44,6 +46,9 @@
   --color-brand-muted: var(--brand-muted);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-cta: var(--cta-bg);
+  --color-cta-foreground: var(--cta-fg);
+  --color-cta-border: var(--cta-border);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -51,6 +56,7 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-pill: 9999px;
 }
 
 /* 라이트 테마 (기본) */
@@ -71,6 +77,8 @@
   --accent-foreground: #171717;
   --destructive: #ef4444;
   --border: rgba(0, 0, 0, 0.09);
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-strong: rgba(0, 0, 0, 0.14);
   --input: rgba(0, 0, 0, 0.09);
   --ring: #3ecf8e;
   --chart-1: #3ecf8e;
@@ -92,6 +100,9 @@
   --brand-muted: rgba(62, 207, 142, 0.15);
   --warning: #f5a623;
   --warning-foreground: #0d0d0d;
+  --cta-bg: #0f0f0f;
+  --cta-fg: #fafafa;
+  --cta-border: #0f0f0f;
 }
 
 /* 다크 테마 */
@@ -112,6 +123,8 @@
   --accent-foreground: #ededed;
   --destructive: #f04444;
   --border: rgba(255, 255, 255, 0.07);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-strong: rgba(255, 255, 255, 0.12);
   --input: rgba(255, 255, 255, 0.07);
   --ring: #3ecf8e;
   --chart-1: #3ecf8e;
@@ -132,6 +145,9 @@
   --brand-muted: rgba(62, 207, 142, 0.15);
   --warning: #f5a623;
   --warning-foreground: #0d0d0d;
+  --cta-bg: #0f0f0f;
+  --cta-fg: #fafafa;
+  --cta-border: #fafafa;
 }
 
 @layer base {

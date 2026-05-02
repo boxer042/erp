@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   } else if (mapped === "orphan") {
     where.productId = null;
   }
-  if (source && ["INCOMING", "INITIAL", "ADJUSTMENT"].includes(source)) {
+  if (source && ["INCOMING", "INITIAL", "ADJUSTMENT", "SET_PRODUCE"].includes(source)) {
     where.source = source as Prisma.InventoryLotWhereInput["source"];
   }
   if (hasRemaining) {

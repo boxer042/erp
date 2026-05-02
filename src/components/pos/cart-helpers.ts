@@ -4,8 +4,10 @@ import type { CartSession, CartItem } from "@/components/pos/sessions-context";
 export interface CartTotals {
   subtotalNet: number;       // 라인 할인 적용 후, 세션 할인 전 공급가액
   sessionDiscountAmount: number; // 세션 할인 환산액 (세전)
-  net: number;               // 최종 공급가액
-  vat: number;               // 부가세 합계
+  shippingNet: number;       // 배송비 공급가액 (세전)
+  shippingVat: number;       // 배송비 부가세
+  net: number;               // 최종 공급가액 (배송비 포함)
+  vat: number;               // 부가세 합계 (배송비 포함)
   total: number;             // 판매액 (net + vat)
 }
 
@@ -45,12 +47,19 @@ export function calcCartTotals(session: CartSession): CartTotals {
 
   const finalTaxableNet = Math.max(0, taxableNet - taxableDiscount);
   const finalExemptNet = Math.max(0, exemptNet - exemptDiscount);
-  const net = finalTaxableNet + finalExemptNet;
-  const vat = Math.round(finalTaxableNet * 0.1);
+
+  // 배송비 — 항상 과세로 처리 (세전 입력 기준). net/vat 합계엔 포함, 별도 필드도 노출
+  const shippingNet = Math.max(0, parseFloat((session.shippingCost ?? "0").replace(/,/g, "")) || 0);
+  const shippingVat = Math.round(shippingNet * 0.1);
+
+  const net = finalTaxableNet + finalExemptNet + shippingNet;
+  const vat = Math.round(finalTaxableNet * 0.1) + shippingVat;
 
   return {
     subtotalNet,
     sessionDiscountAmount,
+    shippingNet,
+    shippingVat,
     net,
     vat,
     total: net + vat,

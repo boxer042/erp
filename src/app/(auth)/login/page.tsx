@@ -81,7 +81,7 @@ export default function LoginPage() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Button type="submit" className="w-full bg-brand text-brand-foreground hover:bg-brand/90" disabled={loading}>
+          <Button type="submit" variant="success" size="pill" className="w-full" disabled={loading}>
             {loading ? "로그인 중..." : "로그인"}
           </Button>
           <p className="text-sm text-muted-foreground">

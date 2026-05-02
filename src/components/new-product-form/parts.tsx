@@ -1,10 +1,103 @@
 "use client";
 
-import { useId, isValidElement, cloneElement, type ReactElement } from "react";
+import { useId, useMemo, useState, isValidElement, cloneElement, type ReactElement } from "react";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Plus, X, ChevronRight, Package, Wrench, Layers, Cpu } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
 import { TYPE_ACCENT, emptyCostRow, type CostRow, type ProductType } from "./types";
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, "");
+}
+
+export interface NameAutocompleteItem {
+  id: string;
+  name: string;
+  badge?: string | null;
+}
+
+export function NameAutocomplete({
+  value,
+  onChange,
+  items,
+  placeholder = "상품명을 입력하세요",
+  autoFocus,
+  onKeyDown,
+  warningLabel = "이미 등록된 상품",
+  inputClassName = "h-9",
+}: {
+  value: string;
+  onChange: (name: string) => void;
+  items: NameAutocompleteItem[];
+  placeholder?: string;
+  autoFocus?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  warningLabel?: string;
+  inputClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const normalized = useMemo(() => normalizeName(value), [value]);
+
+  const suggestions = useMemo(() => {
+    if (normalized.length < 1) return [];
+    return items
+      .filter((it) => normalizeName(it.name).includes(normalized))
+      .slice(0, 8);
+  }, [items, normalized]);
+
+  const exactMatch = useMemo(() => {
+    if (normalized.length < 1) return null;
+    return items.find((it) => normalizeName(it.name) === normalized) ?? null;
+  }, [items, normalized]);
+
+  return (
+    <div className="relative">
+      <Input
+        autoFocus={autoFocus}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (value.trim().length >= 1) setOpen(true);
+        }}
+        onBlur={() => setOpen(false)}
+        onKeyDown={onKeyDown}
+        className={inputClassName}
+      />
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-md border border-input bg-popover shadow-md">
+          {suggestions.map((it) => (
+            <button
+              key={it.id}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(it.name);
+                setOpen(false);
+              }}
+              className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-left"
+            >
+              <span className="truncate">{it.name}</span>
+              {it.badge && <Badge variant="outline" className="ml-2 shrink-0">{it.badge}</Badge>}
+            </button>
+          ))}
+        </div>
+      )}
+      {exactMatch && (
+        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+          {warningLabel}: <span className="font-medium">{exactMatch.name}</span>
+          {exactMatch.badge && (
+            <span className="ml-1 text-muted-foreground">({exactMatch.badge})</span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function Field({
   label,

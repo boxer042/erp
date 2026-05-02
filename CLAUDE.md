@@ -482,10 +482,12 @@ export async function GET(
 ### 테마 색상 (CSS 변수 기반 — 라이트/다크 자동 대응)
 - 배경: `bg-background` (메인), `bg-card` (카드), `bg-muted` (테이블헤더·서브배경), `bg-secondary` (강조 배경)
 - 사이드바: `bg-sidebar`
-- 테두리: `border-border`
+- 테두리: `border-border-subtle` (미세 구분선), `border-border` (표준), `border-border-strong` (호버/강조)
 - 텍스트: `text-foreground` (기본), `text-muted-foreground` (뮤트)
 - 호버: `hover:bg-muted/50`, `hover:bg-muted`
-- 브랜드: `text-primary`, `bg-primary`, `bg-brand-muted`
+- CTA(주요 액션): `bg-cta text-cta-foreground border-cta-border` (라이트=검정 면, 다크=깊은 검정+흰 테두리)
+- 브랜드 그린: `text-primary`, `bg-brand-muted`, `border-primary/40` — **small accent 전용** (링크/배지/포커스 링/얇은 라인)
+- **그린은 큰 surface 금지**: `bg-primary` 면에 채우는 패턴 금지. CTA 버튼은 `<Button>` 또는 `bg-cta text-cta-foreground` 사용
 - **하드코딩 hex 색상 사용 금지** (`bg-[#...]` 패턴). CSS 변수 토큰만 사용할 것.
 
 ### 테이블 (Table)

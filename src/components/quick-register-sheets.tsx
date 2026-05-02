@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,9 +13,12 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { digitsOnly, formatBusinessNumber, formatPhone, formatComma, parseComma } from "@/lib/utils";
-import { apiMutate, ApiError } from "@/lib/api-client";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import { NameAutocomplete } from "@/components/new-product-form/parts";
 
 // ─── 공통 필드 행 ───
 
@@ -342,6 +345,24 @@ export function QuickSupplierProductSheet({
   const [isTaxable, setIsTaxable] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const existingQuery = useQuery({
+    queryKey: queryKeys.supplierProducts.list({ supplierId }),
+    queryFn: () =>
+      apiGet<Array<{ id: string; name: string; supplierCode: string | null }>>(
+        `/api/supplier-products?supplierId=${encodeURIComponent(supplierId)}`,
+      ),
+    enabled: open && !!supplierId,
+  });
+  const nameItems = useMemo(
+    () =>
+      (existingQuery.data ?? []).map((sp) => ({
+        id: sp.id,
+        name: sp.name,
+        badge: sp.supplierCode ?? null,
+      })),
+    [existingQuery.data],
+  );
+
   useEffect(() => {
     if (open) { setName(defaultName); setSupplierCode(""); setUnitOfMeasure("EA"); setListPrice(""); setUnitPrice(""); setIsTaxable(true); }
   }, [open, defaultName]);
@@ -388,7 +409,18 @@ export function QuickSupplierProductSheet({
         <ScrollArea className="flex-1 min-h-0">
           <div className="px-5 py-5 space-y-3">
           <FieldRow label="상품명" required>
-            <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) handleSubmit(); }} />
+            <NameAutocomplete
+              autoFocus
+              value={name}
+              onChange={setName}
+              items={nameItems}
+              placeholder="공급상품명을 입력하세요"
+              warningLabel="이미 등록된 공급상품"
+              inputClassName=""
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) handleSubmit();
+              }}
+            />
           </FieldRow>
           <FieldRow label="품번">
             <Input value={supplierCode} onChange={(e) => setSupplierCode(e.target.value)} placeholder="공급자 코드" />

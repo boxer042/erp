@@ -43,17 +43,17 @@ export function PosCustomerHeader() {
 
   return (
     <>
-      <div className="shrink-0 border-b border-border bg-background">
+      <div className="shrink-0 bg-background">
         <ScrollArea className="w-full">
           <div className="flex items-stretch gap-2 px-3 py-3 sm:px-4">
             {/* 전체보기 — 항상 첫번째 */}
             <button
               onClick={() => router.push("/pos/all")}
               className={cn(
-                "flex min-w-[96px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 transition-all",
+                "flex aspect-square w-25 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-card px-2 ring-1 ring-foreground/10 transition-all",
                 isAll
-                  ? "border-primary bg-primary/5 text-foreground shadow-sm"
-                  : "border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+                  ? "text-foreground ring-2 ring-primary"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Grid3x3 className="size-7" />
@@ -70,18 +70,18 @@ export function PosCustomerHeader() {
                   key={s.id}
                   onClick={() => handleCustomerClick(s.id)}
                   className={cn(
-                    "flex min-w-[96px] shrink-0 flex-col items-center gap-1.5 rounded-xl border px-3 py-2.5 transition-all",
-                    isActive
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border bg-card hover:border-foreground/20"
+                    "flex aspect-square w-25 shrink-0 flex-col items-center justify-center gap-1 rounded-xl bg-card px-2 ring-1 ring-foreground/10 transition-all",
+                    isActive && "ring-2 ring-primary"
                   )}
                 >
-                  <Avatar size="lg" className="size-12">
-                    <AvatarFallback className="text-base font-semibold">
+                  <Avatar size="lg" className="size-10">
+                    <AvatarFallback className="text-sm font-semibold">
                       {initial}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="text-sm font-medium leading-tight">{displayName}</div>
+                  <div className="line-clamp-1 w-full text-center text-sm font-medium leading-tight">
+                    {displayName}
+                  </div>
                   <div className="text-xs tabular-nums text-muted-foreground">
                     ₩{totals.total.toLocaleString("ko-KR")}
                   </div>
@@ -92,7 +92,7 @@ export function PosCustomerHeader() {
             {/* 손님 추가 — 항상 마지막 */}
             <button
               onClick={handleAdd}
-              className="flex min-w-[96px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+              className="flex aspect-square w-25 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-card px-2 text-muted-foreground ring-1 ring-foreground/10 hover:text-foreground"
             >
               <Plus className="size-7" />
               <div className="text-sm font-medium leading-tight">손님 추가</div>
