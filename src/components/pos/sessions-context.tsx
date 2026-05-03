@@ -6,6 +6,7 @@ export interface RepairMeta {
   deviceBrand?: string;
   deviceModel?: string;
   issueDescription?: string;
+  serialItemId?: string; // 시리얼 라벨 연결 (선택)
 }
 
 export interface RentalMeta {

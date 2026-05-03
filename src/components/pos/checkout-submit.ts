@@ -23,6 +23,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
           symptom: firstRepairMeta?.issueDescription,
           deviceBrand: firstRepairMeta?.deviceBrand,
           deviceModel: firstRepairMeta?.deviceModel,
+          serialItemId: firstRepairMeta?.serialItemId ?? null,
           labors: repairItems.map((i) => ({ name: i.name, unitRate: i.unitPrice })),
         }
       : undefined;

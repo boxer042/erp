@@ -20,6 +20,7 @@ interface RepairTicketData {
   symptom?: string;
   deviceBrand?: string;
   deviceModel?: string;
+  serialItemId?: string | null;
   labors: { name: string; unitRate: number }[];
 }
 
@@ -281,18 +282,46 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // RepairTicket 생성 (수리 항목 + 고객 있을 때)
+      // RepairTicket 생성 (수리 항목 + 고객 있을 때) — POS는 즉시수리(ON_SITE) → 결제 즉시 PICKED_UP
       if (body.repairTicketData && body.customerId) {
         const rd = body.repairTicketData;
         const symptomParts = [rd.deviceBrand, rd.deviceModel].filter(Boolean).join(" ");
         const symptomFull = [symptomParts, rd.symptom].filter(Boolean).join(" — ") || null;
+
+        // 보증 기본값
+        const company = await tx.companyInfo.findUnique({
+          where: { id: "singleton" },
+          select: { defaultRepairWarrantyMonths: true },
+        });
+        const warrantyMonths = company?.defaultRepairWarrantyMonths ?? null;
+
+        const now = new Date();
+        const warrantyEnds =
+          warrantyMonths != null && warrantyMonths > 0
+            ? new Date(now.getFullYear(), now.getMonth() + warrantyMonths, now.getDate())
+            : null;
+
+        const laborTotal = rd.labors.reduce((s, l) => s + (l.unitRate || 0), 0);
+
         const ticket = await tx.repairTicket.create({
           data: {
-            ticketNo: genNo("TKT"),
+            ticketNo: genNo("R"),
+            type: "ON_SITE",
             customerId: body.customerId,
+            serialItemId: rd.serialItemId || null,
             symptom: symptomFull,
-            status: "RECEIVED",
-            receivedAt: new Date(),
+            status: "PICKED_UP",
+            receivedAt: now,
+            startedAt: now,
+            readyAt: now,
+            pickedUpAt: now,
+            paymentMethod: body.paymentMethod ?? null,
+            finalAmount: laborTotal,
+            quotedLaborAmount: laborTotal,
+            quotedTotalAmount: laborTotal,
+            quotedAt: now,
+            repairWarrantyMonths: warrantyMonths,
+            repairWarrantyEnds: warrantyEnds,
             createdById: user.id,
             labors: {
               create: rd.labors.map((l) => ({
