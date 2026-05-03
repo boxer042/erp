@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertCircle,
   BarChart3,
   Calculator,
   Code2,
   FileCode2,
+  FileText,
   Film,
   Image as ImageIcon,
   Images,
   Layers,
   Layout,
+  ListChecks,
   Loader2,
   Monitor,
   Mountain,
@@ -94,6 +97,9 @@ const BLOCK_ICON: Record<BlockType, React.ComponentType<{ className?: string }>>
   table: Table2,
   chart: BarChart3,
   "stats-grid": Calculator,
+  callout: AlertCircle,
+  "info-grid": ListChecks,
+  "product-info": FileText,
   "html-embed": FileCode2,
 };
 
@@ -111,6 +117,9 @@ const BLOCK_TYPES: BlockType[] = [
   "table",
   "chart",
   "stats-grid",
+  "callout",
+  "info-grid",
+  "product-info",
   "html-embed",
 ];
 

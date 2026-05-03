@@ -131,6 +131,14 @@ export interface ProductDetail {
   zeroRateEligible: boolean;
   trackable?: boolean;
   warrantyMonths?: number | null;
+  // 상품정보 고시
+  countryOfOrigin?: string | null;
+  manufacturer?: string | null;
+  importer?: string | null;
+  certifications?: string | null;
+  manufactureDate?: string | null;
+  warrantyPolicy?: string | null;
+  asResponsible?: string | null;
   sellingPrice: string;
   listPrice?: string;
   productType: string;

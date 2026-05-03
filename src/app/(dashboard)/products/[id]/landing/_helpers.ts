@@ -82,6 +82,12 @@ export function blockTitle(block: LandingBlock): string {
       return block.heading
         ? block.heading.replace(/\n/g, " ").slice(0, 24)
         : `스탯 (${block.items.length}개)`;
+    case "callout":
+      return block.label || (block.body ? block.body.slice(0, 24) : "강조 박스");
+    case "info-grid":
+      return `정보 그리드 (${block.sections.length}섹션)`;
+    case "product-info":
+      return block.title || "상품정보 고시 (자동)";
     case "html-embed":
       return block.htmlUrl
         ? `HTML 임베드 (${block.displayMode}, ${block.heightPx}px)`

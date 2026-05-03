@@ -188,6 +188,79 @@ export const statsGridBlockSchema = z.object({
   useProductSpecs: z.boolean().default(false),
 });
 
+// 강조 박스 (callout) — 좌측 컬러 세로 바 + 라벨 + 본문. 한국 쇼핑몰의 "주의" 박스 패턴
+export const calloutBlockSchema = z.object({
+  id: z.string(),
+  type: z.literal("callout"),
+  variant: z.enum(["warning", "info", "success", "danger", "neutral"]).default("warning"),
+  /** preset 아이콘 이름 (LANDING_ICON_NAMES 중 하나). 없으면 null */
+  icon: z.string().nullable().default(null),
+  /** "주의", "TIP", "안내" 등 — 본문 앞에 굵게 표시 */
+  label: z.string().default(""),
+  /** 본문 — InlineMarkdown 지원 */
+  body: z.string().default(""),
+  paddingY: z.enum(["sm", "md", "lg"]).default("md"),
+});
+
+// 정보 그리드 (info-grid) — 한국 쇼핑몰 표준 footer 패턴
+// "— 01 / 배송 안내" 헤더 + key-value <dl> + 추가 불릿 + 선택적 내부 notice
+export const infoGridBlockSchema = z.object({
+  id: z.string(),
+  type: z.literal("info-grid"),
+  background: z.enum(["none", "muted"]).default("muted"),
+  paddingY: z.enum(["md", "lg", "xl"]).default("xl"),
+  sections: z
+    .array(
+      z.object({
+        number: z.string().default(""),
+        title: z.string().default(""),
+        icon: z.string().nullable().default(null),
+        rows: z
+          .array(
+            z.object({
+              key: z.string().default(""),
+              value: z.string().default(""),
+            }),
+          )
+          .default([]),
+        bullets: z.array(z.string()).default([]),
+        notice: z
+          .object({
+            variant: z.enum(["warning", "info", "success", "danger", "neutral"]),
+            label: z.string(),
+            body: z.string(),
+          })
+          .nullable()
+          .default(null),
+      }),
+    )
+    .default([]),
+});
+
+// 상품정보 고시 (전자상거래법 표시 의무) — Product 의 6개 의무 필드 + 선택적 ProductSpec 자동 매핑
+// info-grid 1섹션 디자인 재사용
+export const productInfoBlockSchema = z.object({
+  id: z.string(),
+  type: z.literal("product-info"),
+  background: z.enum(["none", "muted"]).default("muted"),
+  paddingY: z.enum(["md", "lg", "xl"]).default("xl"),
+  number: z.string().default("— 04"),
+  title: z.string().default("상품정보 고시"),
+  /** 켜면 ProductSpec.values 를 "주요 사양" 행으로 자동 추가 */
+  useProductSpecs: z.boolean().default(true),
+  /** 자동 행 중 빼고 싶은 키 (예: "수입자" 자동 매핑이 필요 없으면) */
+  excludeKeys: z.array(z.string()).default([]),
+  /** 사용자가 자유롭게 추가하는 행 — 자동 행 뒤에 표시됨 */
+  customRows: z
+    .array(
+      z.object({
+        key: z.string().default(""),
+        value: z.string().default(""),
+      }),
+    )
+    .default([]),
+});
+
 // HTML 임베드 — 사용자가 직접 만든 .html 파일을 업로드해 sandboxed iframe 으로 표시
 // htmlUrl 은 절대 URL(외부) 또는 "/api/..." 같은 상대 경로(우리 프록시) 모두 허용
 export const htmlEmbedBlockSchema = z.object({
@@ -215,6 +288,9 @@ export const landingBlockSchema = z.discriminatedUnion("type", [
   tableBlockSchema,
   chartBlockSchema,
   statsGridBlockSchema,
+  calloutBlockSchema,
+  infoGridBlockSchema,
+  productInfoBlockSchema,
   htmlEmbedBlockSchema,
 ]);
 
@@ -233,6 +309,9 @@ export type AmbientVideoBlock = z.infer<typeof ambientVideoBlockSchema>;
 export type TableBlock = z.infer<typeof tableBlockSchema>;
 export type ChartBlock = z.infer<typeof chartBlockSchema>;
 export type StatsGridBlock = z.infer<typeof statsGridBlockSchema>;
+export type CalloutBlock = z.infer<typeof calloutBlockSchema>;
+export type InfoGridBlock = z.infer<typeof infoGridBlockSchema>;
+export type ProductInfoBlock = z.infer<typeof productInfoBlockSchema>;
 export type HtmlEmbedBlock = z.infer<typeof htmlEmbedBlockSchema>;
 export type LandingBlock = z.infer<typeof landingBlockSchema>;
 
@@ -252,6 +331,9 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   table: "표",
   chart: "차트",
   "stats-grid": "스탯 그리드",
+  callout: "강조 박스",
+  "info-grid": "정보 그리드",
+  "product-info": "상품정보 고시",
   "html-embed": "HTML 임베드",
 };
 
@@ -320,6 +402,21 @@ export const BLOCK_DESCRIPTIONS: Record<BlockType, { title: string; body: string
     title: "스탯 그리드",
     body: "큰 숫자 + 단위 + 라벨 형태로 핵심 사양을 N컬럼으로 표시. Apple 제품 페이지 \"AT A GLANCE\" 섹션 같은 디자인.",
     example: "예) 배기량/출력/마력/가이드바 같은 핵심 스펙 한눈에",
+  },
+  callout: {
+    title: "강조 박스",
+    body: "좌측 컬러 세로 바 + 라벨 + 본문 형태의 주의/안내 박스. variant 로 색상(주황 경고 / 녹색 안내 / 빨강 위험 등) 선택.",
+    example: "예) \"주의 — 재고 상황에 따라 배송이 지연될 수 있습니다\"",
+  },
+  "info-grid": {
+    title: "정보 그리드",
+    body: "한국 쇼핑몰 표준 footer 디자인. 좌측 \"— 01 배송 안내\" 헤더 + 우측 키-값 표 + 추가 불릿 + 선택적 내부 notice. N개 섹션을 세로 스택으로.",
+    example: "예) 배송 / 교환·반품 / A/S / 사업자 정보 4섹션 한 번에",
+  },
+  "product-info": {
+    title: "상품정보 고시 (자동)",
+    body: "전자상거래법 표시 의무 — 품명/모델명/제조국/제조자/인증·허가/품질보증기준/A/S 등을 Product 데이터에서 자동으로 매핑. 상품 정보 변경 시 자동 반영. 주요 사양은 등록된 Spec 자동 사용 (토글).",
+    example: "예) 모든 판매 상품에 의무 표시 — 한 번 추가하면 끝",
   },
   "html-embed": {
     title: "HTML 임베드",
@@ -463,6 +560,49 @@ export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
         background: "muted",
         paddingY: "xl",
         useProductSpecs: false,
+      };
+    case "callout":
+      return {
+        id,
+        type: "callout",
+        variant: "warning",
+        icon: "AlertTriangle",
+        label: "주의",
+        body: "",
+        paddingY: "md",
+      };
+    case "info-grid":
+      return {
+        id,
+        type: "info-grid",
+        background: "muted",
+        paddingY: "xl",
+        sections: [
+          {
+            number: "— 01",
+            title: "배송 안내",
+            icon: "Truck",
+            rows: [
+              { key: "배송 방법", value: "" },
+              { key: "배송 지역", value: "" },
+              { key: "배송 비용", value: "" },
+            ],
+            bullets: [],
+            notice: null,
+          },
+        ],
+      };
+    case "product-info":
+      return {
+        id,
+        type: "product-info",
+        background: "muted",
+        paddingY: "xl",
+        number: "— 04",
+        title: "상품정보 고시",
+        useProductSpecs: true,
+        excludeKeys: [],
+        customRows: [],
       };
     case "html-embed":
       return {

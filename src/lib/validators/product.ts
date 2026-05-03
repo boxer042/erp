@@ -54,6 +54,14 @@ export const productSchema = z.object({
   // 시리얼 라벨 (개별추적)
   trackable: z.boolean().default(false),
   warrantyMonths: z.coerce.number().int().min(0).nullable().optional(),
+  // 상품정보 고시 (전자상거래법 표시 의무) — 전부 선택 입력
+  countryOfOrigin: z.string().nullable().optional(),
+  manufacturer: z.string().nullable().optional(),
+  importer: z.string().nullable().optional(),
+  certifications: z.string().nullable().optional(),
+  manufactureDate: z.string().nullable().optional(),
+  warrantyPolicy: z.string().nullable().optional(),
+  asResponsible: z.string().nullable().optional(),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;

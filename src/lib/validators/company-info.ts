@@ -15,6 +15,12 @@ export const companyInfoSchema = z.object({
   address: optionalString.optional(),
   businessType: optionalString.optional(),
   businessItem: optionalString.optional(),
+  defaultRepairWarrantyMonths: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .nullable()
+    .optional(),
 });
 
 export type CompanyInfoInput = z.infer<typeof companyInfoSchema>;

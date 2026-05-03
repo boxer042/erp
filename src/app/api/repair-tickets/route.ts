@@ -1,21 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
-import { genTicketNo } from "@/lib/repair";
+import { requireAuth } from "@/lib/auth";
+import { guardUser } from "@/lib/api-auth";
+import { repairTicketCreateSchema } from "@/lib/validators/repair-ticket";
+import { generateRepairTicketNo } from "@/lib/document-no";
+import type { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
+  const [, deny] = await guardUser();
+  if (deny) return deny;
+
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
+  const type = searchParams.get("type");
   const customerId = searchParams.get("customerId");
+  const assignedToId = searchParams.get("assignedToId");
+  const search = searchParams.get("search")?.trim() ?? "";
+
+  const where: Prisma.RepairTicketWhereInput = {
+    ...(status ? { status: status as never } : {}),
+    ...(type ? { type: type as never } : {}),
+    ...(customerId ? { customerId } : {}),
+    ...(assignedToId ? { assignedToId } : {}),
+    ...(search
+      ? {
+          OR: [
+            { ticketNo: { contains: search, mode: "insensitive" } },
+            { customer: { name: { contains: search, mode: "insensitive" } } },
+            { customer: { phone: { contains: search } } },
+            { symptom: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
 
   const tickets = await prisma.repairTicket.findMany({
-    where: {
-      ...(status ? { status: status as never } : {}),
-      ...(customerId ? { customerId } : {}),
-    },
+    where,
     include: {
       customer: { select: { id: true, name: true, phone: true } },
       customerMachine: { select: { id: true, name: true } },
+      serialItem: { select: { id: true, code: true } },
+      assignedTo: { select: { id: true, name: true } },
+      _count: { select: { parts: true, labors: true } },
     },
     orderBy: { receivedAt: "desc" },
     take: 200,
@@ -24,43 +50,49 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
-
+  const user = await requireAuth();
   const body = await request.json();
-  const { customerId, customerMachineId, symptom, memo, labors = [], parts = [] } = body ?? {};
-  if (!customerId) return NextResponse.json({ error: "customerId 필수" }, { status: 400 });
+  const parsed = repairTicketCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  const data = parsed.data;
+
+  // 보증기간 기본값: CompanyInfo.defaultRepairWarrantyMonths
+  let warrantyMonths = data.repairWarrantyMonths;
+  if (warrantyMonths == null) {
+    const company = await prisma.companyInfo.findUnique({
+      where: { id: "singleton" },
+      select: { defaultRepairWarrantyMonths: true },
+    });
+    warrantyMonths = company?.defaultRepairWarrantyMonths ?? null;
+  }
 
   const ticket = await prisma.repairTicket.create({
     data: {
-      ticketNo: genTicketNo(),
-      customerId,
-      customerMachineId: customerMachineId || null,
+      ticketNo: generateRepairTicketNo(),
+      type: data.type,
+      customerId: data.customerId,
+      customerMachineId: data.customerMachineId || null,
+      serialItemId: data.serialItemId || null,
       status: "RECEIVED",
       receivedAt: new Date(),
-      symptom: symptom?.trim() || null,
-      memo: memo?.trim() || null,
+      symptom: data.symptom?.trim() || null,
+      diagnosis: data.diagnosis?.trim() || null,
+      diagnosisFee: data.diagnosisFee,
+      repairWarrantyMonths: warrantyMonths,
+      parentRepairTicketId: data.parentRepairTicketId || null,
+      assignedToId: data.assignedToId || null,
+      memo: data.memo?.trim() || null,
       createdById: user.id,
-      labors: labors.length > 0 ? {
-        create: labors.map((l: { name: string; hours?: number; unitRate: number }) => ({
-          name: l.name,
-          hours: l.hours ?? 1,
-          unitRate: l.unitRate,
-          totalPrice: (l.hours ?? 1) * l.unitRate,
-        })),
-      } : undefined,
-      parts: parts.length > 0 ? {
-        create: parts.map((p: { productId: string; quantity: number; unitPrice: number }) => ({
-          productId: p.productId,
-          quantity: p.quantity,
-          unitPrice: p.unitPrice,
-          totalPrice: p.quantity * p.unitPrice,
-        })),
-      } : undefined,
     },
     include: {
-      labors: true,
+      customer: { select: { id: true, name: true, phone: true } },
+      customerMachine: { select: { id: true, name: true } },
+      serialItem: { select: { id: true, code: true } },
+      assignedTo: { select: { id: true, name: true } },
       parts: true,
+      labors: true,
     },
   });
   return NextResponse.json(ticket, { status: 201 });

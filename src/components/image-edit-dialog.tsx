@@ -314,6 +314,9 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
                 zoom={zoom}
                 rotation={rotation}
                 aspect={1}
+                minZoom={0.5}
+                maxZoom={3}
+                restrictPosition={false}
                 showGrid
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
@@ -391,10 +394,10 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
                   <RotateCw className="h-4 w-4 mr-1" /> 90° 회전
                 </Button>
                 <ZoomIn className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground w-10">확대</span>
+                <span className="text-xs text-muted-foreground w-10">크기</span>
                 <input
                   type="range"
-                  min={1}
+                  min={0.5}
                   max={3}
                   step={0.01}
                   value={zoom}
@@ -403,6 +406,16 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
                   disabled={busy}
                   aria-label="확대/축소"
                 />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setZoom(1)}
+                  disabled={busy}
+                  className="h-7 px-2 text-xs"
+                  title="100%로 복원"
+                >
+                  1:1
+                </Button>
                 <span className="text-xs tabular-nums w-12 text-right">{zoom.toFixed(2)}x</span>
               </div>
 
@@ -513,6 +526,12 @@ async function getCroppedBlob(
   cropped.height = OUTPUT_SIZE;
   const cctx = cropped.getContext("2d");
   if (!cctx) throw new Error("canvas 2d 컨텍스트 생성 실패");
+  // JPEG는 투명도 미지원 → 축소 시 빈 영역이 검정이 되지 않도록 흰색으로 채움
+  // PNG는 투명 유지(배경 제거/지우개 결과 보존)
+  if (outputType === "image/jpeg") {
+    cctx.fillStyle = "#ffffff";
+    cctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+  }
   cctx.drawImage(
     rotated,
     pixelCrop.x,

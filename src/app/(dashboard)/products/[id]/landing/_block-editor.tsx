@@ -31,9 +31,16 @@ import type {
   TableBlock,
   ChartBlock,
   StatsGridBlock,
+  CalloutBlock,
+  InfoGridBlock,
+  ProductInfoBlock,
   HtmlEmbedBlock,
   LandingBlock,
 } from "@/lib/validators/landing-block";
+import {
+  LANDING_ICON_LABELS,
+  LANDING_ICON_NAMES,
+} from "@/lib/landing-icons";
 
 import { ImageUploadField } from "./_image-upload";
 import { uploadHtml } from "./_helpers";
@@ -1283,6 +1290,584 @@ function StatsGridEditor({ block, onChange }: EditorProps<StatsGridBlock>) {
   );
 }
 
+/** 아이콘 선택 Select — preset 20개 + "(없음)" */
+function IconSelect({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  return (
+    <Select
+      value={value ?? "__none"}
+      onValueChange={(v) => onChange(v === "__none" ? null : v)}
+    >
+      <SelectTrigger className="h-9">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none">(없음)</SelectItem>
+        {LANDING_ICON_NAMES.map((name) => (
+          <SelectItem key={name} value={name}>
+            {LANDING_ICON_LABELS[name]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function CalloutEditor({ block, onChange }: EditorProps<CalloutBlock>) {
+  return (
+    <div className="space-y-3">
+      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+        좌측 컬러 바 + 라벨 + 본문 형태의 강조 박스. 본문은 마크다운 사용 가능 (**굵게**, [링크](url)).
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="색상 (variant)">
+          <Select
+            value={block.variant}
+            onValueChange={(v) => onChange({ ...block, variant: v as CalloutBlock["variant"] })}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="warning">경고 (주황)</SelectItem>
+              <SelectItem value="info">정보 (녹색)</SelectItem>
+              <SelectItem value="success">성공 (녹색)</SelectItem>
+              <SelectItem value="danger">위험 (빨강)</SelectItem>
+              <SelectItem value="neutral">중립 (회색)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="아이콘 (선택)">
+          <IconSelect
+            value={block.icon}
+            onChange={(icon) => onChange({ ...block, icon })}
+          />
+        </Field>
+      </div>
+      <Field label="라벨 (예: 주의, TIP, 안내)">
+        <Input
+          value={block.label}
+          onChange={(e) => onChange({ ...block, label: e.target.value })}
+        />
+      </Field>
+      <Field label="본문 (마크다운 가능)">
+        <Textarea
+          value={block.body}
+          onChange={(e) => onChange({ ...block, body: e.target.value })}
+          rows={3}
+        />
+      </Field>
+      <Field label="상하 여백">
+        <Select
+          value={block.paddingY}
+          onValueChange={(v) =>
+            onChange({ ...block, paddingY: v as CalloutBlock["paddingY"] })
+          }
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sm">좁게</SelectItem>
+            <SelectItem value="md">보통</SelectItem>
+            <SelectItem value="lg">넓게</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+    </div>
+  );
+}
+
+function InfoGridEditor({ block, onChange }: EditorProps<InfoGridBlock>) {
+  const updateSection = (
+    idx: number,
+    patch: Partial<InfoGridBlock["sections"][number]>,
+  ) => {
+    const next = block.sections.slice();
+    next[idx] = { ...next[idx], ...patch };
+    onChange({ ...block, sections: next });
+  };
+
+  const addSection = () => {
+    const next = [
+      ...block.sections,
+      {
+        number: `— ${String(block.sections.length + 1).padStart(2, "0")}`,
+        title: "",
+        icon: null,
+        rows: [],
+        bullets: [],
+        notice: null,
+      },
+    ];
+    onChange({ ...block, sections: next });
+  };
+
+  const moveSection = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= block.sections.length) return;
+    const next = block.sections.slice();
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange({ ...block, sections: next });
+  };
+
+  const removeSection = (idx: number) => {
+    onChange({ ...block, sections: block.sections.filter((_, i) => i !== idx) });
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+        한국 쇼핑몰 표준 footer 디자인. 섹션마다 번호 + 제목 + 키-값 표 + 추가 불릿 + 선택적 notice 박스.
+      </p>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="배경">
+          <Select
+            value={block.background}
+            onValueChange={(v) =>
+              onChange({ ...block, background: v as InfoGridBlock["background"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="muted">연한 회색</SelectItem>
+              <SelectItem value="none">없음</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="상하 여백">
+          <Select
+            value={block.paddingY}
+            onValueChange={(v) =>
+              onChange({ ...block, paddingY: v as InfoGridBlock["paddingY"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">넓게</SelectItem>
+              <SelectItem value="xl">아주 넓게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">섹션 ({block.sections.length}개)</Label>
+          <Button type="button" size="sm" variant="outline" className="h-7" onClick={addSection}>
+            <Plus className="h-3.5 w-3.5" />
+            <span>섹션 추가</span>
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {block.sections.map((sec, sIdx) => (
+            <div key={sIdx} className="space-y-2 rounded-md border border-border bg-card p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  섹션 #{sIdx + 1}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    disabled={sIdx === 0}
+                    onClick={() => moveSection(sIdx, -1)}
+                    title="위로"
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    disabled={sIdx === block.sections.length - 1}
+                    onClick={() => moveSection(sIdx, 1)}
+                    title="아래로"
+                  >
+                    ↓
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={() => removeSection(sIdx)}
+                    title="삭제"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="번호">
+                  <Input
+                    value={sec.number}
+                    placeholder="— 01"
+                    onChange={(e) => updateSection(sIdx, { number: e.target.value })}
+                    className="h-8 text-xs"
+                  />
+                </Field>
+                <div className="col-span-2">
+                  <Field label="제목">
+                    <Input
+                      value={sec.title}
+                      placeholder="배송 안내"
+                      onChange={(e) => updateSection(sIdx, { title: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <Field label="아이콘 (선택)">
+                <IconSelect
+                  value={sec.icon}
+                  onChange={(icon) => updateSection(sIdx, { icon })}
+                />
+              </Field>
+
+              {/* rows */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px]">키-값 행 ({sec.rows.length})</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[11px]"
+                    onClick={() =>
+                      updateSection(sIdx, {
+                        rows: [...sec.rows, { key: "", value: "" }],
+                      })
+                    }
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>행 추가</span>
+                  </Button>
+                </div>
+                {sec.rows.map((row, rIdx) => (
+                  <div key={rIdx} className="flex items-start gap-1.5">
+                    <Input
+                      value={row.key}
+                      placeholder="키 (예: 배송 방법)"
+                      onChange={(e) => {
+                        const next = sec.rows.slice();
+                        next[rIdx] = { ...next[rIdx], key: e.target.value };
+                        updateSection(sIdx, { rows: next });
+                      }}
+                      className="h-7 w-1/3 text-xs"
+                    />
+                    <Input
+                      value={row.value}
+                      placeholder="값 (마크다운 가능)"
+                      onChange={(e) => {
+                        const next = sec.rows.slice();
+                        next[rIdx] = { ...next[rIdx], value: e.target.value };
+                        updateSection(sIdx, { rows: next });
+                      }}
+                      className="h-7 flex-1 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => {
+                        updateSection(sIdx, {
+                          rows: sec.rows.filter((_, i) => i !== rIdx),
+                        });
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* bullets */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px]">추가 불릿 ({sec.bullets.length})</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[11px]"
+                    onClick={() => updateSection(sIdx, { bullets: [...sec.bullets, ""] })}
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>불릿 추가</span>
+                  </Button>
+                </div>
+                {sec.bullets.map((b, bIdx) => (
+                  <div key={bIdx} className="flex items-start gap-1.5">
+                    <Input
+                      value={b}
+                      onChange={(e) => {
+                        const next = sec.bullets.slice();
+                        next[bIdx] = e.target.value;
+                        updateSection(sIdx, { bullets: next });
+                      }}
+                      className="h-7 flex-1 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => {
+                        updateSection(sIdx, {
+                          bullets: sec.bullets.filter((_, i) => i !== bIdx),
+                        });
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* notice */}
+              <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
+                <div className="space-y-0.5">
+                  <div className="text-[11px] font-medium">하단 알림 박스</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    주황 컬러바가 있는 강조 박스를 섹션 끝에 표시
+                  </div>
+                </div>
+                <Switch
+                  checked={sec.notice !== null}
+                  onCheckedChange={(v) => {
+                    updateSection(sIdx, {
+                      notice: v
+                        ? { variant: "warning", label: "주의", body: "" }
+                        : null,
+                    });
+                  }}
+                />
+              </div>
+              {sec.notice && (
+                <div className="space-y-2 rounded-md border border-border bg-muted/40 p-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="색상">
+                      <Select
+                        value={sec.notice.variant}
+                        onValueChange={(v) =>
+                          updateSection(sIdx, {
+                            notice: sec.notice
+                              ? { ...sec.notice, variant: v as CalloutBlock["variant"] }
+                              : null,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="warning">경고 (주황)</SelectItem>
+                          <SelectItem value="info">정보 (녹색)</SelectItem>
+                          <SelectItem value="success">성공 (녹색)</SelectItem>
+                          <SelectItem value="danger">위험 (빨강)</SelectItem>
+                          <SelectItem value="neutral">중립 (회색)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="라벨">
+                      <Input
+                        value={sec.notice.label}
+                        onChange={(e) =>
+                          updateSection(sIdx, {
+                            notice: sec.notice
+                              ? { ...sec.notice, label: e.target.value }
+                              : null,
+                          })
+                        }
+                        className="h-8 text-xs"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="본문 (마크다운 가능)">
+                    <Textarea
+                      value={sec.notice.body}
+                      rows={2}
+                      onChange={(e) =>
+                        updateSection(sIdx, {
+                          notice: sec.notice
+                            ? { ...sec.notice, body: e.target.value }
+                            : null,
+                        })
+                      }
+                      className="text-xs"
+                    />
+                  </Field>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductInfoEditor({ block, onChange }: EditorProps<ProductInfoBlock>) {
+  return (
+    <div className="space-y-3">
+      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+        Product 의 의무 필드 (제조국·제조자·인증·품질보증기준 등) 와 ProductSpec 을 자동 매핑합니다. 누락된 필드는 상품 편집 → "기본 정보" 의 "상품정보 고시" 섹션에서 입력하세요.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="번호 (예: — 04)">
+          <Input
+            value={block.number}
+            onChange={(e) => onChange({ ...block, number: e.target.value })}
+          />
+        </Field>
+        <Field label="제목">
+          <Input
+            value={block.title}
+            onChange={(e) => onChange({ ...block, title: e.target.value })}
+          />
+        </Field>
+        <Field label="배경">
+          <Select
+            value={block.background}
+            onValueChange={(v) =>
+              onChange({ ...block, background: v as ProductInfoBlock["background"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="muted">연한 회색</SelectItem>
+              <SelectItem value="none">없음</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="상하 여백">
+          <Select
+            value={block.paddingY}
+            onValueChange={(v) =>
+              onChange({ ...block, paddingY: v as ProductInfoBlock["paddingY"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">넓게</SelectItem>
+              <SelectItem value="xl">아주 넓게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">주요 사양 자동 사용 (ProductSpec)</div>
+          <div className="text-[11px] text-muted-foreground">
+            켜면 상품에 등록된 Spec 항목 (출력/배기량 등) 을 "주요 사양" 으로 자동 추가
+          </div>
+        </div>
+        <Switch
+          checked={block.useProductSpecs}
+          onCheckedChange={(v) => onChange({ ...block, useProductSpecs: v })}
+        />
+      </div>
+
+      <Field label="자동 행 중 제외할 키 (쉼표로 구분, 비우면 모두 표시)">
+        <Input
+          value={block.excludeKeys.join(", ")}
+          placeholder="예: 수입자, 모델명"
+          onChange={(e) => {
+            const keys = e.target.value
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+            onChange({ ...block, excludeKeys: keys });
+          }}
+        />
+      </Field>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">추가 행 ({block.customRows.length})</Label>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7"
+            onClick={() =>
+              onChange({
+                ...block,
+                customRows: [...block.customRows, { key: "", value: "" }],
+              })
+            }
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>행 추가</span>
+          </Button>
+        </div>
+        {block.customRows.map((row, i) => (
+          <div key={i} className="flex items-start gap-1.5">
+            <Input
+              value={row.key}
+              placeholder="키"
+              onChange={(e) => {
+                const next = block.customRows.slice();
+                next[i] = { ...next[i], key: e.target.value };
+                onChange({ ...block, customRows: next });
+              }}
+              className="h-8 w-1/3 text-xs"
+            />
+            <Input
+              value={row.value}
+              placeholder="값 (마크다운 가능)"
+              onChange={(e) => {
+                const next = block.customRows.slice();
+                next[i] = { ...next[i], value: e.target.value };
+                onChange({ ...block, customRows: next });
+              }}
+              className="h-8 flex-1 text-xs"
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={() =>
+                onChange({
+                  ...block,
+                  customRows: block.customRows.filter((_, idx) => idx !== i),
+                })
+              }
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -1476,6 +2061,12 @@ export function BlockEditor({
       return <ChartEditor block={block} onChange={onChange} />;
     case "stats-grid":
       return <StatsGridEditor block={block} onChange={onChange} />;
+    case "callout":
+      return <CalloutEditor block={block} onChange={onChange} />;
+    case "info-grid":
+      return <InfoGridEditor block={block} onChange={onChange} />;
+    case "product-info":
+      return <ProductInfoEditor block={block} onChange={onChange} />;
     case "html-embed":
       return <HtmlEmbedEditor block={block} onChange={onChange} />;
   }

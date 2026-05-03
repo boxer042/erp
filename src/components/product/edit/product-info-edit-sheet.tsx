@@ -76,6 +76,14 @@ function ProductInfoEditSheetContent({
     trackable: product.trackable ?? false,
     warrantyMonths:
       product.warrantyMonths != null ? String(product.warrantyMonths) : "",
+    // 상품정보 고시
+    countryOfOrigin: product.countryOfOrigin ?? "",
+    manufacturer: product.manufacturer ?? "",
+    importer: product.importer ?? "",
+    certifications: product.certifications ?? "",
+    manufactureDate: product.manufactureDate ?? "",
+    warrantyPolicy: product.warrantyPolicy ?? "",
+    asResponsible: product.asResponsible ?? "",
   });
 
   const brandsQuery = useQuery({
@@ -121,6 +129,13 @@ function ProductInfoEditSheetContent({
         zeroRateEligible: form.zeroRateEligible,
         trackable: form.trackable,
         warrantyMonths: form.warrantyMonths ? parseInt(form.warrantyMonths, 10) : null,
+        countryOfOrigin: form.countryOfOrigin || null,
+        manufacturer: form.manufacturer || null,
+        importer: form.importer || null,
+        certifications: form.certifications || null,
+        manufactureDate: form.manufactureDate || null,
+        warrantyPolicy: form.warrantyPolicy || null,
+        asResponsible: form.asResponsible || null,
       };
       return updateProductFields(product.id, fields);
     },
@@ -298,6 +313,89 @@ function ProductInfoEditSheetContent({
                   )}
                 </div>
               </Field>
+
+              <div className="rounded-md border border-border-subtle bg-muted/40 px-3 py-3 space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h4 className="text-[13px] font-semibold">상품정보 고시</h4>
+                  <span className="text-[11px] text-muted-foreground">
+                    전자상거래법 표시 의무 — 빈 칸은 페이지에 표시 안 됨
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field label="제조국">
+                    <Input
+                      value={form.countryOfOrigin}
+                      placeholder="예: 한국, 독일, 중국"
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, countryOfOrigin: e.target.value }))
+                      }
+                      className="h-9"
+                    />
+                  </Field>
+                  <Field label="제조자">
+                    <Input
+                      value={form.manufacturer}
+                      placeholder="예: STIHL AG"
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, manufacturer: e.target.value }))
+                      }
+                      className="h-9"
+                    />
+                  </Field>
+                  <Field label="수입자 (해외 제품)">
+                    <Input
+                      value={form.importer}
+                      placeholder="국내 제품이면 비워두세요"
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, importer: e.target.value }))
+                      }
+                      className="h-9"
+                    />
+                  </Field>
+                  <Field label="제조 연월">
+                    <Input
+                      value={form.manufactureDate}
+                      placeholder="예: 2024-03 또는 본체 라벨 별도 표기"
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, manufactureDate: e.target.value }))
+                      }
+                      className="h-9"
+                    />
+                  </Field>
+                  <div className="md:col-span-2">
+                    <Field label="인증·허가 사항">
+                      <Input
+                        value={form.certifications}
+                        placeholder="예: 안전인증 KC-2024-0000 / 관련 안전 인증 취득 완료"
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, certifications: e.target.value }))
+                        }
+                        className="h-9"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="품질보증기준">
+                    <Input
+                      value={form.warrantyPolicy}
+                      placeholder="비우면 '소비자분쟁해결기준 준용' 자동 표시"
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, warrantyPolicy: e.target.value }))
+                      }
+                      className="h-9"
+                    />
+                  </Field>
+                  <Field label="A/S 책임자">
+                    <Input
+                      value={form.asResponsible}
+                      placeholder="비우면 사업자 정보 자동 표시"
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, asResponsible: e.target.value }))
+                      }
+                      className="h-9"
+                    />
+                  </Field>
+                </div>
+              </div>
             </div>
 
             <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">

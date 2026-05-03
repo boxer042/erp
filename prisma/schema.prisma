@@ -34,6 +34,7 @@ model User {
   createdStatements Statement[]
   customerNotes     CustomerNote[]
   createdRepairs    RepairTicket[]
+  assignedRepairs   RepairTicket[] @relation("RepairAssignee")
   createdRentals    Rental[]
   createdExpenses   Expense[]
 
@@ -237,6 +238,14 @@ model Product {
   landingBlocks      Json?         @map("landing_blocks")
   landingMode        ProductLandingMode @default(BLOCKS) @map("landing_mode")
   singleHtmlUrl      String?       @map("single_html_url")
+  // 상품정보 고시 (전자상거래법 표시 의무)
+  countryOfOrigin    String?       @map("country_of_origin")
+  manufacturer       String?
+  importer           String?
+  certifications     String?
+  manufactureDate    String?       @map("manufacture_date")
+  warrantyPolicy     String?       @map("warranty_policy")
+  asResponsible      String?       @map("as_responsible")
   assemblyTemplateId String?       @map("assembly_template_id")
   assemblyTemplate   AssemblyTemplate? @relation("ProductDefaultTemplate", fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
   createdAt          DateTime      @default(now()) @map("created_at")
@@ -859,16 +868,17 @@ model CardCompanyFee {
 // ============================================================
 
 model CompanyInfo {
-  id             String   @id @default("singleton")
-  name           String
-  businessNumber String?  @map("business_number")
-  ceo            String?
-  phone          String?
-  email          String?
-  address        String?
-  businessType   String?  @map("business_type")
-  businessItem   String?  @map("business_item")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id                          String   @id @default("singleton")
+  name                        String
+  businessNumber              String?  @map("business_number")
+  ceo                         String?
+  phone                       String?
+  email                       String?
+  address                     String?
+  businessType                String?  @map("business_type")
+  businessItem                String?  @map("business_item")
+  defaultRepairWarrantyMonths Int?     @map("default_repair_warranty_months") // 수리 보증 기본값 (개월)
+  updatedAt                   DateTime @updatedAt @map("updated_at")
 
   bankAccounts CompanyBankAccount[]
 
@@ -1181,14 +1191,14 @@ model CustomerNote {
 // ============================================================
 
 enum RepairStatus {
-  RECEIVED
-  DIAGNOSING
-  QUOTED
-  APPROVED
-  REPAIRING
-  READY
-  PICKED_UP
-  CANCELLED
+  RECEIVED      // 접수
+  DIAGNOSING    // 진단 중 (DROP_OFF만)
+  QUOTED        // 견적 안내 (DROP_OFF만)
+  APPROVED      // 손님 승인 (DROP_OFF만)
+  REPAIRING     // 수리 중
+  READY         // 완료, 픽업 대기
+  PICKED_UP     // 픽업/결제 완료
+  CANCELLED     // 거절(DECLINED)/취소 — 진단비만 청구
 }
 
 enum RepairApprovalMethod {
@@ -1196,18 +1206,33 @@ enum RepairApprovalMethod {
   REMOTE
 }
 
+enum RepairType {
+  ON_SITE   // 즉시수리 — POS 카트에서 받자마자 수리·결제
+  DROP_OFF  // 맡김수리 — 받아두고 며칠 내 수리 후 픽업
+}
+
+enum RepairPartStatus {
+  USED   // 정상 사용 — 청구 포함
+  LOST   // 손실 (수리 실패·교체로 망가짐) — 청구 제외, 재고는 차감 유지 → 매출원가 손실
+}
+
 model RepairTicket {
   id                     String                @id @default(uuid())
   ticketNo               String                @unique @map("ticket_no")
+  type                   RepairType            @default(ON_SITE)
   customerId             String                @map("customer_id")
   customer               Customer              @relation(fields: [customerId], references: [id])
   customerMachineId      String?               @map("customer_machine_id")
   customerMachine        CustomerMachine?      @relation(fields: [customerMachineId], references: [id])
+  serialItemId           String?               @map("serial_item_id")
+  serialItem             SerialItem?           @relation(fields: [serialItemId], references: [id], onDelete: SetNull)
   status                 RepairStatus          @default(RECEIVED)
   receivedAt             DateTime              @map("received_at")
   symptom                String?
   diagnosis              String?
   repairNotes            String?               @map("repair_notes")
+  diagnosisFee           Decimal               @default(0) @map("diagnosis_fee") @db.Decimal(15, 2)
+  totalDiscount          String                @default("0") @map("total_discount") // "1000" or "10%"
   quotedLaborAmount      Decimal               @default(0) @map("quoted_labor_amount") @db.Decimal(15, 2)
   quotedPartsAmount      Decimal               @default(0) @map("quoted_parts_amount") @db.Decimal(15, 2)
   quotedTotalAmount      Decimal               @default(0) @map("quoted_total_amount") @db.Decimal(15, 2)
@@ -1222,6 +1247,16 @@ model RepairTicket {
   pickedUpAt             DateTime?             @map("picked_up_at")
   finalAmount            Decimal               @default(0) @map("final_amount") @db.Decimal(15, 2)
   paymentMethod          OrderPaymentMethod?   @map("payment_method")
+  // 수리 보증 — 픽업(완료) 시점부터 시작
+  repairWarrantyMonths   Int?                  @map("repair_warranty_months")
+  repairWarrantyEnds     DateTime?             @map("repair_warranty_ends")
+  // 재수리 — 보증 내 같은 증상으로 다시 입고
+  parentRepairTicketId   String?               @map("parent_repair_ticket_id")
+  parentRepairTicket     RepairTicket?         @relation("RepairRevisits", fields: [parentRepairTicketId], references: [id], onDelete: SetNull)
+  revisits               RepairTicket[]        @relation("RepairRevisits")
+  // 작업자 지정
+  assignedToId           String?               @map("assigned_to_id")
+  assignedTo             User?                 @relation("RepairAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   memo                   String?
   createdById            String                @map("created_by_id")
   createdBy              User                  @relation(fields: [createdById], references: [id])
@@ -1235,21 +1270,26 @@ model RepairTicket {
   @@index([customerId])
   @@index([status])
   @@index([receivedAt])
+  @@index([assignedToId])
+  @@index([parentRepairTicketId])
+  @@index([serialItemId])
   @@map("repair_tickets")
 }
 
 model RepairPart {
-  id               String       @id @default(uuid())
-  repairTicketId   String       @map("repair_ticket_id")
-  repairTicket     RepairTicket @relation(fields: [repairTicketId], references: [id], onDelete: Cascade)
-  productId        String       @map("product_id")
-  product          Product      @relation(fields: [productId], references: [id])
-  quantity         Decimal      @db.Decimal(15, 4)
-  unitPrice        Decimal      @map("unit_price") @db.Decimal(15, 2)
-  totalPrice       Decimal      @map("total_price") @db.Decimal(15, 2)
-  unitCostSnapshot Decimal?     @map("unit_cost_snapshot") @db.Decimal(15, 4)
-  consumedAt       DateTime?    @map("consumed_at")
-  createdAt        DateTime     @default(now()) @map("created_at")
+  id               String           @id @default(uuid())
+  repairTicketId   String           @map("repair_ticket_id")
+  repairTicket     RepairTicket     @relation(fields: [repairTicketId], references: [id], onDelete: Cascade)
+  productId        String           @map("product_id")
+  product          Product          @relation(fields: [productId], references: [id])
+  quantity         Decimal          @db.Decimal(15, 4)
+  unitPrice        Decimal          @map("unit_price") @db.Decimal(15, 2)
+  totalPrice       Decimal          @map("total_price") @db.Decimal(15, 2)
+  unitCostSnapshot Decimal?         @map("unit_cost_snapshot") @db.Decimal(15, 4)
+  consumedAt       DateTime?        @map("consumed_at")
+  status           RepairPartStatus @default(USED)
+  discount         String           @default("0") // 라인 할인 — "1000" or "10%"
+  createdAt        DateTime         @default(now()) @map("created_at")
 
   lotConsumptions LotConsumption[]
 
@@ -1618,6 +1658,8 @@ model SerialItem {
   memo         String?
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  repairTickets RepairTicket[]
 
   @@index([code])
   @@index([productId])

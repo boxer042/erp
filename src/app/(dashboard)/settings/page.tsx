@@ -58,6 +58,7 @@ interface CompanyInfoData {
   address: string | null;
   businessType: string | null;
   businessItem: string | null;
+  defaultRepairWarrantyMonths: number | null;
   bankAccounts: BankAccount[];
 }
 
@@ -70,6 +71,7 @@ const emptyCompanyForm = {
   address: "",
   businessType: "",
   businessItem: "",
+  defaultRepairWarrantyMonths: "",
 };
 
 const emptyBankForm = {
@@ -103,12 +105,22 @@ export default function SettingsPage() {
         address: companyQuery.data.address ?? "",
         businessType: companyQuery.data.businessType ?? "",
         businessItem: companyQuery.data.businessItem ?? "",
+        defaultRepairWarrantyMonths:
+          companyQuery.data.defaultRepairWarrantyMonths != null
+            ? String(companyQuery.data.defaultRepairWarrantyMonths)
+            : "",
       });
     }
   }, [companyQuery.data, companyDirty]);
 
   const updateCompany = useMutation({
-    mutationFn: () => apiMutate("/api/company-info", "PUT", companyForm),
+    mutationFn: () =>
+      apiMutate("/api/company-info", "PUT", {
+        ...companyForm,
+        defaultRepairWarrantyMonths: companyForm.defaultRepairWarrantyMonths
+          ? parseInt(companyForm.defaultRepairWarrantyMonths, 10)
+          : null,
+      }),
     onSuccess: () => {
       toast.success("사업자 정보가 저장되었습니다");
       setCompanyDirty(false);
@@ -300,6 +312,14 @@ export default function SettingsPage() {
             <CompanyField label="이메일" value={companyForm.email} onChange={(v) => setCompanyField("email", v)} />
             <CompanyField label="업태" value={companyForm.businessType} onChange={(v) => setCompanyField("businessType", v)} />
             <CompanyField label="종목" value={companyForm.businessItem} onChange={(v) => setCompanyField("businessItem", v)} />
+            <CompanyField
+              label="수리 보증 기본값 (개월)"
+              value={companyForm.defaultRepairWarrantyMonths}
+              onChange={(v) =>
+                setCompanyField("defaultRepairWarrantyMonths", v.replace(/\D/g, ""))
+              }
+              placeholder="예: 1"
+            />
             <div className="md:col-span-2">
               <CompanyField label="주소" value={companyForm.address} onChange={(v) => setCompanyField("address", v)} />
             </div>

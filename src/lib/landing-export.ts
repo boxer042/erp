@@ -6,9 +6,9 @@
  *
  * 한계:
  * - 모션 블록(scrolly-hero / sticky-feature / parallax) → 정적 이미지+텍스트로 다운그레이드
- * - ambient-video / video → 비디오 URL 만 표시 (외부 채널은 비디오 임베드 제한 많음)
- * - chart / spec-table (자동 채움) → 빈 placeholder. 차트는 스크린샷 권장
- * - html-embed / single-html → URL 안내문 (격리된 iframe 콘텐츠는 인라인 불가)
+ * - ambient-video / video → 비디오 URL 만 표시
+ * - chart / spec-table → 빈 placeholder
+ * - html-embed → URL 안내문 (격리된 iframe 콘텐츠는 인라인 불가)
  */
 
 import type { LandingBlock } from "./validators/landing-block";
@@ -34,8 +34,24 @@ function inlineMdToHtml(text: string): string {
   return s.replace(/\n/g, "<br>");
 }
 
-/** 인라인 마크다운 → 단순 텍스트 (markdown 보존) */
-const inlineMdToMd = (s: string) => s;
+/** 외부 export 용 인라인 색상 (callout / notice) */
+function calloutInlineColors(variant: "warning" | "info" | "success" | "danger" | "neutral"): {
+  bar: string;
+  bg: string;
+} {
+  switch (variant) {
+    case "warning":
+      return { bar: "#f5a623", bg: "rgba(245,166,35,0.08)" };
+    case "info":
+      return { bar: "#3ecf8e", bg: "rgba(62,207,142,0.06)" };
+    case "success":
+      return { bar: "#3ecf8e", bg: "rgba(62,207,142,0.10)" };
+    case "danger":
+      return { bar: "#ef4444", bg: "rgba(239,68,68,0.08)" };
+    case "neutral":
+      return { bar: "#888", bg: "#f5f5f7" };
+  }
+}
 
 export function blocksToHtml(blocks: LandingBlock[]): string {
   return blocks.map((b) => blockToHtml(b)).filter(Boolean).join("\n\n");
@@ -113,10 +129,7 @@ function blockToHtml(block: LandingBlock): string {
     }
     case "video":
     case "ambient-video": {
-      const url =
-        block.type === "video"
-          ? block.value
-          : block.videoUrl;
+      const url = block.type === "video" ? block.value : block.videoUrl;
       if (!url) return "";
       return `<div style="padding:24px 0;text-align:center;">
   <p style="margin:0 0 8px;font-size:14px;color:#666;">▶︎ 영상 보기</p>
@@ -189,6 +202,49 @@ function blockToHtml(block: LandingBlock): string {
       return `<div style="padding:48px;text-align:center;background:#f5f5f7;color:#666;">[차트] 외부 채널 export 시에는 별도 스크린샷으로 대체하세요.</div>`;
     case "spec-table":
       return `<div style="padding:48px;text-align:center;background:#f5f5f7;color:#666;">[자동 스펙표] 상품 상세에서 확인 가능합니다.</div>`;
+    case "callout": {
+      const colors = calloutInlineColors(block.variant);
+      return `<div style="padding:24px 32px;">
+  <div style="border-left:3px solid ${colors.bar};background:${colors.bg};padding:16px 20px;font-size:14px;line-height:1.7;color:#444;">
+    ${block.label ? `<strong style="color:${colors.bar};font-weight:700;letter-spacing:0.04em;margin-right:6px;">${escapeHtml(block.label)}</strong>` : ""}${inlineMdToHtml(block.body)}
+  </div>
+</div>`;
+    }
+    case "info-grid": {
+      const bg = block.background === "muted" ? "background:#f1f1ec;" : "";
+      return `<section style="${bg}padding:80px 32px;">
+  <div style="max-width:1200px;margin:0 auto;">
+    ${block.sections
+      .map((sec, i) => {
+        const isLast = i === block.sections.length - 1;
+        return `<div style="display:grid;grid-template-columns:260px 1fr;gap:48px;padding:32px 0;border-top:1px solid #d8d8d2;${isLast ? "border-bottom:1px solid #d8d8d2;" : ""}">
+      <div>
+        ${sec.number ? `<div style="font-size:11px;letter-spacing:0.25em;color:#999;font-weight:600;margin-bottom:8px;">${escapeHtml(sec.number)}</div>` : ""}
+        <div style="font-size:22px;font-weight:800;letter-spacing:-0.02em;">${escapeHtml(sec.title)}</div>
+      </div>
+      <div style="font-size:14px;line-height:1.85;color:#444;">
+        ${sec.rows.length > 0 ? `<dl style="display:grid;grid-template-columns:110px 1fr;gap:12px 24px;margin:0;">${sec.rows.map((r) => `<dt style="color:#888;font-weight:500;">${escapeHtml(r.key)}</dt><dd style="color:#1a1a1a;font-weight:500;margin:0;">${inlineMdToHtml(r.value)}</dd>`).join("")}</dl>` : ""}
+        ${sec.bullets.length > 0 ? `<ul style="margin-top:16px;padding:0;list-style:none;">${sec.bullets.map((b) => `<li style="position:relative;padding-left:14px;margin-bottom:6px;">${inlineMdToHtml(b)}</li>`).join("")}</ul>` : ""}
+        ${
+          sec.notice
+            ? (() => {
+                const c = calloutInlineColors(sec.notice.variant);
+                return `<div style="margin-top:16px;padding:16px 18px;background:#fafaf8;font-size:13px;color:#666;border-left:2px solid ${c.bar};line-height:1.7;">
+          ${sec.notice.label ? `<strong style="color:${c.bar};font-weight:700;letter-spacing:0.04em;margin-right:6px;">${escapeHtml(sec.notice.label)}</strong>` : ""}${inlineMdToHtml(sec.notice.body)}
+        </div>`;
+              })()
+            : ""
+        }
+      </div>
+    </div>`;
+      })
+      .join("")}
+  </div>
+</section>`;
+    }
+    case "product-info":
+      // Product 데이터 동적 매핑은 export 시에는 placeholder 로 (서버에서 Product fetch 별도 처리 필요)
+      return `<div style="padding:48px;text-align:center;background:#f5f5f7;color:#666;">[상품정보 고시 — ${escapeHtml(block.title)}] 자동 생성 영역 (Product 데이터에서 매핑됨)</div>`;
     case "html-embed":
       return block.htmlUrl
         ? `<div style="padding:24px;text-align:center;"><a href="${escapeHtml(block.htmlUrl)}" target="_blank" rel="noreferrer noopener">커스텀 콘텐츠 보기 →</a></div>`
@@ -221,7 +277,7 @@ function blockToMarkdown(block: LandingBlock): string {
       const lines: string[] = [];
       if (block.eyebrow) lines.push(`> **${block.eyebrow.toUpperCase()}**`);
       if (block.heading) lines.push(`## ${block.heading}`);
-      if (block.body) lines.push(inlineMdToMd(block.body));
+      if (block.body) lines.push(block.body);
       return lines.join("\n\n");
     }
     case "gallery": {
@@ -270,6 +326,28 @@ function blockToMarkdown(block: LandingBlock): string {
       return `_[차트는 별도 스크린샷으로 대체하세요]_`;
     case "spec-table":
       return `_[상품 자동 스펙표]_`;
+    case "callout": {
+      const prefix = block.label ? `**${block.label}**: ` : "";
+      return `> ${prefix}${block.body}`;
+    }
+    case "info-grid": {
+      const out: string[] = [];
+      for (const sec of block.sections) {
+        out.push(`### ${sec.number ? `${sec.number} ` : ""}${sec.title}`);
+        for (const r of sec.rows) {
+          out.push(`- **${r.key}**: ${r.value}`);
+        }
+        if (sec.bullets.length > 0) {
+          out.push(...sec.bullets.map((b) => `- ${b}`));
+        }
+        if (sec.notice) {
+          out.push(`> **${sec.notice.label}**: ${sec.notice.body}`);
+        }
+      }
+      return out.join("\n\n");
+    }
+    case "product-info":
+      return `_[${block.title} — Product 자동 매핑 영역]_`;
     case "html-embed":
       return block.htmlUrl ? `[커스텀 콘텐츠 보기 →](${block.htmlUrl})` : "";
   }

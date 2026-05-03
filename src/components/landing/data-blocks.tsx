@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { FileText } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -26,8 +27,13 @@ import type {
   TableBlock,
   ChartBlock,
   StatsGridBlock,
+  CalloutBlock,
+  InfoGridBlock,
+  ProductInfoBlock,
   HtmlEmbedBlock,
 } from "@/lib/validators/landing-block";
+import { resolveLandingIcon } from "@/lib/landing-icons";
+import { InlineMarkdown } from "@/components/landing/inline-md";
 
 interface SpecValue {
   id: string;
@@ -410,6 +416,362 @@ export function StatsGridBlockView({
             })}
           </div>
         )}
+      </div>
+    </section>
+  );
+}
+
+/** Callout / Info-grid 의 variant 별 색상 토큰 매핑 */
+const CALLOUT_VARIANT: Record<
+  NonNullable<CalloutBlock["variant"]>,
+  { border: string; bg: string; text: string }
+> = {
+  warning: { border: "border-warning", bg: "bg-warning/10", text: "text-warning" },
+  info: { border: "border-primary", bg: "bg-primary/5", text: "text-primary" },
+  success: { border: "border-brand", bg: "bg-brand-muted", text: "text-brand" },
+  danger: { border: "border-destructive", bg: "bg-destructive/10", text: "text-destructive" },
+  neutral: { border: "border-foreground/40", bg: "bg-muted", text: "text-foreground" },
+};
+
+const CALLOUT_PADDING: Record<NonNullable<CalloutBlock["paddingY"]>, string> = {
+  sm: "py-2",
+  md: "py-3",
+  lg: "py-5",
+};
+
+/** 강조 박스 — 좌측 컬러 바 + 라벨 + 본문. info-grid 안의 notice 에서도 재사용 */
+export function CalloutBlockView({
+  block,
+}: {
+  block: CalloutBlock;
+}) {
+  return <CalloutBox {...block} />;
+}
+
+/** 내부 컴포넌트 — info-grid 의 notice 에서도 사용 */
+export function CalloutBox({
+  variant,
+  icon,
+  label,
+  body,
+  paddingY = "md",
+  inSection = false,
+}: {
+  variant: CalloutBlock["variant"];
+  icon?: string | null;
+  label: string;
+  body: string;
+  paddingY?: CalloutBlock["paddingY"];
+  /** info-grid 내부면 외부 패딩 안 줌 */
+  inSection?: boolean;
+}) {
+  const style = CALLOUT_VARIANT[variant];
+  const Icon = resolveLandingIcon(icon ?? null);
+
+  const inner = (
+    <div
+      className={cn(
+        "border-l-2 pl-4 pr-4",
+        style.border,
+        style.bg,
+        CALLOUT_PADDING[paddingY ?? "md"],
+      )}
+    >
+      <div className="flex items-start gap-2">
+        {Icon && <Icon className={cn("mt-[3px] h-4 w-4 shrink-0", style.text)} />}
+        <div className="flex-1 text-sm leading-relaxed">
+          {label && <strong className={cn("mr-1.5 font-bold", style.text)}>{label}</strong>}
+          <span className="text-muted-foreground">
+            <InlineMarkdown text={body} />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (inSection) return inner;
+  return <section className="w-full px-6 md:px-16">{inner}</section>;
+}
+
+const INFO_GRID_PADDING: Record<NonNullable<InfoGridBlock["paddingY"]>, string> = {
+  md: "py-12",
+  lg: "py-16",
+  xl: "py-20 md:py-24",
+};
+
+const INFO_GRID_BG: Record<NonNullable<InfoGridBlock["background"]>, string> = {
+  none: "",
+  muted: "bg-muted",
+};
+
+/** 정보 그리드 — 한국 쇼핑몰 표준 footer 4섹션 패턴 */
+export function InfoGridBlockView({ block }: { block: InfoGridBlock }) {
+  const sections = block.sections;
+
+  if (sections.length === 0) {
+    return (
+      <section className={cn("w-full px-6 md:px-16", INFO_GRID_BG[block.background ?? "muted"])}>
+        <div className="mx-auto flex h-32 max-w-5xl items-center justify-center text-sm text-muted-foreground">
+          섹션을 추가하세요
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className={cn(
+        "w-full px-6 md:px-16",
+        INFO_GRID_PADDING[block.paddingY ?? "xl"],
+        INFO_GRID_BG[block.background ?? "muted"],
+      )}
+    >
+      <div className="mx-auto max-w-5xl">
+        {sections.map((sec, i) => {
+          const Icon = resolveLandingIcon(sec.icon);
+          return (
+            <div
+              key={i}
+              className={cn(
+                "grid gap-5 border-t border-border-strong/30 py-8 md:grid-cols-[260px_1fr] md:gap-12 md:py-10",
+                i === sections.length - 1 && "border-b",
+              )}
+            >
+              <div className="flex flex-col gap-1.5">
+                {sec.number && (
+                  <span className="text-[11px] font-semibold tracking-[0.25em] text-muted-foreground">
+                    {sec.number}
+                  </span>
+                )}
+                <div className="flex items-center gap-2">
+                  {Icon && <Icon className="h-5 w-5 shrink-0 text-foreground" />}
+                  <h3 className="text-xl font-bold tracking-tight md:text-[22px]">
+                    {sec.title}
+                  </h3>
+                </div>
+              </div>
+              <div className="space-y-3 text-sm leading-relaxed text-foreground/80">
+                {sec.rows.length > 0 && (
+                  <dl className="grid gap-x-6 gap-y-3 md:grid-cols-[110px_1fr]">
+                    {sec.rows.map((row, ri) => (
+                      <div key={ri} className="contents">
+                        <dt className="text-muted-foreground">{row.key}</dt>
+                        <dd className="font-medium text-foreground">
+                          <InlineMarkdown text={row.value} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {sec.bullets.length > 0 && (
+                  <ul className="mt-3 space-y-1.5">
+                    {sec.bullets.map((b, bi) => (
+                      <li
+                        key={bi}
+                        className="relative pl-3.5 text-[13px] before:absolute before:left-0 before:top-[10px] before:h-px before:w-2 before:bg-muted-foreground/60"
+                      >
+                        <InlineMarkdown text={b} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {sec.notice && (
+                  <div className="mt-4">
+                    <CalloutBox
+                      variant={sec.notice.variant}
+                      label={sec.notice.label}
+                      body={sec.notice.body}
+                      paddingY="md"
+                      inSection
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+interface ProductInfoApiResponse {
+  id: string;
+  name: string;
+  modelName: string | null;
+  brand: string | null;
+  brandRef?: { name: string } | null;
+  spec: string | null;
+  countryOfOrigin: string | null;
+  manufacturer: string | null;
+  importer: string | null;
+  certifications: string | null;
+  manufactureDate: string | null;
+  warrantyPolicy: string | null;
+  asResponsible: string | null;
+}
+
+interface CompanyInfoApiResponse {
+  name: string;
+  phone: string | null;
+  email: string | null;
+}
+
+/** 상품정보 고시 — Product 의 의무 필드 + spec 자동 + custom rows 합쳐서 info-grid 1섹션 디자인으로 */
+export function ProductInfoBlockView({
+  block,
+  productId,
+}: {
+  block: ProductInfoBlock;
+  productId?: string;
+}) {
+  const productQuery = useQuery({
+    queryKey: ["product-info-disclosure", productId ?? ""],
+    queryFn: () => apiGet<ProductInfoApiResponse>(`/api/products/${productId}`),
+    enabled: !!productId,
+  });
+
+  const companyQuery = useQuery({
+    queryKey: ["company-info-fallback"],
+    queryFn: () => apiGet<CompanyInfoApiResponse>("/api/company-info"),
+    enabled: !!productId,
+  });
+
+  const specsQuery = useQuery({
+    queryKey: ["product-specs", productId ?? ""],
+    queryFn: () => apiGet<SpecValue[]>(`/api/products/${productId}/specs`),
+    enabled: !!productId && block.useProductSpecs,
+  });
+
+  const product = productQuery.data;
+  const company = companyQuery.data;
+
+  // 자동 매핑 행 생성
+  const autoRows: Array<{ key: string; value: string }> = [];
+  if (product) {
+    if (product.name) autoRows.push({ key: "품명", value: product.name });
+    if (product.modelName) autoRows.push({ key: "모델명", value: product.modelName });
+    if (product.brandRef?.name || product.brand) {
+      autoRows.push({
+        key: "제조사 / 브랜드",
+        value: product.brandRef?.name ?? product.brand ?? "",
+      });
+    }
+    if (product.countryOfOrigin)
+      autoRows.push({ key: "제조국", value: product.countryOfOrigin });
+    if (product.manufacturer)
+      autoRows.push({ key: "제조자", value: product.manufacturer });
+    if (product.importer) autoRows.push({ key: "수입자", value: product.importer });
+    if (product.certifications)
+      autoRows.push({ key: "인증·허가", value: product.certifications });
+    if (product.spec) autoRows.push({ key: "규격", value: product.spec });
+
+    // 주요 사양 (Spec 자동 매핑)
+    if (block.useProductSpecs && specsQuery.data) {
+      for (const sv of specsQuery.data) {
+        autoRows.push({
+          key: sv.slot.name,
+          value: `${sv.value}${sv.slot.type === "NUMBER" && sv.slot.unit ? ` ${sv.slot.unit}` : ""}`,
+        });
+      }
+    }
+
+    if (product.manufactureDate)
+      autoRows.push({ key: "제조 연월", value: product.manufactureDate });
+
+    autoRows.push({
+      key: "품질보증기준",
+      value: product.warrantyPolicy || "소비자분쟁해결기준 (공정거래위원회 고시) 준용",
+    });
+
+    // A/S 책임자 / 연락처 — Product 우선, 없으면 CompanyInfo 폴백
+    const asResp = product.asResponsible || company?.name || "";
+    if (asResp) autoRows.push({ key: "A/S 책임자", value: asResp });
+    const asPhone = company?.phone;
+    const asEmail = company?.email;
+    if (asPhone || asEmail) {
+      autoRows.push({
+        key: "A/S 연락처",
+        value: [asPhone, asEmail].filter(Boolean).join(" / "),
+      });
+    }
+  }
+
+  // excludeKeys 필터 + customRows 합치기
+  const filtered = autoRows.filter((r) => !block.excludeKeys.includes(r.key));
+  const allRows = [...filtered, ...block.customRows.filter((r) => r.key || r.value)];
+
+  // 데이터 미준비/오류 상태
+  if (!productId) {
+    return (
+      <section
+        className={cn(
+          "w-full px-6 py-12 md:px-16",
+          block.background === "muted" ? "bg-muted" : "",
+        )}
+      >
+        <div className="mx-auto max-w-5xl rounded-md border border-dashed border-border bg-background/50 px-4 py-6 text-center text-sm text-muted-foreground">
+          상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
+        </div>
+      </section>
+    );
+  }
+
+  if (productQuery.isPending) {
+    return (
+      <section
+        className={cn(
+          "w-full px-6 py-12 md:px-16",
+          block.background === "muted" ? "bg-muted" : "",
+        )}
+      >
+        <div className="mx-auto h-32 max-w-5xl animate-pulse rounded-md bg-muted" />
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className={cn(
+        "w-full px-6 md:px-16",
+        INFO_GRID_PADDING[block.paddingY ?? "xl"],
+        INFO_GRID_BG[block.background ?? "muted"],
+      )}
+    >
+      <div className="mx-auto max-w-5xl">
+        <div className="grid gap-5 border-y border-border-strong/30 py-8 md:grid-cols-[260px_1fr] md:gap-12 md:py-10">
+          <div className="flex flex-col gap-1.5">
+            {block.number && (
+              <span className="text-[11px] font-semibold tracking-[0.25em] text-muted-foreground">
+                {block.number}
+              </span>
+            )}
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 shrink-0 text-foreground" />
+              <h3 className="text-xl font-bold tracking-tight md:text-[22px]">
+                {block.title}
+              </h3>
+            </div>
+          </div>
+          <div className="space-y-3 text-sm leading-relaxed text-foreground/80">
+            {allRows.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                표시할 항목이 없습니다 — 상품 정보 또는 ProductSpec 을 먼저 등록하세요
+              </div>
+            ) : (
+              <dl className="grid gap-x-6 gap-y-3 md:grid-cols-[110px_1fr]">
+                {allRows.map((row, ri) => (
+                  <div key={ri} className="contents">
+                    <dt className="text-muted-foreground">{row.key}</dt>
+                    <dd className="font-medium text-foreground">
+                      <InlineMarkdown text={row.value} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        </div>
       </div>
     </section>
   );

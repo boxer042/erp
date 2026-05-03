@@ -840,6 +840,13 @@ export async function PUT(
         zeroRateEligible: data.zeroRateEligible ?? false,
         trackable: data.trackable ?? false,
         warrantyMonths: data.warrantyMonths ?? null,
+        countryOfOrigin: data.countryOfOrigin ?? null,
+        manufacturer: data.manufacturer ?? null,
+        importer: data.importer ?? null,
+        certifications: data.certifications ?? null,
+        manufactureDate: data.manufactureDate ?? null,
+        warrantyPolicy: data.warrantyPolicy ?? null,
+        asResponsible: data.asResponsible ?? null,
       },
     });
 

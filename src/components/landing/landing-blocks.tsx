@@ -19,6 +19,9 @@ import {
   TableBlockView,
   ChartBlockView,
   StatsGridBlockView,
+  CalloutBlockView,
+  InfoGridBlockView,
+  ProductInfoBlockView,
   HtmlEmbedBlockView,
 } from "./data-blocks";
 
@@ -432,6 +435,12 @@ export function BlockView({
       return <ChartBlockView block={block} />;
     case "stats-grid":
       return <StatsGridBlockView block={block} productId={productId} />;
+    case "callout":
+      return <CalloutBlockView block={block} />;
+    case "info-grid":
+      return <InfoGridBlockView block={block} />;
+    case "product-info":
+      return <ProductInfoBlockView block={block} productId={productId} />;
     case "html-embed":
       return <HtmlEmbedBlockView block={block} />;
   }

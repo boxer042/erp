@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertCircle,
   ArrowLeft,
   BarChart3,
   Calculator,
@@ -12,11 +13,13 @@ import {
   Download,
   ExternalLink,
   FileCode2,
+  FileText,
   Film,
   Image as ImageIcon,
   Images,
   Layers,
   Layout,
+  ListChecks,
   Loader2,
   Monitor,
   Mountain,
@@ -116,6 +119,9 @@ const BLOCK_ICON: Record<BlockType, React.ComponentType<{ className?: string }>>
   table: Table2,
   chart: BarChart3,
   "stats-grid": Calculator,
+  callout: AlertCircle,
+  "info-grid": ListChecks,
+  "product-info": FileText,
   "html-embed": FileCode2,
 };
 
@@ -133,6 +139,9 @@ const BLOCK_TYPES: BlockType[] = [
   "table",
   "chart",
   "stats-grid",
+  "callout",
+  "info-grid",
+  "product-info",
   "html-embed",
 ];
 
@@ -151,6 +160,8 @@ export default function ProductLandingPage() {
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [singleUploading, setSingleUploading] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const pendingNavRef = useRef<(() => void) | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -193,6 +204,28 @@ export default function ProductLandingPage() {
   const landingMode = current.landingMode;
   const singleHtmlUrl = current.singleHtmlUrl;
   const dirty = editState !== null;
+
+  // 저장 안 된 변경 사항 있을 때 브라우저 탭 닫기 / 새로고침 / 외부 이동 차단
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // 일부 브라우저는 returnValue 가 설정되어야 표시
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  // dirty 면 dialog 열고 confirm 후 이동, 아니면 즉시
+  const navigateAway = (target: () => void) => {
+    if (dirty) {
+      setLeaveDialogOpen(true);
+      pendingNavRef.current = target;
+    } else {
+      target();
+    }
+  };
 
   const updateState = (patch: Partial<EditState>) => {
     setEditState((prev) => ({ ...(prev ?? serverState), ...patch }));
@@ -280,7 +313,7 @@ export default function ProductLandingPage() {
           variant="ghost"
           size="icon"
           aria-label="뒤로"
-          onClick={() => router.push(`/products/${id}`)}
+          onClick={() => navigateAway(() => router.push(`/products/${id}`))}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -600,6 +633,47 @@ export default function ProductLandingPage() {
             <Button variant="outline" onClick={() => setDeleteId(null)}>취소</Button>
             <Button variant="destructive" onClick={() => deleteId && removeBlock(deleteId)}>
               삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={leaveDialogOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            pendingNavRef.current = null;
+            setLeaveDialogOpen(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>저장하지 않은 변경사항이 있습니다</DialogTitle>
+            <DialogDescription>
+              지금 페이지를 나가면 저장하지 않은 변경 내용이 사라집니다. 정말 나가시겠어요?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                pendingNavRef.current = null;
+                setLeaveDialogOpen(false);
+              }}
+            >
+              취소 (계속 편집)
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const fn = pendingNavRef.current;
+                pendingNavRef.current = null;
+                setLeaveDialogOpen(false);
+                if (fn) fn();
+              }}
+            >
+              나가기 (변경 버림)
             </Button>
           </DialogFooter>
         </DialogContent>
