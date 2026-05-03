@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ImageEditDialog } from "@/components/image-edit-dialog";
 
 interface Brand {
   id: string;
@@ -223,6 +224,7 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const open = brand !== null;
 
@@ -271,20 +273,17 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
     onClose();
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploadBlob = async (data: Blob | File, name: string) => {
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", data, name);
       const res = await fetch("/api/brands/upload", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) {
         toast.error(json.error || "업로드 실패");
         return;
       }
-      // 기존 로고가 있으면 삭제
       if (logoPath) {
         await apiMutate("/api/brands/upload", "DELETE", { path: logoPath });
       }
@@ -292,8 +291,19 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
       setLogoPath(json.path);
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+    // SVG는 편집 불가 → 그대로 업로드
+    if (file.type === "image/svg+xml") {
+      uploadBlob(file, file.name);
+      return;
+    }
+    setPendingFile(file);
   };
 
   const handleRemoveLogo = async () => {
@@ -393,6 +403,15 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
           </div>
         </div>
       </SheetContent>
+      <ImageEditDialog
+        open={pendingFile !== null}
+        file={pendingFile}
+        onConfirm={async (blob, name) => {
+          setPendingFile(null);
+          await uploadBlob(blob, name);
+        }}
+        onCancel={() => setPendingFile(null)}
+      />
     </Sheet>
   );
 }

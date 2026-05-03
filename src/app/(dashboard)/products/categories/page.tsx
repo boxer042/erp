@@ -26,6 +26,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { ImageEditDialog } from "@/components/image-edit-dialog";
 
 interface CategoryChild {
   id: string;
@@ -95,6 +96,7 @@ export default function CategoriesPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categoriesQuery = useQuery({
@@ -168,23 +170,31 @@ export default function CategoriesPage() {
     setSheetOpen(true);
   };
 
-  const handleUpload = async (file: File) => {
+  const uploadBlob = async (data: Blob | File, name: string) => {
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", data, name);
       const res = await fetch("/api/categories/upload", { method: "POST", body: fd });
       if (!res.ok) throw new Error((await res.json()).error ?? "업로드 실패");
-      const data = await res.json() as { url: string; path: string };
+      const json = await res.json() as { url: string; path: string };
       if (form.imagePath) {
         apiMutate("/api/categories/upload", "DELETE", { path: form.imagePath }).catch(() => {});
       }
-      setForm((f) => ({ ...f, imageUrl: data.url, imagePath: data.path }));
+      setForm((f) => ({ ...f, imageUrl: json.url, imagePath: json.path }));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "업로드 실패");
     } finally {
       setUploading(false);
     }
+  };
+
+  const handlePickFile = (file: File) => {
+    if (file.type === "image/svg+xml") {
+      uploadBlob(file, file.name);
+      return;
+    }
+    setPendingFile(file);
   };
 
   const handleRemoveImage = async () => {
@@ -408,7 +418,7 @@ export default function CategoriesPage() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleUpload(file);
+                  if (file) handlePickFile(file);
                   e.target.value = "";
                 }}
               />
@@ -477,6 +487,16 @@ export default function CategoriesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImageEditDialog
+        open={pendingFile !== null}
+        file={pendingFile}
+        onConfirm={async (blob, name) => {
+          setPendingFile(null);
+          await uploadBlob(blob, name);
+        }}
+        onCancel={() => setPendingFile(null)}
+      />
     </div>
   );
 }

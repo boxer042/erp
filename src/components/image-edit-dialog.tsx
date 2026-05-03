@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
-import { Loader2, RotateCw, Sparkles, Sun, Undo2, ZoomIn } from "lucide-react";
+import { Eraser, Loader2, RotateCcw, RotateCw, Sparkles, Sun, Undo2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -25,19 +25,32 @@ interface Props {
   onCancel: () => void;
 }
 
+type PreviewSource = "bg-removal" | "manual";
+
 export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
+  // Phase 1 (cropper) state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [brightness, setBrightness] = useState(1);
-  const [bgPreviewBlob, setBgPreviewBlob] = useState<Blob | null>(null);
-  const [bgPreviewUrl, setBgPreviewUrl] = useState<string | null>(null);
-  const [bgProcessing, setBgProcessing] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
 
-  const isPreview = bgPreviewUrl !== null;
+  // Phase 2 (preview + erase) state
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("manual");
+  const [bgProcessing, setBgProcessing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [brushSize, setBrushSize] = useState(40);
+  const [canUndo, setCanUndo] = useState(false);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const undoStackRef = useRef<ImageData[]>([]);
+  const drawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const isPreview = previewUrl !== null;
   const busy = bgProcessing || uploading;
 
   useEffect(() => {
@@ -51,22 +64,40 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
     setZoom(1);
     setRotation(0);
     setBrightness(1);
-    setBgPreviewBlob(null);
-    setBgPreviewUrl(null);
+    setPreviewUrl(null);
     setCroppedAreaPixels(null);
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // bgPreviewUrl 메모리 정리: 값이 바뀔 때 이전 URL revoke
+  // previewUrl 메모리 정리
   useEffect(() => {
     return () => {
-      if (bgPreviewUrl) URL.revokeObjectURL(bgPreviewUrl);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, [bgPreviewUrl]);
+  }, [previewUrl]);
 
   const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
     setCroppedAreaPixels(areaPixels);
   }, []);
+
+  // 미리보기 이미지를 캔버스에 다시 렌더 (지우기 초기화 / 진입 시)
+  const renderPreviewToCanvas = useCallback(async () => {
+    if (!canvasRef.current || !previewUrl) return;
+    const img = await loadImage(previewUrl);
+    const canvas = canvasRef.current;
+    canvas.width = OUTPUT_SIZE;
+    canvas.height = OUTPUT_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    undoStackRef.current = [];
+    setCanUndo(false);
+  }, [previewUrl]);
+
+  useEffect(() => {
+    if (previewUrl) renderPreviewToCanvas();
+  }, [previewUrl, renderPreviewToCanvas]);
 
   const handleApplyBgRemoval = async () => {
     if (!imageSrc || !croppedAreaPixels || busy) return;
@@ -81,8 +112,8 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
       );
       const { removeBackground } = await import("@imgly/background-removal");
       const removed = await removeBackground(cropped);
-      setBgPreviewBlob(removed);
-      setBgPreviewUrl(URL.createObjectURL(removed));
+      setPreviewSource("bg-removal");
+      setPreviewUrl(URL.createObjectURL(removed));
     } catch (e) {
       console.error(e);
       toast.error("배경 제거에 실패했습니다");
@@ -91,26 +122,122 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
     }
   };
 
-  const handleRevertBg = () => {
-    setBgPreviewBlob(null);
-    setBgPreviewUrl(null);
+  const handleEnterEraser = async () => {
+    if (!imageSrc || !croppedAreaPixels || busy) return;
+    try {
+      const cropped = await getCroppedBlob(
+        imageSrc,
+        croppedAreaPixels,
+        rotation,
+        brightness,
+        "image/png",
+      );
+      setPreviewSource("manual");
+      setPreviewUrl(URL.createObjectURL(cropped));
+    } catch (e) {
+      console.error(e);
+      toast.error("이미지 처리에 실패했습니다");
+    }
+  };
+
+  const handleRevertPreview = () => {
+    setPreviewUrl(null);
+  };
+
+  // ── 지우개 드로잉 ─────────────────────────────────
+  const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((e.clientY - rect.top) / rect.height) * canvas.height,
+    };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (busy) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.setPointerCapture(e.pointerId);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    // 되돌리기 스택에 현재 상태 저장
+    undoStackRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+    setCanUndo(true);
+    drawingRef.current = true;
+    const { x, y } = getCanvasCoords(e);
+    lastPointRef.current = { x, y };
+    drawErase(ctx, x, y, x, y, brushSize);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    setHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    if (!drawingRef.current) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const { x, y } = getCanvasCoords(e);
+    const last = lastPointRef.current;
+    drawErase(ctx, last?.x ?? x, last?.y ?? y, x, y, brushSize);
+    lastPointRef.current = { x, y };
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    const canvas = canvasRef.current;
+    if (canvas?.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const handlePointerLeave = () => {
+    setHoverPos(null);
+  };
+
+  const handleUndo = () => {
+    const stack = undoStackRef.current;
+    if (stack.length === 0) return;
+    const snapshot = stack.pop()!;
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.putImageData(snapshot, 0, 0);
+    setCanUndo(stack.length > 0);
+  };
+
+  const handleResetErase = () => {
+    renderPreviewToCanvas();
   };
 
   const handleConfirm = async () => {
     if (!file || busy) return;
 
-    // 미리보기에서 결과 확정 시: 이미 처리된 blob을 그대로 업로드
-    if (bgPreviewBlob) {
+    // 미리보기/지우개 단계에서 확정 → 캔버스 결과를 PNG로 출력
+    if (isPreview && canvasRef.current) {
       setUploading(true);
       try {
-        onConfirm(bgPreviewBlob, file.name);
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvasRef.current!.toBlob(
+            (b) => (b ? resolve(b) : reject(new Error("toBlob 실패"))),
+            "image/png",
+          );
+        });
+        const baseName = file.name.replace(/\.[^.]+$/, "") || file.name;
+        onConfirm(blob, `${baseName}.png`);
+      } catch (e) {
+        console.error(e);
+        toast.error("이미지 처리에 실패했습니다");
       } finally {
         setUploading(false);
       }
       return;
     }
 
-    // 일반 편집(배경 제거 미적용)
+    // 단순 크롭만 적용해 확정
     if (!imageSrc || !croppedAreaPixels) return;
     setUploading(true);
     try {
@@ -132,6 +259,12 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
 
   const fileLabel = file ? file.name : "";
 
+  // 표시용 브러시 지름(CSS px) — 캔버스 표시 크기에 비례
+  const liveCanvas = canvasRef.current;
+  const brushDiamCss = liveCanvas
+    ? brushSize * (liveCanvas.getBoundingClientRect().width / liveCanvas.width || 0)
+    : brushSize;
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && !busy) onCancel(); }}>
       <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden sm:max-w-2xl" showCloseButton={false}>
@@ -139,18 +272,38 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
           {fileLabel ? `이미지 편집 — ${fileLabel}` : "이미지 편집"}
         </DialogTitle>
 
-        <div className="relative aspect-square w-full bg-black">
+        <div className="relative aspect-square w-full bg-black select-none">
           {isPreview ? (
             <div className="absolute inset-0" style={CHECKER_BG}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={bgPreviewUrl}
-                alt="배경 제거 미리보기"
-                className="size-full object-contain"
+              <canvas
+                ref={canvasRef}
+                className="size-full touch-none cursor-none"
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                onPointerLeave={handlePointerLeave}
               />
-              <div className="absolute top-2 right-2 rounded-md bg-primary/90 px-2 py-1 text-[11px] text-primary-foreground">
-                <Sparkles className="inline h-3 w-3 mr-1" />
-                배경 제거 적용됨
+              {hoverPos && brushDiamCss > 0 && (
+                <div
+                  className="pointer-events-none absolute rounded-full border-2 border-primary/80 bg-primary/10"
+                  style={{
+                    left: hoverPos.x - brushDiamCss / 2,
+                    top: hoverPos.y - brushDiamCss / 2,
+                    width: brushDiamCss,
+                    height: brushDiamCss,
+                  }}
+                />
+              )}
+              {previewSource === "bg-removal" && (
+                <div className="absolute top-2 right-2 rounded-md bg-primary/90 px-2 py-1 text-[11px] text-primary-foreground">
+                  <Sparkles className="inline h-3 w-3 mr-1" />
+                  배경 제거 적용됨
+                </div>
+              )}
+              <div className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[11px] text-white">
+                <Eraser className="inline h-3 w-3 mr-1" />
+                드래그로 지우기
               </div>
             </div>
           ) : (
@@ -182,16 +335,50 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
 
         <div className="px-4 py-3 space-y-3 border-t border-border">
           {isPreview ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRevertBg}
-              disabled={busy}
-              className="w-full"
-            >
-              <Undo2 className="h-4 w-4 mr-1" />
-              다시 편집 (원본으로 돌아가기)
-            </Button>
+            <>
+              <div className="flex items-center gap-3">
+                <Eraser className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground w-10">굵기</span>
+                <input
+                  type="range"
+                  min={10}
+                  max={200}
+                  step={1}
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                  className="flex-1 accent-primary"
+                  disabled={busy}
+                  aria-label="지우개 굵기"
+                />
+                <span className="text-xs tabular-nums w-12 text-right">{brushSize}px</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUndo}
+                  disabled={busy || !canUndo}
+                >
+                  <Undo2 className="h-4 w-4 mr-1" /> 되돌리기
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetErase}
+                  disabled={busy}
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" /> 지우기 초기화
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRevertPreview}
+                  disabled={busy}
+                >
+                  처음부터 다시
+                </Button>
+              </div>
+            </>
           ) : (
             <>
               <div className="flex items-center gap-3">
@@ -236,20 +423,30 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
                 <span className="text-xs tabular-nums w-12 text-right">{Math.round(brightness * 100)}%</span>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleApplyBgRemoval}
-                disabled={busy || !croppedAreaPixels}
-                className="w-full"
-              >
-                {bgProcessing ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-1" />
-                )}
-                {bgProcessing ? "분석 중..." : "AI 배경 제거 미리보기"}
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApplyBgRemoval}
+                  disabled={busy || !croppedAreaPixels}
+                >
+                  {bgProcessing ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-1" />
+                  )}
+                  AI 배경 제거
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEnterEraser}
+                  disabled={busy || !croppedAreaPixels}
+                >
+                  <Eraser className="h-4 w-4 mr-1" />
+                  지우개로 다듬기
+                </Button>
+              </div>
             </>
           )}
         </div>
@@ -266,6 +463,26 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function drawErase(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  size: number,
+) {
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = size;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+  ctx.restore();
 }
 
 async function getCroppedBlob(
