@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { landingBlocksSchema } from "@/lib/validators/landing-block";
+import { ensureProductHeroFirst } from "@/lib/landing-blocks-utils";
 import { LandingPageView } from "@/components/landing/landing-page-view";
 import { SingleHtmlPreview } from "@/components/landing/single-html-preview";
 
@@ -50,14 +51,19 @@ export default async function LandingPreviewPage({
     );
   }
 
-  // BLOCKS 모드: 기존 동작 (블록 + 공통 footer)
+  // BLOCKS 모드: 공통 header + 상품 블록 + 공통 footer
   const productParsed = landingBlocksSchema.safeParse(product.landingBlocks ?? []);
-  const productBlocks = productParsed.success ? productParsed.data : [];
+  // 저장된 블록이 비거나 product-hero 가 없어도 자동으로 첫 블록에 보장 (사용자가 별도 저장 안 해도 노출)
+  const productBlocks = ensureProductHeroFirst(productParsed.success ? productParsed.data : []);
+
+  const headerParsed = landingBlocksSchema.safeParse(settings?.headerBlocks ?? []);
+  const headerBlocks = headerParsed.success ? headerParsed.data : [];
 
   const footerParsed = landingBlocksSchema.safeParse(settings?.footerBlocks ?? []);
   const footerBlocks = footerParsed.success ? footerParsed.data : [];
 
   const blocks = [
+    ...headerBlocks.map((b) => ({ ...b, id: `__header__${b.id}` })),
     ...productBlocks,
     ...footerBlocks.map((b) => ({ ...b, id: `__footer__${b.id}` })),
   ];

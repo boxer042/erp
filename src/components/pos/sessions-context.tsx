@@ -7,6 +7,7 @@ export interface RepairMeta {
   deviceModel?: string;
   issueDescription?: string;
   serialItemId?: string; // 시리얼 라벨 연결 (선택)
+  repairTicketId?: string; // 기존 RepairTicket 픽업 결제용
 }
 
 export interface RentalMeta {
@@ -50,6 +51,7 @@ export interface CartSession {
   quotationFingerprint?: string;   // 발행 시점 카트 지문 — 카트 변경 감지용
   labelCodes?: string[];           // 마지막 발번 라벨 코드 목록
   labelFingerprint?: string;       // 발번 시점 카트 지문
+  repairTicketIds?: string[];      // 이 세션에서 시작한 수리 티켓 ID들 (미등록 고객 추적용)
 }
 
 interface AddOptions {
@@ -77,6 +79,7 @@ interface SessionsContextValue {
   setSessionShipping: (amount: string, sessionId?: string) => void;
   setSessionQuotation: (quotationId: string, fingerprint: string, sessionId?: string) => void;
   setSessionLabels: (codes: string[], fingerprint: string, sessionId?: string) => void;
+  addSessionRepairTicket: (ticketId: string, sessionId?: string) => void;
   clear: (sessionId?: string) => void;
   totalItemCount: number;
   getSession: (id: string) => CartSession | undefined;
@@ -88,7 +91,7 @@ const STORAGE_KEY = "pos.sessions.v1";
 function makeSession(index: number): CartSession {
   return {
     id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
-    label: `손님 ${index}`,
+    label: `고객 ${index}`,
     items: [],
     totalDiscount: "0",
     shippingCost: "0",
@@ -408,6 +411,19 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     [activeId]
   );
 
+  const addSessionRepairTicket = useCallback(
+    (ticketId: string, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      setSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          repairTicketIds: [...(s.repairTicketIds ?? []), ticketId],
+        }))
+      );
+    },
+    [activeId]
+  );
+
   const clear = useCallback(
     (sessionId?: string) => {
       const targetId = sessionId ?? activeId;
@@ -467,11 +483,12 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       setSessionShipping,
       setSessionQuotation,
       setSessionLabels,
+      addSessionRepairTicket,
       clear,
       totalItemCount,
       getSession,
     }),
-    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, clear, totalItemCount, getSession]
+    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, clear, totalItemCount, getSession]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

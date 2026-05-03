@@ -242,6 +242,9 @@ function blockToHtml(block: LandingBlock): string {
   </div>
 </section>`;
     }
+    case "product-hero":
+      // Product 데이터 동적 매핑은 export 시 placeholder
+      return `<div style="padding:48px;text-align:center;background:#f5f5f7;color:#666;">[상품 메인 (PDP Hero)] 자동 생성 영역 — 이미지/상품명/가격/CTA 가 Product 데이터에서 매핑됩니다</div>`;
     case "product-info":
       // Product 데이터 동적 매핑은 export 시에는 placeholder 로 (서버에서 Product fetch 별도 처리 필요)
       return `<div style="padding:48px;text-align:center;background:#f5f5f7;color:#666;">[상품정보 고시 — ${escapeHtml(block.title)}] 자동 생성 영역 (Product 데이터에서 매핑됨)</div>`;
@@ -346,6 +349,8 @@ function blockToMarkdown(block: LandingBlock): string {
       }
       return out.join("\n\n");
     }
+    case "product-hero":
+      return `_[상품 메인 — Product 자동 매핑 영역]_`;
     case "product-info":
       return `_[${block.title} — Product 자동 매핑 영역]_`;
     case "html-embed":

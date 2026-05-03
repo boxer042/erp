@@ -55,7 +55,7 @@ function computeQuotationFingerprint(session: CartSession): string {
   });
 }
 
-// 라벨 발번 지문 — 손님과 trackable 상품 수량 변화에만 영향. 단가/할인 등은 무관.
+// 라벨 발번 지문 — 고객과 trackable 상품 수량 변화에만 영향. 단가/할인 등은 무관.
 function computeLabelFingerprint(session: CartSession): string {
   return JSON.stringify({
     items: session.items
@@ -88,7 +88,7 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
         (i) => i.itemType === "repair" || i.itemType === "rental"
       );
       if (hasRepairOrRental && !session.customerId) {
-        throw new Error("수리/임대는 손님 연결이 필요합니다");
+        throw new Error("수리/임대는 고객 연결이 필요합니다");
       }
       return submitCheckout(session, { action: "order", paymentMethod: "CARD" });
     },
@@ -137,7 +137,7 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
   const quotationMutation = useMutation<{ id: string; fingerprint: string }, Error>({
     mutationFn: async () => {
       if (session.items.length === 0) throw new Error("카트가 비어있습니다");
-      if (!session.customerId) throw new Error("견적서 발행은 손님 연결이 필요합니다");
+      if (!session.customerId) throw new Error("견적서 발행은 고객 연결이 필요합니다");
 
       const fingerprint = computeQuotationFingerprint(session);
 
@@ -288,11 +288,11 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
         )}
       </div>
 
-      {/* 손님 / 견적서 / 배송비 / 라벨 — 4그리드 버튼 */}
+      {/* 고객 / 견적서 / 배송비 / 라벨 — 4그리드 버튼 */}
       <div className="grid shrink-0 grid-cols-4 gap-px border-t border-border bg-border">
         <ActionTile
           icon={<User className="size-7" />}
-          label="손님"
+          label="고객"
           value={session.customerName ?? `${session.label} 연결`}
           subValue={null}
           onClick={() => setCustomerSheetOpen(true)}
@@ -453,7 +453,7 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
         </DialogContent>
       </Dialog>
 
-      {/* 손님 연결 시트 */}
+      {/* 고객 연결 시트 */}
       <CustomerLinkSheet
         open={customerSheetOpen}
         onOpenChange={setCustomerSheetOpen}

@@ -237,6 +237,56 @@ export const infoGridBlockSchema = z.object({
     .default([]),
 });
 
+// 상품 메인 (PDP Hero) — 페이지 최상단 상품 요약 영역
+// 좌측 이미지 갤러리 + 우측 상품명/브랜드/가격/CTA. Product 데이터 자동 매핑
+export const productHeroBlockSchema = z.object({
+  id: z.string(),
+  type: z.literal("product-hero"),
+  layout: z.enum(["image-left", "image-right", "image-top"]).default("image-left"),
+  background: z.enum(["none", "muted"]).default("none"),
+  paddingY: z.enum(["md", "lg", "xl"]).default("xl"),
+  /** "GAS CHAINSAW · 가솔린 체인톱" 같은 작은 라벨 (자유 입력 — 비우면 카테고리·브랜드에서 자동 채움) */
+  eyebrow: z.string().default(""),
+  /** 상품명 아래 1~2줄 카피 (자유 입력) */
+  subheadline: z.string().default(""),
+  /** 가격 표시 on/off (B2B 비공개 케이스) */
+  priceVisible: z.boolean().default(true),
+  /** 가격을 VAT 포함 금액으로 표시 (taxable 상품만 적용) */
+  vatIncluded: z.boolean().default(false),
+  /** 추가 CTA 버튼 (최대 2개 — 장바구니/구매하기와 별도. 예: "대리점 찾기", "견적 문의") */
+  ctas: z
+    .array(
+      z.object({
+        label: z.string().default(""),
+        href: z.string().default(""),
+        variant: z.enum(["primary", "outline"]).default("primary"),
+      }),
+    )
+    .default([]),
+  /** 할인이 있을 때 SALE 배지 자동 표시 (끄면 강제 숨김) */
+  showSaleBadge: z.boolean().default(true),
+  /** 이미지 갤러리 (메인 + 썸네일). 자동 = Product.imageUrl + media. 수동 override 가능 */
+  imagesOverride: z
+    .array(z.object({ url: z.string(), alt: z.string().default("") }))
+    .default([]),
+  /** 수량 선택기 표시 — 장바구니·구매하기 버튼이 활성일 때만 의미 있음 */
+  quantityVisible: z.boolean().default(true),
+  /** 장바구니 버튼 — 클릭 핸들러는 commerceContext 로 주입 (POS/자사몰 분기) */
+  addToCart: z
+    .object({
+      visible: z.boolean().default(true),
+      label: z.string().default("장바구니"),
+    })
+    .default({ visible: true, label: "장바구니" }),
+  /** 바로 구매 버튼 — 클릭 핸들러는 commerceContext 로 주입 */
+  buyNow: z
+    .object({
+      visible: z.boolean().default(true),
+      label: z.string().default("바로 구매"),
+    })
+    .default({ visible: true, label: "바로 구매" }),
+});
+
 // 상품정보 고시 (전자상거래법 표시 의무) — Product 의 6개 의무 필드 + 선택적 ProductSpec 자동 매핑
 // info-grid 1섹션 디자인 재사용
 export const productInfoBlockSchema = z.object({
@@ -290,6 +340,7 @@ export const landingBlockSchema = z.discriminatedUnion("type", [
   statsGridBlockSchema,
   calloutBlockSchema,
   infoGridBlockSchema,
+  productHeroBlockSchema,
   productInfoBlockSchema,
   htmlEmbedBlockSchema,
 ]);
@@ -311,6 +362,7 @@ export type ChartBlock = z.infer<typeof chartBlockSchema>;
 export type StatsGridBlock = z.infer<typeof statsGridBlockSchema>;
 export type CalloutBlock = z.infer<typeof calloutBlockSchema>;
 export type InfoGridBlock = z.infer<typeof infoGridBlockSchema>;
+export type ProductHeroBlock = z.infer<typeof productHeroBlockSchema>;
 export type ProductInfoBlock = z.infer<typeof productInfoBlockSchema>;
 export type HtmlEmbedBlock = z.infer<typeof htmlEmbedBlockSchema>;
 export type LandingBlock = z.infer<typeof landingBlockSchema>;
@@ -333,6 +385,7 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   "stats-grid": "스탯 그리드",
   callout: "강조 박스",
   "info-grid": "정보 그리드",
+  "product-hero": "상품 메인",
   "product-info": "상품정보 고시",
   "html-embed": "HTML 임베드",
 };
@@ -412,6 +465,11 @@ export const BLOCK_DESCRIPTIONS: Record<BlockType, { title: string; body: string
     title: "정보 그리드",
     body: "한국 쇼핑몰 표준 footer 디자인. 좌측 \"— 01 배송 안내\" 헤더 + 우측 키-값 표 + 추가 불릿 + 선택적 내부 notice. N개 섹션을 세로 스택으로.",
     example: "예) 배송 / 교환·반품 / A/S / 사업자 정보 4섹션 한 번에",
+  },
+  "product-hero": {
+    title: "상품 메인 (PDP Hero)",
+    body: "상품 페이지 최상단 요약 영역. 이미지/상품명/브랜드/가격은 Product 데이터 자동 매핑. subheadline·CTA만 상품별로 입력하면 됩니다. 신규 상품 생성 시 자동 추가됨.",
+    example: "예) STIHL/쿠팡 같은 PDP 첫 화면 — 보통 페이지 첫 블록으로 사용",
   },
   "product-info": {
     title: "상품정보 고시 (자동)",
@@ -591,6 +649,24 @@ export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
             notice: null,
           },
         ],
+      };
+    case "product-hero":
+      return {
+        id,
+        type: "product-hero",
+        layout: "image-left",
+        background: "none",
+        paddingY: "xl",
+        eyebrow: "",
+        subheadline: "",
+        priceVisible: true,
+        vatIncluded: false,
+        ctas: [],
+        showSaleBadge: true,
+        imagesOverride: [],
+        quantityVisible: true,
+        addToCart: { visible: true, label: "장바구니" },
+        buyNow: { visible: true, label: "바로 구매" },
       };
     case "product-info":
       return {

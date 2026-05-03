@@ -23,6 +23,7 @@ import {
   Loader2,
   Monitor,
   Mountain,
+  ShoppingBag,
   Smartphone,
   Sparkles,
   Table2,
@@ -121,11 +122,13 @@ const BLOCK_ICON: Record<BlockType, React.ComponentType<{ className?: string }>>
   "stats-grid": Calculator,
   callout: AlertCircle,
   "info-grid": ListChecks,
+  "product-hero": ShoppingBag,
   "product-info": FileText,
   "html-embed": FileCode2,
 };
 
 const BLOCK_TYPES: BlockType[] = [
+  "product-hero",
   "hero",
   "image",
   "text",
@@ -176,7 +179,9 @@ export default function ProductLandingPage() {
   const footerQuery = useQuery({
     queryKey: queryKeys.landingSettings.all,
     queryFn: () =>
-      apiGet<{ footerBlocks: LandingBlock[] }>("/api/landing-settings"),
+      apiGet<{ headerBlocks: LandingBlock[]; footerBlocks: LandingBlock[] }>(
+        "/api/landing-settings",
+      ),
   });
 
   const saveMutation = useMutation({
@@ -217,6 +222,43 @@ export default function ProductLandingPage() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
+  // product-hero 는 항상 첫 블록으로 존재해야 하는 필수 블록.
+  // 첫 로드 시 (1) 없으면 prepend (2) 첫 위치가 아니면 0번으로 이동.
+  // 페이지당 1회만 동작 (이후 dirty 발생해도 재동기화 안 함).
+  const autoSeededRef = useRef(false);
+  useEffect(() => {
+    if (autoSeededRef.current) return;
+    if (!landingQuery.data) return;
+    if (editState !== null) return;
+    if (landingQuery.data.landingMode !== "BLOCKS") return;
+    autoSeededRef.current = true;
+
+    const serverBlocks = landingQuery.data.blocks;
+    const heroIdx = serverBlocks.findIndex((b) => b.type === "product-hero");
+
+    if (heroIdx === -1) {
+      // 없음 → prepend
+      setEditState({
+        blocks: [makeEmptyBlock("product-hero", makeId()), ...serverBlocks],
+        landingMode: "BLOCKS",
+        singleHtmlUrl: landingQuery.data.singleHtmlUrl,
+      });
+    } else if (heroIdx !== 0) {
+      // 첫 위치가 아님 → 0번으로 이동
+      const reordered = [
+        serverBlocks[heroIdx],
+        ...serverBlocks.slice(0, heroIdx),
+        ...serverBlocks.slice(heroIdx + 1),
+      ];
+      setEditState({
+        blocks: reordered,
+        landingMode: "BLOCKS",
+        singleHtmlUrl: landingQuery.data.singleHtmlUrl,
+      });
+    }
+    // 이미 0번에 product-hero → 아무것도 안 함 (dirty 발생 X)
+  }, [landingQuery.data, editState]);
+
   // dirty 면 dialog 열고 confirm 후 이동, 아니면 즉시
   const navigateAway = (target: () => void) => {
     if (dirty) {
@@ -239,6 +281,11 @@ export default function ProductLandingPage() {
   };
 
   const addBlock = (type: BlockType) => {
+    // product-hero 는 자동 추가되는 필수 블록 — 중복 추가 차단
+    if (type === "product-hero" && blocks.some((b) => b.type === "product-hero")) {
+      toast.error("상품 메인은 이미 첫 블록으로 존재합니다 (1개만 허용)");
+      return;
+    }
     const newId = makeId();
     dispatchBlocks((prev) => [...prev, makeEmptyBlock(type, newId)]);
     setExpandedId(newId);
@@ -249,6 +296,13 @@ export default function ProductLandingPage() {
   };
 
   const removeBlock = (blockId: string) => {
+    // product-hero 는 필수 블록 — 삭제 차단
+    const target = blocks.find((b) => b.id === blockId);
+    if (target?.type === "product-hero") {
+      toast.error("상품 메인은 필수 블록이라 삭제할 수 없습니다");
+      setDeleteId(null);
+      return;
+    }
     dispatchBlocks((prev) => prev.filter((b) => b.id !== blockId));
     if (expandedId === blockId) setExpandedId(null);
     setDeleteId(null);
@@ -261,11 +315,19 @@ export default function ProductLandingPage() {
       const oldIdx = prev.findIndex((b) => b.id === active.id);
       const newIdx = prev.findIndex((b) => b.id === over.id);
       if (oldIdx < 0 || newIdx < 0) return prev;
+      // product-hero 는 항상 0번 위치 고정 — 자기 자신 이동 + 다른 블록의 0번 자리 침범 모두 차단
+      if (prev[oldIdx].type === "product-hero") return prev;
+      if (newIdx === 0 && prev[0]?.type === "product-hero") return prev;
       return arrayMove(prev, oldIdx, newIdx);
     });
   };
 
   const duplicateBlock = (idx: number) => {
+    // product-hero 는 1개만 — 복제 차단
+    if (blocks[idx]?.type === "product-hero") {
+      toast.error("상품 메인은 1개만 존재할 수 있어 복제할 수 없습니다");
+      return;
+    }
     const newId = makeId();
     dispatchBlocks((prev) => duplicateAt(prev, idx, newId).next);
     setExpandedId(newId);
@@ -460,6 +522,7 @@ export default function ProductLandingPage() {
                 {BLOCK_TYPES.map((t) => {
                   const Icon = BLOCK_ICON[t];
                   const desc = BLOCK_DESCRIPTIONS[t];
+                  const alreadyHasHero = t === "product-hero" && blocks.some((b) => b.type === "product-hero");
                   return (
                     <Tooltip key={t}>
                       <TooltipTrigger
@@ -468,6 +531,7 @@ export default function ProductLandingPage() {
                             type="button"
                             variant="outline"
                             size="sm"
+                            disabled={alreadyHasHero}
                             className="flex h-auto flex-col gap-1 py-2 text-[11px]"
                             onClick={() => addBlock(t)}
                           >
@@ -528,6 +592,7 @@ export default function ProductLandingPage() {
                         block={block}
                         iconMap={BLOCK_ICON}
                         expanded={expandedId === block.id}
+                        locked={block.type === "product-hero"}
                         onToggle={() =>
                           setExpandedId(expandedId === block.id ? null : block.id)
                         }
@@ -603,6 +668,20 @@ export default function ProductLandingPage() {
                 previewWidth === "mobile" && "max-w-[375px]",
               )}
             >
+              {(footerQuery.data?.headerBlocks ?? []).length > 0 && (
+                <>
+                  <div className="border-b border-dashed border-border bg-muted/30 px-4 py-2 text-center text-[11px] text-muted-foreground">
+                    ↑ 위는 모든 상품에 공통으로 붙는 상단 공지/배너 (설정 → 상단 공지/배너)
+                  </div>
+                  <LandingPageView
+                    blocks={(footerQuery.data?.headerBlocks ?? []).map((b) => ({
+                      ...b,
+                      id: `__header__${b.id}`,
+                    }))}
+                    productId={id}
+                  />
+                </>
+              )}
               <LandingPageView blocks={blocks} productId={id} />
               {(footerQuery.data?.footerBlocks ?? []).length > 0 && (
                 <>

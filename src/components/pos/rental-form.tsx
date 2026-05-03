@@ -66,7 +66,7 @@ export function RentalForm({ sessionId, enabled = true }: Props) {
 
   const handleSubmit = () => {
     if (!session?.customerId) {
-      toast.error("임대 추가는 손님 연결이 필요합니다");
+      toast.error("임대 추가는 고객 연결이 필요합니다");
       return;
     }
     if (!selected) {

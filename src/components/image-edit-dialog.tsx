@@ -8,7 +8,29 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
-const OUTPUT_SIZE = 1024;
+// 출력 이미지의 긴 변 길이 (1024px 고정).
+// 비율에 따라 W/H가 결정됨: aspect>=1이면 W=LONG, H=LONG/aspect; aspect<1이면 H=LONG, W=LONG*aspect
+const LONG_SIDE = 1024;
+
+function computeOutputSize(aspect: number) {
+  if (aspect >= 1) {
+    return { width: LONG_SIDE, height: Math.round(LONG_SIDE / aspect) };
+  }
+  return { width: Math.round(LONG_SIDE * aspect), height: LONG_SIDE };
+}
+
+interface AspectPreset {
+  label: string;
+  value: number;
+}
+
+const ASPECT_PRESETS: AspectPreset[] = [
+  { label: "1:1", value: 1 },
+  { label: "4:3", value: 4 / 3 },
+  { label: "3:4", value: 3 / 4 },
+  { label: "16:9", value: 16 / 9 },
+  { label: "9:16", value: 9 / 16 },
+];
 
 const CHECKER_BG: React.CSSProperties = {
   backgroundColor: "#fafafa",
@@ -23,18 +45,25 @@ interface Props {
   file: File | null;
   onConfirm: (edited: Blob, originalName: string) => void;
   onCancel: () => void;
+  /** 기본 종횡비 (가로/세로). 미지정 시 1 (정사각형). */
+  defaultAspect?: number;
+  /** true면 비율 변경 UI를 숨겨 defaultAspect를 강제. 통일성이 중요한 영역(썸네일/카테고리)에서 사용. */
+  lockAspect?: boolean;
 }
 
 type PreviewSource = "bg-removal" | "manual";
 
-export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
+export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect = 1, lockAspect = false }: Props) {
   // Phase 1 (cropper) state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [brightness, setBrightness] = useState(1);
+  const [aspect, setAspect] = useState(defaultAspect);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  const output = computeOutputSize(aspect);
 
   // Phase 2 (preview + erase) state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -64,10 +93,11 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
     setZoom(1);
     setRotation(0);
     setBrightness(1);
+    setAspect(defaultAspect);
     setPreviewUrl(null);
     setCroppedAreaPixels(null);
     return () => URL.revokeObjectURL(url);
-  }, [file]);
+  }, [file, defaultAspect]);
 
   // previewUrl 메모리 정리
   useEffect(() => {
@@ -85,8 +115,9 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
     if (!canvasRef.current || !previewUrl) return;
     const img = await loadImage(previewUrl);
     const canvas = canvasRef.current;
-    canvas.width = OUTPUT_SIZE;
-    canvas.height = OUTPUT_SIZE;
+    // 미리보기 진입 시점의 이미지 크기를 그대로 사용 (aspect는 진입 시 고정됨)
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -109,6 +140,8 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
         rotation,
         brightness,
         "image/png",
+        output.width,
+        output.height,
       );
       const { removeBackground } = await import("@imgly/background-removal");
       const removed = await removeBackground(cropped);
@@ -131,6 +164,8 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
         rotation,
         brightness,
         "image/png",
+        output.width,
+        output.height,
       );
       setPreviewSource("manual");
       setPreviewUrl(URL.createObjectURL(cropped));
@@ -247,6 +282,8 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
         rotation,
         brightness,
         "image/jpeg",
+        output.width,
+        output.height,
       );
       onConfirm(blob, file.name);
     } catch (e) {
@@ -272,7 +309,15 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
           {fileLabel ? `이미지 편집 — ${fileLabel}` : "이미지 편집"}
         </DialogTitle>
 
-        <div className="relative aspect-square w-full bg-black select-none">
+        <div
+          className="relative bg-black select-none mx-auto"
+          style={{
+            aspectRatio: aspect,
+            width: aspect >= 1 ? "100%" : "auto",
+            height: aspect >= 1 ? "auto" : "min(60vh, 600px)",
+            maxHeight: "min(60vh, 600px)",
+          }}
+        >
           {isPreview ? (
             <div className="absolute inset-0" style={CHECKER_BG}>
               <canvas
@@ -313,7 +358,7 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
                 crop={crop}
                 zoom={zoom}
                 rotation={rotation}
-                aspect={1}
+                aspect={aspect}
                 minZoom={0.5}
                 maxZoom={3}
                 restrictPosition={false}
@@ -384,6 +429,41 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel }: Props) {
             </>
           ) : (
             <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground w-10">비율</span>
+                {lockAspect ? (
+                  <div className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                    {ASPECT_PRESETS.find((p) => Math.abs(aspect - p.value) < 0.001)?.label
+                      ?? aspect.toFixed(2)} 고정 (사용처 통일성 유지)
+                  </div>
+                ) : (
+                  <div className="flex h-7 rounded-md border border-border overflow-hidden text-[12px]">
+                    {ASPECT_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => {
+                          setAspect(p.value);
+                          setCrop({ x: 0, y: 0 });
+                          setZoom(1);
+                        }}
+                        disabled={busy}
+                        className={`px-2.5 transition-colors ${
+                          Math.abs(aspect - p.value) < 0.001
+                            ? "bg-secondary text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <span className="text-[10px] text-muted-foreground tabular-nums ml-auto">
+                  {output.width} × {output.height}
+                </span>
+              </div>
+
               <div className="flex items-center gap-3">
                 <Button
                   variant="outline"
@@ -504,6 +584,8 @@ async function getCroppedBlob(
   rotation: number,
   brightness: number,
   outputType: "image/jpeg" | "image/png",
+  outputWidth: number,
+  outputHeight: number,
 ): Promise<Blob> {
   const image = await loadImage(imageSrc);
   const rotRad = (rotation * Math.PI) / 180;
@@ -522,15 +604,15 @@ async function getCroppedBlob(
   rctx.drawImage(image, 0, 0);
 
   const cropped = document.createElement("canvas");
-  cropped.width = OUTPUT_SIZE;
-  cropped.height = OUTPUT_SIZE;
+  cropped.width = outputWidth;
+  cropped.height = outputHeight;
   const cctx = cropped.getContext("2d");
   if (!cctx) throw new Error("canvas 2d 컨텍스트 생성 실패");
   // JPEG는 투명도 미지원 → 축소 시 빈 영역이 검정이 되지 않도록 흰색으로 채움
   // PNG는 투명 유지(배경 제거/지우개 결과 보존)
   if (outputType === "image/jpeg") {
     cctx.fillStyle = "#ffffff";
-    cctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+    cctx.fillRect(0, 0, outputWidth, outputHeight);
   }
   cctx.drawImage(
     rotated,
@@ -540,8 +622,8 @@ async function getCroppedBlob(
     pixelCrop.height,
     0,
     0,
-    OUTPUT_SIZE,
-    OUTPUT_SIZE,
+    outputWidth,
+    outputHeight,
   );
 
   return await new Promise<Blob>((resolve, reject) => {

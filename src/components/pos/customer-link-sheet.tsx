@@ -52,12 +52,12 @@ export function CustomerLinkSheet({ open, onOpenChange, sessionId }: Props) {
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="h-auto max-h-[80vh] gap-0">
           <SheetHeader className="border-b border-border">
-            <SheetTitle>손님 정보</SheetTitle>
+            <SheetTitle>고객 정보</SheetTitle>
             <SheetDescription>등록된 고객을 연결하거나 신규 등록할 수 있습니다.</SheetDescription>
           </SheetHeader>
 
           <div className="flex flex-col gap-5 p-5">
-            {/* 현재 손님 표시 */}
+            {/* 현재 고객 표시 */}
             <div className="flex items-center gap-3 rounded-xl border border-border p-4">
               <Avatar size="lg" className="size-12">
                 <AvatarFallback className="text-base font-semibold">{initial}</AvatarFallback>
@@ -67,7 +67,7 @@ export function CustomerLinkSheet({ open, onOpenChange, sessionId }: Props) {
                 {session.customerPhone ? (
                   <div className="text-sm text-muted-foreground">{session.customerPhone}</div>
                 ) : (
-                  <div className="text-sm text-muted-foreground">미등록 손님</div>
+                  <div className="text-sm text-muted-foreground">미등록 고객</div>
                 )}
               </div>
               {session.customerId && (
@@ -82,7 +82,7 @@ export function CustomerLinkSheet({ open, onOpenChange, sessionId }: Props) {
               )}
             </div>
 
-            {/* 손님 검색 */}
+            {/* 고객 검색 */}
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium">등록된 고객 검색</label>
               <CustomerCombobox

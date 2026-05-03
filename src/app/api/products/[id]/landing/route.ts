@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { landingBlocksSchema } from "@/lib/validators/landing-block";
+import { ensureProductHeroFirst } from "@/lib/landing-blocks-utils";
 import { extractHtmlStoragePaths, extractHtmlStoragePath } from "@/lib/html-utils";
 
 const HTML_BUCKET = "product-html";
@@ -30,12 +31,16 @@ export async function GET(
 
   const raw = product.landingBlocks ?? [];
   const parsed = landingBlocksSchema.safeParse(raw);
+  // SINGLE_HTML 모드는 블록 미사용. BLOCKS 모드에서만 product-hero 자동 보장.
+  const blocks = product.landingMode === "BLOCKS"
+    ? ensureProductHeroFirst(parsed.success ? parsed.data : [])
+    : (parsed.success ? parsed.data : []);
   return NextResponse.json({
     id: product.id,
     name: product.name,
     sku: product.sku,
     imageUrl: product.imageUrl,
-    blocks: parsed.success ? parsed.data : [],
+    blocks,
     landingMode: product.landingMode,
     singleHtmlUrl: product.singleHtmlUrl,
   });

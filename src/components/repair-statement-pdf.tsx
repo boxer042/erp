@@ -240,10 +240,10 @@ function RepairStatementDocument({ company, repair }: Props) {
         <Text style={s.title}>수리내역서</Text>
         <Text style={s.ticketNo}>{repair.ticketNo}</Text>
 
-        {/* 손님/기기 */}
-        <Text style={s.sectionTitle}>손님 / 기기</Text>
+        {/* 고객/기기 */}
+        <Text style={s.sectionTitle}>고객 / 기기</Text>
         <View style={s.infoBox}>
-          <InfoRow label="손님" value={repair.customerName} />
+          <InfoRow label="고객" value={repair.customerName} />
           <InfoRow label="연락처" value={repair.customerPhone ?? "-"} />
           <InfoRow
             label="기기"

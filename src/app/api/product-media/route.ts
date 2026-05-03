@@ -20,13 +20,15 @@ export async function POST(request: NextRequest) {
   const [, deny] = await guardUser();
   if (deny) return deny;
   const body = await request.json();
-  const { productId, type, url, title, sortOrder, setPrimary } = body ?? {};
+  const { productId, type, kind, url, title, sortOrder, setPrimary } = body ?? {};
   if (!productId || !type || !url) {
     return NextResponse.json({ error: "productId, type, url 필수" }, { status: 400 });
   }
   if (type !== "IMAGE" && type !== "YOUTUBE") {
     return NextResponse.json({ error: "type은 IMAGE 또는 YOUTUBE" }, { status: 400 });
   }
+  const resolvedKind: "THUMBNAIL" | "DETAIL" =
+    kind === "DETAIL" ? "DETAIL" : "THUMBNAIL";
   const cleanUrl = String(url).trim();
   const media = await prisma.$transaction(async (tx) => {
     // sortOrder 미지정 시 현재 갯수로 자동 부여 (맨 끝에 추가)
@@ -38,6 +40,7 @@ export async function POST(request: NextRequest) {
       data: {
         productId,
         type,
+        kind: resolvedKind,
         url: cleanUrl,
         title: title?.trim() || null,
         sortOrder: resolvedSortOrder,

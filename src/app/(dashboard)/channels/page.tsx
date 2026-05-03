@@ -24,7 +24,9 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Pencil, Store, Trash2, Upload, X } from "lucide-react";
+import { Loader2, Pencil, Store, Trash2, Upload, X, Library } from "lucide-react";
+import { MediaPickerDialog } from "@/components/media-picker-dialog";
+import { ImageEditDialog } from "@/components/image-edit-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function ChannelsSkeletonRows({ rows = 6 }: { rows?: number }) {
@@ -74,6 +76,8 @@ export default function ChannelsPage() {
     logoPath: null as string | null,
   });
   const [uploading, setUploading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const channelsQuery = useQuery({
@@ -102,33 +106,37 @@ export default function ChannelsPage() {
     setDialogOpen(true);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploadBlob = async (data: Blob | File, name: string) => {
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", data, name);
       const res = await fetch("/api/channels/upload", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) {
         toast.error(json.error || "업로드 실패");
         return;
       }
-      if (form.logoPath) {
-        await apiMutate("/api/channels/upload", "DELETE", { path: form.logoPath });
-      }
+      // 기존 로고 스토리지 삭제 X — /settings/media 에서 일괄 관리
       setForm((prev) => ({ ...prev, logoUrl: json.url, logoPath: json.path }));
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleRemoveLogo = async () => {
-    if (form.logoPath) {
-      await apiMutate("/api/channels/upload", "DELETE", { path: form.logoPath });
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+    if (file.type === "image/svg+xml") {
+      uploadBlob(file, file.name);
+      return;
     }
+    setPendingFile(file);
+  };
+
+  const handleRemoveLogo = () => {
+    // 스토리지 삭제는 /settings/media 에서 — 여기서는 분리만
     setForm((prev) => ({ ...prev, logoUrl: null, logoPath: null }));
   };
 
@@ -303,20 +311,31 @@ export default function ChannelsPage() {
                   onChange={handleFileChange}
                   className="hidden"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                  ) : (
-                    <Upload className="h-3.5 w-3.5 mr-1" />
-                  )}
-                  {form.logoUrl ? "교체" : "업로드"}
-                </Button>
+                <div className="flex flex-col gap-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    {form.logoUrl ? "교체" : "업로드"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPickerOpen(true)}
+                    disabled={uploading}
+                  >
+                    <Library className="h-3.5 w-3.5 mr-1" /> 라이브러리
+                  </Button>
+                </div>
               </div>
               <p className="text-[11px] text-muted-foreground">JPG/PNG/WebP/SVG · 최대 5MB</p>
             </div>
@@ -375,6 +394,25 @@ export default function ChannelsPage() {
           </form>
         </DialogContent>
       </Dialog>
+      <MediaPickerDialog
+        open={pickerOpen}
+        bucket="channel-logos"
+        onSelect={({ url, path }) => {
+          setForm((prev) => ({ ...prev, logoUrl: url, logoPath: path }));
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
+      <ImageEditDialog
+        open={pendingFile !== null}
+        file={pendingFile}
+        defaultAspect={16 / 9}
+        onConfirm={async (blob, name) => {
+          setPendingFile(null);
+          await uploadBlob(blob, name);
+        }}
+        onCancel={() => setPendingFile(null)}
+      />
     </>
   );
 }

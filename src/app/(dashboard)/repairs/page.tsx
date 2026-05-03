@@ -40,7 +40,7 @@ interface RepairTicketRow {
   receivedAt: string;
   pickedUpAt: string | null;
   symptom: string | null;
-  customer: { id: string; name: string; phone: string | null };
+  customer: { id: string; name: string; phone: string | null } | null;
   customerMachine: { id: string; name: string } | null;
   serialItem: { id: string; code: string } | null;
   assignedTo: { id: string; name: string } | null;
@@ -131,7 +131,7 @@ export default function RepairsPage() {
           value: search,
           onChange: setSearch,
           onSearch: () => ticketsQuery.refetch(),
-          placeholder: "수리번호·손님이름·전화·증상 검색",
+          placeholder: "수리번호·고객이름·전화·증상 검색",
         }}
         onRefresh={() => ticketsQuery.refetch()}
         loading={ticketsQuery.isFetching}
@@ -161,7 +161,7 @@ export default function RepairsPage() {
               <TableHead>상태</TableHead>
               <TableHead>수리번호</TableHead>
               <TableHead>유형</TableHead>
-              <TableHead>손님</TableHead>
+              <TableHead>고객</TableHead>
               <TableHead>증상 / 기기</TableHead>
               <TableHead>접수일</TableHead>
               <TableHead>담당</TableHead>
@@ -181,7 +181,7 @@ export default function RepairsPage() {
                 <TableRow
                   key={t.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/repairs/${t.id}`)}
+                  onClick={() => router.push(`/pos/repairs/${t.id}`)}
                 >
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
@@ -198,14 +198,22 @@ export default function RepairsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="flex items-center gap-1">
-                        <User className="size-3 text-muted-foreground" />
-                        {t.customer.name}
-                      </span>
-                      {t.customer.phone && (
+                      {t.customer ? (
+                        <>
+                          <span className="flex items-center gap-1">
+                            <User className="size-3 text-muted-foreground" />
+                            {t.customer.name}
+                          </span>
+                          {t.customer.phone && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Phone className="size-3" />
+                              {t.customer.phone}
+                            </span>
+                          )}
+                        </>
+                      ) : (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Phone className="size-3" />
-                          {t.customer.phone}
+                          <User className="size-3" /> 미등록
                         </span>
                       )}
                     </div>

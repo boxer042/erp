@@ -17,8 +17,19 @@ export async function GET(
       customer: true,
       customerMachine: true,
       serialItem: {
-        include: { product: { select: { id: true, name: true, sku: true } } },
+        include: {
+          product: { select: { id: true, name: true, sku: true, imageUrl: true } },
+          orderItem: {
+            select: {
+              id: true,
+              order: {
+                select: { id: true, orderNo: true, orderDate: true, totalAmount: true },
+              },
+            },
+          },
+        },
       },
+      repairProduct: { select: { id: true, name: true, sku: true, imageUrl: true } },
       assignedTo: { select: { id: true, name: true } },
       parentRepairTicket: {
         select: { id: true, ticketNo: true, status: true, repairWarrantyEnds: true },
@@ -75,6 +86,12 @@ export async function PUT(
           : {}),
         ...(d.serialItemId !== undefined
           ? { serialItemId: d.serialItemId || null }
+          : {}),
+        ...(d.repairProductId !== undefined
+          ? { repairProductId: d.repairProductId || null }
+          : {}),
+        ...(d.repairProductText !== undefined
+          ? { repairProductText: d.repairProductText?.trim() || null }
           : {}),
         ...(d.diagnosisFee !== undefined ? { diagnosisFee: d.diagnosisFee } : {}),
         ...(d.totalDiscount !== undefined ? { totalDiscount: d.totalDiscount } : {}),

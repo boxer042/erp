@@ -18,6 +18,7 @@ import {
   Loader2,
   Monitor,
   Mountain,
+  ShoppingBag,
   Smartphone,
   Sparkles,
   Table2,
@@ -80,6 +81,7 @@ import { cn } from "@/lib/utils";
 import { duplicateAt, makeId } from "../../products/[id]/landing/_helpers";
 
 interface LandingSettingsResponse {
+  headerBlocks: LandingBlock[];
   footerBlocks: LandingBlock[];
 }
 
@@ -99,11 +101,14 @@ const BLOCK_ICON: Record<BlockType, React.ComponentType<{ className?: string }>>
   "stats-grid": Calculator,
   callout: AlertCircle,
   "info-grid": ListChecks,
+  "product-hero": ShoppingBag,
   "product-info": FileText,
   "html-embed": FileCode2,
 };
 
-const BLOCK_TYPES: BlockType[] = [
+// 헤더/푸터 모두 동일한 블록 목록 사용 (사용자가 어떤 조합이든 자유롭게 선택)
+const ALL_BLOCK_TYPES: BlockType[] = [
+  "product-hero",
   "hero",
   "image",
   "text",
@@ -123,9 +128,13 @@ const BLOCK_TYPES: BlockType[] = [
   "html-embed",
 ];
 
+type Section = "header" | "footer";
+
 export default function LandingSettingsPage() {
   const queryClient = useQueryClient();
-  const [editState, setEditState] = useState<LandingBlock[] | null>(null);
+  const [section, setSection] = useState<Section>("header");
+  const [editHeader, setEditHeader] = useState<LandingBlock[] | null>(null);
+  const [editFooter, setEditFooter] = useState<LandingBlock[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -144,11 +153,12 @@ export default function LandingSettingsPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (next: LandingBlock[]) =>
-      apiMutate("/api/landing-settings", "PUT", { footerBlocks: next }),
+    mutationFn: (payload: { headerBlocks?: LandingBlock[]; footerBlocks?: LandingBlock[] }) =>
+      apiMutate("/api/landing-settings", "PUT", payload),
     onSuccess: () => {
       toast.success("저장되었습니다");
-      setEditState(null);
+      setEditHeader(null);
+      setEditFooter(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.landingSettings.all });
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "저장 실패"),
@@ -156,12 +166,22 @@ export default function LandingSettingsPage() {
 
   if (settingsQuery.isPending) return <LoadingState />;
 
-  const serverBlocks = settingsQuery.data?.footerBlocks ?? [];
-  const blocks = editState ?? serverBlocks;
-  const dirty = editState !== null;
+  const serverHeader = settingsQuery.data?.headerBlocks ?? [];
+  const serverFooter = settingsQuery.data?.footerBlocks ?? [];
+  const headerBlocks = editHeader ?? serverHeader;
+  const footerBlocks = editFooter ?? serverFooter;
+  const headerDirty = editHeader !== null;
+  const footerDirty = editFooter !== null;
+  const dirty = headerDirty || footerDirty;
+
+  const isHeader = section === "header";
+  const blocks = isHeader ? headerBlocks : footerBlocks;
+  const setEdit = isHeader ? setEditHeader : setEditFooter;
+  const serverBlocks = isHeader ? serverHeader : serverFooter;
+  const blockTypes = ALL_BLOCK_TYPES;
 
   const dispatch = (updater: (prev: LandingBlock[]) => LandingBlock[]) => {
-    setEditState((prev) => updater(prev ?? serverBlocks));
+    setEdit((prev) => updater(prev ?? serverBlocks));
   };
 
   const addBlock = (type: BlockType) => {
@@ -197,14 +217,62 @@ export default function LandingSettingsPage() {
     setExpandedId(newId);
   };
 
+  const onSave = () => {
+    const payload: { headerBlocks?: LandingBlock[]; footerBlocks?: LandingBlock[] } = {};
+    if (headerDirty) payload.headerBlocks = headerBlocks;
+    if (footerDirty) payload.footerBlocks = footerBlocks;
+    if (Object.keys(payload).length === 0) return;
+    saveMutation.mutate(payload);
+  };
+
+  const sectionLabel = isHeader ? "header" : "footer";
+  const sectionTitle = isHeader
+    ? "상단 공지 / 배너 (header)"
+    : "공통 상세페이지 footer";
+  const sectionDesc = isHeader
+    ? "모든 상품 상세페이지 최상단에 자동으로 붙는 공지·프로모션 배너 영역입니다. 신규 출시 알림, 시즌 프로모션, 긴급 공지 등 모든 상품에 공통으로 노출할 콘텐츠를 한 곳에서 관리합니다. (상품별 메인 영역은 각 상품 편집 페이지에서 관리)"
+    : "모든 상품 상세페이지 하단에 자동으로 붙는 배송/환불/AS 안내 등 공통 블록을 한 곳에서 관리합니다.";
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">공통 상세페이지 footer</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            모든 상품 상세페이지 하단에 자동으로 표시되는 블록입니다. 배송/환불/AS 안내, 사업자 정보 등 공통 내용을 한 곳에서 관리하세요.
-          </p>
+        <div className="space-y-2">
+          <div className="flex h-8 w-fit rounded-md border border-border bg-card text-[13px]">
+            <button
+              type="button"
+              className={cn(
+                "px-3 transition",
+                section === "header"
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => {
+                setSection("header");
+                setExpandedId(null);
+              }}
+            >
+              상단 공지/배너 (header)
+              {headerDirty && <span className="ml-1 text-warning">●</span>}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "border-l border-border px-3 transition",
+                section === "footer"
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => {
+                setSection("footer");
+                setExpandedId(null);
+              }}
+            >
+              공통 footer
+              {footerDirty && <span className="ml-1 text-warning">●</span>}
+            </button>
+          </div>
+          <h2 className="text-lg font-semibold">{sectionTitle}</h2>
+          <p className="text-sm text-muted-foreground">{sectionDesc}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -223,7 +291,7 @@ export default function LandingSettingsPage() {
           <Button
             size="sm"
             disabled={!dirty || saveMutation.isPending}
-            onClick={() => saveMutation.mutate(blocks)}
+            onClick={onSave}
           >
             {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{saveMutation.isPending ? "저장 중..." : "저장"}</span>
@@ -235,13 +303,13 @@ export default function LandingSettingsPage() {
         <CardHeader>
           <CardTitle>블록 추가</CardTitle>
           <CardDescription>
-            아래 블록 종류를 클릭하면 footer 끝에 추가됩니다. 각 블록 위에 마우스를 올리면 어떤 용도인지 설명이 표시됩니다.
+            아래 블록 종류를 클릭하면 {sectionLabel} 끝에 추가됩니다. 각 블록 위에 마우스를 올리면 어떤 용도인지 설명이 표시됩니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <TooltipProvider delay={200}>
             <div className="grid grid-cols-4 gap-2 md:grid-cols-8">
-              {BLOCK_TYPES.map((t) => {
+              {blockTypes.map((t) => {
                 const Icon = BLOCK_ICON[t];
                 const desc = BLOCK_DESCRIPTIONS[t];
                 return (
@@ -272,13 +340,12 @@ export default function LandingSettingsPage() {
               })}
             </div>
           </TooltipProvider>
-          {/* 모바일/터치 환경에서도 볼 수 있도록 인라인 설명 카드 */}
           <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
               블록 종류별 설명 보기 (터치 환경 대안)
             </summary>
             <ul className="mt-2 space-y-2">
-              {BLOCK_TYPES.map((t) => {
+              {blockTypes.map((t) => {
                 const Icon = BLOCK_ICON[t];
                 const desc = BLOCK_DESCRIPTIONS[t];
                 return (
@@ -300,13 +367,13 @@ export default function LandingSettingsPage() {
         <CardHeader>
           <CardTitle>블록 목록</CardTitle>
           <CardDescription>
-            위에서 아래 순서로 모든 상품 상세페이지 끝에 붙습니다.
+            위에서 아래 순서로 모든 상품 상세페이지 {isHeader ? "최상단" : "끝"}에 붙습니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {blocks.length === 0 ? (
             <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-              아직 등록된 footer 블록이 없습니다
+              아직 등록된 {sectionLabel} 블록이 없습니다
             </div>
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -394,6 +461,11 @@ export default function LandingSettingsPage() {
               )}
             >
               <LandingPageView blocks={blocks} emptyMessage="블록을 추가하면 여기에 표시됩니다" />
+              {isHeader && (
+                <div className="border-t border-dashed border-border bg-muted/30 px-4 py-2 text-center text-[11px] text-muted-foreground">
+                  ↓ (실제 페이지에서는 여기에 상품별 본문 + 공통 footer 가 이어집니다)
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -419,9 +491,9 @@ export default function LandingSettingsPage() {
       <Dialog open={jsonOpen} onOpenChange={setJsonOpen}>
         <DialogContent className="flex max-h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3 sm:max-w-none">
           <DialogHeader>
-            <DialogTitle>Footer JSON 가져오기 / 내보내기</DialogTitle>
+            <DialogTitle>{sectionLabel} JSON 가져오기 / 내보내기</DialogTitle>
             <DialogDescription>
-              Claude Code 등으로 만든 footer 블록 JSON 을 붙여넣고 <b>가져오기</b> 누르면 미리보기에 즉시 반영됩니다 (저장은 헤더의 &ldquo;저장&rdquo; 버튼).
+              Claude Code 등으로 만든 {sectionLabel} 블록 JSON 을 붙여넣고 <b>가져오기</b> 누르면 미리보기에 즉시 반영됩니다 (저장은 헤더의 &ldquo;저장&rdquo; 버튼).
             </DialogDescription>
           </DialogHeader>
           <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -473,7 +545,7 @@ export default function LandingSettingsPage() {
                     );
                     return;
                   }
-                  setEditState(parsed.data);
+                  setEdit(parsed.data);
                   setJsonOpen(false);
                   setJsonError(null);
                   toast.success(

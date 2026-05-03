@@ -27,6 +27,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
+import { MediaPickerDialog } from "@/components/media-picker-dialog";
+import { Library } from "lucide-react";
 
 interface CategoryChild {
   id: string;
@@ -97,6 +99,7 @@ export default function CategoriesPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categoriesQuery = useQuery({
@@ -178,9 +181,7 @@ export default function CategoriesPage() {
       const res = await fetch("/api/categories/upload", { method: "POST", body: fd });
       if (!res.ok) throw new Error((await res.json()).error ?? "업로드 실패");
       const json = await res.json() as { url: string; path: string };
-      if (form.imagePath) {
-        apiMutate("/api/categories/upload", "DELETE", { path: form.imagePath }).catch(() => {});
-      }
+      // 기존 이미지 스토리지 삭제 X — /settings/media 에서 일괄 관리
       setForm((f) => ({ ...f, imageUrl: json.url, imagePath: json.path }));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "업로드 실패");
@@ -197,10 +198,8 @@ export default function CategoriesPage() {
     setPendingFile(file);
   };
 
-  const handleRemoveImage = async () => {
-    if (form.imagePath) {
-      apiMutate("/api/categories/upload", "DELETE", { path: form.imagePath }).catch(() => {});
-    }
+  const handleRemoveImage = () => {
+    // 스토리지 삭제는 /settings/media 에서 — 여기서는 분리만
     setForm((f) => ({ ...f, imageUrl: null, imagePath: null }));
   };
 
@@ -422,32 +421,56 @@ export default function CategoriesPage() {
                   e.target.value = "";
                 }}
               />
-              {form.imageUrl ? (
-                <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border">
-                  <img src={form.imageUrl} alt="preview" className="w-full h-full object-cover" />
+              <div className="flex items-start gap-2">
+                {form.imageUrl ? (
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border">
+                    <img src={form.imageUrl} alt="preview" className="w-full h-full object-cover" />
+                    <button
+                      onClick={handleRemoveImage}
+                      className="absolute top-1 right-1 bg-background/80 rounded p-0.5 hover:bg-background"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ) : (
                   <button
-                    onClick={handleRemoveImage}
-                    className="absolute top-1 right-1 bg-background/80 rounded p-0.5 hover:bg-background"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-primary flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <X className="size-3.5" />
+                    {uploading ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Upload className="size-5" />
+                        <span className="text-xs">업로드</span>
+                      </>
+                    )}
                   </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-primary flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {uploading ? (
-                    <Loader2 className="size-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Upload className="size-5" />
-                      <span className="text-xs">업로드</span>
-                    </>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  {form.imageUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1" /> 교체
+                    </Button>
                   )}
-                </button>
-              )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPickerOpen(true)}
+                    disabled={uploading}
+                  >
+                    <Library className="h-3.5 w-3.5 mr-1" /> 라이브러리
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -491,11 +514,22 @@ export default function CategoriesPage() {
       <ImageEditDialog
         open={pendingFile !== null}
         file={pendingFile}
+        defaultAspect={1}
+        lockAspect
         onConfirm={async (blob, name) => {
           setPendingFile(null);
           await uploadBlob(blob, name);
         }}
         onCancel={() => setPendingFile(null)}
+      />
+      <MediaPickerDialog
+        open={pickerOpen}
+        bucket="category-images"
+        onSelect={({ url, path }) => {
+          setForm((f) => ({ ...f, imageUrl: url, imagePath: path }));
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
       />
     </div>
   );

@@ -282,6 +282,53 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // 기존 RepairTicket 픽업/결제 — body.repairTicketId 단독 (repairTicketData 없음)
+      if (body.repairTicketId && !body.repairTicketData) {
+        const existing = await tx.repairTicket.findUnique({
+          where: { id: body.repairTicketId },
+          select: {
+            id: true,
+            status: true,
+            repairWarrantyMonths: true,
+            customerId: true,
+            ticketNo: true,
+          },
+        });
+        if (existing && existing.status !== "PICKED_UP" && existing.status !== "CANCELLED") {
+          const pickupAt = new Date();
+          const warrantyEnds =
+            existing.repairWarrantyMonths != null && existing.repairWarrantyMonths > 0
+              ? new Date(
+                  pickupAt.getFullYear(),
+                  pickupAt.getMonth() + existing.repairWarrantyMonths,
+                  pickupAt.getDate(),
+                )
+              : null;
+          // 수리 라인 합계 = 본 수리에 대한 finalAmount
+          const repairLines = body.items.filter((i) => !i.productId);
+          const repairTotal = repairLines.reduce(
+            (s, i) =>
+              s +
+              Math.max(0, i.unitPrice - (i.discountPerUnit || 0)) * i.quantity,
+            0,
+          );
+          await tx.repairTicket.update({
+            where: { id: existing.id },
+            data: {
+              status: "PICKED_UP",
+              pickedUpAt: pickupAt,
+              finalAmount: repairTotal,
+              paymentMethod: body.paymentMethod ?? null,
+              repairWarrantyEnds: warrantyEnds,
+              // 미등록이었던 티켓 → 결제 시점 등록된 고객으로 업그레이드
+              ...(existing.customerId == null && body.customerId
+                ? { customerId: body.customerId }
+                : {}),
+            },
+          });
+        }
+      }
+
       // RepairTicket 생성 (수리 항목 + 고객 있을 때) — POS는 즉시수리(ON_SITE) → 결제 즉시 PICKED_UP
       if (body.repairTicketData && body.customerId) {
         const rd = body.repairTicketData;

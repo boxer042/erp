@@ -17,8 +17,10 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
   const customerId = session.customerId ?? null;
 
   const firstRepairMeta = repairItems[0]?.repairMeta;
+  // 기존 RepairTicket 픽업 결제: 첫 행에 repairTicketId가 있으면 픽업 모드로 전환
+  const linkedRepairTicketId = firstRepairMeta?.repairTicketId ?? null;
   const repairTicketData =
-    repairItems.length > 0 && customerId
+    repairItems.length > 0 && customerId && !linkedRepairTicketId
       ? {
           symptom: firstRepairMeta?.issueDescription,
           deviceBrand: firstRepairMeta?.deviceBrand,
@@ -72,6 +74,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
       isZeroRate: i.isZeroRate ?? false,
     })),
     repairTicketData,
+    repairTicketId: linkedRepairTicketId,
     rentalRecords,
   };
 }

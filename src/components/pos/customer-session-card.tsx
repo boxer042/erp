@@ -34,7 +34,7 @@ export function CustomerSessionCard({ session }: Props) {
           removeSession(session.id);
         }}
         className="absolute right-1.5 top-1.5 size-7 opacity-0 transition-opacity group-hover:opacity-100"
-        aria-label="손님 비우기"
+        aria-label="고객 비우기"
       >
         <X />
       </Button>
@@ -89,7 +89,7 @@ export function AddCustomerCard({ onAdd }: AddProps) {
       )}
     >
       <Plus className="size-8" />
-      <div className="text-sm font-medium">손님 추가</div>
+      <div className="text-sm font-medium">고객 추가</div>
     </Card>
   );
 }

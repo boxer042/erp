@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 /**
  * GET /api/serial-items
  * Query params:
- *   search   — 코드/상품명/손님이름 부분일치
+ *   search   — 코드/상품명/고객이름 부분일치
  *   customerId
  *   productId
  *   limit (default 50, max 200)

@@ -21,6 +21,7 @@ import {
   StatsGridBlockView,
   CalloutBlockView,
   InfoGridBlockView,
+  ProductHeroBlockView,
   ProductInfoBlockView,
   HtmlEmbedBlockView,
 } from "./data-blocks";
@@ -140,8 +141,7 @@ export function ImageBlockView({ block }: { block: ImageBlock }) {
   return (
     <section
       className={cn(
-        "w-full",
-        block.background !== "none" && "px-6 md:px-16",
+        "w-full px-6 md:px-16",
         IMG_PADDING[block.paddingY ?? "none"],
         IMG_BG[block.background ?? "none"],
       )}
@@ -302,15 +302,18 @@ function youtubeEmbedUrl(value: string, autoplay: boolean): string | null {
 export function VideoBlockView({ block }: { block: VideoBlock }) {
   if (!block.value) {
     return (
-      <div className="mx-auto flex h-72 w-full max-w-3xl items-center justify-center bg-muted text-muted-foreground">
-        비디오 URL을 입력하세요
-      </div>
+      <section className="w-full px-6 md:px-16">
+        <div className="mx-auto flex h-72 w-full max-w-4xl items-center justify-center bg-muted text-muted-foreground">
+          비디오 URL을 입력하세요
+        </div>
+      </section>
     );
   }
 
   return (
-    <figure className="mx-auto w-full max-w-4xl px-4">
-      <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
+    <section className="w-full px-6 md:px-16">
+      <figure className="mx-auto w-full max-w-4xl">
+        <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
         {block.source === "youtube" ? (
           <iframe
             src={youtubeEmbedUrl(block.value, block.autoplay) ?? ""}
@@ -331,12 +334,13 @@ export function VideoBlockView({ block }: { block: VideoBlock }) {
           />
         )}
       </div>
-      {block.caption && (
-        <figcaption className="mt-2 text-center text-sm text-muted-foreground">
-          {block.caption}
-        </figcaption>
-      )}
-    </figure>
+        {block.caption && (
+          <figcaption className="mt-2 text-center text-sm text-muted-foreground">
+            {block.caption}
+          </figcaption>
+        )}
+      </figure>
+    </section>
   );
 }
 
@@ -367,9 +371,11 @@ export function GalleryBlockView({ block }: { block: GalleryBlock }) {
   const items = block.images.filter((img) => img.url);
   if (items.length === 0) {
     return (
-      <div className="mx-auto flex h-40 w-full max-w-3xl items-center justify-center bg-muted text-muted-foreground">
-        이미지를 추가하세요
-      </div>
+      <section className="w-full px-6 md:px-16">
+        <div className="mx-auto flex h-40 w-full max-w-4xl items-center justify-center bg-muted text-muted-foreground">
+          이미지를 추가하세요
+        </div>
+      </section>
     );
   }
   const cols =
@@ -380,7 +386,7 @@ export function GalleryBlockView({ block }: { block: GalleryBlock }) {
         : "grid-cols-2 md:grid-cols-3";
 
   return (
-    <section className="w-full px-4 py-6 md:px-8">
+    <section className="w-full px-6 py-6 md:px-16">
       <div className={cn("grid", cols, GALLERY_GAP[block.gap ?? "sm"])}>
         {items.map((img, i) => (
           // eslint-disable-next-line @next/next/no-img-element
@@ -439,6 +445,8 @@ export function BlockView({
       return <CalloutBlockView block={block} />;
     case "info-grid":
       return <InfoGridBlockView block={block} />;
+    case "product-hero":
+      return <ProductHeroBlockView block={block} productId={productId} />;
     case "product-info":
       return <ProductInfoBlockView block={block} productId={productId} />;
     case "html-embed":

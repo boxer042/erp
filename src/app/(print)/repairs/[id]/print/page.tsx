@@ -35,7 +35,7 @@ export default async function RepairPrintPage({
         customerMachine: true,
         serialItem: { include: { product: true } },
         parts: {
-          where: { status: "USED" }, // 손님 영수증엔 USED만
+          where: { status: "USED" }, // 고객 영수증엔 USED만
           include: { product: true },
           orderBy: { createdAt: "asc" },
         },
@@ -69,8 +69,8 @@ export default async function RepairPrintPage({
     type: ticket.type,
     receivedAt: format(ticket.receivedAt, "yyyy-MM-dd HH:mm"),
     pickedUpAt: ticket.pickedUpAt ? format(ticket.pickedUpAt, "yyyy-MM-dd HH:mm") : null,
-    customerName: ticket.customer.name,
-    customerPhone: ticket.customer.phone,
+    customerName: ticket.customer?.name ?? "(미등록)",
+    customerPhone: ticket.customer?.phone ?? null,
     deviceLine,
     serialCode: ticket.serialItem?.code ?? null,
     symptom: ticket.symptom,

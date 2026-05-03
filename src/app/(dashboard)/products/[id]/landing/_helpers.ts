@@ -86,6 +86,8 @@ export function blockTitle(block: LandingBlock): string {
       return block.label || (block.body ? block.body.slice(0, 24) : "강조 박스");
     case "info-grid":
       return `정보 그리드 (${block.sections.length}섹션)`;
+    case "product-hero":
+      return "상품 메인 (자동)";
     case "product-info":
       return block.title || "상품정보 고시 (자동)";
     case "html-embed":

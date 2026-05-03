@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Plus, Grid3x3 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -18,22 +18,31 @@ function getActiveSessionId(pathname: string): string {
 export function PosCustomerHeader() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { sessions, addSession, hydrated } = useSessions();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const activeSessionId = getActiveSessionId(pathname);
   const isAll = pathname === "/pos/all";
 
+  // 고객 변경 시 현재 mode를 유지 (수리 → 다른 고객 클릭해도 수리 모드 유지)
+  const currentMode = searchParams.get("mode");
+
+  const buildHref = (sid: string) => {
+    if (!currentMode || currentMode === "product") return `/pos/cart/${sid}`;
+    return `/pos/cart/${sid}?mode=${currentMode}`;
+  };
+
   const handleAdd = () => {
     const id = addSession();
-    if (id) router.push(`/pos/cart/${id}`);
+    if (id) router.push(buildHref(id));
   };
 
   const handleCustomerClick = (sessionId: string) => {
     if (sessionId === activeSessionId) {
       setSheetOpen(true);
     } else {
-      router.push(`/pos/cart/${sessionId}`);
+      router.push(buildHref(sessionId));
     }
   };
 
@@ -41,7 +50,7 @@ export function PosCustomerHeader() {
     return <div className="h-[92px] shrink-0 border-b border-border bg-background" />;
   }
 
-  // 전체보기(손님 그리드) 화면에서는 상단 손님 탭 숨김
+  // 전체보기(고객 그리드) 화면에서는 상단 고객 탭 숨김
   if (isAll) return null;
 
   return (
@@ -92,13 +101,13 @@ export function PosCustomerHeader() {
               );
             })}
 
-            {/* 손님 추가 — 항상 마지막 */}
+            {/* 고객 추가 — 항상 마지막 */}
             <button
               onClick={handleAdd}
               className="flex aspect-square w-25 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-card px-2 text-muted-foreground ring-1 ring-foreground/10 hover:text-foreground"
             >
               <Plus className="size-7" />
-              <div className="text-sm font-medium leading-tight">손님 추가</div>
+              <div className="text-sm font-medium leading-tight">고객 추가</div>
             </button>
           </div>
           <ScrollBar orientation="horizontal" />

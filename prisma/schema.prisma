@@ -265,6 +265,7 @@ model Product {
   media              ProductMedia[]
   customerMachines   CustomerMachine[]
   repairParts        RepairPart[]
+  repairTickets      RepairTicket[]    @relation("RepairProduct")
   rentalAssets       RentalAsset[]
   serialItems        SerialItem[]
 
@@ -885,9 +886,12 @@ model CompanyInfo {
   @@map("company_info")
 }
 
-// 모든 상품 상세페이지에 자동으로 attach 되는 공통 footer 블록 (배송/환불/AS 안내 등)
+// 모든 상품 상세페이지에 자동으로 attach 되는 공통 header/footer 블록
+// header: product-hero 등 페이지 최상단 영역 (모든 상품 공통 디자인)
+// footer: 배송/환불/AS 안내 등
 model LandingSettings {
   id           String   @id @default("singleton")
+  headerBlocks Json?    @map("header_blocks")
   footerBlocks Json?    @map("footer_blocks")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -1128,11 +1132,17 @@ enum ProductMediaType {
   YOUTUBE
 }
 
+enum ProductMediaKind {
+  THUMBNAIL // 1:1 정사각, 상품 카드/리스트 썸네일용
+  DETAIL    // 자유 비율, 상품 상세 페이지 슬라이드/디테일샷
+}
+
 model ProductMedia {
   id        String           @id @default(uuid())
   productId String           @map("product_id")
   product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   type      ProductMediaType
+  kind      ProductMediaKind @default(THUMBNAIL)
   url       String
   title     String?
   sortOrder Int              @default(0) @map("sort_order")
@@ -1220,8 +1230,8 @@ model RepairTicket {
   id                     String                @id @default(uuid())
   ticketNo               String                @unique @map("ticket_no")
   type                   RepairType            @default(ON_SITE)
-  customerId             String                @map("customer_id")
-  customer               Customer              @relation(fields: [customerId], references: [id])
+  customerId             String?               @map("customer_id")
+  customer               Customer?             @relation(fields: [customerId], references: [id])
   customerMachineId      String?               @map("customer_machine_id")
   customerMachine        CustomerMachine?      @relation(fields: [customerMachineId], references: [id])
   serialItemId           String?               @map("serial_item_id")
@@ -1231,6 +1241,10 @@ model RepairTicket {
   symptom                String?
   diagnosis              String?
   repairNotes            String?               @map("repair_notes")
+  // 가져온 기기 정보 — 시리얼/판매상품 카탈로그에 없을 때 자유 입력 fallback
+  repairProductId        String?               @map("repair_product_id")
+  repairProduct          Product?              @relation("RepairProduct", fields: [repairProductId], references: [id], onDelete: SetNull)
+  repairProductText      String?               @map("repair_product_text") // 카탈로그에 없을 때 자유 입력 (예: "Sony A7M4 Black")
   diagnosisFee           Decimal               @default(0) @map("diagnosis_fee") @db.Decimal(15, 2)
   totalDiscount          String                @default("0") @map("total_discount") // "1000" or "10%"
   quotedLaborAmount      Decimal               @default(0) @map("quoted_labor_amount") @db.Decimal(15, 2)

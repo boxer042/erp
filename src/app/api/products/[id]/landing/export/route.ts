@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { landingBlocksSchema } from "@/lib/validators/landing-block";
+import { ensureProductHeroFirst } from "@/lib/landing-blocks-utils";
 import { blocksToHtml, blocksToMarkdown } from "@/lib/landing-export";
 
 export const dynamic = "force-dynamic";
@@ -51,12 +52,16 @@ export async function GET(
   }
 
   const productParsed = landingBlocksSchema.safeParse(product.landingBlocks ?? []);
-  const productBlocks = productParsed.success ? productParsed.data : [];
+  // 저장된 블록이 비거나 product-hero 가 없어도 자동으로 첫 블록에 보장
+  const productBlocks = ensureProductHeroFirst(productParsed.success ? productParsed.data : []);
+
+  const headerParsed = landingBlocksSchema.safeParse(settings?.headerBlocks ?? []);
+  const headerBlocks = headerParsed.success ? headerParsed.data : [];
 
   const footerParsed = landingBlocksSchema.safeParse(settings?.footerBlocks ?? []);
   const footerBlocks = footerParsed.success ? footerParsed.data : [];
 
-  const allBlocks = [...productBlocks, ...footerBlocks];
+  const allBlocks = [...headerBlocks, ...productBlocks, ...footerBlocks];
 
   if (format === "md" || format === "markdown") {
     const md = blocksToMarkdown(allBlocks);

@@ -33,6 +33,7 @@ import type {
   StatsGridBlock,
   CalloutBlock,
   InfoGridBlock,
+  ProductHeroBlock,
   ProductInfoBlock,
   HtmlEmbedBlock,
   LandingBlock,
@@ -1725,6 +1726,273 @@ function InfoGridEditor({ block, onChange }: EditorProps<InfoGridBlock>) {
   );
 }
 
+function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
+  return (
+    <div className="space-y-3">
+      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+        Product 의 이미지·상품명·브랜드·가격을 자동으로 매핑합니다. 이 블록은 모든 상품 공통 — 상품 정보가 바뀌면 자동 반영됩니다.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="레이아웃">
+          <Select
+            value={block.layout}
+            onValueChange={(v) =>
+              onChange({ ...block, layout: v as ProductHeroBlock["layout"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="image-left">이미지 좌 / 정보 우</SelectItem>
+              <SelectItem value="image-right">정보 좌 / 이미지 우</SelectItem>
+              <SelectItem value="image-top">이미지 상 / 정보 하</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="배경">
+          <Select
+            value={block.background}
+            onValueChange={(v) =>
+              onChange({ ...block, background: v as ProductHeroBlock["background"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="muted">연한 회색</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="상하 여백">
+          <Select
+            value={block.paddingY}
+            onValueChange={(v) =>
+              onChange({ ...block, paddingY: v as ProductHeroBlock["paddingY"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">넓게</SelectItem>
+              <SelectItem value="xl">아주 넓게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <Field label="작은 라벨 (eyebrow, 비우면 카테고리·브랜드 자동)">
+        <Input
+          value={block.eyebrow}
+          placeholder="예: GAS CHAINSAW · 가솔린 체인톱"
+          onChange={(e) => onChange({ ...block, eyebrow: e.target.value })}
+        />
+      </Field>
+
+      <Field label="상품명 아래 카피 (subheadline)">
+        <Textarea
+          value={block.subheadline}
+          rows={2}
+          placeholder="예: 정원·조경·임업 현장에서 신뢰받는 정밀 절단력"
+          onChange={(e) => onChange({ ...block, subheadline: e.target.value })}
+        />
+      </Field>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">가격 표시</div>
+          <div className="text-[11px] text-muted-foreground">
+            끄면 가격·SALE 배지 모두 숨김 (B2B 비공개 상품)
+          </div>
+        </div>
+        <Switch
+          checked={block.priceVisible}
+          onCheckedChange={(v) => onChange({ ...block, priceVisible: v })}
+        />
+      </div>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">VAT 포함 표시</div>
+          <div className="text-[11px] text-muted-foreground">
+            과세 상품일 때 가격을 ×1.1 로 표시. 아래 작은 글씨 "VAT 포함" 노출
+          </div>
+        </div>
+        <Switch
+          checked={block.vatIncluded}
+          onCheckedChange={(v) => onChange({ ...block, vatIncluded: v })}
+        />
+      </div>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">SALE 배지 자동 표시</div>
+          <div className="text-[11px] text-muted-foreground">
+            정가 &gt; 판매가 일 때 자동 표시. 끄면 강제 숨김
+          </div>
+        </div>
+        <Switch
+          checked={block.showSaleBadge}
+          onCheckedChange={(v) => onChange({ ...block, showSaleBadge: v })}
+        />
+      </div>
+
+      <div className="space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
+        <div className="text-xs font-semibold">구매 액션</div>
+        <p className="text-[11px] text-muted-foreground">
+          POS / 자사몰 환경에 따라 클릭 핸들러가 자동 분기됩니다 (편집기 미리보기에서는 토스트 안내).
+        </p>
+
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-1.5">
+          <span className="text-xs">수량 선택기 표시</span>
+          <Switch
+            checked={block.quantityVisible}
+            onCheckedChange={(v) => onChange({ ...block, quantityVisible: v })}
+          />
+        </div>
+
+        <div className="space-y-1.5 rounded-md border border-border bg-background p-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-medium">장바구니 버튼</span>
+            <Switch
+              checked={block.addToCart.visible}
+              onCheckedChange={(v) =>
+                onChange({ ...block, addToCart: { ...block.addToCart, visible: v } })
+              }
+            />
+          </div>
+          {block.addToCart.visible && (
+            <Input
+              value={block.addToCart.label}
+              placeholder="장바구니"
+              onChange={(e) =>
+                onChange({
+                  ...block,
+                  addToCart: { ...block.addToCart, label: e.target.value },
+                })
+              }
+              className="h-8 text-xs"
+            />
+          )}
+        </div>
+
+        <div className="space-y-1.5 rounded-md border border-border bg-background p-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-medium">바로 구매 버튼</span>
+            <Switch
+              checked={block.buyNow.visible}
+              onCheckedChange={(v) =>
+                onChange({ ...block, buyNow: { ...block.buyNow, visible: v } })
+              }
+            />
+          </div>
+          {block.buyNow.visible && (
+            <Input
+              value={block.buyNow.label}
+              placeholder="바로 구매"
+              onChange={(e) =>
+                onChange({
+                  ...block,
+                  buyNow: { ...block.buyNow, label: e.target.value },
+                })
+              }
+              className="h-8 text-xs"
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">추가 CTA 버튼 ({block.ctas.length}/2)</Label>
+          {block.ctas.length < 2 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7"
+              onClick={() =>
+                onChange({
+                  ...block,
+                  ctas: [...block.ctas, { label: "", href: "", variant: "primary" }],
+                })
+              }
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>버튼 추가</span>
+            </Button>
+          )}
+        </div>
+        {block.ctas.map((cta, i) => (
+          <div key={i} className="space-y-1.5 rounded-md border border-border p-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-muted-foreground">
+                버튼 {i + 1}
+              </span>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() =>
+                  onChange({
+                    ...block,
+                    ctas: block.ctas.filter((_, idx) => idx !== i),
+                  })
+                }
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <Input
+                value={cta.label}
+                placeholder="라벨 (예: 대리점 찾기)"
+                onChange={(e) => {
+                  const next = block.ctas.slice();
+                  next[i] = { ...next[i], label: e.target.value };
+                  onChange({ ...block, ctas: next });
+                }}
+                className="h-8 text-xs"
+              />
+              <Select
+                value={cta.variant}
+                onValueChange={(v) => {
+                  const next = block.ctas.slice();
+                  next[i] = { ...next[i], variant: v as "primary" | "outline" };
+                  onChange({ ...block, ctas: next });
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="primary">강조 (검은 배경)</SelectItem>
+                  <SelectItem value="outline">외곽선</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Input
+              value={cta.href}
+              placeholder="URL (예: /pos/dealers, https://...)"
+              onChange={(e) => {
+                const next = block.ctas.slice();
+                next[i] = { ...next[i], href: e.target.value };
+                onChange({ ...block, ctas: next });
+              }}
+              className="h-8 text-xs"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProductInfoEditor({ block, onChange }: EditorProps<ProductInfoBlock>) {
   return (
     <div className="space-y-3">
@@ -2065,6 +2333,8 @@ export function BlockEditor({
       return <CalloutEditor block={block} onChange={onChange} />;
     case "info-grid":
       return <InfoGridEditor block={block} onChange={onChange} />;
+    case "product-hero":
+      return <ProductHeroEditor block={block} onChange={onChange} />;
     case "product-info":
       return <ProductInfoEditor block={block} onChange={onChange} />;
     case "html-embed":

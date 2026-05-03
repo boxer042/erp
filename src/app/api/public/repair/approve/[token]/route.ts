@@ -24,7 +24,7 @@ export async function GET(
     id: ticket.id,
     ticketNo: ticket.ticketNo,
     status: ticket.status,
-    customerName: ticket.customer.name,
+    customerName: ticket.customer?.name ?? "(미등록)",
     machineName: ticket.customerMachine?.name ?? null,
     symptom: ticket.symptom,
     diagnosis: ticket.diagnosis,

@@ -23,6 +23,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
+import { MediaPickerDialog } from "@/components/media-picker-dialog";
+import { Library } from "lucide-react";
 
 interface Brand {
   id: string;
@@ -225,6 +227,7 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
   const [isActive, setIsActive] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const open = brand !== null;
 
@@ -284,9 +287,7 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
         toast.error(json.error || "업로드 실패");
         return;
       }
-      if (logoPath) {
-        await apiMutate("/api/brands/upload", "DELETE", { path: logoPath });
-      }
+      // 기존 로고 스토리지 삭제 X — /settings/media 에서 일괄 관리
       setLogoUrl(json.url);
       setLogoPath(json.path);
     } finally {
@@ -306,10 +307,8 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
     setPendingFile(file);
   };
 
-  const handleRemoveLogo = async () => {
-    if (logoPath) {
-      await apiMutate("/api/brands/upload", "DELETE", { path: logoPath });
-    }
+  const handleRemoveLogo = () => {
+    // 스토리지 삭제는 /settings/media 에서 — 여기서는 분리만
     setLogoUrl(null);
     setLogoPath(null);
   };
@@ -352,16 +351,27 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
                   onChange={handleFileChange}
                   className="hidden"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
-                  {logoUrl ? "교체" : "업로드"}
-                </Button>
+                <div className="flex flex-col gap-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
+                    {logoUrl ? "교체" : "업로드"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPickerOpen(true)}
+                    disabled={uploading}
+                  >
+                    <Library className="h-3.5 w-3.5 mr-1" /> 라이브러리
+                  </Button>
+                </div>
               </div>
               <p className="text-[11px] text-muted-foreground">JPG/PNG/WebP/SVG · 최대 5MB</p>
             </div>
@@ -406,11 +416,22 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
       <ImageEditDialog
         open={pendingFile !== null}
         file={pendingFile}
+        defaultAspect={16 / 9}
         onConfirm={async (blob, name) => {
           setPendingFile(null);
           await uploadBlob(blob, name);
         }}
         onCancel={() => setPendingFile(null)}
+      />
+      <MediaPickerDialog
+        open={pickerOpen}
+        bucket="brand-logos"
+        onSelect={({ url, path }) => {
+          setLogoUrl(url);
+          setLogoPath(path);
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
       />
     </Sheet>
   );

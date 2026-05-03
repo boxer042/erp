@@ -136,7 +136,7 @@ export default function SerialItemsPage() {
           value: search,
           onChange: setSearch,
           onSearch: () => {},
-          placeholder: "코드·상품명·손님 검색",
+          placeholder: "코드·상품명·고객 검색",
         }}
         onRefresh={() => itemsQuery.refetch()}
         loading={itemsQuery.isFetching}
@@ -162,7 +162,7 @@ export default function SerialItemsPage() {
               </TableHead>
               <TableHead>코드</TableHead>
               <TableHead>상품</TableHead>
-              <TableHead>손님</TableHead>
+              <TableHead>고객</TableHead>
               <TableHead>판매일</TableHead>
               <TableHead>보증만료</TableHead>
               <TableHead>상태</TableHead>

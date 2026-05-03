@@ -20,7 +20,7 @@ export default function PosAllCustomersPage() {
     <div className="h-full overflow-y-auto p-3 sm:p-4">
       <div className="mb-4 flex items-end justify-between sm:mb-6">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">손님</h1>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">고객</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             현재 {hydrated ? sessions.length : 0}팀
           </p>

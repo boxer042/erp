@@ -16,12 +16,14 @@ export async function GET(request: NextRequest) {
   const customerId = searchParams.get("customerId");
   const assignedToId = searchParams.get("assignedToId");
   const search = searchParams.get("search")?.trim() ?? "";
+  const ids = searchParams.get("ids")?.split(",").filter(Boolean) ?? [];
 
   const where: Prisma.RepairTicketWhereInput = {
     ...(status ? { status: status as never } : {}),
     ...(type ? { type: type as never } : {}),
     ...(customerId ? { customerId } : {}),
     ...(assignedToId ? { assignedToId } : {}),
+    ...(ids.length > 0 ? { id: { in: ids } } : {}),
     ...(search
       ? {
           OR: [
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     data: {
       ticketNo: generateRepairTicketNo(),
       type: data.type,
-      customerId: data.customerId,
+      customerId: data.customerId || null,
       customerMachineId: data.customerMachineId || null,
       serialItemId: data.serialItemId || null,
       status: "RECEIVED",

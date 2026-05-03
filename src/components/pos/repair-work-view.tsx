@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -10,11 +10,11 @@ import {
   FileText,
   Loader2,
   MapPin,
+  Package,
   Phone,
   Plus,
   QrCode,
   Trash2,
-  User,
   Wrench,
   XCircle,
 } from "lucide-react";
@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,15 +36,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import { SectionTitle } from "@/components/new-product-form/parts";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn, formatComma, parseComma } from "@/lib/utils";
+import { useSessions } from "@/components/pos/sessions-context";
+import { usePosShell } from "@/components/pos/pos-shell-context";
 
 // ──────── 타입 ────────
 
@@ -95,13 +96,32 @@ interface RepairTicketDetail {
   finalAmount: string;
   repairWarrantyMonths: number | null;
   repairWarrantyEnds: string | null;
-  customer: { id: string; name: string; phone: string | null };
+  customer: { id: string; name: string; phone: string | null } | null;
   customerMachine: { id: string; name: string } | null;
   serialItem: {
     id: string;
     code: string;
-    product: { id: string; name: string; sku: string };
+    soldAt: string;
+    warrantyEnds: string | null;
+    status: "ACTIVE" | "RETURNED" | "SCRAPPED";
+    product: { id: string; name: string; sku: string; imageUrl: string | null };
+    orderItem: {
+      id: string;
+      order: {
+        id: string;
+        orderNo: string;
+        orderDate: string;
+        totalAmount: string;
+      };
+    } | null;
   } | null;
+  repairProduct: {
+    id: string;
+    name: string;
+    sku: string;
+    imageUrl: string | null;
+  } | null;
+  repairProductText: string | null;
   assignedTo: { id: string; name: string } | null;
   parentRepairTicket: {
     id: string;
@@ -179,8 +199,16 @@ function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
 
 // ──────── 메인 페이지 ────────
 
-export default function RepairDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+interface RepairWorkViewProps {
+  ticketId: string;
+  /** 좌측 ← 버튼 클릭 동작. 미제공이면 router.back() */
+  onBack?: () => void;
+  /** 헤더에서 ← 버튼 숨기고 싶을 때 (탭 안에 임베드되는 케이스) */
+  hideBack?: boolean;
+}
+
+export function RepairWorkView({ ticketId, onBack, hideBack = false }: RepairWorkViewProps) {
+  const id = ticketId;
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -220,15 +248,17 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     <div className="flex h-full flex-col">
       {/* 상단 헤더 */}
       <div className="flex items-center gap-3 border-b border-border bg-background px-4 py-3 sm:px-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={() => router.push("/repairs")}
-          aria-label="목록"
-        >
-          <ArrowLeft />
-        </Button>
+        {!hideBack && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={() => (onBack ? onBack() : router.push("/pos"))}
+            aria-label="뒤로"
+          >
+            <ArrowLeft />
+          </Button>
+        )}
         <div className="flex flex-1 items-center gap-2">
           <span className="font-mono text-sm font-semibold">{t.ticketNo}</span>
           <Badge variant="outline" className="text-[10px]">
@@ -262,6 +292,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="flex flex-col gap-4">
           <CustomerSection ticket={t} />
+          <ProductSection ticket={t} readonly={readonly} onChanged={invalidate} />
           <SymptomSection ticket={t} readonly={readonly} onSaved={invalidate} />
           {!readonly && <PackagesSection ticket={t} onChanged={invalidate} />}
           <PartsSection ticket={t} readonly={readonly} onChanged={invalidate} />
@@ -288,59 +319,422 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   );
 }
 
-// ──────── 고객 / 기기 정보 ────────
+// ──────── 고객 정보 ────────
 
 function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
+  const { sessions } = useSessions();
+  // 미등록 고객일 때, 이 티켓을 추적하는 세션의 라벨 사용 (예: "고객 1")
+  const sessionLabel = ticket.customer
+    ? null
+    : (sessions.find((s) => s.repairTicketIds?.includes(ticket.id))?.label ?? "미등록 고객");
+
+  const displayName = ticket.customer?.name ?? sessionLabel;
+  const initial = (displayName ?? "?").charAt(0);
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">고객 / 기기</CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">고객</span>
-          <span className="flex items-center gap-1 font-medium">
-            <User className="size-3.5 text-muted-foreground" />
-            {ticket.customer.name}
-          </span>
-          {ticket.customer.phone && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Phone className="size-3" />
-              {ticket.customer.phone}
+    <section>
+      <SectionTitle title="고객" />
+      <Card size="sm">
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* 이름 */}
+        <div className="flex items-center gap-3">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-base font-semibold">
+            {initial}
+          </div>
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              이름
             </span>
-          )}
+            <span className="line-clamp-1 text-base font-semibold">{displayName}</span>
+            {!ticket.customer && (
+              <span className="text-[11px] text-muted-foreground">결제 시 등록</span>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">기기 / 시리얼</span>
-          {ticket.serialItem ? (
-            <>
-              <span className="flex items-center gap-1 font-medium">
-                <QrCode className="size-3.5 text-muted-foreground" />
-                <span className="font-mono">{ticket.serialItem.code}</span>
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {ticket.serialItem.product.name}
-              </span>
-            </>
-          ) : ticket.customerMachine ? (
-            <span className="font-medium">{ticket.customerMachine.name}</span>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">담당</span>
-          <span className="font-medium">
-            {ticket.assignedTo?.name ?? <span className="text-muted-foreground">미지정</span>}
-          </span>
-          {ticket.repairWarrantyEnds && (
-            <span className="text-xs text-muted-foreground">
-              수리 보증 ~{format(new Date(ticket.repairWarrantyEnds), "yyyy-MM-dd")}
+
+        {/* 연락처 */}
+        <div className="flex items-center gap-3">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted">
+            <Phone className="size-5 text-muted-foreground" />
+          </div>
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              연락처
             </span>
-          )}
+            {ticket.customer?.phone ? (
+              <span className="text-base font-semibold tabular-nums">
+                {ticket.customer.phone}
+              </span>
+            ) : (
+              <span className="text-base text-muted-foreground">-</span>
+            )}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* 담당자 */}
+        <div className="flex items-center gap-3">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted">
+            <Wrench className="size-5 text-muted-foreground" />
+          </div>
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              담당자
+            </span>
+            <span className="text-base font-semibold">
+              {ticket.assignedTo?.name ?? (
+                <span className="text-muted-foreground">미지정</span>
+              )}
+            </span>
+          </div>
+        </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+// ──────── 상품 (가져온 기기) ────────
+
+type ProductMode = "SERIAL" | "SEARCH" | "TEXT";
+
+function ProductSection({
+  ticket,
+  readonly,
+  onChanged,
+}: {
+  ticket: RepairTicketDetail;
+  readonly: boolean;
+  onChanged: () => void;
+}) {
+  const initialMode: ProductMode = ticket.serialItem
+    ? "SERIAL"
+    : ticket.repairProduct
+      ? "SEARCH"
+      : ticket.repairProductText
+        ? "TEXT"
+        : "SERIAL";
+  const [mode, setMode] = useState<ProductMode>(initialMode);
+  const [serialCode, setSerialCode] = useState(ticket.serialItem?.code ?? "");
+  const [textValue, setTextValue] = useState(ticket.repairProductText ?? "");
+
+  const productsQuery = useQuery({
+    queryKey: ["repairs", "products"],
+    queryFn: () =>
+      apiGet<ProductOption[]>("/api/products?isBulk=all&excludeVariants=true"),
+    enabled: mode === "SEARCH" && !readonly,
+  });
+
+  const serialLookup = useMutation({
+    mutationFn: async () => {
+      const list = await apiGet<
+        Array<{ id: string; code: string; product: { name: string } }>
+      >(`/api/serial-items?search=${encodeURIComponent(serialCode)}`);
+      const exact = list.find((i) => i.code === serialCode.trim());
+      if (!exact) throw new Error("해당 라벨 코드를 찾을 수 없습니다");
+      await apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", {
+        serialItemId: exact.id,
+        repairProductId: null,
+        repairProductText: null,
+      });
+      return exact;
+    },
+    onSuccess: (item) => {
+      toast.success(`${item.code} — ${item.product.name} 연결됨`);
+      onChanged();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : err.message || "조회 실패"),
+  });
+
+  const setProductMutation = useMutation({
+    mutationFn: (p: ProductOption) =>
+      apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", {
+        serialItemId: null,
+        repairProductId: p.id,
+        repairProductText: null,
+      }),
+    onSuccess: () => {
+      toast.success("상품 연결됨");
+      onChanged();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+  });
+
+  const setTextMutation = useMutation({
+    mutationFn: (text: string) =>
+      apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", {
+        serialItemId: null,
+        repairProductId: null,
+        repairProductText: text.trim() || null,
+      }),
+    onSuccess: () => {
+      toast.success("저장됨");
+      onChanged();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+  });
+
+  const clearProductMutation = useMutation({
+    mutationFn: () =>
+      apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", {
+        serialItemId: null,
+        repairProductId: null,
+        repairProductText: null,
+      }),
+    onSuccess: () => {
+      toast.success("상품 정보 초기화");
+      setSerialCode("");
+      setTextValue("");
+      onChanged();
+    },
+  });
+
+  // hasDisplay flag for clear button
+  const hasDisplay =
+    !!ticket.serialItem || !!ticket.repairProduct || !!ticket.repairProductText;
+
+  return (
+    <section>
+      <SectionTitle
+        title="상품 (가져온 기기)"
+        badge={
+          hasDisplay && !readonly ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => clearProductMutation.mutate()}
+            >
+              초기화
+            </Button>
+          ) : null
+        }
+      />
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-3">
+        {ticket.serialItem ? (
+          <SerialItemDisplay serialItem={ticket.serialItem} />
+        ) : ticket.repairProduct ? (
+          <SearchedProductDisplay product={ticket.repairProduct} />
+        ) : ticket.repairProductText ? (
+          <TextProductDisplay text={ticket.repairProductText} />
+        ) : (
+          <div className="rounded-md border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+            연결된 상품이 없습니다 — 아래에서 시리얼/검색/직접입력으로 연결하세요
+          </div>
+        )}
+
+        {!readonly && (
+          <>
+            {/* 입력 모드 토글 */}
+            <div className="flex gap-1">
+              {(
+                [
+                  { v: "SERIAL", label: "시리얼 코드" },
+                  { v: "SEARCH", label: "상품 검색" },
+                  { v: "TEXT", label: "직접 입력" },
+                ] as const
+              ).map((b) => (
+                <button
+                  key={b.v}
+                  type="button"
+                  onClick={() => setMode(b.v)}
+                  className={cn(
+                    "rounded-md border px-3 py-1.5 text-xs transition-colors",
+                    mode === b.v
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted/50",
+                  )}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 입력 영역 */}
+            {mode === "SERIAL" && (
+              <div className="flex gap-2">
+                <Input
+                  value={serialCode}
+                  onChange={(e) => setSerialCode(e.target.value)}
+                  placeholder="예: 241125-0042"
+                  className="font-mono"
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !e.nativeEvent.isComposing &&
+                      serialCode.trim()
+                    ) {
+                      serialLookup.mutate();
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => serialLookup.mutate()}
+                  disabled={!serialCode.trim() || serialLookup.isPending}
+                >
+                  {serialLookup.isPending && <Loader2 className="size-4 animate-spin" />}
+                  조회·연결
+                </Button>
+              </div>
+            )}
+
+            {mode === "SEARCH" && (
+              <ProductCombobox
+                products={productsQuery.data ?? []}
+                value=""
+                onChange={(p) => {
+                  if (p?.id) setProductMutation.mutate(p);
+                }}
+                filterType="component"
+                placeholder="상품명 또는 SKU 검색..."
+              />
+            )}
+
+            {mode === "TEXT" && (
+              <div className="flex gap-2">
+                <Input
+                  value={textValue}
+                  onChange={(e) => setTextValue(e.target.value)}
+                  placeholder="예: Sony A7M4 (Black) — 카탈로그에 없을 때"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => setTextMutation.mutate(textValue)}
+                  disabled={!textValue.trim() || setTextMutation.isPending}
+                >
+                  {setTextMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+                  저장
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+// 시리얼 모드 — 우리가 판매한 상품. 구매일·보증·주문번호까지 표시.
+function SerialItemDisplay({
+  serialItem,
+}: {
+  serialItem: NonNullable<RepairTicketDetail["serialItem"]>;
+}) {
+  const warrantyActive =
+    serialItem.warrantyEnds && new Date(serialItem.warrantyEnds) > new Date();
+  return (
+    <div className="flex flex-col gap-2 rounded-md bg-primary/5 p-3 ring-1 ring-primary/20">
+      <div className="flex items-center gap-3">
+        {serialItem.product.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={serialItem.product.imageUrl}
+            alt={serialItem.product.name}
+            className="size-14 rounded-md object-cover"
+          />
+        ) : (
+          <div className="flex size-14 items-center justify-center rounded-md bg-background">
+            <Package className="size-6 text-muted-foreground" />
+          </div>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-center gap-1 font-mono text-xs font-semibold text-primary">
+            <QrCode className="size-3" /> {serialItem.code}
+          </span>
+          <span className="line-clamp-1 text-sm font-semibold">
+            {serialItem.product.name}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {serialItem.product.sku}
+          </span>
+        </div>
+        <Badge variant="secondary" className="self-start text-[10px]">
+          우리 판매
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-t border-primary/20 pt-2 text-xs sm:grid-cols-3">
+        <div>
+          <span className="text-muted-foreground">구매일</span>
+          <div className="font-medium">
+            {format(new Date(serialItem.soldAt), "yyyy-MM-dd")}
+          </div>
+        </div>
+        <div>
+          <span className="text-muted-foreground">제품 보증</span>
+          <div className="font-medium">
+            {serialItem.warrantyEnds ? (
+              <span className={warrantyActive ? "text-primary" : "text-destructive"}>
+                ~{format(new Date(serialItem.warrantyEnds), "yyyy-MM-dd")}
+                {warrantyActive ? " (유효)" : " (만료)"}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        </div>
+        {serialItem.orderItem?.order && (
+          <div>
+            <span className="text-muted-foreground">주문번호</span>
+            <div className="font-mono text-[11px] font-medium">
+              {serialItem.orderItem.order.orderNo}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 검색 모드 — 카탈로그에 있는 상품. 우리가 판 건 아님.
+function SearchedProductDisplay({
+  product,
+}: {
+  product: NonNullable<RepairTicketDetail["repairProduct"]>;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-md bg-muted/50 p-3">
+      {product.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          className="size-14 rounded-md object-cover"
+        />
+      ) : (
+        <div className="flex size-14 items-center justify-center rounded-md bg-background">
+          <Package className="size-6 text-muted-foreground" />
+        </div>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="line-clamp-1 text-sm font-semibold">{product.name}</span>
+        <span className="text-xs text-muted-foreground">{product.sku}</span>
+      </div>
+      <Badge variant="outline" className="self-start text-[10px]">
+        카탈로그 매칭
+      </Badge>
+    </div>
+  );
+}
+
+// 직접 입력 모드 — 우리 카탈로그에 없는 상품. 텍스트만.
+function TextProductDisplay({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-md bg-muted/30 p-3">
+      <div className="flex size-14 items-center justify-center rounded-md border border-dashed border-border">
+        <Package className="size-6 text-muted-foreground" />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="line-clamp-2 text-sm font-medium">{text}</span>
+      </div>
+      <Badge variant="outline" className="self-start text-[10px] text-muted-foreground">
+        직접 입력
+      </Badge>
+    </div>
   );
 }
 
@@ -380,11 +774,10 @@ function SymptomSection({
   });
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">증상 · 진단 · 메모</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <section>
+      <SectionTitle title="증상 · 진단 · 메모" />
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">증상 (고객 호소)</label>
           <Textarea
@@ -426,8 +819,9 @@ function SymptomSection({
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -470,23 +864,25 @@ function PackagesSection({
   const packages = packagesQuery.data ?? [];
   if (packagesQuery.isPending) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 py-3">
-          <Skeleton className="h-7 w-32 rounded-full" />
-          <Skeleton className="h-7 w-28 rounded-full" />
-          <Skeleton className="h-7 w-36 rounded-full" />
-        </CardContent>
-      </Card>
+      <section>
+        <SectionTitle title="패키지 빠른 추가" />
+        <Card size="sm">
+          <CardContent className="flex items-center gap-2 py-3">
+            <Skeleton className="h-7 w-32 rounded-full" />
+            <Skeleton className="h-7 w-28 rounded-full" />
+            <Skeleton className="h-7 w-36 rounded-full" />
+          </CardContent>
+        </Card>
+      </section>
     );
   }
   if (packages.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">패키지 빠른 추가</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-1.5">
+    <section>
+      <SectionTitle title="패키지 빠른 추가" />
+      <Card size="sm">
+        <CardContent className="flex flex-wrap gap-1.5">
         {packages.map((p) => {
           const partsCount = p.parts.length;
           const laborsCount = p.labors.length;
@@ -512,8 +908,9 @@ function PackagesSection({
             </button>
           );
         })}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -562,22 +959,25 @@ function PartsSection({
     .reduce((s, p) => s + Number(p.totalPrice), 0);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">사용 부속</CardTitle>
-        {!readonly && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8"
-            onClick={() => setAdding((v) => !v)}
-          >
-            <Plus className="size-3.5" />
-            부속 검색/추가
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-0">
+    <section>
+      <SectionTitle
+        title="사용 부속"
+        badge={
+          !readonly ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={() => setAdding((v) => !v)}
+            >
+              <Plus className="size-3.5" />
+              부속 검색/추가
+            </Button>
+          ) : null
+        }
+      />
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-3 p-0">
         {adding && (
           <div className="px-6">
             <ProductCombobox
@@ -639,8 +1039,9 @@ function PartsSection({
             </span>
           </span>
         </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -815,17 +1216,20 @@ function LaborsSection({
   const total = ticket.labors.reduce((s, l) => s + Number(l.totalPrice), 0);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">공임</CardTitle>
-        {!readonly && (
-          <Button size="sm" variant="outline" className="h-8" onClick={() => setAdding(!adding)}>
-            <Plus className="size-3.5" />
-            공임 추가
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 p-0">
+    <section>
+      <SectionTitle
+        title="공임"
+        badge={
+          !readonly ? (
+            <Button size="sm" variant="outline" className="h-8" onClick={() => setAdding(!adding)}>
+              <Plus className="size-3.5" />
+              공임 추가
+            </Button>
+          ) : null
+        }
+      />
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-2 p-0">
         {adding && (
           <div className="flex items-center gap-2 px-6">
             <Input
@@ -894,8 +1298,9 @@ function LaborsSection({
             </span>
           </span>
         </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -944,11 +1349,10 @@ function FeesAndTotalsSection({
   const finalTotal = Math.max(0, subtotal - discountAmount);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">진단비 · 할인 · 합계</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <section>
+      <SectionTitle title="진단비 · 할인 · 합계" />
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">
@@ -1001,8 +1405,9 @@ function FeesAndTotalsSection({
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -1025,14 +1430,6 @@ function Row({
 
 // ──────── 상태 진행 액션 ────────
 
-type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
-const PAYMENT_LABEL: Record<PaymentMethod, string> = {
-  CASH: "현금",
-  CARD: "카드",
-  TRANSFER: "계좌",
-  UNPAID: "외상",
-};
-
 function StatusActionsSection({
   ticket,
   onChanged,
@@ -1040,9 +1437,10 @@ function StatusActionsSection({
   ticket: RepairTicketDetail;
   onChanged: () => void;
 }) {
+  const router = useRouter();
   const actions = nextActions(ticket.status, ticket.type);
-  const [pickupOpen, setPickupOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
+  const { sessions, addSession, add, setCustomer, switchSession } = useSessions();
+  const { setCartOpen } = usePosShell();
 
   const transitionMutation = useMutation({
     mutationFn: (vars: { action: string; payload?: Record<string, unknown> }) =>
@@ -1057,11 +1455,9 @@ function StatusActionsSection({
         approve: "승인 완료",
         start: "수리 시작",
         ready: "수리 완료",
-        pickup: "픽업/결제 완료",
         cancel: "취소 처리됨",
       };
       toast.success(labels[vars.action] ?? "처리되었습니다");
-      setPickupOpen(false);
       onChanged();
     },
     onError: (err) =>
@@ -1070,124 +1466,104 @@ function StatusActionsSection({
 
   const finalAmount = calcRepairFinalTotal(ticket);
 
+  // 픽업 → 카트로 이동 (수리비를 카트 라인으로 추가, 일반 상품과 함께 결제 가능)
+  const sendToCart = () => {
+    if (finalAmount <= 0) {
+      toast.error("청구할 금액이 없습니다");
+      return;
+    }
+    // 고객 세션 찾기 — 등록된 고객이면 그 세션 재사용, 미등록이면 새 세션
+    let targetSessionId = ticket.customer
+      ? sessions.find((s) => s.customerId === ticket.customer!.id)?.id
+      : undefined;
+    if (!targetSessionId) {
+      targetSessionId = addSession();
+      if (ticket.customer) {
+        setCustomer(
+          ticket.customer.id,
+          ticket.customer.name,
+          ticket.customer.phone ?? undefined,
+          targetSessionId,
+        );
+      }
+    }
+    // 수리 라인 추가 (repairTicketId 연결)
+    add(
+      {
+        itemType: "repair",
+        name: `수리 ${ticket.ticketNo}`,
+        imageUrl: null,
+        unitPrice: finalAmount,
+        taxType: "TAXABLE",
+        repairMeta: {
+          repairTicketId: ticket.id,
+          deviceModel:
+            ticket.serialItem?.product?.name ??
+            ticket.customerMachine?.name ??
+            undefined,
+          issueDescription: ticket.symptom ?? undefined,
+        },
+      },
+      { sessionId: targetSessionId },
+    );
+    switchSession(targetSessionId);
+    toast.success("카트에 수리비가 추가되었습니다");
+    router.push(`/pos/cart/${targetSessionId}`);
+    setCartOpen(true);
+  };
+
   if (actions.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-          {ticket.status === "PICKED_UP" ? (
-            <>
-              <CheckCircle2 className="size-4" /> 수리 완료 — 픽업/결제 완료 (
-              ₩{Number(ticket.finalAmount).toLocaleString("ko-KR")})
-            </>
-          ) : (
-            <>
-              <XCircle className="size-4" /> 취소된 수리
-            </>
-          )}
-        </CardContent>
-      </Card>
+      <section>
+        <SectionTitle title="상태" />
+        <Card size="sm">
+          <CardContent className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+            {ticket.status === "PICKED_UP" ? (
+              <>
+                <CheckCircle2 className="size-4" /> 수리 완료 — 픽업/결제 완료 (
+                ₩{Number(ticket.finalAmount).toLocaleString("ko-KR")})
+              </>
+            ) : (
+              <>
+                <XCircle className="size-4" /> 취소된 수리
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </section>
     );
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">상태 진행</CardTitle>
-        </CardHeader>
+    <section>
+      <SectionTitle title="상태 진행" />
+      <Card size="sm">
         <CardContent className="flex flex-wrap gap-2">
-          {actions.map((a) => (
-            <Button
-              key={a.action}
-              variant={a.variant ?? "default"}
-              size="sm"
-              disabled={transitionMutation.isPending}
-              onClick={() => {
-                if (a.action === "pickup") {
-                  setPickupOpen(true);
-                  return;
-                }
-                if (
-                  a.action === "cancel" &&
-                  !confirm("정말 취소하시겠습니까? 부속은 재고로 복원됩니다.")
-                ) {
-                  return;
-                }
-                transitionMutation.mutate({ action: a.action });
-              }}
-            >
-              {a.label}
-            </Button>
-          ))}
+        {actions.map((a) => (
+          <Button
+            key={a.action}
+            variant={a.variant ?? "default"}
+            size="sm"
+            disabled={transitionMutation.isPending}
+            onClick={() => {
+              if (a.action === "pickup") {
+                sendToCart();
+                return;
+              }
+              if (
+                a.action === "cancel" &&
+                !confirm("정말 취소하시겠습니까? 부속은 재고로 복원됩니다.")
+              ) {
+                return;
+              }
+              transitionMutation.mutate({ action: a.action });
+            }}
+          >
+            {a.label}
+          </Button>
+        ))}
         </CardContent>
       </Card>
-
-      {/* 픽업/결제 다이얼로그 */}
-      <Dialog open={pickupOpen} onOpenChange={setPickupOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>픽업 / 결제</DialogTitle>
-            <DialogDescription>
-              결제수단을 선택하면 수리가 완료 처리되고 보증 만료일이 설정됩니다.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4 py-2">
-            <div className="rounded-lg bg-muted/50 p-4 text-center">
-              <div className="text-xs text-muted-foreground">최종 청구 금액</div>
-              <div className="mt-1 text-3xl font-bold tabular-nums">
-                ₩{finalAmount.toLocaleString("ko-KR")}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-1.5">
-              {(["CASH", "CARD", "TRANSFER", "UNPAID"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setPaymentMethod(m)}
-                  className={cn(
-                    "flex h-12 items-center justify-center rounded-md border text-sm font-medium transition-colors",
-                    paymentMethod === m
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-background text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {PAYMENT_LABEL[m]}
-                </button>
-              ))}
-            </div>
-
-            {ticket.repairWarrantyMonths != null && ticket.repairWarrantyMonths > 0 && (
-              <div className="text-xs text-muted-foreground">
-                ✓ 수리 보증 {ticket.repairWarrantyMonths}개월 자동 적용
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setPickupOpen(false)}
-              disabled={transitionMutation.isPending}
-            >
-              취소
-            </Button>
-            <Button
-              onClick={() =>
-                transitionMutation.mutate({
-                  action: "pickup",
-                  payload: { paymentMethod, finalAmount },
-                })
-              }
-              disabled={transitionMutation.isPending}
-            >
-              {transitionMutation.isPending && <Loader2 className="size-4 animate-spin" />}
-              결제 완료
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    </section>
   );
 }

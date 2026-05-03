@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const repairTicketCreateSchema = z.object({
   type: z.enum(["ON_SITE", "DROP_OFF"]).default("ON_SITE"),
-  customerId: z.string().min(1, "손님을 선택해주세요"),
+  customerId: z.string().nullable().optional(),
   customerMachineId: z.string().nullable().optional(),
   serialItemId: z.string().nullable().optional(),
   symptom: z.string().nullable().optional(),
@@ -18,8 +18,11 @@ export type RepairTicketCreateInput = z.infer<typeof repairTicketCreateSchema>;
 
 export const repairTicketUpdateSchema = z.object({
   type: z.enum(["ON_SITE", "DROP_OFF"]).optional(),
+  customerId: z.string().nullable().optional(),
   customerMachineId: z.string().nullable().optional(),
   serialItemId: z.string().nullable().optional(),
+  repairProductId: z.string().nullable().optional(),
+  repairProductText: z.string().nullable().optional(),
   symptom: z.string().nullable().optional(),
   diagnosis: z.string().nullable().optional(),
   repairNotes: z.string().nullable().optional(),

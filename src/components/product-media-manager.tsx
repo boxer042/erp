@@ -10,11 +10,12 @@ import {
 import {
   Dialog, DialogContent, DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon, Star } from "lucide-react";
+import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon, Star, Library } from "lucide-react";
 import { extractYoutubeId } from "@/lib/utils";
 import { apiGet, apiMutate } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
+import { MediaPickerDialog } from "@/components/media-picker-dialog";
 
 function MediaSkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
@@ -25,6 +26,7 @@ function MediaSkeletonRows({ rows = 4 }: { rows?: number }) {
           <TableCell><Skeleton className="h-4 w-8" /></TableCell>
           <TableCell><Skeleton className="h-12 w-12 rounded-md" /></TableCell>
           <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-7 w-20 rounded-md" /></TableCell>
           <TableCell><Skeleton className="h-4 w-48" /></TableCell>
           <TableCell><Skeleton className="h-4 w-32" /></TableCell>
           <TableCell><div className="flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
@@ -35,11 +37,13 @@ function MediaSkeletonRows({ rows = 4 }: { rows?: number }) {
 }
 
 type MediaType = "IMAGE" | "YOUTUBE";
+type MediaKind = "THUMBNAIL" | "DETAIL";
 
 interface ProductMedia {
   id: string;
   productId: string;
   type: MediaType;
+  kind: MediaKind;
   url: string;
   title: string | null;
   sortOrder: number;
@@ -64,6 +68,10 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
   const [editQueue, setEditQueue] = useState<File[]>([]);
   const [editIndex, setEditIndex] = useState(0);
   const [batchSuccess, setBatchSuccess] = useState(0);
+  const [editKind, setEditKind] = useState<MediaKind>("THUMBNAIL");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerKind, setPickerKind] = useState<MediaKind>("THUMBNAIL");
+  const [picking, setPicking] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentEditFile = editQueue[editIndex] ?? null;
 
@@ -82,7 +90,7 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
     load();
   }, [load]);
 
-  const create = (data: { type: MediaType; url: string; title: string | null }) =>
+  const create = (data: { type: MediaType; kind: MediaKind; url: string; title: string | null }) =>
     apiMutate("/api/product-media", "POST", {
       productId,
       ...data,
@@ -99,7 +107,8 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
     const type: MediaType = extractYoutubeId(url) ? "YOUTUBE" : "IMAGE";
     setSubmitting(true);
     try {
-      await create({ type, url, title: null });
+      // 외부 URL은 비율을 강제할 수 없어 DETAIL 기본
+      await create({ type, kind: "DETAIL", url, title: null });
       setUrlInput("");
       await load();
       toast.success(type === "YOUTUBE" ? "YouTube 영상이 추가되었습니다" : "이미지가 추가되었습니다");
@@ -110,8 +119,9 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
     }
   };
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = (files: FileList | null, kind: MediaKind) => {
     if (!files || files.length === 0) return;
+    setEditKind(kind);
     setEditQueue(Array.from(files));
     setEditIndex(0);
     setBatchSuccess(0);
@@ -134,6 +144,7 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
       try {
         await create({
           type: "IMAGE",
+          kind: editKind,
           url,
           title: name.replace(/\.[^.]+$/, "") || null,
         });
@@ -173,6 +184,35 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
 
   const handleEditCancel = async () => {
     await advanceQueue(false);
+  };
+
+  const handlePickFromLibrary = async ({ url, name }: { url: string; name: string }) => {
+    setPicking(true);
+    try {
+      await create({
+        type: "IMAGE",
+        kind: pickerKind,
+        url,
+        title: name.replace(/\.[^.]+$/, "") || null,
+      });
+      await load();
+      onImageUrlChange?.();
+      toast.success("이미지가 추가되었습니다");
+      setPickerOpen(false);
+    } catch {
+      toast.error("추가에 실패했습니다");
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  const updateKind = async (id: string, kind: MediaKind) => {
+    try {
+      await apiMutate(`/api/product-media/${id}`, "PUT", { kind });
+      await load();
+    } catch {
+      toast.error("종류 변경 실패");
+    }
   };
 
   const remove = async (id: string) => {
@@ -241,45 +281,74 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
           e.preventDefault();
           e.stopPropagation();
           setDragActive(false);
-          handleFiles(e.dataTransfer.files);
+          // 드래그앤드롭은 썸네일로 기본 처리 (1:1 lock)
+          handleFiles(e.dataTransfer.files, "THUMBNAIL");
         }}
       >
-        {/* 상단: 파일 업로드 */}
-        <div className="flex items-center gap-3">
-          <ImageIcon className="h-5 w-5 text-muted-foreground shrink-0" />
+        {/* 상단: 파일 업로드 (kind 별 분리) */}
+        <div className="flex items-start gap-3">
+          <ImageIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-1" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">이미지 파일 업로드</p>
             <p className="text-xs text-muted-foreground">
-              드래그앤드롭 가능 · JPG/PNG/WebP/GIF/SVG · 10MB 이하 · 여러 개 동시 업로드
+              <span className="font-medium text-foreground">썸네일</span>은 1:1 정사각 (카드/리스트), <span className="font-medium text-foreground">상세 이미지</span>는 자유 비율 (상세 페이지)
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || editQueue.length > 0}
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> 업로드 중...
-              </>
-            ) : editQueue.length > 0 ? (
-              <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> 편집 중 ({editIndex + 1}/{editQueue.length})
-              </>
-            ) : (
-              <>
-                <Upload className="mr-1.5 h-3.5 w-3.5" /> 파일 선택
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditKind("THUMBNAIL");
+                fileInputRef.current?.click();
+              }}
+              disabled={uploading || editQueue.length > 0}
+            >
+              {uploading || editQueue.length > 0 ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {editQueue.length > 0
+                ? `편집 중 (${editIndex + 1}/${editQueue.length})`
+                : "썸네일 (1:1)"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditKind("DETAIL");
+                fileInputRef.current?.click();
+              }}
+              disabled={uploading || editQueue.length > 0}
+            >
+              <Upload className="mr-1.5 h-3.5 w-3.5" />
+              상세 이미지 (자유)
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setPickerKind("THUMBNAIL");
+                setPickerOpen(true);
+              }}
+              disabled={uploading || picking || editQueue.length > 0}
+            >
+              {picking ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Library className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              라이브러리
+            </Button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             multiple
             className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
+            onChange={(e) => handleFiles(e.target.files, editKind)}
           />
         </div>
 
@@ -345,6 +414,7 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
             <TableHead className="w-[80px]">순서</TableHead>
             <TableHead className="w-[80px]">미리보기</TableHead>
             <TableHead className="w-[100px]">타입</TableHead>
+            <TableHead className="w-[120px]">종류</TableHead>
             <TableHead>URL</TableHead>
             <TableHead>제목</TableHead>
             <TableHead className="w-[60px] text-right">액션</TableHead>
@@ -355,7 +425,7 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
             <MediaSkeletonRows />
           ) : items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                 등록된 미디어가 없습니다
               </TableCell>
             </TableRow>
@@ -425,6 +495,20 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
                   </button>
                 </TableCell>
                 <TableCell>{m.type === "YOUTUBE" ? "YouTube" : "이미지"}</TableCell>
+                <TableCell>
+                  {m.type === "IMAGE" ? (
+                    <select
+                      value={m.kind}
+                      onChange={(e) => updateKind(m.id, e.target.value as MediaKind)}
+                      className="h-7 px-1.5 text-xs rounded border border-border bg-card focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="THUMBNAIL">썸네일</option>
+                      <option value="DETAIL">상세</option>
+                    </select>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="max-w-[320px] truncate">
                   <a href={m.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                     {m.url}
@@ -443,12 +527,22 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
         </TableBody>
       </Table>
 
-      {/* 업로드 직전 편집 다이얼로그 */}
+      {/* 업로드 직전 편집 다이얼로그 — kind에 따라 비율 잠금/자유 분기 */}
       <ImageEditDialog
         open={currentEditFile !== null}
         file={currentEditFile}
+        defaultAspect={editKind === "THUMBNAIL" ? 1 : 16 / 9}
+        lockAspect={editKind === "THUMBNAIL"}
         onConfirm={handleEditConfirm}
         onCancel={handleEditCancel}
+      />
+
+      {/* 라이브러리에서 이미지 선택 */}
+      <MediaPickerDialog
+        open={pickerOpen}
+        bucket="product-images"
+        onSelect={handlePickFromLibrary}
+        onClose={() => setPickerOpen(false)}
       />
 
       {/* 라이트박스 — 클릭 시 큰 미리보기 */}

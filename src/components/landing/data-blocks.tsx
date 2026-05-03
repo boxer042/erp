@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText } from "lucide-react";
+import { FileText, Minus, Plus, ShoppingCart } from "lucide-react";
+import { toast } from "sonner";
 import {
   Bar,
   BarChart,
@@ -29,11 +30,13 @@ import type {
   StatsGridBlock,
   CalloutBlock,
   InfoGridBlock,
+  ProductHeroBlock,
   ProductInfoBlock,
   HtmlEmbedBlock,
 } from "@/lib/validators/landing-block";
 import { resolveLandingIcon } from "@/lib/landing-icons";
 import { InlineMarkdown } from "@/components/landing/inline-md";
+import { useCommerce } from "@/components/landing/commerce-context";
 
 interface SpecValue {
   id: string;
@@ -609,6 +612,356 @@ interface ProductInfoApiResponse {
   manufactureDate: string | null;
   warrantyPolicy: string | null;
   asResponsible: string | null;
+}
+
+interface ProductHeroApiResponse {
+  id: string;
+  name: string;
+  modelName: string | null;
+  brand: string | null;
+  brandRef?: { name: string } | null;
+  category?: { name: string } | null;
+  imageUrl: string | null;
+  listPrice: string;
+  sellingPrice: string;
+  taxRate: string;
+  taxType: string;
+  media: Array<{ id: string; url: string; type: string; sortOrder: number; title: string | null }>;
+}
+
+const PRODUCT_HERO_PADDING: Record<NonNullable<ProductHeroBlock["paddingY"]>, string> = {
+  md: "py-12 md:py-16",
+  lg: "py-16 md:py-24",
+  xl: "py-20 md:py-28 lg:pt-[100px] lg:pb-[120px]",
+};
+
+const PRODUCT_HERO_BG: Record<NonNullable<ProductHeroBlock["background"]>, string> = {
+  none: "",
+  muted: "bg-muted",
+};
+
+/** 상품 메인 — PDP 최상단 요약 영역. Product 데이터 자동 매핑 */
+export function ProductHeroBlockView({
+  block,
+  productId,
+}: {
+  block: ProductHeroBlock;
+  productId?: string;
+}) {
+  const productQuery = useQuery({
+    queryKey: ["product-hero", productId ?? ""],
+    queryFn: () => apiGet<ProductHeroApiResponse>(`/api/products/${productId}`),
+    enabled: !!productId,
+  });
+
+  const product = productQuery.data;
+  const commerce = useCommerce();
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [busyAction, setBusyAction] = useState<"cart" | "buy" | null>(null);
+
+  const runCommerce = async (
+    action: "cart" | "buy",
+    handler: ((productId: string, qty: number) => void | Promise<void>) | undefined,
+    productIdLocal: string,
+  ) => {
+    if (!handler) {
+      const env = commerce.environment ?? "preview";
+      if (env === "preview" || env === "export") {
+        toast.info(
+          action === "cart"
+            ? "미리보기 — 실제 페이지에서 장바구니에 담깁니다"
+            : "미리보기 — 실제 페이지에서 결제 화면으로 이동합니다",
+        );
+      } else {
+        toast.error(`${env} 환경에서 ${action === "cart" ? "장바구니" : "구매"} 핸들러가 설정되지 않았습니다`);
+      }
+      return;
+    }
+    try {
+      setBusyAction(action);
+      await handler(productIdLocal, quantity);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "처리 실패");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  // 이미지 — override 우선, 없으면 Product.imageUrl + media (IMAGE 타입만, sortOrder 기준)
+  const images = (() => {
+    if (block.imagesOverride.length > 0) {
+      return block.imagesOverride.filter((img) => img.url);
+    }
+    if (!product) return [];
+    const list: Array<{ url: string; alt: string }> = [];
+    if (product.imageUrl) list.push({ url: product.imageUrl, alt: product.name });
+    const mediaImgs = (product.media ?? [])
+      .filter((m) => m.type === "IMAGE" && m.url && m.url !== product.imageUrl)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((m) => ({ url: m.url, alt: m.title || product.name }));
+    return [...list, ...mediaImgs];
+  })();
+
+  if (!productId) {
+    return (
+      <section
+        className={cn(
+          "w-full px-6 py-16 md:px-16",
+          PRODUCT_HERO_BG[block.background ?? "none"],
+        )}
+      >
+        <div className="mx-auto max-w-6xl rounded-md border border-dashed border-border bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
+          상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
+        </div>
+      </section>
+    );
+  }
+
+  if (productQuery.isPending) {
+    return (
+      <section
+        className={cn(
+          "w-full px-6 md:px-16",
+          PRODUCT_HERO_PADDING[block.paddingY ?? "xl"],
+          PRODUCT_HERO_BG[block.background ?? "none"],
+        )}
+      >
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-8 md:grid-cols-2 md:gap-12">
+            <div className="aspect-square w-full animate-pulse rounded-lg bg-muted" />
+            <div className="space-y-4">
+              <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+              <div className="h-10 w-2/3 animate-pulse rounded bg-muted" />
+              <div className="h-4 w-full animate-pulse rounded bg-muted" />
+              <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+              <div className="h-12 w-40 animate-pulse rounded bg-muted" />
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!product) return null;
+
+  const list = parseFloat(product.listPrice || "0");
+  const sell = parseFloat(product.sellingPrice || "0");
+  const taxRate = parseFloat(product.taxRate || "0");
+  const isTaxable = product.taxType === "TAXABLE";
+  const factor = block.vatIncluded && isTaxable ? 1 + taxRate : 1;
+  const displayList = Math.round(list * factor);
+  const displaySell = Math.round(sell * factor);
+  const hasDiscount = list > sell && sell > 0;
+  const discountPct = hasDiscount ? Math.round(((list - sell) / list) * 100) : 0;
+
+  const eyebrow = block.eyebrow.trim()
+    ? block.eyebrow
+    : [product.category?.name, product.brandRef?.name ?? product.brand]
+        .filter(Boolean)
+        .join(" · ");
+
+  const isImageTop = block.layout === "image-top";
+  const isImageRight = block.layout === "image-right";
+
+  const safeIdx = images.length > 0 ? Math.min(activeIdx, images.length - 1) : 0;
+  const mainImage = images[safeIdx];
+
+  const imageBlock = (
+    <div className="hero-fade-up-image space-y-3">
+      <div className="relative aspect-square w-full overflow-hidden">
+        {mainImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={mainImage.url}
+            alt={mainImage.alt}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+            상품 이미지 없음
+          </div>
+        )}
+      </div>
+      {images.length > 1 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {images.map((img, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setActiveIdx(i)}
+              className={cn(
+                "h-14 w-14 overflow-hidden border-2 transition md:h-16 md:w-16",
+                i === safeIdx ? "border-foreground" : "border-transparent opacity-70 hover:opacity-100",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={img.url} alt={img.alt} className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const infoBlock = (
+    <div className="hero-fade-up-stagger flex flex-col">
+      {eyebrow && (
+        <div className="mb-7 text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+          {eyebrow}
+        </div>
+      )}
+      <h1 className="mb-7 text-5xl font-black leading-[0.95] tracking-[-0.03em] md:text-7xl lg:text-[84px]">
+        {product.name}
+      </h1>
+      {block.subheadline ? (
+        <p className="mb-12 max-w-md whitespace-pre-wrap text-base leading-[1.65] text-muted-foreground md:mb-14 md:text-lg">
+          {block.subheadline}
+        </p>
+      ) : product.modelName ? (
+        <p className="mb-12 max-w-md text-base leading-[1.65] text-muted-foreground md:mb-14 md:text-lg">
+          모델명 · {product.modelName}
+        </p>
+      ) : (
+        <div className="mb-2" />
+      )}
+      {block.priceVisible && (
+        <div className="mb-9 border-y border-border-subtle py-7">
+          {hasDiscount && (
+            <div className="mb-1.5 text-sm text-muted-foreground line-through tabular-nums tracking-[0.02em]">
+              ₩{displayList.toLocaleString("ko-KR")}
+            </div>
+          )}
+          <div className="flex items-baseline gap-3.5">
+            <div className="text-4xl font-extrabold tabular-nums tracking-[-0.03em] md:text-[38px]">
+              ₩{displaySell.toLocaleString("ko-KR")}
+            </div>
+            {hasDiscount && block.showSaleBadge && (
+              <span className="inline-flex items-center border border-warning px-2 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-warning">
+                SALE{discountPct > 0 && ` ${discountPct}%`}
+              </span>
+            )}
+          </div>
+          {block.vatIncluded && isTaxable && (
+            <div className="mt-2 text-xs text-muted-foreground">VAT 포함</div>
+          )}
+        </div>
+      )}
+      {(block.quantityVisible || block.addToCart.visible || block.buyNow.visible) && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          {block.quantityVisible && (block.addToCart.visible || block.buyNow.visible) && (
+            <div className="inline-flex h-[52px] items-center border border-border bg-background">
+              <button
+                type="button"
+                className="flex h-full w-11 items-center justify-center text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                disabled={quantity <= 1}
+                aria-label="수량 감소"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={quantity}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value.replace(/\D/g, ""), 10);
+                  setQuantity(Number.isFinite(v) && v > 0 ? v : 1);
+                }}
+                className="h-full w-12 border-x border-border bg-transparent text-center text-sm font-semibold tabular-nums outline-none"
+                aria-label="수량"
+              />
+              <button
+                type="button"
+                className="flex h-full w-11 items-center justify-center text-muted-foreground transition hover:bg-muted"
+                onClick={() => setQuantity((q) => q + 1)}
+                aria-label="수량 증가"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          {block.addToCart.visible && (
+            <button
+              type="button"
+              disabled={busyAction !== null}
+              onClick={() => runCommerce("cart", commerce.onAddToCart, product.id)}
+              className="group inline-flex h-[52px] items-center justify-center gap-2.5 border border-border bg-background px-7 text-[13px] font-semibold uppercase tracking-[0.18em] text-foreground transition hover:bg-muted disabled:opacity-60"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              {busyAction === "cart" ? "처리 중..." : block.addToCart.label}
+            </button>
+          )}
+          {block.buyNow.visible && (
+            <button
+              type="button"
+              disabled={busyAction !== null}
+              onClick={() => runCommerce("buy", commerce.onBuyNow, product.id)}
+              className="group inline-flex h-[52px] items-center justify-center gap-3 bg-cta px-9 text-[13px] font-semibold uppercase tracking-[0.18em] text-cta-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              {busyAction === "buy" ? "처리 중..." : block.buyNow.label}
+              <span aria-hidden className="inline-block transition-transform duration-200 group-hover:translate-x-1">→</span>
+            </button>
+          )}
+        </div>
+      )}
+      {block.ctas.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {block.ctas
+            .filter((c) => c.label)
+            .slice(0, 2)
+            .map((cta, i) => (
+              <a
+                key={i}
+                href={cta.href || "#"}
+                className={cn(
+                  "group inline-flex h-11 items-center justify-center gap-2 px-5 text-[12px] font-semibold uppercase tracking-[0.18em] transition-colors",
+                  cta.variant === "primary"
+                    ? "bg-cta text-cta-foreground hover:opacity-90"
+                    : "border border-border text-foreground hover:bg-muted",
+                )}
+              >
+                {cta.label}
+                <span aria-hidden className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">→</span>
+              </a>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <section
+      className={cn(
+        "w-full px-6 md:px-16",
+        PRODUCT_HERO_PADDING[block.paddingY ?? "xl"],
+        PRODUCT_HERO_BG[block.background ?? "none"],
+      )}
+    >
+      <div className="mx-auto max-w-6xl">
+        {isImageTop ? (
+          <div className="space-y-12 md:space-y-16">
+            {imageBlock}
+            {infoBlock}
+          </div>
+        ) : (
+          <div className="grid gap-12 md:grid-cols-[1.15fr_1fr] md:gap-16 md:items-center lg:gap-[100px]">
+            {isImageRight ? (
+              <>
+                <div>{infoBlock}</div>
+                <div>{imageBlock}</div>
+              </>
+            ) : (
+              <>
+                <div>{imageBlock}</div>
+                <div>{infoBlock}</div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 interface CompanyInfoApiResponse {
