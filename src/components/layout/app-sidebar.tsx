@@ -34,6 +34,7 @@ import {
   Factory,
   FolderTree,
   SlidersHorizontal,
+  QrCode,
 } from "lucide-react";
 
 import {
@@ -95,6 +96,7 @@ const navGroups: NavGroup[] = [
       { id: "orders", label: "주문", href: "/orders", icon: ShoppingCart },
       { id: "quotations", label: "견적서", href: "/quotations", icon: FileText },
       { id: "statements", label: "거래명세표", href: "/statements", icon: Receipt },
+      { id: "serial-items", label: "시리얼 라벨", href: "/serial-items", icon: QrCode },
       { id: "customers", label: "고객", href: "/customers", icon: Users },
       { id: "customer-ledger", label: "고객 원장", href: "/customers/ledger", icon: BookOpen },
       { id: "channels", label: "판매 채널", href: "/channels", icon: Store },

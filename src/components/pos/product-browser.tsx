@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
 import { useSessions } from "@/components/pos/sessions-context";
+import { usePosShell } from "@/components/pos/pos-shell-context";
 import { ProductGrid, type ProductLite } from "@/components/pos/product-grid";
 
 interface CategoryRoot {
@@ -25,6 +26,7 @@ interface Props {
 
 export function ProductBrowser({ sessionId, enabled = true }: Props) {
   const { add } = useSessions();
+  const { openLanding } = usePosShell();
   const [categoryId, setCategoryId] = useState<string>("");
 
   const categoriesQuery = useQuery({
@@ -44,7 +46,7 @@ export function ProductBrowser({ sessionId, enabled = true }: Props) {
     enabled,
   });
 
-  const handleProductSelect = (p: ProductLite) => {
+  const handleAddToCart = (p: ProductLite) => {
     add(
       {
         productId: p.id,
@@ -62,6 +64,10 @@ export function ProductBrowser({ sessionId, enabled = true }: Props) {
       { sessionId }
     );
     toast.success(`${p.name} 추가됨`);
+  };
+
+  const handleViewDetail = (p: ProductLite) => {
+    openLanding(p.id);
   };
 
   return (
@@ -95,7 +101,8 @@ export function ProductBrowser({ sessionId, enabled = true }: Props) {
         <ProductGrid
           products={productsQuery.data ?? []}
           loading={productsQuery.isPending}
-          onSelect={handleProductSelect}
+          onAddToCart={handleAddToCart}
+          onViewDetail={handleViewDetail}
         />
       </div>
     </div>

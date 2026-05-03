@@ -51,6 +51,9 @@ export const productSchema = z.object({
   memo: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   assemblyTemplateId: z.string().nullable().optional(),
+  // 시리얼 라벨 (개별추적)
+  trackable: z.boolean().default(false),
+  warrantyMonths: z.coerce.number().int().min(0).nullable().optional(),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;

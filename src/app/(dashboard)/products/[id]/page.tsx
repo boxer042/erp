@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive } from "lucide-react";
+import { Archive, Layout } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -187,23 +187,25 @@ export default function ProductDetailPage() {
           <ProductHeaderBar
             product={product}
             onSaveName={(name) => saveSingleField({ name })}
-            onSaveImageUrl={(imageUrl) =>
-              apiMutate("/api/product-media", "POST", {
-                productId: product.id,
-                type: "IMAGE",
-                url: imageUrl,
-                setPrimary: true,
-              }).then(() => undefined)
-            }
             actions={
-              <Button
-                size="sm"
-                variant="destructive"
-                className="h-8"
-                onClick={() => setDeleteOpen(true)}
-              >
-                <Archive className="h-3.5 w-3.5 mr-1.5" />비활성
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => router.push(`/products/${product.id}/landing`)}
+                >
+                  <Layout className="h-3.5 w-3.5 mr-1.5" />상세페이지
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-8"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Archive className="h-3.5 w-3.5 mr-1.5" />비활성
+                </Button>
+              </>
             }
           />
 

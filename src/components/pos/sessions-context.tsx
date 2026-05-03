@@ -47,6 +47,8 @@ export interface CartSession {
   shippingCost: string;  // 세전 공급가액 기준, 정수 문자열
   quotationId?: string;            // 마지막 발행 견적서 ID
   quotationFingerprint?: string;   // 발행 시점 카트 지문 — 카트 변경 감지용
+  labelCodes?: string[];           // 마지막 발번 라벨 코드 목록
+  labelFingerprint?: string;       // 발번 시점 카트 지문
 }
 
 interface AddOptions {
@@ -73,6 +75,7 @@ interface SessionsContextValue {
   setSessionDiscount: (discount: string, sessionId?: string) => void;
   setSessionShipping: (amount: string, sessionId?: string) => void;
   setSessionQuotation: (quotationId: string, fingerprint: string, sessionId?: string) => void;
+  setSessionLabels: (codes: string[], fingerprint: string, sessionId?: string) => void;
   clear: (sessionId?: string) => void;
   totalItemCount: number;
   getSession: (id: string) => CartSession | undefined;
@@ -156,7 +159,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
         // 마지막 세션이면 비우기만
         return prev.map((s) =>
           s.id === id
-            ? { ...s, items: [], customerId: undefined, customerName: undefined, customerPhone: undefined, totalDiscount: "0", shippingCost: "0", quotationId: undefined, quotationFingerprint: undefined }
+            ? { ...s, items: [], customerId: undefined, customerName: undefined, customerPhone: undefined, totalDiscount: "0", shippingCost: "0", quotationId: undefined, quotationFingerprint: undefined, labelCodes: undefined, labelFingerprint: undefined }
             : s
         );
       }
@@ -390,6 +393,20 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     [activeId]
   );
 
+  const setSessionLabels = useCallback(
+    (codes: string[], fingerprint: string, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      setSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          labelCodes: codes,
+          labelFingerprint: fingerprint,
+        }))
+      );
+    },
+    [activeId]
+  );
+
   const clear = useCallback(
     (sessionId?: string) => {
       const targetId = sessionId ?? activeId;
@@ -404,6 +421,8 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
           shippingCost: "0",
           quotationId: undefined,
           quotationFingerprint: undefined,
+          labelCodes: undefined,
+          labelFingerprint: undefined,
         }))
       );
     },
@@ -446,11 +465,12 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       setSessionDiscount,
       setSessionShipping,
       setSessionQuotation,
+      setSessionLabels,
       clear,
       totalItemCount,
       getSession,
     }),
-    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, clear, totalItemCount, getSession]
+    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, clear, totalItemCount, getSession]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

@@ -128,6 +128,8 @@ export function NewProductForm({
     memo: "",
     vatIncluded: false,
     categoryId: "",
+    trackable: false,
+    warrantyMonths: "",
   });
 
   // 변형(variant) 연결 — URL `?canonicalProductId=<id>` 로 진입 시 자동 채움
@@ -415,6 +417,8 @@ export function NewProductForm({
       memo: "",
       vatIncluded: false,
       categoryId: "",
+      trackable: false,
+      warrantyMonths: "",
     });
     setMapping({ supplierId: "", supplierProductId: "", conversionRate: "1", isProvisional: false, syncName: false });
     setSupplierProducts([]);
@@ -956,6 +960,7 @@ export function NewProductForm({
           canonicalProductId: canonicalProductId || null,
           containerSize: bulkUsable ? containerSize || null : null,
           assemblyTemplateId: productType === "ASSEMBLED" && templateId ? templateId : null,
+          warrantyMonths: form.warrantyMonths ? parseInt(form.warrantyMonths, 10) : null,
           createBulk:
             bulkUsable && newBulkName.trim()
               ? { name: newBulkName.trim(), unitOfMeasure: newBulkUnit }
@@ -2027,6 +2032,44 @@ export function NewProductForm({
                         >
                           영세율 가능
                         </button>
+                      </div>
+                    </Field>
+
+                    <Field label="개별추적">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, trackable: !prev.trackable }))
+                          }
+                          className={cn(
+                            "px-2 h-6 rounded text-[11px] border transition-colors",
+                            form.trackable
+                              ? "bg-primary/10 border-primary/40 text-primary"
+                              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                          )}
+                        >
+                          시리얼 라벨 발번
+                        </button>
+                        {form.trackable && (
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={form.warrantyMonths}
+                              onChange={(e) =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  warrantyMonths: e.target.value.replace(/\D/g, ""),
+                                }))
+                              }
+                              onFocus={(e) => e.currentTarget.select()}
+                              className="h-7 w-16 text-right text-[13px]"
+                            />
+                            <span className="text-[11px] text-muted-foreground">개월 보증</span>
+                          </div>
+                        )}
                       </div>
                     </Field>
 

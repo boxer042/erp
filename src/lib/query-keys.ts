@@ -15,6 +15,7 @@ export const queryKeys = {
     detail: (id: string) => ["products", "detail", id] as const,
     costs: (id: string) => ["products", "costs", id] as const,
     movements: (id: string) => ["products", "movements", id] as const,
+    landing: (id: string) => ["products", "landing", id] as const,
   },
   incoming: {
     all: ["incoming"] as const,
@@ -49,6 +50,9 @@ export const queryKeys = {
   },
   companyInfo: {
     all: ["company-info"] as const,
+  },
+  landingSettings: {
+    all: ["landing-settings"] as const,
   },
   cardFeeRate: {
     all: ["card-fee-rate"] as const,

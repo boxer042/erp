@@ -47,6 +47,8 @@ export interface ProductFieldsInput {
   memo?: string | null;
   categoryId?: string | null;
   assemblyTemplateId?: string | null;
+  trackable?: boolean;
+  warrantyMonths?: number | null;
 }
 
 export async function updateProductFields(

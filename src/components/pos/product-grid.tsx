@@ -1,9 +1,10 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Package } from "lucide-react";
+import { Eye, Package, ShoppingCart } from "lucide-react";
 
 export interface ProductLite {
   id: string;
@@ -22,10 +23,11 @@ export interface ProductLite {
 interface Props {
   products: ProductLite[];
   loading?: boolean;
-  onSelect: (p: ProductLite) => void;
+  onAddToCart: (p: ProductLite) => void;
+  onViewDetail: (p: ProductLite) => void;
 }
 
-export function ProductGrid({ products, loading, onSelect }: Props) {
+export function ProductGrid({ products, loading, onAddToCart, onViewDetail }: Props) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 sm:gap-4 sm:p-4 md:grid-cols-4 lg:grid-cols-5">
@@ -35,6 +37,10 @@ export function ProductGrid({ products, loading, onSelect }: Props) {
             <div className="flex flex-col gap-1.5 p-3">
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-5 w-1/2" />
+              <div className="mt-1 flex gap-1.5">
+                <Skeleton className="h-8 flex-1 rounded-md" />
+                <Skeleton className="h-8 flex-1 rounded-md" />
+              </div>
             </div>
           </Card>
         ))}
@@ -60,8 +66,7 @@ export function ProductGrid({ products, loading, onSelect }: Props) {
       {products.map((p) => (
         <Card
           key={p.id}
-          onClick={() => onSelect(p)}
-          className="group flex cursor-pointer flex-col gap-0 overflow-hidden p-0 transition-shadow hover:shadow-md"
+          className="group flex flex-col gap-0 overflow-hidden p-0 transition-shadow hover:shadow-md"
         >
           <div className="relative aspect-square w-full bg-muted">
             {p.imageUrl ? (
@@ -84,6 +89,27 @@ export function ProductGrid({ products, loading, onSelect }: Props) {
               {Math.round(
                 Number(p.sellingPrice) * (p.taxType === "TAX_FREE" ? 1 : 1.1)
               ).toLocaleString("ko-KR")}
+            </div>
+            <div className="mt-1.5 flex gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 flex-1"
+                onClick={() => onViewDetail(p)}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                <span>상세</span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 flex-1"
+                onClick={() => onAddToCart(p)}
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                <span>담기</span>
+              </Button>
             </div>
           </div>
         </Card>

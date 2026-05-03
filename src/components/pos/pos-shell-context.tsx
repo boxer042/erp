@@ -9,6 +9,10 @@ export interface PosShellContextValue {
   setSearchOpen: (open: boolean) => void;
   cartOpen: boolean;
   setCartOpen: (open: boolean) => void;
+  /** 상세페이지 미리보기 — productId 설정 시 Drawer 열림 */
+  landingProductId: string | null;
+  openLanding: (productId: string) => void;
+  closeLanding: () => void;
 }
 
 export const PosShellContext = createContext<PosShellContextValue | null>(null);

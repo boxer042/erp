@@ -129,6 +129,8 @@ export interface ProductDetail {
   taxType: string;
   taxRate?: string;
   zeroRateEligible: boolean;
+  trackable?: boolean;
+  warrantyMonths?: number | null;
   sellingPrice: string;
   listPrice?: string;
   productType: string;

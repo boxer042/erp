@@ -87,6 +87,19 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
         </div>
       ),
     },
+    {
+      label: "개별추적",
+      value: product.trackable ? (
+        <div className="flex items-center gap-1">
+          <Badge variant="default">시리얼 라벨 발번</Badge>
+          {product.warrantyMonths != null && product.warrantyMonths > 0 && (
+            <span className="text-xs text-muted-foreground">
+              보증 {product.warrantyMonths}개월
+            </span>
+          )}
+        </div>
+      ) : null,
+    },
     { label: "모델명", value: product.modelName },
     { label: "규격", value: product.spec },
     {

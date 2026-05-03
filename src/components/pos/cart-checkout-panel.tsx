@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, ShoppingCart, Trash2, Truck, User } from "lucide-react";
+import { FileText, ShoppingCart, Tag, Trash2, Truck, User } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -55,15 +55,26 @@ function computeQuotationFingerprint(session: CartSession): string {
   });
 }
 
+// 라벨 발번 지문 — 손님과 trackable 상품 수량 변화에만 영향. 단가/할인 등은 무관.
+function computeLabelFingerprint(session: CartSession): string {
+  return JSON.stringify({
+    items: session.items
+      .filter((i) => i.itemType === "product" && i.productId)
+      .map((i) => ({ p: i.productId, q: i.quantity })),
+    c: session.customerId ?? null,
+  });
+}
+
 export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false }: Props) {
   const router = useRouter();
-  const { setSessionDiscount, setSessionShipping, setSessionQuotation, clear } = useSessions();
+  const { setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, clear } = useSessions();
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [discountDraft, setDiscountDraft] = useState("");
   const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
   const [shippingDialogOpen, setShippingDialogOpen] = useState(false);
   const [shippingDraft, setShippingDraft] = useState("");
   const [quotationPreviewId, setQuotationPreviewId] = useState<string | null>(null);
+  const [labelPreviewCodes, setLabelPreviewCodes] = useState<string[] | null>(null);
   const sessionId = session.id;
 
   const checkoutMutation = useMutation({
@@ -197,6 +208,46 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
       toast.error(err instanceof ApiError ? err.message : err.message || "견적서 생성 실패"),
   });
 
+  // 시리얼 라벨 발번 — trackable 상품에 한해 수량만큼 코드 생성
+  const labelMutation = useMutation<{ codes: string[]; fingerprint: string }, Error>({
+    mutationFn: async () => {
+      if (session.items.length === 0) throw new Error("카트가 비어있습니다");
+      const fingerprint = computeLabelFingerprint(session);
+
+      // 동일 카트 → 기존 코드 재사용
+      if (
+        session.labelCodes &&
+        session.labelCodes.length > 0 &&
+        session.labelFingerprint === fingerprint
+      ) {
+        return { codes: session.labelCodes, fingerprint };
+      }
+
+      const items = session.items
+        .filter((i) => i.itemType === "product" && i.productId)
+        .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) }));
+
+      if (items.length === 0) throw new Error("발번할 상품이 없습니다");
+
+      const res = await apiMutate<{ codes: { code: string }[] }>(
+        "/api/serial-items/issue",
+        "POST",
+        { customerId: session.customerId ?? null, items }
+      );
+      const codes = res.codes.map((c) => c.code);
+      if (codes.length === 0) {
+        throw new Error("개별추적(trackable) 설정된 상품이 없습니다");
+      }
+      return { codes, fingerprint };
+    },
+    onSuccess: (data) => {
+      setSessionLabels(data.codes, data.fingerprint, sessionId);
+      setLabelPreviewCodes(data.codes);
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : err.message || "라벨 발번 실패"),
+  });
+
   return (
     <div className="flex h-full w-full flex-col">
       {/* 라인 리스트 */}
@@ -237,8 +288,8 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
         )}
       </div>
 
-      {/* 손님 / 견적서 / 배송비 — 3그리드 버튼 */}
-      <div className="grid shrink-0 grid-cols-3 gap-px border-t border-border bg-border">
+      {/* 손님 / 견적서 / 배송비 / 라벨 — 4그리드 버튼 */}
+      <div className="grid shrink-0 grid-cols-4 gap-px border-t border-border bg-border">
         <ActionTile
           icon={<User className="size-7" />}
           label="손님"
@@ -264,6 +315,14 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
           }
           subValue={null}
           onClick={openShippingDialog}
+        />
+        <ActionTile
+          icon={<Tag className="size-7" />}
+          label="라벨"
+          value={labelMutation.isPending ? "처리 중..." : "출력"}
+          subValue={null}
+          onClick={() => labelMutation.mutate()}
+          disabled={labelMutation.isPending || session.items.length === 0}
         />
       </div>
 
@@ -417,6 +476,27 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
               src={`/quotations/${quotationPreviewId}/print`}
               className="size-full flex-1 border-0"
               title="견적서 미리보기"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 라벨 미리보기 모달 */}
+      <Dialog
+        open={!!labelPreviewCodes}
+        onOpenChange={(o) => {
+          if (!o) setLabelPreviewCodes(null);
+        }}
+      >
+        <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
+          <DialogHeader className="border-b border-border p-4">
+            <DialogTitle>라벨 미리보기 ({labelPreviewCodes?.length ?? 0}장)</DialogTitle>
+          </DialogHeader>
+          {labelPreviewCodes && labelPreviewCodes.length > 0 && (
+            <iframe
+              src={`/serial-items/print?codes=${labelPreviewCodes.join(",")}`}
+              className="size-full flex-1 border-0"
+              title="라벨 미리보기"
             />
           )}
         </DialogContent>

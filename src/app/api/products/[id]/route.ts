@@ -838,6 +838,8 @@ export async function PUT(
         categoryId: data.categoryId || null,
         assemblyTemplateId: data.assemblyTemplateId || null,
         zeroRateEligible: data.zeroRateEligible ?? false,
+        trackable: data.trackable ?? false,
+        warrantyMonths: data.warrantyMonths ?? null,
       },
     });
 

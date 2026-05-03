@@ -225,8 +225,11 @@ model Product {
   bulkProduct        Product?      @relation("ProductBulk", fields: [bulkProductId], references: [id], onDelete: SetNull)
   salesContainers    Product[]     @relation("ProductBulk")
   isActive           Boolean       @default(true) @map("is_active")
+  trackable          Boolean       @default(false) @map("trackable")
+  warrantyMonths     Int?          @map("warranty_months")
   imageUrl           String?       @map("image_url")
   memo               String?
+  landingBlocks      Json?         @map("landing_blocks")
   assemblyTemplateId String?       @map("assembly_template_id")
   assemblyTemplate   AssemblyTemplate? @relation("ProductDefaultTemplate", fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
   createdAt          DateTime      @default(now()) @map("created_at")
@@ -247,6 +250,7 @@ model Product {
   customerMachines   CustomerMachine[]
   repairParts        RepairPart[]
   rentalAssets       RentalAsset[]
+  serialItems        SerialItem[]
 
   assemblies                    Assembly[]
   assemblyComponentConsumptions AssemblyComponentConsumption[]
@@ -687,6 +691,7 @@ model OrderItem {
   memo                          String?
 
   lotConsumptions LotConsumption[]
+  serialItems     SerialItem[]
 
   @@map("order_items")
 }
@@ -863,6 +868,15 @@ model CompanyInfo {
   @@map("company_info")
 }
 
+// 모든 상품 상세페이지에 자동으로 attach 되는 공통 footer 블록 (배송/환불/AS 안내 등)
+model LandingSettings {
+  id           String   @id @default("singleton")
+  footerBlocks Json?    @map("footer_blocks")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("landing_settings")
+}
+
 model CompanyBankAccount {
   id        String   @id @default(uuid())
   companyId String   @default("singleton") @map("company_id")
@@ -906,6 +920,7 @@ model Customer {
   repairs    RepairTicket[]
   rentals    Rental[]
   expenses   Expense[]
+  serialItems SerialItem[]
 
   @@index([name])
   @@index([phone])
@@ -1568,4 +1583,38 @@ model AssemblyComponentConsumption {
   @@index([assemblyId])
   @@index([lotId])
   @@map("assembly_component_consumptions")
+}
+
+// ============================================================
+// SerialItem — 개별 시리얼 라벨 (큰 상품 추적용)
+// 자세한 기획은 docs/serial-item-plan.md 참조
+// ============================================================
+
+enum SerialItemStatus {
+  ACTIVE
+  RETURNED
+  SCRAPPED
+}
+
+model SerialItem {
+  id           String           @id @default(uuid())
+  code         String           @unique // "YYMMDD-NNNN" — 일별 4자리 시퀀스
+  productId    String           @map("product_id")
+  product      Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  orderItemId  String?          @map("order_item_id")
+  orderItem    OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  customerId   String?          @map("customer_id")
+  customer     Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  soldAt       DateTime         @map("sold_at")
+  warrantyEnds DateTime?        @map("warranty_ends")
+  status       SerialItemStatus @default(ACTIVE)
+  memo         String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@index([code])
+  @@index([productId])
+  @@index([customerId])
+  @@index([orderItemId])
+  @@map("serial_items")
 }

@@ -21,8 +21,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Package, Store, Truck, ShoppingCart, Warehouse, ChevronDown, ChevronUp, Plus,
-  Pencil, Trash2, Loader2, Building2, Landmark, Star,
+  Pencil, Trash2, Loader2, Building2, Landmark, Star, Layout, ChevronRight,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -80,6 +81,7 @@ const emptyBankForm = {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [stats, setStats] = useState<Stats | null>(null);
 
@@ -243,6 +245,23 @@ export default function SettingsPage() {
             </div>
           )}
         </CardContent>
+      </Card>
+
+      <Card
+        onClick={() => router.push("/settings/landing")}
+        className="cursor-pointer transition-shadow hover:shadow-md"
+      >
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <Layout className="h-4 w-4" /> 공통 상세페이지 footer
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </CardTitle>
+          <CardDescription>
+            모든 상품 상세페이지 하단에 자동으로 붙는 배송/환불/AS 안내 등 공통 블록을 한 곳에서 관리합니다.
+          </CardDescription>
+        </CardHeader>
       </Card>
 
       <Card>

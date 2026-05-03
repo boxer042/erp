@@ -73,6 +73,9 @@ function ProductInfoEditSheetContent({
     unitOfMeasure: product.unitOfMeasure,
     taxType: product.taxType as "TAXABLE" | "TAX_FREE",
     zeroRateEligible: product.zeroRateEligible,
+    trackable: product.trackable ?? false,
+    warrantyMonths:
+      product.warrantyMonths != null ? String(product.warrantyMonths) : "",
   });
 
   const brandsQuery = useQuery({
@@ -116,6 +119,8 @@ function ProductInfoEditSheetContent({
         categoryId: form.categoryId || null,
         assemblyTemplateId: product.assemblyTemplateId ?? null,
         zeroRateEligible: form.zeroRateEligible,
+        trackable: form.trackable,
+        warrantyMonths: form.warrantyMonths ? parseInt(form.warrantyMonths, 10) : null,
       };
       return updateProductFields(product.id, fields);
     },
@@ -253,6 +258,45 @@ function ProductInfoEditSheetContent({
                     체크 시 판매·견적·거래명세표에서 라인별 영세율 적용 토글이 노출됩니다 (예: 수출 거래)
                   </span>
                 </label>
+              </Field>
+
+              <Field label="개별추적">
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={form.trackable}
+                      onCheckedChange={(c) =>
+                        setForm((p) => ({ ...p, trackable: c === true }))
+                      }
+                    />
+                    <span className="text-muted-foreground">
+                      체크 시 POS 결제 시 시리얼 라벨이 발번됩니다 (큰 상품·내구재)
+                    </span>
+                  </label>
+                  {form.trackable && (
+                    <div className="flex items-center gap-2 pl-6">
+                      <Label className="text-sm text-muted-foreground" htmlFor="warrantyMonths">
+                        보증기간
+                      </Label>
+                      <Input
+                        id="warrantyMonths"
+                        type="text"
+                        inputMode="numeric"
+                        value={form.warrantyMonths}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            warrantyMonths: e.target.value.replace(/\D/g, ""),
+                          }))
+                        }
+                        onFocus={(e) => e.currentTarget.select()}
+                        placeholder="0"
+                        className="h-8 w-20 text-right tabular-nums"
+                      />
+                      <span className="text-sm text-muted-foreground">개월</span>
+                    </div>
+                  )}
+                </div>
               </Field>
             </div>
 
