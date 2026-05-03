@@ -3,12 +3,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDown,
-  ArrowUp,
   BarChart3,
   Calculator,
-  ChevronDown,
-  ChevronRight,
+  Code2,
   FileCode2,
   Film,
   Image as ImageIcon,
@@ -16,15 +13,33 @@ import {
   Layers,
   Layout,
   Loader2,
+  Monitor,
   Mountain,
+  Smartphone,
   Sparkles,
   Table2,
-  Trash2,
+  Tablet,
   Type,
   Video,
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,21 +57,24 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   BLOCK_DESCRIPTIONS,
   BLOCK_LABELS,
+  landingBlocksSchema,
   type BlockType,
   type LandingBlock,
   makeEmptyBlock,
 } from "@/lib/validators/landing-block";
+import { Textarea } from "@/components/ui/textarea";
 
 import { LandingPageView } from "@/components/landing/landing-page-view";
+import { SortableBlockItem } from "@/components/landing/sortable-block-item";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
-import { BlockEditor } from "../../products/[id]/landing/_block-editor";
-import { blockTitle, makeId, move } from "../../products/[id]/landing/_helpers";
+import { duplicateAt, makeId } from "../../products/[id]/landing/_helpers";
 
 interface LandingSettingsResponse {
   footerBlocks: LandingBlock[];
@@ -101,6 +119,15 @@ export default function LandingSettingsPage() {
   const [editState, setEditState] = useState<LandingBlock[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const [jsonText, setJsonText] = useState("");
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [previewWidth, setPreviewWidth] = useState<"desktop" | "tablet" | "mobile">("desktop");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.landingSettings.all,
@@ -144,8 +171,21 @@ export default function LandingSettingsPage() {
     setDeleteId(null);
   };
 
-  const moveBlock = (idx: number, dir: -1 | 1) => {
-    dispatch((prev) => move(prev, idx, idx + dir));
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    dispatch((prev) => {
+      const oldIdx = prev.findIndex((b) => b.id === active.id);
+      const newIdx = prev.findIndex((b) => b.id === over.id);
+      if (oldIdx < 0 || newIdx < 0) return prev;
+      return arrayMove(prev, oldIdx, newIdx);
+    });
+  };
+
+  const duplicateBlock = (idx: number) => {
+    const newId = makeId();
+    dispatch((prev) => duplicateAt(prev, idx, newId).next);
+    setExpandedId(newId);
   };
 
   return (
@@ -157,14 +197,29 @@ export default function LandingSettingsPage() {
             모든 상품 상세페이지 하단에 자동으로 표시되는 블록입니다. 배송/환불/AS 안내, 사업자 정보 등 공통 내용을 한 곳에서 관리하세요.
           </p>
         </div>
-        <Button
-          size="sm"
-          disabled={!dirty || saveMutation.isPending}
-          onClick={() => saveMutation.mutate(blocks)}
-        >
-          {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          <span>{saveMutation.isPending ? "저장 중..." : "저장"}</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setJsonText(JSON.stringify(blocks, null, 2));
+              setJsonError(null);
+              setJsonOpen(true);
+            }}
+            title="JSON 가져오기/내보내기 — Claude Code 등으로 만든 JSON 적용"
+          >
+            <Code2 className="h-4 w-4" />
+            <span>JSON</span>
+          </Button>
+          <Button
+            size="sm"
+            disabled={!dirty || saveMutation.isPending}
+            onClick={() => saveMutation.mutate(blocks)}
+          >
+            {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            <span>{saveMutation.isPending ? "저장 중..." : "저장"}</span>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -245,79 +300,92 @@ export default function LandingSettingsPage() {
               아직 등록된 footer 블록이 없습니다
             </div>
           ) : (
-            <ul className="divide-y divide-border border-y border-border">
-              {blocks.map((block, idx) => {
-                const Icon = BLOCK_ICON[block.type];
-                const expanded = expandedId === block.id;
-                return (
-                  <li key={block.id} className="bg-background">
-                    <div className="flex items-center gap-2 px-4 py-3">
-                      <button
-                        type="button"
-                        className="flex flex-1 items-center gap-2 text-left"
-                        onClick={() => setExpandedId(expanded ? null : block.id)}
-                      >
-                        {expanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <Icon className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{BLOCK_LABELS[block.type]}</span>
-                        <span className="truncate text-xs text-muted-foreground">
-                          {blockTitle(block)}
-                        </span>
-                      </button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        disabled={idx === 0}
-                        onClick={() => moveBlock(idx, -1)}
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        disabled={idx === blocks.length - 1}
-                        onClick={() => moveBlock(idx, 1)}
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => setDeleteId(block.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    {expanded && (
-                      <div className="border-t border-border bg-muted/30 px-4 py-3">
-                        <BlockEditor block={block} onChange={updateBlock} />
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext
+                items={blocks.map((b) => b.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="divide-y divide-border border-y border-border">
+                  {blocks.map((block) => (
+                    <SortableBlockItem
+                      key={block.id}
+                      block={block}
+                      iconMap={BLOCK_ICON}
+                      expanded={expandedId === block.id}
+                      onToggle={() =>
+                        setExpandedId(expandedId === block.id ? null : block.id)
+                      }
+                      onUpdate={updateBlock}
+                      onDelete={() => setDeleteId(block.id)}
+                      onDuplicate={() =>
+                        duplicateBlock(blocks.findIndex((b) => b.id === block.id))
+                      }
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           )}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>미리보기</CardTitle>
+          <div className="flex h-7 rounded-md border border-border bg-background text-[12px]">
+            <button
+              type="button"
+              className={cn(
+                "flex items-center px-2",
+                previewWidth === "desktop"
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setPreviewWidth("desktop")}
+              title="데스크톱 폭"
+            >
+              <Monitor className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex items-center border-l border-border px-2",
+                previewWidth === "tablet"
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setPreviewWidth("tablet")}
+              title="태블릿 폭 (768px)"
+            >
+              <Tablet className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex items-center border-l border-border px-2",
+                previewWidth === "mobile"
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setPreviewWidth("mobile")}
+              title="모바일 폭 (375px)"
+            >
+              <Smartphone className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="border-y border-border">
-            <LandingPageView blocks={blocks} emptyMessage="블록을 추가하면 여기에 표시됩니다" />
+        <CardContent className="bg-muted/30 p-0">
+          <div className="border-t border-border">
+            <div
+              className={cn(
+                "mx-auto bg-background",
+                previewWidth === "desktop" && "max-w-[960px]",
+                previewWidth === "tablet" && "max-w-[768px]",
+                previewWidth === "mobile" && "max-w-[375px]",
+              )}
+            >
+              <LandingPageView blocks={blocks} emptyMessage="블록을 추가하면 여기에 표시됩니다" />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -334,6 +402,82 @@ export default function LandingSettingsPage() {
             <Button variant="outline" onClick={() => setDeleteId(null)}>취소</Button>
             <Button variant="destructive" onClick={() => deleteId && removeBlock(deleteId)}>
               삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={jsonOpen} onOpenChange={setJsonOpen}>
+        <DialogContent className="flex max-h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3 sm:max-w-none">
+          <DialogHeader>
+            <DialogTitle>Footer JSON 가져오기 / 내보내기</DialogTitle>
+            <DialogDescription>
+              Claude Code 등으로 만든 footer 블록 JSON 을 붙여넣고 <b>가져오기</b> 누르면 미리보기에 즉시 반영됩니다 (저장은 헤더의 &ldquo;저장&rdquo; 버튼).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <Textarea
+              value={jsonText}
+              onChange={(e) => {
+                setJsonText(e.target.value);
+                setJsonError(null);
+              }}
+              className="min-h-0 flex-1 resize-none font-mono text-[11px] leading-snug"
+              spellCheck={false}
+            />
+            {jsonError && (
+              <p className="rounded-md bg-destructive/15 px-2 py-1.5 text-xs text-destructive">
+                {jsonError}
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              스키마: <code className="rounded bg-muted px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
+              <code className="rounded bg-muted px-1">src/lib/validators/landing-block.ts</code>{" "}
+              참고
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(jsonText);
+                  toast.success("클립보드에 복사되었습니다");
+                } catch {
+                  toast.error("클립보드 복사 실패 — 직접 선택해 복사하세요");
+                }
+              }}
+            >
+              클립보드로 복사
+            </Button>
+            <div className="flex-1" />
+            <Button variant="outline" onClick={() => setJsonOpen(false)}>닫기</Button>
+            <Button
+              onClick={() => {
+                try {
+                  const parsedRaw = JSON.parse(jsonText);
+                  const parsed = landingBlocksSchema.safeParse(parsedRaw);
+                  if (!parsed.success) {
+                    const first = parsed.error.issues[0];
+                    setJsonError(
+                      `검증 실패: ${first?.path.join(".") || "root"} — ${first?.message ?? "알 수 없는 오류"}`,
+                    );
+                    return;
+                  }
+                  setEditState(parsed.data);
+                  setJsonOpen(false);
+                  setJsonError(null);
+                  toast.success(
+                    `${parsed.data.length}개 블록을 가져왔습니다 — 헤더의 "저장"을 눌러 확정하세요`,
+                  );
+                } catch (e) {
+                  setJsonError(
+                    `JSON 파싱 실패: ${e instanceof Error ? e.message : "알 수 없는 오류"}`,
+                  );
+                }
+              }}
+            >
+              가져오기 (미리보기에 반영)
             </Button>
           </DialogFooter>
         </DialogContent>

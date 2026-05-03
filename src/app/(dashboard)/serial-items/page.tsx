@@ -56,14 +56,30 @@ function SerialSkeletonRows({ rows = 8 }: { rows?: number }) {
     <>
       {Array.from({ length: rows }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell><Skeleton className="size-4 rounded" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
+          <TableCell>
+            <Skeleton className="size-4 rounded" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-28" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-40" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-24" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-20" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-20" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-12 rounded-md" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-8 w-8 rounded-md" />
+          </TableCell>
         </TableRow>
       ))}
     </>
@@ -84,7 +100,8 @@ export default function SerialItemsPage() {
   });
 
   const items = itemsQuery.data ?? [];
-  const allSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
+  const allSelected =
+    items.length > 0 && items.every((i) => selectedIds.has(i.id));
   const someSelected = selectedIds.size > 0 && !allSelected;
 
   const selectedCodes = useMemo(
@@ -118,6 +135,7 @@ export default function SerialItemsPage() {
         search={{
           value: search,
           onChange: setSearch,
+          onSearch: () => {},
           placeholder: "코드·상품명·손님 검색",
         }}
         onRefresh={() => itemsQuery.refetch()}
@@ -141,7 +159,9 @@ export default function SerialItemsPage() {
             <TableRow>
               <TableHead className="w-10">
                 <Checkbox
-                  checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                  checked={
+                    allSelected ? true : someSelected ? "indeterminate" : false
+                  }
                   onCheckedChange={toggleAll}
                 />
               </TableHead>
@@ -159,7 +179,10 @@ export default function SerialItemsPage() {
               <SerialSkeletonRows />
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell
+                  colSpan={8}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   발번된 라벨이 없습니다
                 </TableCell>
               </TableRow>
@@ -177,7 +200,9 @@ export default function SerialItemsPage() {
                     {it.product ? (
                       <div className="flex flex-col">
                         <span>{it.product.name}</span>
-                        <span className="text-xs text-muted-foreground">{it.product.sku}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {it.product.sku}
+                        </span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">-</span>
@@ -197,12 +222,18 @@ export default function SerialItemsPage() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell>{format(new Date(it.soldAt), "yyyy-MM-dd")}</TableCell>
                   <TableCell>
-                    {it.warrantyEnds ? format(new Date(it.warrantyEnds), "yyyy-MM-dd") : "-"}
+                    {format(new Date(it.soldAt), "yyyy-MM-dd")}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant(it.status)}>{statusLabel(it.status)}</Badge>
+                    {it.warrantyEnds
+                      ? format(new Date(it.warrantyEnds), "yyyy-MM-dd")
+                      : "-"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant(it.status)}>
+                      {statusLabel(it.status)}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -222,7 +253,10 @@ export default function SerialItemsPage() {
         </Table>
       </div>
 
-      <Dialog open={!!printCodes} onOpenChange={(o) => !o && setPrintCodes(null)}>
+      <Dialog
+        open={!!printCodes}
+        onOpenChange={(o) => !o && setPrintCodes(null)}
+      >
         <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
           <DialogHeader className="border-b border-border p-4">
             <DialogTitle>라벨 재출력 ({printCodes?.length ?? 0}장)</DialogTitle>

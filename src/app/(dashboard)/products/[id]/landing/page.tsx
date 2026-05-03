@@ -8,15 +8,11 @@ import {
   BarChart3,
   Calculator,
   Camera,
-  ChevronDown,
-  ChevronRight,
   Code2,
-  Copy,
   Download,
   ExternalLink,
   FileCode2,
   Film,
-  GripVertical,
   Image as ImageIcon,
   Images,
   Layers,
@@ -48,10 +44,8 @@ import {
   SortableContext,
   arrayMove,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -79,6 +73,7 @@ import {
 
 import { LandingPageView } from "@/components/landing/landing-page-view";
 import { SingleHtmlPreview } from "@/components/landing/single-html-preview";
+import { SortableBlockItem } from "@/components/landing/sortable-block-item";
 import {
   Tooltip,
   TooltipContent,
@@ -498,6 +493,7 @@ export default function ProductLandingPage() {
                       <SortableBlockItem
                         key={block.id}
                         block={block}
+                        iconMap={BLOCK_ICON}
                         expanded={expandedId === block.id}
                         onToggle={() =>
                           setExpandedId(expandedId === block.id ? null : block.id)
@@ -692,87 +688,6 @@ function resolveHtmlSrc(url: string): string {
   const m = url.match(/\/storage\/v1\/object\/public\/product-html\/(.+)$/);
   if (m) return `/api/products/landing-html/${m[1]}`;
   return url;
-}
-
-function SortableBlockItem({
-  block,
-  expanded,
-  onToggle,
-  onUpdate,
-  onDelete,
-  onDuplicate,
-}: {
-  block: LandingBlock;
-  expanded: boolean;
-  onToggle: () => void;
-  onUpdate: (next: LandingBlock) => void;
-  onDelete: () => void;
-  onDuplicate: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: block.id });
-  const Icon = BLOCK_ICON[block.type];
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 10 : undefined,
-    opacity: isDragging ? 0.6 : undefined,
-  };
-
-  return (
-    <li ref={setNodeRef} style={style} className="bg-background">
-      <div className="flex items-center gap-2 px-3 py-2">
-        <button
-          type="button"
-          className="flex h-7 w-5 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-          aria-label="드래그해서 순서 변경"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          className="flex flex-1 items-center gap-2 text-left"
-          onClick={onToggle}
-        >
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium">{BLOCK_LABELS[block.type]}</span>
-          <span className="truncate text-xs text-muted-foreground">{blockTitle(block)}</span>
-        </button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={onDuplicate}
-          title="복제"
-        >
-          <Copy className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={onDelete}
-          title="삭제"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      {expanded && (
-        <div className="border-t border-border bg-muted/30 px-4 py-3">
-          <BlockEditor block={block} onChange={onUpdate} />
-        </div>
-      )}
-    </li>
-  );
 }
 
 function SingleHtmlEditorBody({
