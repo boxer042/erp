@@ -6,8 +6,10 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart3,
+  Calculator,
   ChevronDown,
   ChevronRight,
+  FileCode2,
   Film,
   Image as ImageIcon,
   Images,
@@ -73,6 +75,8 @@ const BLOCK_ICON: Record<BlockType, React.ComponentType<{ className?: string }>>
   "ambient-video": Film,
   table: Table2,
   chart: BarChart3,
+  "stats-grid": Calculator,
+  "html-embed": FileCode2,
 };
 
 const BLOCK_TYPES: BlockType[] = [
@@ -88,6 +92,8 @@ const BLOCK_TYPES: BlockType[] = [
   "ambient-video",
   "table",
   "chart",
+  "stats-grid",
+  "html-embed",
 ];
 
 export default function LandingSettingsPage() {

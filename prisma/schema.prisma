@@ -194,6 +194,11 @@ enum ProductType {
   ASSEMBLED // 조립상품
 }
 
+enum ProductLandingMode {
+  BLOCKS       // 블록 컴포지션 (기본)
+  SINGLE_HTML  // 단일 HTML 파일 통째로
+}
+
 model Product {
   id                 String        @id @default(uuid())
   name               String
@@ -230,6 +235,8 @@ model Product {
   imageUrl           String?       @map("image_url")
   memo               String?
   landingBlocks      Json?         @map("landing_blocks")
+  landingMode        ProductLandingMode @default(BLOCKS) @map("landing_mode")
+  singleHtmlUrl      String?       @map("single_html_url")
   assemblyTemplateId String?       @map("assembly_template_id")
   assemblyTemplate   AssemblyTemplate? @relation("ProductDefaultTemplate", fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
   createdAt          DateTime      @default(now()) @map("created_at")

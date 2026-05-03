@@ -4,6 +4,7 @@ export const heroBlockSchema = z.object({
   id: z.string(),
   type: z.literal("hero"),
   imageUrl: z.string().url().or(z.literal("")),
+  eyebrow: z.string().default(""),
   headline: z.string().default(""),
   subheadline: z.string().default(""),
   textAlign: z.enum(["left", "center", "right"]).default("center"),
@@ -17,16 +18,39 @@ export const imageBlockSchema = z.object({
   imageUrl: z.string().url().or(z.literal("")),
   alt: z.string().default(""),
   caption: z.string().default(""),
+  /** @deprecated maxWidth 사용. true=full / false=md 로 자동 매핑됨 */
   fullWidth: z.boolean().default(true),
+  /** 폭 — full(전체), lg(960), md(768), sm(560) */
+  maxWidth: z.enum(["full", "lg", "md", "sm"]).default("full"),
+  /** 라운드 코너 */
+  rounded: z.enum(["none", "sm", "md", "lg", "xl", "full"]).default("none"),
+  /** 그림자 */
+  shadow: z.enum(["none", "sm", "md", "lg"]).default("none"),
+  /** 상하 여백 */
+  paddingY: z.enum(["none", "sm", "md", "lg"]).default("none"),
+  /** 배경 — 이미지 주변 영역 색 */
+  background: z.enum(["none", "muted", "dark"]).default("none"),
 });
 
 export const textBlockSchema = z.object({
   id: z.string(),
   type: z.literal("text"),
+  /** 제목 위에 붙는 작은 강조 라벨 (예: "AT A GLANCE", "NEW"). 비워두면 안 표시 */
+  eyebrow: z.string().default(""),
   heading: z.string().default(""),
   body: z.string().default(""),
   align: z.enum(["left", "center", "right"]).default("left"),
-  background: z.enum(["none", "muted"]).default("none"),
+  background: z.enum(["none", "muted", "dark"]).default("none"),
+  /** 제목 크기 — sm(소제목) / md(기본 섹션) / lg(큰 섹션) / xl(디스플레이) */
+  headingSize: z.enum(["sm", "md", "lg", "xl"]).default("md"),
+  /** 제목 굵기 */
+  headingWeight: z.enum(["normal", "semibold", "bold"]).default("semibold"),
+  /** 본문 크기 */
+  bodySize: z.enum(["sm", "md", "lg"]).default("md"),
+  /** 텍스트 색 — default(헤딩=fg/본문=muted) / muted(전체 muted) / brand(브랜드 컬러) */
+  color: z.enum(["default", "muted", "brand"]).default("default"),
+  /** 상하 패딩 */
+  paddingY: z.enum(["sm", "md", "lg", "xl"]).default("lg"),
 });
 
 export const videoBlockSchema = z.object({
@@ -51,6 +75,9 @@ export const galleryBlockSchema = z.object({
     )
     .default([]),
   columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).default(3),
+  rounded: z.enum(["none", "sm", "md", "lg", "xl", "full"]).default("md"),
+  shadow: z.enum(["none", "sm", "md", "lg"]).default("none"),
+  gap: z.enum(["none", "sm", "md", "lg"]).default("sm"),
 });
 
 // 스크롤 진입 시 fade-in + 위로 슬라이드 — 애플 첫 화면 같은 진입 효과
@@ -136,6 +163,44 @@ export const chartBlockSchema = z.object({
     .default([]),
 });
 
+// 스탯 그리드 — Apple 스타일의 "큰 숫자 + 단위 + 라벨" N컬럼 표시
+export const statsGridBlockSchema = z.object({
+  id: z.string(),
+  type: z.literal("stats-grid"),
+  eyebrow: z.string().default(""),
+  heading: z.string().default(""),
+  body: z.string().default(""),
+  align: z.enum(["left", "center"]).default("left"),
+  columns: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).default(4),
+  items: z
+    .array(
+      z.object({
+        value: z.string().default(""),
+        unit: z.string().default(""),
+        label: z.string().default(""),
+      }),
+    )
+    .default([]),
+  dividers: z.boolean().default(true),
+  background: z.enum(["none", "muted", "dark"]).default("muted"),
+  paddingY: z.enum(["sm", "md", "lg", "xl"]).default("xl"),
+  /** 켜면 상품의 specValues 를 자동으로 items 으로 사용 (수동 items 무시) */
+  useProductSpecs: z.boolean().default(false),
+});
+
+// HTML 임베드 — 사용자가 직접 만든 .html 파일을 업로드해 sandboxed iframe 으로 표시
+// htmlUrl 은 절대 URL(외부) 또는 "/api/..." 같은 상대 경로(우리 프록시) 모두 허용
+export const htmlEmbedBlockSchema = z.object({
+  id: z.string(),
+  type: z.literal("html-embed"),
+  htmlUrl: z.string(),
+  heightPx: z.number().int().positive().default(600),
+  displayMode: z.enum(["inline", "cover"]).default("inline"),
+  allowForms: z.boolean().default(false),
+  /** 자동 높이 — iframe 내부 콘텐츠 높이를 postMessage 로 받아 동적 조절. 끄면 heightPx 고정 */
+  autoHeight: z.boolean().default(true),
+});
+
 export const landingBlockSchema = z.discriminatedUnion("type", [
   heroBlockSchema,
   imageBlockSchema,
@@ -149,6 +214,8 @@ export const landingBlockSchema = z.discriminatedUnion("type", [
   ambientVideoBlockSchema,
   tableBlockSchema,
   chartBlockSchema,
+  statsGridBlockSchema,
+  htmlEmbedBlockSchema,
 ]);
 
 export const landingBlocksSchema = z.array(landingBlockSchema);
@@ -165,6 +232,8 @@ export type SpecTableBlock = z.infer<typeof specTableBlockSchema>;
 export type AmbientVideoBlock = z.infer<typeof ambientVideoBlockSchema>;
 export type TableBlock = z.infer<typeof tableBlockSchema>;
 export type ChartBlock = z.infer<typeof chartBlockSchema>;
+export type StatsGridBlock = z.infer<typeof statsGridBlockSchema>;
+export type HtmlEmbedBlock = z.infer<typeof htmlEmbedBlockSchema>;
 export type LandingBlock = z.infer<typeof landingBlockSchema>;
 
 export type BlockType = LandingBlock["type"];
@@ -182,6 +251,8 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   "ambient-video": "분위기 영상",
   table: "표",
   chart: "차트",
+  "stats-grid": "스탯 그리드",
+  "html-embed": "HTML 임베드",
 };
 
 export const BLOCK_DESCRIPTIONS: Record<BlockType, { title: string; body: string; example: string }> = {
@@ -245,6 +316,16 @@ export const BLOCK_DESCRIPTIONS: Record<BlockType, { title: string; body: string
     body: "막대/선/원형 그래프. 데이터를 직접 입력합니다. 외부 채널 export 시 스크린샷으로만 변환됨에 유의.",
     example: "예) 연료 효율 비교, 주요 성분 비율, 사용 통계",
   },
+  "stats-grid": {
+    title: "스탯 그리드",
+    body: "큰 숫자 + 단위 + 라벨 형태로 핵심 사양을 N컬럼으로 표시. Apple 제품 페이지 \"AT A GLANCE\" 섹션 같은 디자인.",
+    example: "예) 배기량/출력/마력/가이드바 같은 핵심 스펙 한눈에",
+  },
+  "html-embed": {
+    title: "HTML 임베드",
+    body: "직접 만든 .html 파일을 업로드해 sandboxed iframe 으로 표시. 본인이 작성한 CSS 애니메이션·커스텀 레이아웃을 그대로 넣을 수 있습니다. 보안상 부모 페이지의 쿠키/세션엔 접근 못 함.",
+    example: "예) 1회성 커스텀 디자인 섹션, CSS 모션 위젯, 인터랙티브 데모",
+  },
 };
 
 export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
@@ -254,6 +335,7 @@ export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
         id,
         type: "hero",
         imageUrl: "",
+        eyebrow: "",
         headline: "",
         subheadline: "",
         textAlign: "center",
@@ -261,13 +343,46 @@ export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
         height: "md",
       };
     case "image":
-      return { id, type: "image", imageUrl: "", alt: "", caption: "", fullWidth: true };
+      return {
+        id,
+        type: "image",
+        imageUrl: "",
+        alt: "",
+        caption: "",
+        fullWidth: true,
+        maxWidth: "full",
+        rounded: "none",
+        shadow: "none",
+        paddingY: "none",
+        background: "none",
+      };
     case "text":
-      return { id, type: "text", heading: "", body: "", align: "left", background: "none" };
+      return {
+        id,
+        type: "text",
+        eyebrow: "",
+        heading: "",
+        body: "",
+        align: "left",
+        background: "none",
+        headingSize: "md",
+        headingWeight: "semibold",
+        bodySize: "md",
+        color: "default",
+        paddingY: "lg",
+      };
     case "video":
       return { id, type: "video", source: "youtube", value: "", caption: "", autoplay: false };
     case "gallery":
-      return { id, type: "gallery", images: [], columns: 3 };
+      return {
+        id,
+        type: "gallery",
+        images: [],
+        columns: 3,
+        rounded: "md",
+        shadow: "none",
+        gap: "sm",
+      };
     case "scrolly-hero":
       return {
         id,
@@ -328,6 +443,36 @@ export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
           { label: "A", value: 0 },
           { label: "B", value: 0 },
         ],
+      };
+    case "stats-grid":
+      return {
+        id,
+        type: "stats-grid",
+        eyebrow: "AT A GLANCE",
+        heading: "한눈에 보는\n핵심 사양.",
+        body: "",
+        align: "left",
+        columns: 4,
+        items: [
+          { value: "", unit: "", label: "" },
+          { value: "", unit: "", label: "" },
+          { value: "", unit: "", label: "" },
+          { value: "", unit: "", label: "" },
+        ],
+        dividers: true,
+        background: "muted",
+        paddingY: "xl",
+        useProductSpecs: false,
+      };
+    case "html-embed":
+      return {
+        id,
+        type: "html-embed",
+        htmlUrl: "",
+        heightPx: 600,
+        displayMode: "inline",
+        allowForms: false,
+        autoHeight: true,
       };
   }
 }

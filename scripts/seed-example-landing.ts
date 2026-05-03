@@ -181,6 +181,26 @@ const exampleBlocks = [
       { label: "경쟁사 평균", value: 3.0 },
     ],
   },
+
+  // 14) 스탯 그리드 — Apple 스타일 핵심 사양
+  {
+    id: "ex-stats",
+    type: "stats-grid",
+    eyebrow: "AT A GLANCE",
+    heading: "한눈에 보는\n핵심 사양.",
+    body: "",
+    align: "left",
+    columns: 4,
+    items: [
+      { value: "35.8", unit: "cm³", label: "배기량" },
+      { value: "1.60", unit: "kW", label: "출력" },
+      { value: "2.20", unit: "hp", label: "엔진 마력" },
+      { value: "14", unit: "in", label: "가이드바" },
+    ],
+    dividers: true,
+    background: "muted",
+    paddingY: "xl",
+  },
 ] as const;
 
 const exampleFooter = [

@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Eye, Package, ShoppingCart } from "lucide-react";
+import { Info, Package, ShoppingCart } from "lucide-react";
 
 export interface ProductLite {
   id: string;
@@ -98,11 +98,12 @@ export function ProductGrid({ products, loading, onAddToCart, onViewDetail }: Pr
                 className="h-8 flex-1"
                 onClick={() => onViewDetail(p)}
               >
-                <Eye className="h-3.5 w-3.5" />
+                <Info className="h-3.5 w-3.5" />
                 <span>상세</span>
               </Button>
               <Button
                 type="button"
+                variant="secondary"
                 size="sm"
                 className="h-8 flex-1"
                 onClick={() => onAddToCart(p)}

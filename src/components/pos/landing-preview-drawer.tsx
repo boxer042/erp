@@ -12,9 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiGet } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import { queryKeys } from "@/lib/query-keys";
 import { usePosShell } from "@/components/pos/pos-shell-context";
 import { LandingPageView } from "@/components/landing/landing-page-view";
+import { SingleHtmlPreview } from "@/components/landing/single-html-preview";
 import type { LandingBlock } from "@/lib/validators/landing-block";
 
 interface LandingResponse {
@@ -23,6 +25,14 @@ interface LandingResponse {
   sku: string;
   imageUrl: string | null;
   blocks: LandingBlock[];
+  landingMode: "BLOCKS" | "SINGLE_HTML";
+  singleHtmlUrl: string | null;
+}
+
+function resolveHtmlSrc(url: string): string {
+  const m = url.match(/\/storage\/v1\/object\/public\/product-html\/(.+)$/);
+  if (m) return `/api/products/landing-html/${m[1]}`;
+  return url;
 }
 
 export function LandingPreviewDrawer() {
@@ -77,7 +87,14 @@ export function LandingPreviewDrawer() {
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div
+          className={cn(
+            "flex-1 min-h-0",
+            landingQuery.data?.landingMode === "SINGLE_HTML"
+              ? "overflow-hidden"
+              : "overflow-y-auto",
+          )}
+        >
           {landingQuery.isPending || footerQuery.isPending ? (
             <PreviewSkeleton />
           ) : landingQuery.isError ? (
@@ -88,6 +105,18 @@ export function LandingPreviewDrawer() {
                 <span>다시 시도</span>
               </Button>
             </div>
+          ) : landingQuery.data?.landingMode === "SINGLE_HTML" ? (
+            landingQuery.data.singleHtmlUrl ? (
+              <div className="overflow-y-auto h-full">
+                <SingleHtmlPreview
+                  src={resolveHtmlSrc(landingQuery.data.singleHtmlUrl)}
+                />
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                HTML 파일이 등록되지 않았습니다
+              </div>
+            )
           ) : (
             <LandingPageView
               blocks={blocks}

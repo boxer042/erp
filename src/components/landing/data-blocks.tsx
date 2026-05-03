@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -19,12 +20,13 @@ import {
 
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query-keys";
 import type {
   SpecTableBlock,
   AmbientVideoBlock,
   TableBlock,
   ChartBlock,
+  StatsGridBlock,
+  HtmlEmbedBlock,
 } from "@/lib/validators/landing-block";
 
 interface SpecValue {
@@ -260,6 +262,224 @@ export function ChartBlockView({ block }: { block: ChartBlock }) {
           </ResponsiveContainer>
         </div>
       </div>
+    </section>
+  );
+}
+
+const STATS_PADDING: Record<NonNullable<StatsGridBlock["paddingY"]>, string> = {
+  sm: "py-8 md:py-12",
+  md: "py-12 md:py-16",
+  lg: "py-16 md:py-24",
+  xl: "py-20 md:py-32",
+};
+
+const STATS_BG: Record<NonNullable<StatsGridBlock["background"]>, string> = {
+  none: "",
+  muted: "bg-muted",
+  dark: "bg-foreground text-background",
+};
+
+const STATS_COLS: Record<2 | 3 | 4 | 5, string> = {
+  2: "grid-cols-2",
+  3: "grid-cols-2 md:grid-cols-3",
+  4: "grid-cols-2 md:grid-cols-4",
+  5: "grid-cols-2 md:grid-cols-5",
+};
+
+export function StatsGridBlockView({
+  block,
+  productId,
+}: {
+  block: StatsGridBlock;
+  productId?: string;
+}) {
+  const isDark = block.background === "dark";
+  const headerAlign = block.align === "center" ? "text-center" : "text-left";
+
+  // useProductSpecs 켜져 있으면 상품 스펙을 자동으로 stats item 으로 변환
+  const specsQuery = useQuery({
+    queryKey: ["product-specs", productId ?? ""],
+    queryFn: () => apiGet<SpecValue[]>(`/api/products/${productId}/specs`),
+    enabled: !!productId && block.useProductSpecs,
+  });
+
+  const items = block.useProductSpecs
+    ? (specsQuery.data ?? []).map((sv) => ({
+        value: sv.value,
+        unit: sv.slot.unit ?? "",
+        label: sv.slot.name,
+      }))
+    : block.items.filter((it) => it.value || it.label);
+
+  return (
+    <section
+      className={cn(
+        "w-full px-6 md:px-16",
+        STATS_PADDING[block.paddingY ?? "xl"],
+        STATS_BG[block.background ?? "muted"],
+      )}
+    >
+      <div className="mx-auto max-w-6xl">
+        {(block.eyebrow || block.heading || block.body) && (
+          <div className={cn("mb-12 space-y-4 md:mb-16", headerAlign)}>
+            {block.eyebrow && (
+              <div
+                className={cn(
+                  "text-xs font-semibold uppercase tracking-[0.18em]",
+                  isDark ? "text-background/70" : "text-muted-foreground",
+                )}
+              >
+                {block.eyebrow}
+              </div>
+            )}
+            {block.heading && (
+              <h3
+                className={cn(
+                  "whitespace-pre-line text-3xl font-bold leading-[1.1] tracking-tight md:text-5xl",
+                  isDark ? "text-background" : "text-foreground",
+                )}
+              >
+                {block.heading}
+              </h3>
+            )}
+            {block.body && (
+              <p
+                className={cn(
+                  "whitespace-pre-wrap text-base leading-relaxed md:text-lg",
+                  isDark ? "text-background/80" : "text-muted-foreground",
+                )}
+              >
+                {block.body}
+              </p>
+            )}
+          </div>
+        )}
+        {items.length > 0 && (
+          <div
+            className={cn(
+              "grid border-t pt-8 md:pt-10",
+              STATS_COLS[block.columns],
+              isDark ? "border-background/20" : "border-border",
+            )}
+          >
+            {items.map((it, i) => {
+              const isLastInRow = (i + 1) % block.columns === 0;
+              const isLastItem = i === items.length - 1;
+              const showDivider = block.dividers && !isLastInRow && !isLastItem;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "px-3 py-4 md:px-6",
+                    showDivider &&
+                      (isDark
+                        ? "md:border-r md:border-background/20"
+                        : "md:border-r md:border-border"),
+                  )}
+                >
+                  <div className="mb-2 flex items-baseline gap-1">
+                    <span
+                      className={cn(
+                        "text-4xl font-bold leading-none tracking-tight md:text-5xl",
+                        isDark ? "text-background" : "text-foreground",
+                      )}
+                    >
+                      {it.value || "—"}
+                    </span>
+                    {it.unit && (
+                      <span
+                        className={cn(
+                          "text-base font-medium md:text-lg",
+                          isDark ? "text-background/70" : "text-muted-foreground",
+                        )}
+                      >
+                        {it.unit}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className={cn(
+                      "text-xs md:text-sm",
+                      isDark ? "text-background/70" : "text-muted-foreground",
+                    )}
+                  >
+                    {it.label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** 직접 Supabase 공개 URL → 우리 프록시 URL 로 재작성 (Content-Type 강제 + 인코딩 자동 변환) */
+function resolveHtmlUrl(url: string): string {
+  if (!url) return url;
+  const m = url.match(/\/storage\/v1\/object\/public\/product-html\/(.+)$/);
+  if (m) return `/api/products/landing-html/${m[1]}`;
+  return url;
+}
+
+export function HtmlEmbedBlockView({ block }: { block: HtmlEmbedBlock }) {
+  const sandbox = block.allowForms ? "allow-scripts allow-forms" : "allow-scripts";
+  const wrapClass = cn(
+    block.displayMode === "cover"
+      ? "relative left-1/2 w-screen -translate-x-1/2 bg-background"
+      : "w-full",
+  );
+
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+
+  // iframe 안 HTML 이 보낸 콘텐츠 높이 수신 → autoHeight 켜져 있으면 iframe 동적 리사이즈
+  useEffect(() => {
+    if (!block.autoHeight) return;
+    const onMessage = (e: MessageEvent) => {
+      const iframe = iframeRef.current;
+      if (!iframe) return;
+      if (e.source !== iframe.contentWindow) return;
+      const data = e.data as { type?: string; height?: number };
+      if (data?.type !== "landing-html-resize") return;
+      if (typeof data.height === "number" && data.height > 0) {
+        setMeasuredHeight(Math.min(Math.ceil(data.height), 50000));
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [block.autoHeight]);
+
+  // 새 iframe 마운트 시 측정값 리셋 (이전 콘텐츠 높이 흔적 제거)
+  useEffect(() => {
+    setMeasuredHeight(null);
+  }, [block.htmlUrl]);
+
+  const finalHeight = block.autoHeight && measuredHeight ? measuredHeight : block.heightPx;
+
+  if (!block.htmlUrl) {
+    return (
+      <section className={wrapClass} style={{ height: block.heightPx }}>
+        <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
+          HTML 파일을 업로드하세요
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className={wrapClass} style={{ height: finalHeight }}>
+      <iframe
+        ref={iframeRef}
+        src={resolveHtmlUrl(block.htmlUrl)}
+        sandbox={sandbox}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        className="block h-full w-full border-0"
+        title="custom-html"
+        scrolling={block.autoHeight ? "no" : "auto"}
+      />
     </section>
   );
 }

@@ -1,11 +1,15 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { ExternalLink, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -26,10 +30,13 @@ import type {
   AmbientVideoBlock,
   TableBlock,
   ChartBlock,
+  StatsGridBlock,
+  HtmlEmbedBlock,
   LandingBlock,
 } from "@/lib/validators/landing-block";
 
 import { ImageUploadField } from "./_image-upload";
+import { uploadHtml } from "./_helpers";
 
 interface EditorProps<T extends LandingBlock> {
   block: T;
@@ -52,6 +59,13 @@ function HeroEditor({ block, onChange }: EditorProps<HeroBlock>) {
         <ImageUploadField
           value={block.imageUrl}
           onChange={(url) => onChange({ ...block, imageUrl: url })}
+        />
+      </Field>
+      <Field label="작은 라벨 (eyebrow, 선택)">
+        <Input
+          value={block.eyebrow}
+          placeholder='예: "NEW", "한정 출시"'
+          onChange={(e) => onChange({ ...block, eyebrow: e.target.value })}
         />
       </Field>
       <Field label="대제목">
@@ -136,20 +150,97 @@ function ImageEditor({ block, onChange }: EditorProps<ImageBlock>) {
           onChange={(e) => onChange({ ...block, caption: e.target.value })}
         />
       </Field>
-      <Field label="너비">
-        <Select
-          value={block.fullWidth ? "full" : "narrow"}
-          onValueChange={(v) => onChange({ ...block, fullWidth: v === "full" })}
-        >
-          <SelectTrigger className="h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="full">전체 폭</SelectItem>
-            <SelectItem value="narrow">좁게 (max-w-3xl)</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="폭">
+          <Select
+            value={block.maxWidth ?? (block.fullWidth ? "full" : "md")}
+            onValueChange={(v) =>
+              onChange({
+                ...block,
+                maxWidth: v as ImageBlock["maxWidth"],
+                fullWidth: v === "full",
+              })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="full">전체 폭</SelectItem>
+              <SelectItem value="lg">크게 (960)</SelectItem>
+              <SelectItem value="md">좁게 (768)</SelectItem>
+              <SelectItem value="sm">아주 좁게 (560)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="라운드 코너">
+          <Select
+            value={block.rounded}
+            onValueChange={(v) => onChange({ ...block, rounded: v as ImageBlock["rounded"] })}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="sm">작게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">크게</SelectItem>
+              <SelectItem value="xl">아주 크게</SelectItem>
+              <SelectItem value="full">완전 (원형)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="그림자">
+          <Select
+            value={block.shadow}
+            onValueChange={(v) => onChange({ ...block, shadow: v as ImageBlock["shadow"] })}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="sm">은은하게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">강하게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="상하 여백">
+          <Select
+            value={block.paddingY}
+            onValueChange={(v) => onChange({ ...block, paddingY: v as ImageBlock["paddingY"] })}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="sm">좁게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">넓게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="배경 (이미지 주변)">
+          <Select
+            value={block.background}
+            onValueChange={(v) =>
+              onChange({ ...block, background: v as ImageBlock["background"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="muted">연한 회색</SelectItem>
+              <SelectItem value="dark">진한 (반전)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
     </div>
   );
 }
@@ -157,6 +248,13 @@ function ImageEditor({ block, onChange }: EditorProps<ImageBlock>) {
 function TextEditor({ block, onChange }: EditorProps<TextBlock>) {
   return (
     <div className="space-y-3">
+      <Field label="작은 라벨 (eyebrow, 선택)">
+        <Input
+          value={block.eyebrow}
+          placeholder='예: "AT A GLANCE", "NEW"'
+          onChange={(e) => onChange({ ...block, eyebrow: e.target.value })}
+        />
+      </Field>
       <Field label="제목 (선택)">
         <Input
           value={block.heading}
@@ -170,7 +268,79 @@ function TextEditor({ block, onChange }: EditorProps<TextBlock>) {
           rows={6}
         />
       </Field>
+      <p className="text-[10px] text-muted-foreground">
+        본문에 마크다운 사용 가능 — <code className="rounded bg-muted px-1">{`**굵게**`}</code>{" "}
+        <code className="rounded bg-muted px-1">{`*기울임*`}</code>{" "}
+        <code className="rounded bg-muted px-1">{`[링크](https://...)`}</code>
+      </p>
       <div className="grid grid-cols-2 gap-2">
+        <Field label="제목 크기">
+          <Select
+            value={block.headingSize}
+            onValueChange={(v) =>
+              onChange({ ...block, headingSize: v as TextBlock["headingSize"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">작게 (소제목)</SelectItem>
+              <SelectItem value="md">기본</SelectItem>
+              <SelectItem value="lg">크게</SelectItem>
+              <SelectItem value="xl">아주 크게 (디스플레이)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="제목 굵기">
+          <Select
+            value={block.headingWeight}
+            onValueChange={(v) =>
+              onChange({ ...block, headingWeight: v as TextBlock["headingWeight"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="normal">보통</SelectItem>
+              <SelectItem value="semibold">반굵게</SelectItem>
+              <SelectItem value="bold">굵게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="본문 크기">
+          <Select
+            value={block.bodySize}
+            onValueChange={(v) =>
+              onChange({ ...block, bodySize: v as TextBlock["bodySize"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">작게</SelectItem>
+              <SelectItem value="md">기본</SelectItem>
+              <SelectItem value="lg">크게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="텍스트 색">
+          <Select
+            value={block.color}
+            onValueChange={(v) => onChange({ ...block, color: v as TextBlock["color"] })}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">기본</SelectItem>
+              <SelectItem value="muted">전체 흐리게</SelectItem>
+              <SelectItem value="brand">브랜드 컬러</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
         <Field label="정렬">
           <Select
             value={block.align}
@@ -199,6 +369,25 @@ function TextEditor({ block, onChange }: EditorProps<TextBlock>) {
             <SelectContent>
               <SelectItem value="none">없음</SelectItem>
               <SelectItem value="muted">연한 회색</SelectItem>
+              <SelectItem value="dark">진한 (반전)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="상하 여백">
+          <Select
+            value={block.paddingY}
+            onValueChange={(v) =>
+              onChange({ ...block, paddingY: v as TextBlock["paddingY"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">좁게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">넓게</SelectItem>
+              <SelectItem value="xl">아주 넓게</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -256,23 +445,79 @@ function VideoEditor({ block, onChange }: EditorProps<VideoBlock>) {
 function GalleryEditor({ block, onChange }: EditorProps<GalleryBlock>) {
   return (
     <div className="space-y-3">
-      <Field label="컬럼 수">
-        <Select
-          value={String(block.columns)}
-          onValueChange={(v) =>
-            onChange({ ...block, columns: Number(v) as GalleryBlock["columns"] })
-          }
-        >
-          <SelectTrigger className="h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="2">2열</SelectItem>
-            <SelectItem value="3">3열</SelectItem>
-            <SelectItem value="4">4열</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="컬럼 수">
+          <Select
+            value={String(block.columns)}
+            onValueChange={(v) =>
+              onChange({ ...block, columns: Number(v) as GalleryBlock["columns"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="2">2열</SelectItem>
+              <SelectItem value="3">3열</SelectItem>
+              <SelectItem value="4">4열</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="간격">
+          <Select
+            value={block.gap}
+            onValueChange={(v) => onChange({ ...block, gap: v as GalleryBlock["gap"] })}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="sm">좁게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">넓게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="라운드 코너">
+          <Select
+            value={block.rounded}
+            onValueChange={(v) =>
+              onChange({ ...block, rounded: v as GalleryBlock["rounded"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="sm">작게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">크게</SelectItem>
+              <SelectItem value="xl">아주 크게</SelectItem>
+              <SelectItem value="full">완전 (원형)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="그림자">
+          <Select
+            value={block.shadow}
+            onValueChange={(v) =>
+              onChange({ ...block, shadow: v as GalleryBlock["shadow"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="sm">은은하게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">강하게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
       <div className="space-y-2">
         <Label className="text-xs">이미지</Label>
         <div className="space-y-2">
@@ -845,6 +1090,358 @@ function ChartEditor({ block, onChange }: EditorProps<ChartBlock>) {
   );
 }
 
+function StatsGridEditor({ block, onChange }: EditorProps<StatsGridBlock>) {
+  const updateItem = (i: number, patch: Partial<StatsGridBlock["items"][number]>) => {
+    const next = block.items.slice();
+    next[i] = { ...next[i], ...patch };
+    onChange({ ...block, items: next });
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+        Apple 스타일의 큰 숫자 + 단위 + 라벨 그리드. 컬럼 수와 항목을 자유롭게 조정.
+      </p>
+      <Field label="작은 라벨 (eyebrow)">
+        <Input
+          value={block.eyebrow}
+          placeholder='예: "AT A GLANCE"'
+          onChange={(e) => onChange({ ...block, eyebrow: e.target.value })}
+        />
+      </Field>
+      <Field label="제목 (줄바꿈은 \n 으로 그대로 입력)">
+        <Textarea
+          value={block.heading}
+          onChange={(e) => onChange({ ...block, heading: e.target.value })}
+          rows={2}
+        />
+      </Field>
+      <Field label="설명 (선택)">
+        <Textarea
+          value={block.body}
+          onChange={(e) => onChange({ ...block, body: e.target.value })}
+          rows={2}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="정렬 (헤더)">
+          <Select
+            value={block.align}
+            onValueChange={(v) => onChange({ ...block, align: v as StatsGridBlock["align"] })}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left">왼쪽</SelectItem>
+              <SelectItem value="center">가운데</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="컬럼 수">
+          <Select
+            value={String(block.columns)}
+            onValueChange={(v) =>
+              onChange({ ...block, columns: Number(v) as StatsGridBlock["columns"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="2">2</SelectItem>
+              <SelectItem value="3">3</SelectItem>
+              <SelectItem value="4">4</SelectItem>
+              <SelectItem value="5">5</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="배경">
+          <Select
+            value={block.background}
+            onValueChange={(v) =>
+              onChange({ ...block, background: v as StatsGridBlock["background"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">없음</SelectItem>
+              <SelectItem value="muted">연한 회색</SelectItem>
+              <SelectItem value="dark">진한 (반전)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="상하 여백">
+          <Select
+            value={block.paddingY}
+            onValueChange={(v) =>
+              onChange({ ...block, paddingY: v as StatsGridBlock["paddingY"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">좁게</SelectItem>
+              <SelectItem value="md">보통</SelectItem>
+              <SelectItem value="lg">넓게</SelectItem>
+              <SelectItem value="xl">아주 넓게</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">컬럼 사이 구분선</div>
+          <div className="text-[11px] text-muted-foreground">
+            데스크톱에서 항목 사이에 세로선 표시 (Apple 스타일)
+          </div>
+        </div>
+        <Switch
+          checked={block.dividers}
+          onCheckedChange={(v) => onChange({ ...block, dividers: v })}
+        />
+      </div>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">상품 스펙 자동 사용</div>
+          <div className="text-[11px] text-muted-foreground">
+            켜면 상품에 등록된 스펙(specValues)을 자동으로 항목으로 사용. 아래 수동 입력은 무시됨
+          </div>
+        </div>
+        <Switch
+          checked={block.useProductSpecs}
+          onCheckedChange={(v) => onChange({ ...block, useProductSpecs: v })}
+        />
+      </div>
+
+      <div className={cn("space-y-2", block.useProductSpecs && "opacity-50 pointer-events-none")}>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">항목 (수동 입력)</Label>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7"
+            onClick={() =>
+              onChange({
+                ...block,
+                items: [...block.items, { value: "", unit: "", label: "" }],
+              })
+            }
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>추가</span>
+          </Button>
+        </div>
+        <div className="space-y-1.5">
+          {block.items.map((it, i) => (
+            <div key={i} className="flex items-center gap-1.5 rounded-md border border-border p-2">
+              <div className="grid flex-1 grid-cols-3 gap-1.5">
+                <Input
+                  value={it.value}
+                  placeholder="숫자 (35.8)"
+                  onChange={(e) => updateItem(i, { value: e.target.value })}
+                  className="h-8 text-xs"
+                />
+                <Input
+                  value={it.unit}
+                  placeholder="단위 (cm³)"
+                  onChange={(e) => updateItem(i, { unit: e.target.value })}
+                  className="h-8 text-xs"
+                />
+                <Input
+                  value={it.label}
+                  placeholder="라벨 (배기량)"
+                  onChange={(e) => updateItem(i, { label: e.target.value })}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0"
+                onClick={() =>
+                  onChange({
+                    ...block,
+                    items: block.items.filter((_, idx) => idx !== i),
+                  })
+                }
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  // 높이 입력 — 자유 편집 가능하도록 로컬 string state 로 버퍼링, blur 시 검증/동기화
+  const [heightStr, setHeightStr] = useState(String(block.heightPx));
+
+  const onFile = async (file: File) => {
+    setUploading(true);
+    try {
+      const url = await uploadHtml(file);
+      onChange({ ...block, htmlUrl: url });
+      toast.success("HTML 파일이 업로드되었습니다");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "업로드 실패");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+        직접 만든 .html 파일을 업로드해 sandboxed iframe 으로 표시합니다. 본인 작성 HTML 권장 — 외부 페이지에 있을 수 있는 트래커가 함께 들어오지 않도록.
+      </p>
+
+      <Field label="HTML 파일 (.html / .htm, 최대 5MB)">
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              <span>{uploading ? "업로드 중..." : block.htmlUrl ? "다른 파일로 교체" : "파일 업로드"}</span>
+            </Button>
+            {block.htmlUrl && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open(block.htmlUrl, "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>새 탭에서 열기</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onChange({ ...block, htmlUrl: "" })}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>제거</span>
+                </Button>
+              </>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".html,.htm,text/html"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onFile(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          {block.htmlUrl && (
+            <Input
+              value={block.htmlUrl}
+              readOnly
+              className="h-8 text-[11px] text-muted-foreground"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          )}
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Field label={block.autoHeight ? "최소 높이 (px)" : "높이 (px)"}>
+          <Input
+            type="number"
+            min={100}
+            value={heightStr}
+            onChange={(e) => setHeightStr(e.target.value)}
+            onBlur={() => {
+              const v = parseInt(heightStr, 10);
+              if (Number.isFinite(v) && v >= 100 && v <= 50000) {
+                if (v !== block.heightPx) onChange({ ...block, heightPx: v });
+                setHeightStr(String(v));
+              } else {
+                setHeightStr(String(block.heightPx));
+              }
+            }}
+            onFocus={(e) => e.currentTarget.select()}
+            disabled={block.autoHeight}
+          />
+        </Field>
+        <Field label="표시 모드">
+          <Select
+            value={block.displayMode}
+            onValueChange={(v) =>
+              onChange({ ...block, displayMode: v as HtmlEmbedBlock["displayMode"] })
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="inline">inline (다른 블록과 같은 폭)</SelectItem>
+              <SelectItem value="cover">cover (풀 viewport 폭)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">자동 높이</div>
+          <div className="text-[11px] text-muted-foreground">
+            iframe 내부 콘텐츠 높이를 자동 측정해 스크롤 없이 펼침. 끄면 위 높이로 고정.
+          </div>
+        </div>
+        <Switch
+          checked={block.autoHeight}
+          onCheckedChange={(v) => onChange({ ...block, autoHeight: v })}
+        />
+      </div>
+
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="space-y-0.5">
+          <div className="text-xs font-medium">폼 사용 허용</div>
+          <div className="text-[11px] text-muted-foreground">
+            iframe 안에서 form 제출이 필요할 때만 켜세요. 보안상 기본은 꺼짐.
+          </div>
+        </div>
+        <Switch
+          checked={block.allowForms}
+          onCheckedChange={(v) => onChange({ ...block, allowForms: v })}
+        />
+      </div>
+
+      <p className="text-[11px] text-muted-foreground">
+        ⚠️ HTML 안의 <code className="rounded bg-muted px-1">{`<img>`}</code> 는 절대 URL 또는 base64 권장.
+        상대 경로는 storage 경로 기준이라 깨질 수 있습니다.
+      </p>
+    </div>
+  );
+}
+
 export function BlockEditor({
   block,
   onChange,
@@ -877,5 +1474,9 @@ export function BlockEditor({
       return <TableEditor block={block} onChange={onChange} />;
     case "chart":
       return <ChartEditor block={block} onChange={onChange} />;
+    case "stats-grid":
+      return <StatsGridEditor block={block} onChange={onChange} />;
+    case "html-embed":
+      return <HtmlEmbedEditor block={block} onChange={onChange} />;
   }
 }

@@ -5,28 +5,53 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  ArrowDown,
-  ArrowUp,
   BarChart3,
+  Calculator,
   Camera,
   ChevronDown,
   ChevronRight,
+  Code2,
+  Copy,
+  Download,
   ExternalLink,
+  FileCode2,
   Film,
+  GripVertical,
   Image as ImageIcon,
   Images,
   Layers,
   Layout,
   Loader2,
+  Monitor,
   Mountain,
+  Smartphone,
   Sparkles,
   Table2,
+  Tablet,
   Trash2,
   Type,
   Video,
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,17 +63,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
 import {
   BLOCK_DESCRIPTIONS,
   BLOCK_LABELS,
+  landingBlocksSchema,
   type BlockType,
   type LandingBlock,
   makeEmptyBlock,
 } from "@/lib/validators/landing-block";
 
 import { LandingPageView } from "@/components/landing/landing-page-view";
+import { SingleHtmlPreview } from "@/components/landing/single-html-preview";
 import {
   Tooltip,
   TooltipContent,
@@ -57,7 +87,9 @@ import {
 } from "@/components/ui/tooltip";
 
 import { BlockEditor } from "./_block-editor";
-import { blockTitle, makeId, move } from "./_helpers";
+import { blockTitle, duplicateAt, makeId } from "./_helpers";
+
+type LandingMode = "BLOCKS" | "SINGLE_HTML";
 
 interface LandingResponse {
   id: string;
@@ -65,6 +97,14 @@ interface LandingResponse {
   sku: string;
   imageUrl: string | null;
   blocks: LandingBlock[];
+  landingMode: LandingMode;
+  singleHtmlUrl: string | null;
+}
+
+interface EditState {
+  blocks: LandingBlock[];
+  landingMode: LandingMode;
+  singleHtmlUrl: string | null;
 }
 
 const BLOCK_ICON: Record<BlockType, React.ComponentType<{ className?: string }>> = {
@@ -80,6 +120,8 @@ const BLOCK_ICON: Record<BlockType, React.ComponentType<{ className?: string }>>
   "ambient-video": Film,
   table: Table2,
   chart: BarChart3,
+  "stats-grid": Calculator,
+  "html-embed": FileCode2,
 };
 
 const BLOCK_TYPES: BlockType[] = [
@@ -95,6 +137,8 @@ const BLOCK_TYPES: BlockType[] = [
   "ambient-video",
   "table",
   "chart",
+  "stats-grid",
+  "html-embed",
 ];
 
 export default function ProductLandingPage() {
@@ -103,10 +147,20 @@ export default function ProductLandingPage() {
   const queryClient = useQueryClient();
 
   // 로컬 편집 상태. null = 서버 데이터를 그대로 사용 (편집 안 함). 첫 변경 시 fork.
-  const [editState, setEditState] = useState<LandingBlock[] | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [shooting, setShooting] = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const [jsonText, setJsonText] = useState("");
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [singleUploading, setSingleUploading] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState<"desktop" | "tablet" | "mobile">("desktop");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const landingQuery = useQuery({
     queryKey: queryKeys.products.landing(id),
@@ -120,8 +174,12 @@ export default function ProductLandingPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (next: LandingBlock[]) =>
-      apiMutate(`/api/products/${id}/landing`, "PUT", { blocks: next }),
+    mutationFn: (next: EditState) =>
+      apiMutate(`/api/products/${id}/landing`, "PUT", {
+        blocks: next.blocks,
+        landingMode: next.landingMode,
+        singleHtmlUrl: next.singleHtmlUrl,
+      }),
     onSuccess: () => {
       toast.success("저장되었습니다");
       setEditState(null); // 서버 데이터로 재정합
@@ -130,32 +188,79 @@ export default function ProductLandingPage() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "저장 실패"),
   });
 
-  const serverBlocks = landingQuery.data?.blocks ?? [];
-  const blocks = editState ?? serverBlocks;
+  const serverState: EditState = {
+    blocks: landingQuery.data?.blocks ?? [],
+    landingMode: landingQuery.data?.landingMode ?? "BLOCKS",
+    singleHtmlUrl: landingQuery.data?.singleHtmlUrl ?? null,
+  };
+  const current: EditState = editState ?? serverState;
+  const blocks = current.blocks;
+  const landingMode = current.landingMode;
+  const singleHtmlUrl = current.singleHtmlUrl;
   const dirty = editState !== null;
 
-  const dispatch = (updater: (prev: LandingBlock[]) => LandingBlock[]) => {
-    setEditState((prev) => updater(prev ?? serverBlocks));
+  const updateState = (patch: Partial<EditState>) => {
+    setEditState((prev) => ({ ...(prev ?? serverState), ...patch }));
+  };
+
+  const dispatchBlocks = (updater: (prev: LandingBlock[]) => LandingBlock[]) => {
+    setEditState((prev) => {
+      const base = prev ?? serverState;
+      return { ...base, blocks: updater(base.blocks) };
+    });
   };
 
   const addBlock = (type: BlockType) => {
     const newId = makeId();
-    dispatch((prev) => [...prev, makeEmptyBlock(type, newId)]);
+    dispatchBlocks((prev) => [...prev, makeEmptyBlock(type, newId)]);
     setExpandedId(newId);
   };
 
   const updateBlock = (next: LandingBlock) => {
-    dispatch((prev) => prev.map((b) => (b.id === next.id ? next : b)));
+    dispatchBlocks((prev) => prev.map((b) => (b.id === next.id ? next : b)));
   };
 
   const removeBlock = (blockId: string) => {
-    dispatch((prev) => prev.filter((b) => b.id !== blockId));
+    dispatchBlocks((prev) => prev.filter((b) => b.id !== blockId));
     if (expandedId === blockId) setExpandedId(null);
     setDeleteId(null);
   };
 
-  const moveBlock = (idx: number, dir: -1 | 1) => {
-    dispatch((prev) => move(prev, idx, idx + dir));
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    dispatchBlocks((prev) => {
+      const oldIdx = prev.findIndex((b) => b.id === active.id);
+      const newIdx = prev.findIndex((b) => b.id === over.id);
+      if (oldIdx < 0 || newIdx < 0) return prev;
+      return arrayMove(prev, oldIdx, newIdx);
+    });
+  };
+
+  const duplicateBlock = (idx: number) => {
+    const newId = makeId();
+    dispatchBlocks((prev) => duplicateAt(prev, idx, newId).next);
+    setExpandedId(newId);
+  };
+
+  const onUploadSingleHtml = async (file: File) => {
+    setSingleUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/products/upload-html", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "업로드 실패");
+      }
+      const { url } = (await res.json()) as { url: string };
+      updateState({ singleHtmlUrl: url });
+      toast.success("HTML 파일이 업로드되었습니다");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "업로드 실패");
+    } finally {
+      setSingleUploading(false);
+    }
   };
 
   if (landingQuery.isPending) {
@@ -189,6 +294,35 @@ export default function ProductLandingPage() {
           <span className="text-xs text-muted-foreground">상세페이지 편집 · {product.sku}</span>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setJsonText(JSON.stringify(blocks, null, 2));
+              setJsonError(null);
+              setJsonOpen(true);
+            }}
+            title="JSON 구조 보기 / Claude Code로 만든 JSON 붙여넣기"
+          >
+            <Code2 className="h-4 w-4" />
+            <span>JSON</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={landingMode === "SINGLE_HTML" || dirty}
+            onClick={() => window.open(`/api/products/${id}/landing/export?format=html`, "_blank")}
+            title={
+              landingMode === "SINGLE_HTML"
+                ? "단일 HTML 모드는 export 불필요 (HTML 파일 자체 사용)"
+                : dirty
+                  ? "저장 후 export 가능"
+                  : "외부 채널(쿠팡/네이버 등) 복붙용 HTML 다운로드"
+            }
+          >
+            <Download className="h-4 w-4" />
+            <span>HTML</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -233,7 +367,7 @@ export default function ProductLandingPage() {
           <Button
             size="sm"
             disabled={!dirty || saveMutation.isPending}
-            onClick={() => saveMutation.mutate(blocks)}
+            onClick={() => saveMutation.mutate(current)}
           >
             {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{saveMutation.isPending ? "저장 중..." : "저장"}</span>
@@ -241,6 +375,51 @@ export default function ProductLandingPage() {
         </div>
       </div>
 
+      {/* 모드 토글 */}
+      <div className="flex items-center gap-2 border-b border-border bg-card px-5 py-2">
+        <span className="text-xs text-muted-foreground">모드:</span>
+        <div className="flex h-7 rounded-md border border-border bg-background text-[12px]">
+          <button
+            type="button"
+            className={cn(
+              "px-3 transition-colors",
+              landingMode === "BLOCKS"
+                ? "bg-secondary text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => updateState({ landingMode: "BLOCKS" })}
+          >
+            블록 모드
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "px-3 transition-colors",
+              landingMode === "SINGLE_HTML"
+                ? "bg-secondary text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => updateState({ landingMode: "SINGLE_HTML" })}
+          >
+            단일 HTML
+          </button>
+        </div>
+        <span className="ml-2 text-[11px] text-muted-foreground">
+          {landingMode === "BLOCKS"
+            ? "블록을 조합해서 페이지 구성 + 공통 footer 자동 연결"
+            : "업로드한 HTML 파일 1개를 통째로 페이지 전체로 (footer 미적용)"}
+        </span>
+      </div>
+
+      {landingMode === "SINGLE_HTML" ? (
+        <SingleHtmlEditorBody
+          singleHtmlUrl={singleHtmlUrl}
+          uploading={singleUploading}
+          onUpload={onUploadSingleHtml}
+          onClear={() => updateState({ singleHtmlUrl: null })}
+          dirty={dirty}
+        />
+      ) : (
       <div className="flex flex-1 min-h-0">
         {/* 왼쪽: 블록 리스트 + 인라인 편집 */}
         <aside className="flex w-[420px] shrink-0 flex-col border-r border-border bg-card">
@@ -309,68 +488,28 @@ export default function ProductLandingPage() {
                 위에서 블록을 추가하세요
               </div>
             ) : (
-              <ul className="divide-y divide-border">
-                {blocks.map((block, idx) => {
-                  const Icon = BLOCK_ICON[block.type];
-                  const expanded = expandedId === block.id;
-                  return (
-                    <li key={block.id} className="bg-background">
-                      <div className="flex items-center gap-2 px-3 py-2">
-                        <button
-                          type="button"
-                          className="flex flex-1 items-center gap-2 text-left"
-                          onClick={() => setExpandedId(expanded ? null : block.id)}
-                        >
-                          {expanded ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <Icon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs font-medium">{BLOCK_LABELS[block.type]}</span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {blockTitle(block)}
-                          </span>
-                        </button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          disabled={idx === 0}
-                          onClick={() => moveBlock(idx, -1)}
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          disabled={idx === blocks.length - 1}
-                          onClick={() => moveBlock(idx, 1)}
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => setDeleteId(block.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      {expanded && (
-                        <div className="border-t border-border bg-muted/30 px-4 py-3">
-                          <BlockEditor block={block} onChange={updateBlock} />
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                <SortableContext
+                  items={blocks.map((b) => b.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <ul className="divide-y divide-border">
+                    {blocks.map((block) => (
+                      <SortableBlockItem
+                        key={block.id}
+                        block={block}
+                        expanded={expandedId === block.id}
+                        onToggle={() =>
+                          setExpandedId(expandedId === block.id ? null : block.id)
+                        }
+                        onUpdate={updateBlock}
+                        onDelete={() => setDeleteId(block.id)}
+                        onDuplicate={() => duplicateBlock(blocks.findIndex((b) => b.id === block.id))}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
             )}
           </div>
         </aside>
@@ -384,9 +523,57 @@ export default function ProductLandingPage() {
                 저장되지 않은 변경사항
               </span>
             )}
+            <div className="ml-auto flex h-7 rounded-md border border-border bg-background text-[12px]">
+              <button
+                type="button"
+                className={cn(
+                  "flex items-center gap-1 px-2",
+                  previewWidth === "desktop"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setPreviewWidth("desktop")}
+                title="데스크톱 폭"
+              >
+                <Monitor className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex items-center gap-1 border-l border-border px-2",
+                  previewWidth === "tablet"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setPreviewWidth("tablet")}
+                title="태블릿 폭 (768px)"
+              >
+                <Tablet className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex items-center gap-1 border-l border-border px-2",
+                  previewWidth === "mobile"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setPreviewWidth("mobile")}
+                title="모바일 폭 (375px)"
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="mx-auto max-w-[960px] bg-background shadow-sm">
+            <div
+              className={cn(
+                "mx-auto bg-background shadow-sm",
+                previewWidth === "desktop" && "max-w-[960px]",
+                previewWidth === "tablet" && "max-w-[768px]",
+                previewWidth === "mobile" && "max-w-[375px]",
+              )}
+            >
               <LandingPageView blocks={blocks} productId={id} />
               {(footerQuery.data?.footerBlocks ?? []).length > 0 && (
                 <>
@@ -405,6 +592,7 @@ export default function ProductLandingPage() {
           </div>
         </div>
       </div>
+      )}
 
       <Dialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
         <DialogContent>
@@ -420,6 +608,267 @@ export default function ProductLandingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={jsonOpen} onOpenChange={setJsonOpen}>
+        <DialogContent className="flex max-h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3 sm:max-w-none">
+          <DialogHeader>
+            <DialogTitle>JSON 가져오기 / 내보내기</DialogTitle>
+            <DialogDescription>
+              로컬 Claude Code 등으로 만든 JSON을 붙여넣고 <b>가져오기</b>를 누르면 미리보기에 즉시 반영됩니다 (저장은 헤더의 &ldquo;저장&rdquo; 버튼).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <Textarea
+              value={jsonText}
+              onChange={(e) => {
+                setJsonText(e.target.value);
+                setJsonError(null);
+              }}
+              className="min-h-0 flex-1 resize-none font-mono text-[11px] leading-snug"
+              spellCheck={false}
+            />
+            {jsonError && (
+              <p className="rounded-md bg-destructive/15 px-2 py-1.5 text-xs text-destructive">
+                {jsonError}
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              스키마: <code className="rounded bg-muted px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
+              <code className="rounded bg-muted px-1">src/lib/validators/landing-block.ts</code>{" "}
+              참고
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(jsonText);
+                  toast.success("클립보드에 복사되었습니다");
+                } catch {
+                  toast.error("클립보드 복사 실패 — 직접 선택해 복사하세요");
+                }
+              }}
+            >
+              클립보드로 복사
+            </Button>
+            <div className="flex-1" />
+            <Button variant="outline" onClick={() => setJsonOpen(false)}>닫기</Button>
+            <Button
+              onClick={() => {
+                try {
+                  const parsedRaw = JSON.parse(jsonText);
+                  const parsed = landingBlocksSchema.safeParse(parsedRaw);
+                  if (!parsed.success) {
+                    const first = parsed.error.issues[0];
+                    setJsonError(
+                      `검증 실패: ${first?.path.join(".") || "root"} — ${first?.message ?? "알 수 없는 오류"}`,
+                    );
+                    return;
+                  }
+                  updateState({ blocks: parsed.data });
+                  setJsonOpen(false);
+                  setJsonError(null);
+                  toast.success(
+                    `${parsed.data.length}개 블록을 가져왔습니다 — 헤더의 "저장"을 눌러 확정하세요`,
+                  );
+                } catch (e) {
+                  setJsonError(
+                    `JSON 파싱 실패: ${e instanceof Error ? e.message : "알 수 없는 오류"}`,
+                  );
+                }
+              }}
+            >
+              가져오기 (미리보기에 반영)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function resolveHtmlSrc(url: string): string {
+  const m = url.match(/\/storage\/v1\/object\/public\/product-html\/(.+)$/);
+  if (m) return `/api/products/landing-html/${m[1]}`;
+  return url;
+}
+
+function SortableBlockItem({
+  block,
+  expanded,
+  onToggle,
+  onUpdate,
+  onDelete,
+  onDuplicate,
+}: {
+  block: LandingBlock;
+  expanded: boolean;
+  onToggle: () => void;
+  onUpdate: (next: LandingBlock) => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: block.id });
+  const Icon = BLOCK_ICON[block.type];
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.6 : undefined,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style} className="bg-background">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          className="flex h-7 w-5 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+          aria-label="드래그해서 순서 변경"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="flex flex-1 items-center gap-2 text-left"
+          onClick={onToggle}
+        >
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-medium">{BLOCK_LABELS[block.type]}</span>
+          <span className="truncate text-xs text-muted-foreground">{blockTitle(block)}</span>
+        </button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onDuplicate}
+          title="복제"
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onDelete}
+          title="삭제"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {expanded && (
+        <div className="border-t border-border bg-muted/30 px-4 py-3">
+          <BlockEditor block={block} onChange={onUpdate} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function SingleHtmlEditorBody({
+  singleHtmlUrl,
+  uploading,
+  onUpload,
+  onClear,
+  dirty,
+}: {
+  singleHtmlUrl: string | null;
+  uploading: boolean;
+  onUpload: (file: File) => void;
+  onClear: () => void;
+  dirty: boolean;
+}) {
+  return (
+    <div className="flex flex-1 min-h-0">
+      <aside className="flex w-[420px] shrink-0 flex-col gap-3 border-r border-border bg-card p-4">
+        <p className="rounded-md bg-muted px-3 py-2 text-[12px] text-muted-foreground">
+          이 모드는 업로드한 HTML 파일을 페이지 전체로 통째 보여줍니다. 블록과 공통 footer 는 적용되지 않으며, sandboxed iframe 안에 격리되어 렌더링됩니다.
+        </p>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium">HTML 파일</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploading}
+              onClick={() => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = ".html,.htm,text/html";
+                input.onchange = () => {
+                  const f = input.files?.[0];
+                  if (f) onUpload(f);
+                };
+                input.click();
+              }}
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode2 className="h-4 w-4" />}
+              <span>{uploading ? "업로드 중..." : singleHtmlUrl ? "다른 파일로 교체" : "파일 업로드"}</span>
+            </Button>
+            {singleHtmlUrl && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open(resolveHtmlSrc(singleHtmlUrl), "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>새 탭에서 열기</span>
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+                  <Trash2 className="h-4 w-4" />
+                  <span>제거</span>
+                </Button>
+              </>
+            )}
+          </div>
+          {singleHtmlUrl && (
+            <Input
+              value={singleHtmlUrl}
+              readOnly
+              className="h-8 text-[11px] text-muted-foreground"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          )}
+        </div>
+
+        <p className="text-[11px] text-muted-foreground">
+          ⚠️ HTML 안의 <code className="rounded bg-muted px-1">{`<img>`}</code> 는 절대 URL 또는 base64 권장. 상대 경로는 storage 경로 기준이라 깨질 수 있습니다.
+        </p>
+      </aside>
+
+      <div className="flex flex-1 min-w-0 flex-col bg-muted/30">
+        <div className="flex items-center gap-2 border-b border-border bg-background px-4 py-2">
+          <span className="text-xs text-muted-foreground">미리보기</span>
+          {dirty && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900">
+              저장되지 않은 변경사항
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto bg-background">
+          {singleHtmlUrl ? (
+            <SingleHtmlPreview src={resolveHtmlSrc(singleHtmlUrl)} />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              왼쪽에서 HTML 파일을 업로드하세요
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
