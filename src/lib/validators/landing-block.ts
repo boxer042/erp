@@ -251,8 +251,8 @@ export const productHeroBlockSchema = z.object({
   subheadline: z.string().default(""),
   /** 가격 표시 on/off (B2B 비공개 케이스) */
   priceVisible: z.boolean().default(true),
-  /** 가격을 VAT 포함 금액으로 표시 (taxable 상품만 적용) */
-  vatIncluded: z.boolean().default(false),
+  /** 가격을 VAT 포함 금액으로 표시 (taxable 상품만 적용). 기본 true — 소비자 노출용 판매가 */
+  vatIncluded: z.boolean().default(true),
   /** 추가 CTA 버튼 (최대 2개 — 장바구니/구매하기와 별도. 예: "대리점 찾기", "견적 문의") */
   ctas: z
     .array(
@@ -660,7 +660,7 @@ export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
         eyebrow: "",
         subheadline: "",
         priceVisible: true,
-        vatIncluded: false,
+        vatIncluded: true,
         ctas: [],
         showSaleBadge: true,
         imagesOverride: [],

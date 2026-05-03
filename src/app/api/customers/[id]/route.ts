@@ -45,6 +45,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const openRepairCount = await prisma.repairTicket.count({
+    where: { customerId: id, status: { notIn: ["PICKED_UP", "CANCELLED"] } },
+  });
+  if (openRepairCount > 0) {
+    return NextResponse.json(
+      {
+        error: `진행중 수리 ${openRepairCount}건이 있어 삭제할 수 없습니다. 먼저 수리를 완료하거나 취소하세요.`,
+      },
+      { status: 409 },
+    );
+  }
   await prisma.customer.update({ where: { id }, data: { isActive: false } });
   return NextResponse.json({ success: true });
 }

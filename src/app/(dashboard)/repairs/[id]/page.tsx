@@ -117,11 +117,11 @@ interface RepairTicketDetail {
 const STATUS_LABEL: Record<RepairStatus, string> = {
   RECEIVED: "접수",
   DIAGNOSING: "진단중",
-  QUOTED: "견적안내",
+  QUOTED: "견적대기",
   APPROVED: "승인",
   REPAIRING: "수리중",
-  READY: "완료대기",
-  PICKED_UP: "픽업완료",
+  READY: "인계대기",
+  PICKED_UP: "수리완료",
   CANCELLED: "취소",
 };
 
@@ -171,8 +171,10 @@ function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
     actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   } else if (status === "REPAIRING") {
     actions.push({ action: "ready", label: "수리 완료" });
+    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   } else if (status === "READY") {
     actions.push({ action: "pickup", label: "픽업 / 결제" });
+    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   }
   return actions;
 }

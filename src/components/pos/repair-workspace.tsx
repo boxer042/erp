@@ -40,6 +40,17 @@ interface OpenRepair {
   receivedAt: string;
 }
 
+const REPAIR_STATUS_LABEL: Record<string, string> = {
+  RECEIVED: "접수",
+  DIAGNOSING: "진단중",
+  QUOTED: "견적대기",
+  APPROVED: "승인",
+  REPAIRING: "수리중",
+  READY: "인계대기",
+  PICKED_UP: "수리완료",
+  CANCELLED: "취소",
+};
+
 interface Props {
   sessionId: string;
 }
@@ -55,7 +66,7 @@ export function RepairWorkspace({ sessionId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { getSession, addSessionRepairTicket } = useSessions();
+  const { getSession, addSessionRepairTicket, setSessionOpenRepairCount } = useSessions();
   const session = getSession(sessionId);
   const customerId = session?.customerId;
   const sessionRepairIds = session?.repairTicketIds ?? [];
@@ -85,6 +96,12 @@ export function RepairWorkspace({ sessionId }: Props) {
   const openRepairs = (repairsQuery.data ?? []).filter(
     (r) => r.status !== "PICKED_UP" && r.status !== "CANCELLED",
   );
+
+  // 헤더 "수리" 표시 동기화 — 진행중 건수가 변할 때마다 세션에 반영
+  useEffect(() => {
+    if (!repairsQuery.data) return;
+    setSessionOpenRepairCount(openRepairs.length, sessionId);
+  }, [openRepairs.length, repairsQuery.data, sessionId, setSessionOpenRepairCount]);
 
   const setActiveTicket = useCallback(
     (ticketId: string | null) => {
@@ -338,10 +355,11 @@ function RepairTab({
   onSelect: () => void;
   onClose: () => void;
 }) {
+  const statusLabel = REPAIR_STATUS_LABEL[repair.status] ?? repair.status;
   return (
     <div
       className={cn(
-        "group flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors",
+        "group flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors",
         active
           ? "border-primary bg-primary/10 text-foreground"
           : "border-border bg-card text-muted-foreground hover:bg-muted/50",
@@ -350,14 +368,24 @@ function RepairTab({
       <button
         type="button"
         onClick={onSelect}
-        className="flex items-center gap-1.5"
+        className="flex items-center gap-2"
       >
         {repair.type === "ON_SITE" ? (
-          <MapPin className="size-3" />
+          <MapPin className="size-3.5 shrink-0" />
         ) : (
-          <ClipboardList className="size-3" />
+          <ClipboardList className="size-3.5 shrink-0" />
         )}
-        <span className="font-mono">{repair.ticketNo}</span>
+        <div className="flex flex-col items-start leading-tight">
+          <span className="font-mono">{repair.ticketNo}</span>
+          <span
+            className={cn(
+              "text-[10px]",
+              active ? "text-primary" : "text-muted-foreground/80",
+            )}
+          >
+            {statusLabel}
+          </span>
+        </div>
       </button>
       <button
         type="button"

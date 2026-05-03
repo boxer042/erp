@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type");
   const customerId = searchParams.get("customerId");
   const assignedToId = searchParams.get("assignedToId");
+  const serialItemId = searchParams.get("serialItemId");
+  const excludeId = searchParams.get("excludeId");
   const search = searchParams.get("search")?.trim() ?? "";
   const ids = searchParams.get("ids")?.split(",").filter(Boolean) ?? [];
 
@@ -23,6 +25,8 @@ export async function GET(request: NextRequest) {
     ...(type ? { type: type as never } : {}),
     ...(customerId ? { customerId } : {}),
     ...(assignedToId ? { assignedToId } : {}),
+    ...(serialItemId ? { serialItemId } : {}),
+    ...(excludeId ? { id: { not: excludeId } } : {}),
     ...(ids.length > 0 ? { id: { in: ids } } : {}),
     ...(search
       ? {

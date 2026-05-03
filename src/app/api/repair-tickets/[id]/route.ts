@@ -117,7 +117,10 @@ export async function PUT(
   }
 }
 
-// 부속/공임이 모두 없을 때만 RECEIVED 상태에서 삭제 가능 (실수로 만든 경우)
+// 삭제 허용 조건:
+//   - RECEIVED: 부속/공임 없을 때만 (실수로 만든 빈 티켓)
+//   - CANCELLED: 항상 (이미 취소된 티켓이라 재고/매출 영향 없음)
+//   - 그 외 상태: 거부 — 먼저 취소(transition cancel) 처리해야 함
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -131,18 +134,21 @@ export async function DELETE(
     include: { _count: { select: { parts: true, labors: true } } },
   });
   if (!ticket) return NextResponse.json({ error: "찾을 수 없음" }, { status: 404 });
-  if (ticket.status !== "RECEIVED") {
+
+  if (ticket.status === "RECEIVED") {
+    if (ticket._count.parts > 0 || ticket._count.labors > 0) {
+      return NextResponse.json(
+        { error: "부속/공임이 있는 티켓은 삭제할 수 없습니다. 먼저 행을 비우거나 취소 처리하세요." },
+        { status: 400 },
+      );
+    }
+  } else if (ticket.status !== "CANCELLED") {
     return NextResponse.json(
-      { error: "접수 상태에서만 삭제 가능합니다. 그 외엔 취소 처리하세요." },
+      { error: "진행중 수리는 삭제할 수 없습니다. 먼저 취소 처리하세요." },
       { status: 400 },
     );
   }
-  if (ticket._count.parts > 0 || ticket._count.labors > 0) {
-    return NextResponse.json(
-      { error: "부속/공임이 있는 티켓은 삭제할 수 없습니다. 먼저 행을 비워주세요." },
-      { status: 400 },
-    );
-  }
+
   await prisma.repairTicket.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

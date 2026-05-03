@@ -183,6 +183,19 @@ export async function POST(
     }
 
     if (action === "cancel") {
+      // 종료 상태(픽업완료/이미 취소)는 취소 불가 — 데이터 무결성 보호
+      if (ticket.status === "PICKED_UP") {
+        return NextResponse.json(
+          { error: "이미 픽업/결제가 완료된 수리는 취소할 수 없습니다" },
+          { status: 400 },
+        );
+      }
+      if (ticket.status === "CANCELLED") {
+        return NextResponse.json(
+          { error: "이미 취소된 수리입니다" },
+          { status: 400 },
+        );
+      }
       // 거절·취소 — 모든 부속의 재고 복원 (USED·LOST 모두), 진단비만 청구.
       // 다만 LOST는 이미 망가진 부속이므로 사용자가 의도적으로 "이건 못 살림" 처리한 경우엔
       // 호출 측에서 사전에 LOST 행을 삭제 처리하도록 해야 함.

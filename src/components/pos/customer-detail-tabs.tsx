@@ -317,16 +317,37 @@ function StatementsPanel({ rows }: { rows: StatementRow[] }) {
   );
 }
 
+const REPAIR_STATUS_LABEL: Record<string, string> = {
+  RECEIVED: "접수",
+  DIAGNOSING: "진단중",
+  QUOTED: "견적대기",
+  APPROVED: "승인",
+  REPAIRING: "수리중",
+  READY: "인계대기",
+  PICKED_UP: "수리완료",
+  CANCELLED: "취소",
+};
+
 function RepairPanel({ rows }: { rows: { id: string; ticketNo: string; status: string; receivedAt: string; finalAmount: number }[] }) {
   if (rows.length === 0) return <Empty text="수리내역이 없습니다" />;
   return (
-    <ul className="divide-y divide-neutral-100">
+    <ul className="divide-y divide-border">
       {rows.map((r) => (
         <li key={r.id} className="py-2">
-          <Link href={`/pos/repair/${r.id}`} className="flex justify-between hover:underline">
-            <span className="font-medium">{r.ticketNo}</span>
-            <span className="text-sm text-muted-foreground">{r.status} · {new Date(r.receivedAt).toLocaleDateString("ko-KR")}</span>
-            <span className="text-sm">₩{Number(r.finalAmount).toLocaleString("ko-KR")}</span>
+          <Link
+            href={`/pos/repairs/${r.id}`}
+            className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-muted/50"
+          >
+            <span className="font-mono text-sm font-medium">{r.ticketNo}</span>
+            <span className="flex-1 text-sm text-muted-foreground">
+              {REPAIR_STATUS_LABEL[r.status] ?? r.status} ·{" "}
+              {new Date(r.receivedAt).toLocaleDateString("ko-KR")}
+            </span>
+            <span className="text-sm tabular-nums">
+              {Number(r.finalAmount) > 0
+                ? `₩${Number(r.finalAmount).toLocaleString("ko-KR")}`
+                : "-"}
+            </span>
           </Link>
         </li>
       ))}

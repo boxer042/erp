@@ -38,11 +38,28 @@ import {
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 import { SectionTitle } from "@/components/new-product-form/parts";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn, formatComma, parseComma } from "@/lib/utils";
 import { useSessions } from "@/components/pos/sessions-context";
 import { usePosShell } from "@/components/pos/pos-shell-context";
@@ -137,11 +154,11 @@ interface RepairTicketDetail {
 const STATUS_LABEL: Record<RepairStatus, string> = {
   RECEIVED: "접수",
   DIAGNOSING: "진단중",
-  QUOTED: "견적안내",
+  QUOTED: "견적대기",
   APPROVED: "승인",
   REPAIRING: "수리중",
-  READY: "완료대기",
-  PICKED_UP: "픽업완료",
+  READY: "인계대기",
+  PICKED_UP: "수리완료",
   CANCELLED: "취소",
 };
 
@@ -191,8 +208,10 @@ function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
     actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   } else if (status === "REPAIRING") {
     actions.push({ action: "ready", label: "수리 완료" });
+    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   } else if (status === "READY") {
     actions.push({ action: "pickup", label: "픽업 / 결제" });
+    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   }
   return actions;
 }
@@ -261,16 +280,24 @@ export function RepairWorkView({ ticketId, onBack, hideBack = false }: RepairWor
         )}
         <div className="flex flex-1 items-center gap-2">
           <span className="font-mono text-sm font-semibold">{t.ticketNo}</span>
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="h-8 gap-1.5 rounded-md px-3 text-sm [&>svg]:size-4!">
             {t.type === "ON_SITE" ? (
-              <><MapPin className="size-3" /> 즉시</>
+              <><MapPin /> 즉시</>
             ) : (
-              <><Wrench className="size-3" /> 맡김</>
+              <><Wrench /> 맡김</>
             )}
           </Badge>
-          <Badge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
+          <Badge
+            variant={STATUS_VARIANT[t.status]}
+            className="h-8 rounded-md px-3 text-sm"
+          >
+            {STATUS_LABEL[t.status]}
+          </Badge>
           {t.parentRepairTicket && (
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge
+              variant="secondary"
+              className="h-8 rounded-md px-3 text-sm"
+            >
               재수리 (← {t.parentRepairTicket.ticketNo})
             </Badge>
           )}
@@ -289,18 +316,29 @@ export function RepairWorkView({ ticketId, onBack, hideBack = false }: RepairWor
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="flex flex-col gap-4">
-          <CustomerSection ticket={t} />
+          <CustomerSection ticket={t} readonly={readonly} onChanged={invalidate} />
           <ProductSection ticket={t} readonly={readonly} onChanged={invalidate} />
+          {t.serialItem && (
+            <DeviceRepairHistorySection
+              currentTicketId={t.id}
+              serialItemId={t.serialItem.id}
+            />
+          )}
           <SymptomSection ticket={t} readonly={readonly} onSaved={invalidate} />
           {!readonly && <PackagesSection ticket={t} onChanged={invalidate} />}
           <PartsSection ticket={t} readonly={readonly} onChanged={invalidate} />
           <LaborsSection ticket={t} readonly={readonly} onChanged={invalidate} />
           <FeesAndTotalsSection ticket={t} readonly={readonly} onChanged={invalidate} />
-          <StatusActionsSection ticket={t} onChanged={invalidate} />
         </div>
       </div>
+
+      <RepairBottomBar
+        ticket={t}
+        onChanged={invalidate}
+        onDeleted={() => router.push("/pos")}
+      />
 
       {/* 내역서 출력 모달 */}
       <Dialog open={statementOpen} onOpenChange={setStatementOpen}>
@@ -321,7 +359,20 @@ export function RepairWorkView({ ticketId, onBack, hideBack = false }: RepairWor
 
 // ──────── 고객 정보 ────────
 
-function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
+interface UserOption {
+  id: string;
+  name: string;
+}
+
+function CustomerSection({
+  ticket,
+  readonly,
+  onChanged,
+}: {
+  ticket: RepairTicketDetail;
+  readonly: boolean;
+  onChanged: () => void;
+}) {
   const { sessions } = useSessions();
   // 미등록 고객일 때, 이 티켓을 추적하는 세션의 라벨 사용 (예: "고객 1")
   const sessionLabel = ticket.customer
@@ -331,62 +382,106 @@ function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
   const displayName = ticket.customer?.name ?? sessionLabel;
   const initial = (displayName ?? "?").charAt(0);
 
+  const usersQuery = useQuery({
+    queryKey: ["users", "list"],
+    queryFn: () => apiGet<UserOption[]>("/api/users"),
+    enabled: !readonly,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (assignedToId: string | null) =>
+      apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", { assignedToId }),
+    onSuccess: () => {
+      toast.success("담당자 변경됨");
+      onChanged();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "변경 실패"),
+  });
+
   return (
     <section>
       <SectionTitle title="고객" />
       <Card size="sm">
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {/* 이름 */}
-        <div className="flex items-center gap-3">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-base font-semibold">
-            {initial}
-          </div>
-          <div className="flex min-w-0 flex-col">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              이름
-            </span>
-            <span className="line-clamp-1 text-base font-semibold">{displayName}</span>
-            {!ticket.customer && (
-              <span className="text-[11px] text-muted-foreground">결제 시 등록</span>
-            )}
-          </div>
-        </div>
-
-        {/* 연락처 */}
-        <div className="flex items-center gap-3">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted">
-            <Phone className="size-5 text-muted-foreground" />
-          </div>
-          <div className="flex min-w-0 flex-col">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              연락처
-            </span>
-            {ticket.customer?.phone ? (
-              <span className="text-base font-semibold tabular-nums">
-                {ticket.customer.phone}
+          {/* 이름 */}
+          <div className="flex items-center gap-3">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-base font-semibold">
+              {initial}
+            </div>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                이름
               </span>
-            ) : (
-              <span className="text-base text-muted-foreground">-</span>
-            )}
-          </div>
-        </div>
-
-        {/* 담당자 */}
-        <div className="flex items-center gap-3">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted">
-            <Wrench className="size-5 text-muted-foreground" />
-          </div>
-          <div className="flex min-w-0 flex-col">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              담당자
-            </span>
-            <span className="text-base font-semibold">
-              {ticket.assignedTo?.name ?? (
-                <span className="text-muted-foreground">미지정</span>
+              <span className="line-clamp-1 text-base font-semibold">{displayName}</span>
+              {!ticket.customer && (
+                <span className="text-[11px] text-muted-foreground">결제 시 등록</span>
               )}
-            </span>
+            </div>
           </div>
-        </div>
+
+          {/* 연락처 */}
+          <div className="flex items-center gap-3">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted">
+              <Phone className="size-5 text-muted-foreground" />
+            </div>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                연락처
+              </span>
+              {ticket.customer?.phone ? (
+                <span className="text-base font-semibold tabular-nums">
+                  {ticket.customer.phone}
+                </span>
+              ) : (
+                <span className="text-base text-muted-foreground">-</span>
+              )}
+            </div>
+          </div>
+
+          {/* 담당자 — 편집 가능 */}
+          <div className="flex items-center gap-3">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted">
+              <Wrench className="size-5 text-muted-foreground" />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                담당자
+              </span>
+              {readonly ? (
+                <span className="text-base font-semibold">
+                  {ticket.assignedTo?.name ?? (
+                    <span className="text-muted-foreground">미지정</span>
+                  )}
+                </span>
+              ) : (
+                <Select
+                  value={ticket.assignedTo?.id ?? "__none"}
+                  onValueChange={(v) =>
+                    assignMutation.mutate(v === "__none" ? null : v)
+                  }
+                  disabled={assignMutation.isPending || usersQuery.isPending}
+                >
+                  <SelectTrigger className="h-9 border-0 bg-transparent p-0 text-base font-semibold shadow-none focus:ring-0 [&>svg]:size-3.5">
+                    <SelectValue placeholder="미지정">
+                      {(v: unknown) =>
+                        v === "__none" || !v
+                          ? "미지정"
+                          : ((usersQuery.data ?? []).find((u) => u.id === v)?.name ?? "미지정")
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">미지정</SelectItem>
+                    {(usersQuery.data ?? []).map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
     </section>
@@ -735,6 +830,93 @@ function TextProductDisplay({ text }: { text: string }) {
         직접 입력
       </Badge>
     </div>
+  );
+}
+
+// ──────── 이 기기의 수리 내역 (환자 차트) ────────
+
+interface DeviceRepairHistoryRow {
+  id: string;
+  ticketNo: string;
+  type: "ON_SITE" | "DROP_OFF";
+  status: RepairStatus;
+  receivedAt: string;
+  pickedUpAt: string | null;
+  symptom: string | null;
+  finalAmount: string;
+}
+
+function DeviceRepairHistorySection({
+  currentTicketId,
+  serialItemId,
+}: {
+  currentTicketId: string;
+  serialItemId: string;
+}) {
+  const router = useRouter();
+  const historyQuery = useQuery({
+    queryKey: ["repairs", "device-history", serialItemId, currentTicketId],
+    queryFn: () =>
+      apiGet<DeviceRepairHistoryRow[]>(
+        `/api/repair-tickets?serialItemId=${serialItemId}&excludeId=${currentTicketId}`,
+      ),
+  });
+
+  if (historyQuery.isPending) {
+    return (
+      <section>
+        <SectionTitle title="이 기기의 수리 내역" />
+        <Card size="sm">
+          <CardContent className="py-3">
+            <Skeleton className="h-12 w-full" />
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+  const rows = historyQuery.data ?? [];
+  if (rows.length === 0) return null;
+
+  return (
+    <section>
+      <SectionTitle title={`이 기기의 수리 내역 (${rows.length}건)`} />
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-1.5 p-0">
+          {rows.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => router.push(`/pos/repairs/${r.id}`)}
+              className="flex items-center gap-3 border-b border-border px-4 py-2.5 text-left text-sm last:border-b-0 hover:bg-muted/50"
+            >
+              <div className="flex w-20 shrink-0 flex-col">
+                <span className="font-mono text-xs">{r.ticketNo}</span>
+                <Badge
+                  variant={STATUS_VARIANT[r.status]}
+                  className="mt-0.5 self-start text-[10px]"
+                >
+                  {STATUS_LABEL[r.status]}
+                </Badge>
+              </div>
+              <div className="flex-1">
+                <div className="line-clamp-1">
+                  {r.symptom ?? <span className="text-muted-foreground">-</span>}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  접수 {format(new Date(r.receivedAt), "yyyy-MM-dd")}
+                  {r.pickedUpAt && ` · 픽업 ${format(new Date(r.pickedUpAt), "yyyy-MM-dd")}`}
+                </div>
+              </div>
+              {r.status === "PICKED_UP" && Number(r.finalAmount) > 0 && (
+                <div className="shrink-0 text-right text-xs tabular-nums">
+                  ₩{Number(r.finalAmount).toLocaleString("ko-KR")}
+                </div>
+              )}
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -1428,19 +1610,25 @@ function Row({
   );
 }
 
-// ──────── 상태 진행 액션 ────────
+// ──────── 하단 고정 액션 바 ────────
 
-function StatusActionsSection({
+function RepairBottomBar({
   ticket,
   onChanged,
+  onDeleted,
 }: {
   ticket: RepairTicketDetail;
   onChanged: () => void;
+  onDeleted: () => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const actions = nextActions(ticket.status, ticket.type);
   const { sessions, addSession, add, setCustomer, switchSession } = useSessions();
   const { setCartOpen } = usePosShell();
+
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const transitionMutation = useMutation({
     mutationFn: (vars: { action: string; payload?: Record<string, unknown> }) =>
@@ -1464,6 +1652,17 @@ function StatusActionsSection({
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => apiMutate(`/api/repair-tickets/${ticket.id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("수리 접수가 삭제되었습니다");
+      queryClient.invalidateQueries({ queryKey: ["repairs"] });
+      onDeleted();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+
   const finalAmount = calcRepairFinalTotal(ticket);
 
   // 픽업 → 카트로 이동 (수리비를 카트 라인으로 추가, 일반 상품과 함께 결제 가능)
@@ -1472,7 +1671,6 @@ function StatusActionsSection({
       toast.error("청구할 금액이 없습니다");
       return;
     }
-    // 고객 세션 찾기 — 등록된 고객이면 그 세션 재사용, 미등록이면 새 세션
     let targetSessionId = ticket.customer
       ? sessions.find((s) => s.customerId === ticket.customer!.id)?.id
       : undefined;
@@ -1487,7 +1685,6 @@ function StatusActionsSection({
         );
       }
     }
-    // 수리 라인 추가 (repairTicketId 연결)
     add(
       {
         itemType: "repair",
@@ -1512,58 +1709,129 @@ function StatusActionsSection({
     setCartOpen(true);
   };
 
-  if (actions.length === 0) {
-    return (
-      <section>
-        <SectionTitle title="상태" />
-        <Card size="sm">
-          <CardContent className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-            {ticket.status === "PICKED_UP" ? (
-              <>
-                <CheckCircle2 className="size-4" /> 수리 완료 — 픽업/결제 완료 (
-                ₩{Number(ticket.finalAmount).toLocaleString("ko-KR")})
-              </>
-            ) : (
-              <>
-                <XCircle className="size-4" /> 취소된 수리
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
+  // 삭제 가능 조건 — RECEIVED + 부속/공임 없음, OR CANCELLED
+  const canDelete =
+    (ticket.status === "RECEIVED" &&
+      ticket.parts.length === 0 &&
+      ticket.labors.length === 0) ||
+    ticket.status === "CANCELLED";
+
+  const isTerminal = ticket.status === "PICKED_UP" || ticket.status === "CANCELLED";
 
   return (
-    <section>
-      <SectionTitle title="상태 진행" />
-      <Card size="sm">
-        <CardContent className="flex flex-wrap gap-2">
-        {actions.map((a) => (
-          <Button
-            key={a.action}
-            variant={a.variant ?? "default"}
-            size="sm"
-            disabled={transitionMutation.isPending}
-            onClick={() => {
-              if (a.action === "pickup") {
-                sendToCart();
-                return;
-              }
-              if (
-                a.action === "cancel" &&
-                !confirm("정말 취소하시겠습니까? 부속은 재고로 복원됩니다.")
-              ) {
-                return;
-              }
-              transitionMutation.mutate({ action: a.action });
-            }}
-          >
-            {a.label}
-          </Button>
-        ))}
-        </CardContent>
-      </Card>
-    </section>
+    <>
+      <div className="shrink-0 border-t border-border bg-background px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* 좌측 — 종료 상태 안내 (액션 없을 때만) */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {isTerminal ? (
+              ticket.status === "PICKED_UP" ? (
+                <>
+                  <CheckCircle2 className="size-4" />
+                  수리 완료 — 픽업/결제 완료 (₩
+                  {Number(ticket.finalAmount).toLocaleString("ko-KR")})
+                </>
+              ) : (
+                <>
+                  <XCircle className="size-4" /> 취소된 수리
+                </>
+              )
+            ) : null}
+          </div>
+
+          {/* 우측 — 진행 버튼 + 삭제 */}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {actions.map((a) => (
+              <Button
+                key={a.action}
+                variant={a.variant ?? "default"}
+                disabled={transitionMutation.isPending}
+                onClick={() => {
+                  if (a.action === "pickup") {
+                    sendToCart();
+                    return;
+                  }
+                  if (a.action === "cancel") {
+                    setCancelOpen(true);
+                    return;
+                  }
+                  transitionMutation.mutate({ action: a.action });
+                }}
+              >
+                {transitionMutation.isPending && (
+                  <Loader2 className="size-4 animate-spin" />
+                )}
+                {a.label}
+              </Button>
+            ))}
+            {canDelete && (
+              <Button
+                variant="destructive"
+                disabled={deleteMutation.isPending}
+                onClick={() => setDeleteOpen(true)}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+                수리접수 삭제
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 취소(soft) 확인 다이얼로그 — 부속 자동 복원 */}
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>수리를 취소하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              수리 상태가 <strong>취소</strong>로 변경되며, 사용된 부속은 재고로 자동 복원됩니다.
+              이력 자체는 남습니다 — 완전히 삭제하려면 취소 후 "수리접수 삭제"를 사용하세요.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>닫기</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setCancelOpen(false);
+                transitionMutation.mutate({ action: "cancel" });
+              }}
+            >
+              취소 처리
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 삭제(hard) 확인 다이얼로그 */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>수리접수를 완전히 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{ticket.ticketNo}</strong> 수리접수를 데이터베이스에서 영구 삭제합니다.
+              이 작업은 되돌릴 수 없으며 이력에서도 사라집니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>닫기</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                setDeleteOpen(false);
+                deleteMutation.mutate();
+              }}
+            >
+              영구 삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

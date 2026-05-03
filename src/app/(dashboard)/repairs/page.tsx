@@ -50,11 +50,11 @@ interface RepairTicketRow {
 const STATUS_LABEL: Record<RepairStatus, string> = {
   RECEIVED: "접수",
   DIAGNOSING: "진단중",
-  QUOTED: "견적안내",
+  QUOTED: "견적대기",
   APPROVED: "승인",
   REPAIRING: "수리중",
-  READY: "완료대기",
-  PICKED_UP: "픽업완료",
+  READY: "인계대기",
+  PICKED_UP: "수리완료",
   CANCELLED: "취소",
 };
 
@@ -73,11 +73,11 @@ const STATUS_FILTERS: { value: RepairStatus | "OPEN" | "ALL"; label: string }[] 
   { value: "OPEN", label: "진행중" },
   { value: "RECEIVED", label: "접수" },
   { value: "DIAGNOSING", label: "진단중" },
-  { value: "QUOTED", label: "견적안내" },
+  { value: "QUOTED", label: "견적대기" },
   { value: "APPROVED", label: "승인" },
   { value: "REPAIRING", label: "수리중" },
-  { value: "READY", label: "완료대기" },
-  { value: "PICKED_UP", label: "픽업완료" },
+  { value: "READY", label: "인계대기" },
+  { value: "PICKED_UP", label: "수리완료" },
   { value: "CANCELLED", label: "취소" },
   { value: "ALL", label: "전체" },
 ];

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Grid3x3 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
 import { useSessions } from "@/components/pos/sessions-context";
-import { usePosShell } from "@/components/pos/pos-shell-context";
 import { ProductGrid, type ProductLite } from "@/components/pos/product-grid";
 
 interface CategoryRoot {
@@ -25,8 +25,8 @@ interface Props {
 }
 
 export function ProductBrowser({ sessionId, enabled = true }: Props) {
+  const router = useRouter();
   const { add } = useSessions();
-  const { openLanding } = usePosShell();
   const [categoryId, setCategoryId] = useState<string>("");
 
   const categoriesQuery = useQuery({
@@ -67,7 +67,7 @@ export function ProductBrowser({ sessionId, enabled = true }: Props) {
   };
 
   const handleViewDetail = (p: ProductLite) => {
-    openLanding(p.id);
+    router.push(`/pos/products/${p.id}`);
   };
 
   return (

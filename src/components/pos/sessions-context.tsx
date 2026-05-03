@@ -52,6 +52,7 @@ export interface CartSession {
   labelCodes?: string[];           // 마지막 발번 라벨 코드 목록
   labelFingerprint?: string;       // 발번 시점 카트 지문
   repairTicketIds?: string[];      // 이 세션에서 시작한 수리 티켓 ID들 (미등록 고객 추적용)
+  openRepairCount?: number;        // 진행중 수리 건수 — 워크스페이스가 동기화 (헤더 표시용)
 }
 
 interface AddOptions {
@@ -80,6 +81,7 @@ interface SessionsContextValue {
   setSessionQuotation: (quotationId: string, fingerprint: string, sessionId?: string) => void;
   setSessionLabels: (codes: string[], fingerprint: string, sessionId?: string) => void;
   addSessionRepairTicket: (ticketId: string, sessionId?: string) => void;
+  setSessionOpenRepairCount: (count: number, sessionId?: string) => void;
   clear: (sessionId?: string) => void;
   totalItemCount: number;
   getSession: (id: string) => CartSession | undefined;
@@ -336,14 +338,29 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const setCustomer = useCallback(
     (id: string, name: string, phone?: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
+      let ticketIdsToUpgrade: string[] = [];
       setSessions((prev) =>
-        updateSession(prev, targetId, (s) => ({
-          ...s,
-          customerId: id,
-          customerName: name,
-          customerPhone: phone,
-        }))
+        updateSession(prev, targetId, (s) => {
+          // 이 세션이 만들었던 미등록 수리 티켓들 — 결제 전이면 customerId 자동 채워줌
+          ticketIdsToUpgrade = s.repairTicketIds ?? [];
+          return {
+            ...s,
+            customerId: id,
+            customerName: name,
+            customerPhone: phone,
+          };
+        })
       );
+      // 미등록으로 만들었던 RepairTicket들에 customerId PUT (best-effort, 실패해도 무시)
+      if (ticketIdsToUpgrade.length > 0) {
+        for (const ticketId of ticketIdsToUpgrade) {
+          fetch(`/api/repair-tickets/${ticketId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ customerId: id }),
+          }).catch(() => {});
+        }
+      }
     },
     [activeId]
   );
@@ -415,10 +432,24 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     (ticketId: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
       setSessions((prev) =>
-        updateSession(prev, targetId, (s) => ({
-          ...s,
-          repairTicketIds: [...(s.repairTicketIds ?? []), ticketId],
-        }))
+        updateSession(prev, targetId, (s) => {
+          const existing = s.repairTicketIds ?? [];
+          if (existing.includes(ticketId)) return s;
+          return { ...s, repairTicketIds: [...existing, ticketId] };
+        })
+      );
+    },
+    [activeId]
+  );
+
+  const setSessionOpenRepairCount = useCallback(
+    (count: number, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      setSessions((prev) =>
+        updateSession(prev, targetId, (s) => {
+          if (s.openRepairCount === count) return s;
+          return { ...s, openRepairCount: count };
+        })
       );
     },
     [activeId]
@@ -484,11 +515,12 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       setSessionQuotation,
       setSessionLabels,
       addSessionRepairTicket,
+      setSessionOpenRepairCount,
       clear,
       totalItemCount,
       getSession,
     }),
-    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, clear, totalItemCount, getSession]
+    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionOpenRepairCount, clear, totalItemCount, getSession]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

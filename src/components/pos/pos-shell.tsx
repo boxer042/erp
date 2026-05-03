@@ -7,7 +7,6 @@ import { PosSidebar } from "@/components/pos/pos-sidebar";
 import { PosCustomerHeader } from "@/components/pos/pos-customer-header";
 import { SearchDialog } from "@/components/pos/search-dialog";
 import { CartDrawer } from "@/components/pos/cart-drawer";
-import { LandingPreviewDrawer } from "@/components/pos/landing-preview-drawer";
 import { PosShellContext, type PosShellContextValue } from "@/components/pos/pos-shell-context";
 
 function getSessionIdFromPath(pathname: string): string {
@@ -21,7 +20,6 @@ export function PosShell({ children }: { children: React.ReactNode }) {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [landingProductId, setLandingProductId] = useState<string | null>(null);
 
   const pickedSessionId = useMemo(() => {
     const fromUrl = getSessionIdFromPath(pathname);
@@ -34,7 +32,6 @@ export function PosShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setCartOpen(false);
     setSearchOpen(false);
-    setLandingProductId(null);
   }, [pathname]);
 
   const value: PosShellContextValue = {
@@ -43,9 +40,6 @@ export function PosShell({ children }: { children: React.ReactNode }) {
     setSearchOpen: useCallback((o: boolean) => setSearchOpen(o), []),
     cartOpen,
     setCartOpen: useCallback((o: boolean) => setCartOpen(o), []),
-    landingProductId,
-    openLanding: useCallback((id: string) => setLandingProductId(id), []),
-    closeLanding: useCallback(() => setLandingProductId(null), []),
   };
 
   return (
@@ -64,7 +58,6 @@ export function PosShell({ children }: { children: React.ReactNode }) {
 
       <SearchDialog />
       <CartDrawer />
-      <LandingPreviewDrawer />
     </PosShellContext.Provider>
   );
 }
