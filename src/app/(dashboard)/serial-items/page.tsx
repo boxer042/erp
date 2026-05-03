@@ -158,12 +158,7 @@ export default function SerialItemsPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">
-                <Checkbox
-                  checked={
-                    allSelected ? true : someSelected ? "indeterminate" : false
-                  }
-                  onCheckedChange={toggleAll}
-                />
+                <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
               </TableHead>
               <TableHead>코드</TableHead>
               <TableHead>상품</TableHead>
