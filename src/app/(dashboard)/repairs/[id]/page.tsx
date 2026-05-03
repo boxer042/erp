@@ -170,11 +170,11 @@ function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
     actions.push({ action: "start", label: "수리 시작" });
     actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   } else if (status === "REPAIRING") {
+    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
     actions.push({ action: "ready", label: "수리 완료" });
-    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   } else if (status === "READY") {
+    // 인계대기: 작업·부속·공임이 모두 확정된 상태 — 취소 불가, 픽업/결제만 가능
     actions.push({ action: "pickup", label: "픽업 / 결제" });
-    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   }
   return actions;
 }

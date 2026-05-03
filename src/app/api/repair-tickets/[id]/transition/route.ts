@@ -183,7 +183,7 @@ export async function POST(
     }
 
     if (action === "cancel") {
-      // 종료 상태(픽업완료/이미 취소)는 취소 불가 — 데이터 무결성 보호
+      // 취소 불가 상태 — 데이터 무결성 보호
       if (ticket.status === "PICKED_UP") {
         return NextResponse.json(
           { error: "이미 픽업/결제가 완료된 수리는 취소할 수 없습니다" },
@@ -193,6 +193,12 @@ export async function POST(
       if (ticket.status === "CANCELLED") {
         return NextResponse.json(
           { error: "이미 취소된 수리입니다" },
+          { status: 400 },
+        );
+      }
+      if (ticket.status === "READY") {
+        return NextResponse.json(
+          { error: "인계대기 상태는 취소할 수 없습니다. 픽업/결제로 마무리하세요" },
           { status: 400 },
         );
       }
