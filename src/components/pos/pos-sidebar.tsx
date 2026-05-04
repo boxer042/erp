@@ -7,6 +7,8 @@ import {
   Wrench,
   CalendarClock,
   ShoppingCart,
+  Sparkles,
+  LayoutGrid,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -100,6 +102,22 @@ export function PosSidebar() {
           active={cartOpen}
           onClick={handleCartToggle}
           badge={cartCount > 0 ? cartCount : undefined}
+        />
+
+        {/* 수리 v2 (테스트) — 별도 페이지로 진입 */}
+        <SidebarButton
+          icon={<Sparkles className="size-5" />}
+          label="수리 v2"
+          active={pathname.startsWith("/pos/repair-v2")}
+          onClick={() => router.push("/pos/repair-v2")}
+        />
+
+        {/* POS v2 (테스트) — 손님 그리드 진입 */}
+        <SidebarButton
+          icon={<LayoutGrid className="size-5" />}
+          label="v2"
+          active={pathname.startsWith("/pos/v2")}
+          onClick={() => router.push("/pos/v2")}
         />
       </div>
 

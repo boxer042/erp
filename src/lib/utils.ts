@@ -5,6 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * 클라이언트 임시 ID 생성 — crypto.randomUUID 가 secure context (HTTPS/localhost) 에서만
+ * 동작하는 문제 회피용. LAN dev 서버 (http://192.168.x.x) 에선 undefined 라 fallback 필수.
+ * DB 저장용 ID 가 아닌 카트 라인·임시 매핑 등 클라이언트측 고유 식별자에만 사용.
+ */
+export function genClientId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      /* falls through */
+    }
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // ─── 전화번호/사업자번호 포맷팅 ───
 
 /** 숫자만 추출 (저장용) */
@@ -47,6 +63,17 @@ export const formatComma = (s: string): string => {
 
 // 콤마 제거 후 raw digits 반환 (DB 저장용)
 export const parseComma = (s: string): string => s.replace(/[^\d]/g, "");
+
+// 상품 가격 표시: 자동매핑 + 0원이면 "담당자 문의", 그 외엔 ₩ 포맷
+export function formatProductPrice(
+  price: number | string | { toString(): string } | null | undefined,
+  opts: { autoMapped?: boolean } = {}
+): string {
+  const n = price == null ? 0 : parseFloat(typeof price === "object" ? price.toString() : String(price));
+  const safe = Number.isFinite(n) ? n : 0;
+  if (opts.autoMapped && safe === 0) return "담당자 문의";
+  return `₩${safe.toLocaleString("ko-KR")}`;
+}
 
 // 소수점 허용 금액 입력용 천 단위 콤마 포맷 (예: "1234567.89" → "1,234,567.89")
 // 입력 중 끝의 "." 도 보존한다 ("1234." → "1,234.")

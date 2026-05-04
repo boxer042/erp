@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { genClientId } from "@/lib/utils";
 
 export interface RepairMeta {
   deviceBrand?: string;
@@ -70,6 +71,7 @@ interface SessionsContextValue {
   add: (item: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number }, opts?: AddOptions) => void;
   remove: (cartItemId: string, sessionId?: string) => void;
   updateQty: (cartItemId: string, qty: number, sessionId?: string) => void;
+  updateUnitPrice: (cartItemId: string, unitPrice: number, sessionId?: string) => void;
   updateDiscount: (cartItemId: string, discount: string, sessionId?: string) => void;
   updateRentalDates: (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number, sessionId?: string) => void;
   assignVariant: (cartItemId: string, variant: { productId: string; name: string; sku?: string; unitPrice: number }, sessionId?: string) => void;
@@ -121,6 +123,13 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<CartSession[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
+  // 서버 sync 용 — 삭제된 세션 ID 추적 (다음 sync 에 보냄)
+  const removedIdsRef = useRef<Set<string>>(new Set());
+  // 첫 서버 fetch 완료 여부 — 그 전엔 push 안 함 (덮어쓰기 방지)
+  const serverHydratedRef = useRef(false);
+  // sessions 의 최신 ref — polling/debounce 안에서 stale state 방지
+  const sessionsRef = useRef<CartSession[]>([]);
+  sessionsRef.current = sessions;
 
   useEffect(() => {
     try {
@@ -148,6 +157,95 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [sessions, activeId, hydrated]);
 
+  // ── 서버 sync ─────────────────────────────────────────
+  // 디바이스간 공유. 마운트 시 GET 한 번 + 변경 시 debounced POST + 5초 polling.
+  // 실패해도 localStorage 가 fallback 이라 graceful.
+  useEffect(() => {
+    if (!hydrated) return;
+
+    let cancelled = false;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const sync = async () => {
+      try {
+        const body = {
+          sessions: sessionsRef.current,
+          deletedIds: Array.from(removedIdsRef.current),
+        };
+        // sync 시도 — 호출 직전 deletedIds 캡처
+        const sentDeleted = body.deletedIds;
+        const res = await fetch("/api/pos/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) return;
+        const serverSessions: (CartSession & { updatedAt?: string })[] = await res.json();
+        if (cancelled) return;
+
+        // 응답 = 서버 최종 상태. 클라이언트에 반영.
+        // 단 sync 도중 새로 추가된 deletedIds 는 보존.
+        for (const id of sentDeleted) removedIdsRef.current.delete(id);
+
+        // 첫 sync 완료 — 이후부터 push 가능
+        serverHydratedRef.current = true;
+
+        // 같은 데이터면 setState 안 함 (불필요한 리렌더 + 무한 polling 루프 방지).
+        // ID 만 비교하면 다른 기기에서 변경한 items 가 반영 안 됨 → JSON 전체 비교.
+        const local = sessionsRef.current;
+        const serverNormalized = serverSessions.map(migrateSession);
+        const sameAsLocal =
+          JSON.stringify(local) === JSON.stringify(serverNormalized);
+        if (!sameAsLocal) {
+          setSessions(serverNormalized);
+          // activeId 가 사라진 세션이면 첫 번째로 fallback
+          const stillExists = serverSessions.some(
+            (s) => s.id === activeIdRef.current,
+          );
+          if (!stillExists && serverSessions.length > 0) {
+            setActiveId(serverSessions[0].id);
+          }
+        }
+      } catch {
+        /* 네트워크 실패 — silent. localStorage 에 의존 */
+      }
+    };
+
+    // 1) 마운트 직후 첫 sync
+    sync();
+
+    // 2) 5초 polling
+    pollTimer = setInterval(sync, 5000);
+
+    // 3) sessions 변경 시 debounced sync — 다른 useEffect 가 sessions 변화 감지해서 호출
+    //    (이 effect 안에선 sessions deps 안 잡음 — 무한루프 방지)
+    debouncePushRef.current = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (!serverHydratedRef.current) return; // 첫 fetch 전엔 skip
+        sync();
+      }, 800);
+    };
+
+    return () => {
+      cancelled = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (pollTimer) clearInterval(pollTimer);
+      debouncePushRef.current = null;
+    };
+  }, [hydrated]);
+
+  // sessions 변경 → debounced push trigger
+  const debouncePushRef = useRef<(() => void) | null>(null);
+  const activeIdRef = useRef<string>("");
+  // eslint-disable-next-line react-hooks/immutability
+  activeIdRef.current = activeId;
+  useEffect(() => {
+    if (!hydrated) return;
+    debouncePushRef.current?.();
+  }, [sessions, hydrated]);
+
   const addSession = useCallback(() => {
     let createdId = "";
     setSessions((prev) => {
@@ -162,13 +260,15 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const removeSession = useCallback((id: string) => {
     setSessions((prev) => {
       if (prev.length <= 1) {
-        // 마지막 세션이면 비우기만
+        // 마지막 세션이면 비우기만 (clear 와 동일 — 서버에서 삭제하지 않음)
         return prev.map((s) =>
           s.id === id
             ? { ...s, items: [], customerId: undefined, customerName: undefined, customerPhone: undefined, totalDiscount: "0", shippingCost: "0", quotationId: undefined, quotationFingerprint: undefined, labelCodes: undefined, labelFingerprint: undefined }
             : s
         );
       }
+      // 서버에서도 삭제 — 다음 sync 에 deletedIds 로 보냄
+      removedIdsRef.current.add(id);
       const next = prev.filter((s) => s.id !== id);
       setActiveId((cur) => (cur === id ? next[Math.max(0, prev.findIndex((s) => s.id === id) - 1)].id : cur));
       return next;
@@ -203,7 +303,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
             items: [
               ...s.items,
               {
-                cartItemId: crypto.randomUUID(),
+                cartItemId: genClientId(),
                 productId: it.productId,
                 itemType: it.itemType,
                 name: it.name,
@@ -252,6 +352,23 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
             const min = p.isBulk ? 0.0001 : 1;
             return { ...p, quantity: Math.max(min, qty) };
           }),
+        }))
+      );
+    },
+    [activeId]
+  );
+
+  const updateUnitPrice = useCallback(
+    (cartItemId: string, unitPrice: number, sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      setSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          items: s.items.map((p) =>
+            p.cartItemId === cartItemId
+              ? { ...p, unitPrice: Math.max(0, Math.round(unitPrice)) }
+              : p,
+          ),
         }))
       );
     },
@@ -504,6 +621,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       add,
       remove,
       updateQty,
+      updateUnitPrice,
       updateDiscount,
       updateRentalDates,
       assignVariant,
@@ -520,7 +638,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       totalItemCount,
       getSession,
     }),
-    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionOpenRepairCount, clear, totalItemCount, getSession]
+    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateUnitPrice, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionOpenRepairCount, clear, totalItemCount, getSession]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

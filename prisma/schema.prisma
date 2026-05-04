@@ -37,6 +37,7 @@ model User {
   assignedRepairs   RepairTicket[] @relation("RepairAssignee")
   createdRentals    Rental[]
   createdExpenses   Expense[]
+  posSessions       PosSession[]
 
   @@map("users")
 }
@@ -943,6 +944,7 @@ model Customer {
   rentals    Rental[]
   expenses   Expense[]
   serialItems SerialItem[]
+  posSessions PosSession[]
 
   @@index([name])
   @@index([phone])
@@ -1692,4 +1694,42 @@ model SerialItem {
   @@index([orderItemId])
   @@index([source])
   @@map("serial_items")
+}
+
+// ============================================================
+// POS 카트 세션 — 디바이스간 공유용 서버 저장소
+// ============================================================
+
+// 한 user 의 카트 세션을 여러 기기에서 공유. id 는 클라이언트 sessionId 그대로
+// 사용(genClientId). items / labelCodes / repairTicketIds 는 JSON 으로 저장 —
+// 정규화는 매 push 마다 부담 크고, 카트는 결제 시까지 임시 데이터라 큰 의미 없음.
+model PosSession {
+  id            String    @id // 클라이언트 sessionId 와 동일
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 고객 — 등록 고객은 customerId, 미등록은 null + customerName 도 null
+  customerId    String?   @map("customer_id")
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName  String?   @map("customer_name")
+  customerPhone String?   @map("customer_phone")
+  // 카트 메타
+  label         String    @default("고객")
+  totalDiscount String    @default("0") @map("total_discount")
+  shippingCost  String    @default("0") @map("shipping_cost")
+  items         Json      @default("[]") // CartItem[] — JSON 직렬화
+  // 견적/라벨/수리 추적 (모두 옵셔널)
+  quotationId            String? @map("quotation_id")
+  quotationFingerprint   String? @map("quotation_fingerprint")
+  labelCodes             Json?   @map("label_codes")
+  labelFingerprint       String? @map("label_fingerprint")
+  repairTicketIds        Json?   @map("repair_ticket_ids") // string[]
+  openRepairCount        Int?    @map("open_repair_count")
+  // 동기화 메타
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+  @@index([customerId])
+  @@map("pos_sessions")
 }

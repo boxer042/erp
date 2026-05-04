@@ -33,6 +33,12 @@ export function PosCustomerHeader() {
 
   const activeSessionId = getActiveSessionId(pathname);
   const isAll = pathname === "/pos/all";
+  // 카트 세션과 무관한 standalone 페이지에서는 상단 고객 탭 숨김.
+  // /pos/v2/* 가 /pos/products/* 도 포함 (v2 의 product 라우트는 이미 v2 prefix).
+  const isStandalone =
+    pathname.startsWith("/pos/repair-v2") ||
+    pathname.startsWith("/pos/v2") ||
+    pathname.startsWith("/pos/products/");
 
   // 고객 변경 시 현재 mode를 유지 (수리 → 다른 고객 클릭해도 수리 모드 유지)
   const currentMode = searchParams.get("mode");
@@ -68,12 +74,13 @@ export function PosCustomerHeader() {
     }
   };
 
+  // 전체보기(고객 그리드) / 수리 v2 같은 standalone 페이지에서는 상단 고객 탭 숨김
+  // — hydration 완료 전에도 미리 확인해서 92px 빈 자리 점프 방지
+  if (isAll || isStandalone) return null;
+
   if (!hydrated) {
     return <div className="h-[92px] shrink-0 border-b border-border bg-background" />;
   }
-
-  // 전체보기(고객 그리드) 화면에서는 상단 고객 탭 숨김
-  if (isAll) return null;
 
   const targetOpenRepairs = closeTarget?.openRepairCount ?? 0;
   const targetCartCount = closeTarget?.items.reduce((a, i) => a + i.quantity, 0) ?? 0;

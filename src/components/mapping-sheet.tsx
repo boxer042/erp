@@ -17,7 +17,7 @@ import { Trash2, Loader2, Plus } from "lucide-react";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { formatComma, parseComma } from "@/lib/utils";
+import { formatComma, parseComma, genClientId } from "@/lib/utils";
 
 // ─── 공통 인터페이스 ─────────────────────────────────────────────────────────
 
@@ -207,7 +207,7 @@ export function MappingSheet(props: MappingSheetProps) {
       sub = sp?.supplier.name ?? "";
     }
 
-    setPendingMappings((prev) => [...prev, { tempId: crypto.randomUUID(), targetId: selectedId, targetLabel: label, targetSub: sub, conversionRate }]);
+    setPendingMappings((prev) => [...prev, { tempId: genClientId(), targetId: selectedId, targetLabel: label, targetSub: sub, conversionRate }]);
     setSelectedId("");
     setConversionRate("1");
   };
