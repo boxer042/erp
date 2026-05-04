@@ -60,7 +60,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cn, formatComma, parseComma } from "@/lib/utils";
+import {
+  cn,
+  formatComma,
+  parseComma,
+  formatDiscountDisplay,
+  normalizeDiscountInput,
+} from "@/lib/utils";
+import { calcRepairTotals } from "@/lib/repair";
 import { useSessions } from "@/components/pos/sessions-context";
 import { usePosShell } from "@/components/pos/pos-shell-context";
 
@@ -118,10 +125,12 @@ interface RepairTicketDetail {
   serialItem: {
     id: string;
     code: string;
+    source: "SALE" | "REPAIR";
+    displayName: string | null;
     soldAt: string;
     warrantyEnds: string | null;
     status: "ACTIVE" | "RETURNED" | "SCRAPPED";
-    product: { id: string; name: string; sku: string; imageUrl: string | null };
+    product: { id: string; name: string; sku: string; imageUrl: string | null } | null;
     orderItem: {
       id: string;
       order: {
@@ -173,19 +182,14 @@ const STATUS_VARIANT: Record<RepairStatus, "default" | "secondary" | "outline" |
   CANCELLED: "destructive",
 };
 
-// USED 부속 + 공임 + 진단비 - 할인
+// USED 부속 + 공임 + 진단비 - 할인 (lib/repair.ts 의 calcRepairTotals 래퍼)
 function calcRepairFinalTotal(ticket: RepairTicketDetail): number {
-  const usedParts = ticket.parts
-    .filter((p) => p.status === "USED")
-    .reduce((s, p) => s + Number(p.totalPrice), 0);
-  const labors = ticket.labors.reduce((s, l) => s + Number(l.totalPrice), 0);
-  const fee = Number(ticket.diagnosisFee || 0);
-  const subtotal = usedParts + labors + fee;
-  const td = ticket.totalDiscount || "0";
-  const discount = td.endsWith("%")
-    ? Math.round((subtotal * (parseFloat(td) || 0)) / 100)
-    : parseInt(td.replace(/,/g, ""), 10) || 0;
-  return Math.max(0, subtotal - discount);
+  return calcRepairTotals({
+    parts: ticket.parts,
+    labors: ticket.labors,
+    diagnosisFee: ticket.diagnosisFee,
+    totalDiscount: ticket.totalDiscount,
+  }).finalTotal;
 }
 
 // 상태 진행 버튼들 — 현재 상태에서 가능한 액션
@@ -616,7 +620,7 @@ function ProductSection({
         ) : ticket.repairProductText ? (
           <TextProductDisplay text={ticket.repairProductText} />
         ) : (
-          <div className="rounded-md border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+          <div className="rounded-md bg-muted/40 p-3 text-center text-xs text-muted-foreground">
             연결된 상품이 없습니다 — 아래에서 시리얼/검색/직접입력으로 연결하세요
           </div>
         )}
@@ -714,7 +718,7 @@ function ProductSection({
   );
 }
 
-// 시리얼 모드 — 우리가 판매한 상품. 구매일·보증·주문번호까지 표시.
+// 시리얼 모드 — SALE: 우리가 판매한 상품 / REPAIR: 수리 받으면서 새로 발번된 라벨
 function SerialItemDisplay({
   serialItem,
 }: {
@@ -722,14 +726,19 @@ function SerialItemDisplay({
 }) {
   const warrantyActive =
     serialItem.warrantyEnds && new Date(serialItem.warrantyEnds) > new Date();
+  const displayName =
+    serialItem.product?.name ?? serialItem.displayName ?? "(미상)";
+  const imageUrl = serialItem.product?.imageUrl ?? null;
+  const sku = serialItem.product?.sku ?? null;
+  const isRepairLabel = serialItem.source === "REPAIR";
   return (
     <div className="flex flex-col gap-2 rounded-md bg-primary/5 p-3 ring-1 ring-primary/20">
       <div className="flex items-center gap-3">
-        {serialItem.product.imageUrl ? (
+        {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={serialItem.product.imageUrl}
-            alt={serialItem.product.name}
+            src={imageUrl}
+            alt={displayName}
             className="size-14 rounded-md object-cover"
           />
         ) : (
@@ -742,14 +751,14 @@ function SerialItemDisplay({
             <QrCode className="size-3" /> {serialItem.code}
           </span>
           <span className="line-clamp-1 text-sm font-semibold">
-            {serialItem.product.name}
+            {displayName}
           </span>
-          <span className="text-xs text-muted-foreground">
-            {serialItem.product.sku}
-          </span>
+          {sku && (
+            <span className="text-xs text-muted-foreground">{sku}</span>
+          )}
         </div>
         <Badge variant="secondary" className="self-start text-[10px]">
-          우리 판매
+          {isRepairLabel ? "수리 라벨" : "우리 판매"}
         </Badge>
       </div>
       <div className="grid grid-cols-2 gap-2 border-t border-primary/20 pt-2 text-xs sm:grid-cols-3">
@@ -820,7 +829,7 @@ function SearchedProductDisplay({
 function TextProductDisplay({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-3 rounded-md bg-muted/30 p-3">
-      <div className="flex size-14 items-center justify-center rounded-md border border-dashed border-border">
+      <div className="flex size-14 items-center justify-center rounded-md bg-background">
         <Package className="size-6 text-muted-foreground" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
@@ -1518,17 +1527,14 @@ function FeesAndTotalsSection({
       toast.error(err instanceof ApiError ? err.message : "저장 실패"),
   });
 
-  // 합계 계산 (USED 부속 + 공임 + 진단비 - 할인)
-  const usedParts = ticket.parts
-    .filter((p) => p.status === "USED")
-    .reduce((s, p) => s + Number(p.totalPrice), 0);
-  const labors = ticket.labors.reduce((s, l) => s + Number(l.totalPrice), 0);
-  const fee = parseInt(diagnosisFee, 10) || 0;
-  const subtotal = usedParts + labors + fee;
-  const discountAmount = totalDiscount.endsWith("%")
-    ? Math.round((subtotal * (parseFloat(totalDiscount) || 0)) / 100)
-    : parseInt(totalDiscount.replace(/,/g, ""), 10) || 0;
-  const finalTotal = Math.max(0, subtotal - discountAmount);
+  // 합계 계산 — lib/repair.ts 의 calcRepairTotals 사용 (서버 pickup 과 동일 로직)
+  const totals = calcRepairTotals({
+    parts: ticket.parts,
+    labors: ticket.labors,
+    diagnosisFee: parseInt(diagnosisFee, 10) || 0,
+    totalDiscount,
+  });
+  const { usedPartsTotal: usedParts, laborTotal: labors, diagnosisFee: fee, discountAmount, finalTotal } = totals;
 
   return (
     <section>
@@ -1554,8 +1560,10 @@ function FeesAndTotalsSection({
               전체 할인 (정액 또는 비율 — 예: 5000 / 10%)
             </label>
             <Input
-              value={totalDiscount}
-              onChange={(e) => setTotalDiscount(e.target.value)}
+              inputMode={totalDiscount.trim().endsWith("%") ? "decimal" : "numeric"}
+              value={formatDiscountDisplay(totalDiscount)}
+              onChange={(e) => setTotalDiscount(normalizeDiscountInput(e.target.value))}
+              onFocus={(e) => e.currentTarget.select()}
               disabled={readonly}
               className="h-9 text-right tabular-nums"
               placeholder="0"

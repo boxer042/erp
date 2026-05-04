@@ -76,6 +76,8 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
     repairTicketData,
     repairTicketId: linkedRepairTicketId,
     rentalRecords,
+    // 결제 직전 발번된 라벨 — 서버에서 OrderItem 과 매칭해 orderItemId 연결
+    labelCodes: session.labelCodes ?? [],
   };
 }
 

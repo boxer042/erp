@@ -5,6 +5,9 @@
 //   - InventoryMovement.OUTGOING 기록 (memo: "수리 #R...")
 //   - 부속 행 삭제 시 LotConsumption 역조회 → InventoryLot.remainingQty 복원 + Inventory 복원
 //   - status (USED/LOST) 변경은 재고에 영향 없음 (이미 차감된 상태). 청구 여부에만 영향.
+//   - RepairPart.unitCostSnapshot 은 같은 행에 누적된 모든 LotConsumption 의 가중평균.
+//     카트 패턴(같은 productId 행에 합치기) 으로 다회 차감 시에도 올바른 값이 되도록
+//     consume/restore 끝마다 LotConsumption 전체로 재계산해 저장.
 
 import type { Prisma } from "@prisma/client";
 import { fifoConsume, ensureBulkStock } from "@/lib/inventory/fifo";
@@ -15,6 +18,27 @@ export interface ConsumePartArgs {
   productId: string;
   productName: string;
   quantity: number;
+}
+
+// 해당 RepairPart 의 모든 LotConsumption 으로 단가 가중평균 재계산.
+// 다회 차감/부분 복원 후에도 unitCostSnapshot 이 정확한 가중평균이 되도록 보장.
+async function recomputeUnitCostSnapshot(
+  tx: Prisma.TransactionClient,
+  partId: string,
+): Promise<number> {
+  const all = await tx.lotConsumption.findMany({
+    where: { repairPartId: partId },
+    select: { quantity: true, unitCost: true },
+  });
+  if (all.length === 0) return 0;
+  let totalQty = 0;
+  let totalCost = 0;
+  for (const c of all) {
+    const q = Number(c.quantity);
+    totalQty += q;
+    totalCost += q * Number(c.unitCost);
+  }
+  return totalQty > 0 ? totalCost / totalQty : 0;
 }
 
 /**
@@ -37,14 +61,15 @@ export async function consumeRepairPart(
     `수리: ${productName}`,
   );
 
-  for (const c of consumptions) {
-    await tx.lotConsumption.create({
-      data: {
+  // N+1 방지 — createMany 로 한 번에 적재
+  if (consumptions.length > 0) {
+    await tx.lotConsumption.createMany({
+      data: consumptions.map((c) => ({
         repairPartId: partId,
         lotId: c.lotId,
         quantity: c.quantity,
         unitCost: c.unitCost,
-      },
+      })),
     });
   }
 
@@ -66,11 +91,14 @@ export async function consumeRepairPart(
     },
   });
 
+  // 행에 누적된 모든 LotConsumption 의 가중평균을 unitCostSnapshot 으로 저장.
+  // 첫 차감 때는 unitCostAvg 와 동일하지만, 카트 패턴으로 합쳐질 때는 누적 평균이 된다.
+  const weightedAvg = await recomputeUnitCostSnapshot(tx, partId);
   await tx.repairPart.update({
     where: { id: partId },
     data: {
       consumedAt: new Date(),
-      unitCostSnapshot: unitCostAvg,
+      unitCostSnapshot: weightedAvg,
     },
   });
 
@@ -99,14 +127,19 @@ export async function restoreRepairPart(
 
   const consumptions = await tx.lotConsumption.findMany({
     where: { repairPartId: partId },
+    select: { lotId: true, quantity: true },
   });
 
-  for (const c of consumptions) {
-    await tx.inventoryLot.update({
-      where: { id: c.lotId },
-      data: { remainingQty: { increment: Number(c.quantity) } },
-    });
-  }
+  // N+1 방지 — Promise.all 로 병렬 increment.
+  // 각 update는 lotId가 다르므로 updateMany로 묶을 수 없음.
+  await Promise.all(
+    consumptions.map((c) =>
+      tx.inventoryLot.update({
+        where: { id: c.lotId },
+        data: { remainingQty: { increment: Number(c.quantity) } },
+      }),
+    ),
+  );
 
   await tx.lotConsumption.deleteMany({ where: { repairPartId: partId } });
 

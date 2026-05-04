@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
     include: {
       customer: { select: { id: true, name: true, phone: true } },
       customerMachine: { select: { id: true, name: true } },
-      serialItem: { select: { id: true, code: true } },
+      serialItem: {
+        select: { id: true, code: true, source: true, displayName: true },
+      },
       assignedTo: { select: { id: true, name: true } },
       _count: { select: { parts: true, labors: true } },
     },
@@ -95,7 +97,9 @@ export async function POST(request: NextRequest) {
     include: {
       customer: { select: { id: true, name: true, phone: true } },
       customerMachine: { select: { id: true, name: true } },
-      serialItem: { select: { id: true, code: true } },
+      serialItem: {
+        select: { id: true, code: true, source: true, displayName: true },
+      },
       assignedTo: { select: { id: true, name: true } },
       parts: true,
       labors: true,

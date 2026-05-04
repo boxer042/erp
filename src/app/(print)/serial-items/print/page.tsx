@@ -48,9 +48,12 @@ export default async function SerialItemsPrintPage({
         errorCorrectionLevel: "M",
         color: { dark: "#000000", light: "#ffffff" },
       });
+      // 표시명 우선순위: product.name > displayName > "(미상)"
+      const productName = it.product?.name ?? it.displayName ?? "(미상)";
       return {
         code: it.code,
-        productName: it.product.name,
+        productName,
+        source: it.source,
         soldAt: it.soldAt.toISOString().slice(0, 10),
         warrantyEnds: it.warrantyEnds ? it.warrantyEnds.toISOString().slice(0, 10) : null,
         qrDataUrl,

@@ -188,7 +188,7 @@ export function RepairWorkspace({ sessionId }: Props) {
         <button
           type="button"
           onClick={handleNewRepair}
-          className="flex shrink-0 items-center gap-1 rounded-md border border-dashed border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+          className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:border-foreground/30 hover:text-foreground"
         >
           <Plus className="size-3.5" />새 수리
         </button>

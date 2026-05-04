@@ -44,7 +44,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn, formatComma, parseComma } from "@/lib/utils";
+import {
+  cn,
+  formatComma,
+  parseComma,
+  formatDiscountDisplay,
+  normalizeDiscountInput,
+} from "@/lib/utils";
+import { calcRepairTotals } from "@/lib/repair";
 
 // ──────── 타입 ────────
 
@@ -100,7 +107,9 @@ interface RepairTicketDetail {
   serialItem: {
     id: string;
     code: string;
-    product: { id: string; name: string; sku: string };
+    source: "SALE" | "REPAIR";
+    displayName: string | null;
+    product: { id: string; name: string; sku: string } | null;
   } | null;
   assignedTo: { id: string; name: string } | null;
   parentRepairTicket: {
@@ -136,19 +145,14 @@ const STATUS_VARIANT: Record<RepairStatus, "default" | "secondary" | "outline" |
   CANCELLED: "destructive",
 };
 
-// USED 부속 + 공임 + 진단비 - 할인
+// USED 부속 + 공임 + 진단비 - 할인 (lib/repair.ts 의 calcRepairTotals 래퍼)
 function calcRepairFinalTotal(ticket: RepairTicketDetail): number {
-  const usedParts = ticket.parts
-    .filter((p) => p.status === "USED")
-    .reduce((s, p) => s + Number(p.totalPrice), 0);
-  const labors = ticket.labors.reduce((s, l) => s + Number(l.totalPrice), 0);
-  const fee = Number(ticket.diagnosisFee || 0);
-  const subtotal = usedParts + labors + fee;
-  const td = ticket.totalDiscount || "0";
-  const discount = td.endsWith("%")
-    ? Math.round((subtotal * (parseFloat(td) || 0)) / 100)
-    : parseInt(td.replace(/,/g, ""), 10) || 0;
-  return Math.max(0, subtotal - discount);
+  return calcRepairTotals({
+    parts: ticket.parts,
+    labors: ticket.labors,
+    diagnosisFee: ticket.diagnosisFee,
+    totalDiscount: ticket.totalDiscount,
+  }).finalTotal;
 }
 
 // 상태 진행 버튼들 — 현재 상태에서 가능한 액션
@@ -321,7 +325,7 @@ function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
                 <span className="font-mono">{ticket.serialItem.code}</span>
               </span>
               <span className="text-xs text-muted-foreground">
-                {ticket.serialItem.product.name}
+                {ticket.serialItem.product?.name ?? ticket.serialItem.displayName ?? "(미상)"}
               </span>
             </>
           ) : ticket.customerMachine ? (
@@ -933,17 +937,14 @@ function FeesAndTotalsSection({
       toast.error(err instanceof ApiError ? err.message : "저장 실패"),
   });
 
-  // 합계 계산 (USED 부속 + 공임 + 진단비 - 할인)
-  const usedParts = ticket.parts
-    .filter((p) => p.status === "USED")
-    .reduce((s, p) => s + Number(p.totalPrice), 0);
-  const labors = ticket.labors.reduce((s, l) => s + Number(l.totalPrice), 0);
-  const fee = parseInt(diagnosisFee, 10) || 0;
-  const subtotal = usedParts + labors + fee;
-  const discountAmount = totalDiscount.endsWith("%")
-    ? Math.round((subtotal * (parseFloat(totalDiscount) || 0)) / 100)
-    : parseInt(totalDiscount.replace(/,/g, ""), 10) || 0;
-  const finalTotal = Math.max(0, subtotal - discountAmount);
+  // 합계 계산 — lib/repair.ts 의 calcRepairTotals 사용 (서버 pickup 과 동일 로직)
+  const totals = calcRepairTotals({
+    parts: ticket.parts,
+    labors: ticket.labors,
+    diagnosisFee: parseInt(diagnosisFee, 10) || 0,
+    totalDiscount,
+  });
+  const { usedPartsTotal: usedParts, laborTotal: labors, diagnosisFee: fee, discountAmount, finalTotal } = totals;
 
   return (
     <Card>
@@ -970,8 +971,10 @@ function FeesAndTotalsSection({
               전체 할인 (정액 또는 비율 — 예: 5000 / 10%)
             </label>
             <Input
-              value={totalDiscount}
-              onChange={(e) => setTotalDiscount(e.target.value)}
+              inputMode={totalDiscount.trim().endsWith("%") ? "decimal" : "numeric"}
+              value={formatDiscountDisplay(totalDiscount)}
+              onChange={(e) => setTotalDiscount(normalizeDiscountInput(e.target.value))}
+              onFocus={(e) => e.currentTarget.select()}
               disabled={readonly}
               className="h-9 text-right tabular-nums"
               placeholder="0"

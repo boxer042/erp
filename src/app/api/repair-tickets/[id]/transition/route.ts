@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
-import { genApprovalToken } from "@/lib/repair";
+import { calcRepairTotals, genApprovalToken } from "@/lib/repair";
 import { restoreRepairPart } from "@/lib/repair-inventory";
 import type { RepairApprovalMethod, OrderPaymentMethod } from "@prisma/client";
 
@@ -58,6 +58,12 @@ export async function POST(
 
     if (action === "quote") {
       // 견적 확정: USED 부속만 합산, 공임 합산 → QUOTED
+      if (!["RECEIVED", "DIAGNOSING", "QUOTED"].includes(ticket.status)) {
+        return NextResponse.json(
+          { error: "견적 확정 가능한 상태가 아닙니다" },
+          { status: 400 },
+        );
+      }
       const partsAmount = ticket.parts
         .filter((p) => p.status === "USED")
         .reduce((s, p) => s + Number(p.totalPrice), 0);
@@ -76,6 +82,13 @@ export async function POST(
     }
 
     if (action === "request-approval") {
+      // 견적 확정된 티켓에 대해서만 원격 승인 토큰 발급
+      if (ticket.status !== "QUOTED") {
+        return NextResponse.json(
+          { error: "견적 확정 후에만 승인 링크를 발급할 수 있습니다" },
+          { status: 400 },
+        );
+      }
       const token = genApprovalToken();
       const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
       const updated = await prisma.repairTicket.update({
@@ -98,6 +111,7 @@ export async function POST(
       if (!["QUOTED", "RECEIVED", "DIAGNOSING"].includes(ticket.status)) {
         return NextResponse.json({ error: "견적 승인 단계가 아닙니다" }, { status: 400 });
       }
+      // 현장 승인 시 발급돼 있던 원격 승인 토큰은 더 이상 유효하지 않으므로 무효화
       const updated = await prisma.repairTicket.update({
         where: { id },
         data: {
@@ -105,6 +119,8 @@ export async function POST(
           approvalMethod: "ON_SITE" as RepairApprovalMethod,
           approvedAt: new Date(),
           approvedByName: approvedByName?.trim() || null,
+          approvalToken: null,
+          approvalTokenExpiresAt: null,
         },
       });
       return NextResponse.json(updated);
@@ -134,13 +150,19 @@ export async function POST(
     }
 
     if (action === "pickup") {
-      // 픽업 + 결제 — finalAmount는 호출 측에서 결정 (USED 부속만 + 공임 + 진단비 - 할인)
-      const { paymentMethod, finalAmount } = body ?? {};
+      // 픽업 + 결제 — finalAmount는 항상 서버에서 calcRepairTotals 로 재계산 (클라이언트 입력 신뢰 안 함).
+      // 클라이언트에 보낸 값은 사용 안 하지만, 호출 측이 표시용으로 보내는 건 허용.
+      const { paymentMethod } = body ?? {};
       if (!["READY", "REPAIRING"].includes(ticket.status)) {
         return NextResponse.json({ error: "픽업 단계가 아닙니다" }, { status: 400 });
       }
-      const finalAmt =
-        finalAmount != null ? Number(finalAmount) : Number(ticket.quotedTotalAmount);
+      const totals = calcRepairTotals({
+        parts: ticket.parts,
+        labors: ticket.labors,
+        diagnosisFee: ticket.diagnosisFee,
+        totalDiscount: ticket.totalDiscount,
+      });
+      const finalAmt = totals.finalTotal; // calcRepairTotals 가 이미 Math.max(0, ...) 적용
 
       // 보증 만료 계산 — repairWarrantyMonths가 설정돼 있을 때만
       const pickupAt = new Date();
@@ -157,6 +179,9 @@ export async function POST(
           finalAmount: finalAmt,
           paymentMethod: (paymentMethod as OrderPaymentMethod) ?? null,
           repairWarrantyEnds: warrantyEnds,
+          // 픽업 후 원격 승인 토큰은 더 이상 의미 없음 — 일회용 보장
+          approvalToken: null,
+          approvalTokenExpiresAt: null,
         },
       });
 
@@ -202,12 +227,12 @@ export async function POST(
           { status: 400 },
         );
       }
-      // 거절·취소 — 모든 부속의 재고 복원 (USED·LOST 모두), 진단비만 청구.
-      // 다만 LOST는 이미 망가진 부속이므로 사용자가 의도적으로 "이건 못 살림" 처리한 경우엔
-      // 호출 측에서 사전에 LOST 행을 삭제 처리하도록 해야 함.
-      // 이 cancel 액션은 단순화: 모든 부속을 복원 (수리 시도 자체가 무산된 케이스).
+      // 거절·취소 — USED 부속만 재고 복원. LOST 는 이미 손실 처리된 부속이므로 그대로 남김
+      // (다시 차감되면 손실 추적이 어긋남). 진단비만 청구.
+      // 토큰은 더 이상 의미 없으므로 정리.
       await prisma.$transaction(async (tx) => {
         for (const part of ticket.parts) {
+          if (part.status !== "USED") continue;
           if (!part.consumedAt) continue;
           await restoreRepairPart(tx, part.id, {
             ticketId: ticket.id,
@@ -224,7 +249,11 @@ export async function POST(
         }
         await tx.repairTicket.update({
           where: { id },
-          data: { status: "CANCELLED" },
+          data: {
+            status: "CANCELLED",
+            approvalToken: null,
+            approvalTokenExpiresAt: null,
+          },
         });
       });
       return NextResponse.json({ success: true });

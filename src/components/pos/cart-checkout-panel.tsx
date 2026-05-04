@@ -29,6 +29,7 @@ import { CartLineRow } from "@/components/pos/cart-line-row";
 import { calcCartTotals } from "@/components/pos/cart-helpers";
 import { submitCheckout } from "@/components/pos/checkout-submit";
 import { CustomerLinkSheet } from "@/components/pos/customer-link-sheet";
+import { LabelIssueDialog } from "@/components/pos/label-issue-dialog";
 
 interface Props {
   session: CartSession;
@@ -55,12 +56,16 @@ function computeQuotationFingerprint(session: CartSession): string {
   });
 }
 
-// 라벨 발번 지문 — 고객과 trackable 상품 수량 변화에만 영향. 단가/할인 등은 무관.
+// 라벨 발번 지문 — 고객·trackable 상품 수량·연결된 수리 티켓 변화에만 영향. 단가/할인 등은 무관.
 function computeLabelFingerprint(session: CartSession): string {
   return JSON.stringify({
     items: session.items
       .filter((i) => i.itemType === "product" && i.productId)
       .map((i) => ({ p: i.productId, q: i.quantity })),
+    repairs: session.items
+      .filter((i) => i.itemType === "repair" && i.repairMeta?.repairTicketId)
+      .map((i) => i.repairMeta!.repairTicketId!)
+      .sort(),
     c: session.customerId ?? null,
   });
 }
@@ -75,10 +80,35 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
   const [shippingDraft, setShippingDraft] = useState("");
   const [quotationPreviewId, setQuotationPreviewId] = useState<string | null>(null);
   const [labelPreviewCodes, setLabelPreviewCodes] = useState<string[] | null>(null);
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const sessionId = session.id;
 
-  const checkoutMutation = useMutation({
-    mutationFn: () => {
+  // 카트 → API request body
+  const buildLabelRequest = () => ({
+    customerId: session.customerId ?? null,
+    productItems: session.items
+      .filter((i) => i.itemType === "product" && i.productId)
+      .map((i) => ({
+        productId: i.productId!,
+        quantity: Math.max(1, Math.round(i.quantity)),
+      })),
+    repairTicketIds: session.items
+      .filter((i) => i.itemType === "repair" && i.repairMeta?.repairTicketId)
+      .map((i) => i.repairMeta!.repairTicketId!),
+  });
+
+  const labelHasCandidates =
+    session.items.some(
+      (i) =>
+        (i.itemType === "product" && i.productId) ||
+        (i.itemType === "repair" && i.repairMeta?.repairTicketId),
+    );
+
+  const checkoutMutation = useMutation<
+    { id: string; no: string; labelCodes: string[] },
+    Error
+  >({
+    mutationFn: async () => {
       if (session.items.length === 0) throw new Error("카트가 비어있습니다");
       const hasUnsetRentalDates = session.items.some(
         (i) => i.itemType === "rental" && (!i.rentalMeta?.startDate || !i.rentalMeta?.endDate)
@@ -90,12 +120,51 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
       if (hasRepairOrRental && !session.customerId) {
         throw new Error("수리/임대는 고객 연결이 필요합니다");
       }
-      return submitCheckout(session, { action: "order", paymentMethod: "CARD" });
+
+      // 결제 직전 자동 발번 — 라벨 다이얼로그를 거치지 않고 바로 결제할 때:
+      // 동일 카트(fingerprint 일치)면 기존 코드 재사용, 다르면 신규 발번.
+      let labelCodes: string[] = session.labelCodes ?? [];
+      let sessionForCheckout = session;
+      const fp = computeLabelFingerprint(session);
+      const needsIssue =
+        labelHasCandidates &&
+        !(
+          session.labelCodes &&
+          session.labelCodes.length > 0 &&
+          session.labelFingerprint === fp
+        );
+      if (needsIssue) {
+        const res = await apiMutate<{ labels: { code: string }[] }>(
+          "/api/serial-items/issue",
+          "POST",
+          buildLabelRequest(),
+        );
+        labelCodes = res.labels.map((l) => l.code);
+        if (labelCodes.length > 0) {
+          setSessionLabels(labelCodes, fp, sessionId);
+          sessionForCheckout = {
+            ...session,
+            labelCodes,
+            labelFingerprint: fp,
+          };
+        }
+      }
+
+      const result = await submitCheckout(sessionForCheckout, {
+        action: "order",
+        paymentMethod: "CARD",
+      });
+      return { ...result, labelCodes };
     },
     onSuccess: (data) => {
       toast.success(`결제 완료 — ${data.no}`);
+      if (data.labelCodes.length > 0) {
+        // 라벨 인쇄 모달 자동 띄움. 모달 닫히면 /pos 로 이동.
+        setLabelPreviewCodes(data.labelCodes);
+      } else {
+        router.push("/pos");
+      }
       clear(sessionId);
-      router.push("/pos");
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : err.message || "결제 실패"),
@@ -208,45 +277,35 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
       toast.error(err instanceof ApiError ? err.message : err.message || "견적서 생성 실패"),
   });
 
-  // 시리얼 라벨 발번 — trackable 상품에 한해 수량만큼 코드 생성
-  const labelMutation = useMutation<{ codes: string[]; fingerprint: string }, Error>({
-    mutationFn: async () => {
-      if (session.items.length === 0) throw new Error("카트가 비어있습니다");
-      const fingerprint = computeLabelFingerprint(session);
+  // 라벨 버튼 클릭 — 다이얼로그 열어서 분석/선택/발번. 동일 카트 + 기존 코드 있으면 바로 인쇄.
+  const onLabelClick = () => {
+    if (session.items.length === 0) {
+      toast.error("카트가 비어있습니다");
+      return;
+    }
+    if (!labelHasCandidates) {
+      toast.error("개별추적 상품이나 수리 티켓이 없습니다");
+      return;
+    }
+    const fingerprint = computeLabelFingerprint(session);
+    if (
+      session.labelCodes &&
+      session.labelCodes.length > 0 &&
+      session.labelFingerprint === fingerprint
+    ) {
+      setLabelPreviewCodes(session.labelCodes);
+      return;
+    }
+    setLabelDialogOpen(true);
+  };
 
-      // 동일 카트 → 기존 코드 재사용
-      if (
-        session.labelCodes &&
-        session.labelCodes.length > 0 &&
-        session.labelFingerprint === fingerprint
-      ) {
-        return { codes: session.labelCodes, fingerprint };
-      }
-
-      const items = session.items
-        .filter((i) => i.itemType === "product" && i.productId)
-        .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) }));
-
-      if (items.length === 0) throw new Error("발번할 상품이 없습니다");
-
-      const res = await apiMutate<{ codes: { code: string }[] }>(
-        "/api/serial-items/issue",
-        "POST",
-        { customerId: session.customerId ?? null, items }
-      );
-      const codes = res.codes.map((c) => c.code);
-      if (codes.length === 0) {
-        throw new Error("개별추적(trackable) 설정된 상품이 없습니다");
-      }
-      return { codes, fingerprint };
-    },
-    onSuccess: (data) => {
-      setSessionLabels(data.codes, data.fingerprint, sessionId);
-      setLabelPreviewCodes(data.codes);
-    },
-    onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : err.message || "라벨 발번 실패"),
-  });
+  // 다이얼로그가 발번 완료 → 코드 저장 + 인쇄 미리보기 띄움
+  const onLabelsIssued = (codes: string[]) => {
+    if (codes.length === 0) return;
+    const fingerprint = computeLabelFingerprint(session);
+    setSessionLabels(codes, fingerprint, sessionId);
+    setLabelPreviewCodes(codes);
+  };
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -319,10 +378,10 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
         <ActionTile
           icon={<Tag className="size-7" />}
           label="라벨"
-          value={labelMutation.isPending ? "처리 중..." : "출력"}
+          value="출력"
           subValue={null}
-          onClick={() => labelMutation.mutate()}
-          disabled={labelMutation.isPending || session.items.length === 0}
+          onClick={onLabelClick}
+          disabled={session.items.length === 0}
         />
       </div>
 
@@ -481,11 +540,23 @@ export function CartCheckoutPanel({ session, onSwitchToProducts, netOnly = false
         </DialogContent>
       </Dialog>
 
-      {/* 라벨 미리보기 모달 */}
+      {/* 라벨 발번 다이얼로그 — 항목별 재출력/신규/스킵 */}
+      <LabelIssueDialog
+        open={labelDialogOpen}
+        onOpenChange={setLabelDialogOpen}
+        request={buildLabelRequest()}
+        onIssued={onLabelsIssued}
+      />
+
+      {/* 라벨 미리보기 모달 — 발번 결과 인쇄. 결제 후 자동 출력일 땐 닫으면 /pos 로 이동. */}
       <Dialog
         open={!!labelPreviewCodes}
         onOpenChange={(o) => {
-          if (!o) setLabelPreviewCodes(null);
+          if (!o) {
+            setLabelPreviewCodes(null);
+            // 결제 직후 자동 모달이었으면 (세션이 이미 비워졌으면) /pos 로 이동
+            if (session.items.length === 0) router.push("/pos");
+          }
         }}
       >
         <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">

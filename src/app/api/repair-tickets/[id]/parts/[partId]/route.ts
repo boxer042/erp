@@ -119,9 +119,9 @@ export async function DELETE(
   if (!part) return NextResponse.json({ error: "찾을 수 없음" }, { status: 404 });
 
   const ticket = part.repairTicket;
-  if (ticket.status === "PICKED_UP") {
+  if (ticket.status === "PICKED_UP" || ticket.status === "CANCELLED") {
     return NextResponse.json(
-      { error: "완료된 수리는 부속을 삭제할 수 없습니다" },
+      { error: "완료/취소된 수리는 부속을 삭제할 수 없습니다" },
       { status: 400 },
     );
   }

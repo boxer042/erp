@@ -62,9 +62,12 @@ export async function DELETE(
     include: { repairTicket: { select: { status: true } } },
   });
   if (!labor) return NextResponse.json({ error: "찾을 수 없음" }, { status: 404 });
-  if (labor.repairTicket.status === "PICKED_UP") {
+  if (
+    labor.repairTicket.status === "PICKED_UP" ||
+    labor.repairTicket.status === "CANCELLED"
+  ) {
     return NextResponse.json(
-      { error: "완료된 수리는 공임을 삭제할 수 없습니다" },
+      { error: "완료/취소된 수리는 공임을 삭제할 수 없습니다" },
       { status: 400 },
     );
   }

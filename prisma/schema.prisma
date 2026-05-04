@@ -231,6 +231,7 @@ model Product {
   bulkProduct        Product?      @relation("ProductBulk", fields: [bulkProductId], references: [id], onDelete: SetNull)
   salesContainers    Product[]     @relation("ProductBulk")
   isActive           Boolean       @default(true) @map("is_active")
+  autoMapped         Boolean       @default(false) @map("auto_mapped")
   trackable          Boolean       @default(false) @map("trackable")
   warrantyMonths     Int?          @map("warranty_months")
   imageUrl           String?       @map("image_url")
@@ -1657,11 +1658,21 @@ enum SerialItemStatus {
   SCRAPPED
 }
 
+// 시리얼 라벨 발번 출처. SALE=일반 판매, REPAIR=수리 받으러 온 기기에 부여(시스템 도입 전 판매분 등).
+enum SerialItemSource {
+  SALE
+  REPAIR
+}
+
 model SerialItem {
   id           String           @id @default(uuid())
   code         String           @unique // "YYMMDD-NNNN" — 일별 4자리 시퀀스
-  productId    String           @map("product_id")
-  product      Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  // productId 는 nullable — 외부에서 가져온 기기(카탈로그에 없음) 의 수리 라벨은 productId 없이
+  // displayName 만으로 식별. 일반 판매 라벨은 productId 가 있고 displayName 은 null.
+  productId    String?          @map("product_id")
+  product      Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+  displayName  String?          @map("display_name") // 카탈로그 없는 기기명 (예: "Sony A7M4 Black")
+  source       SerialItemSource @default(SALE)
   orderItemId  String?          @map("order_item_id")
   orderItem    OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   customerId   String?          @map("customer_id")
@@ -1679,5 +1690,6 @@ model SerialItem {
   @@index([productId])
   @@index([customerId])
   @@index([orderItemId])
+  @@index([source])
   @@map("serial_items")
 }

@@ -76,17 +76,19 @@ export async function POST(
           quantity: qty,
         });
       }
-      // 2) 공임
-      for (const pl of pkg.labors) {
-        const hours = pl.quantity ?? 1;
-        await tx.repairLabor.create({
-          data: {
-            repairTicketId: id,
-            name: pl.name,
-            hours,
-            unitRate: pl.unitRate,
-            totalPrice: Number(pl.unitRate) * hours,
-          },
+      // 2) 공임 — createMany 로 한 번에 적재 (N+1 방지)
+      if (pkg.labors.length > 0) {
+        await tx.repairLabor.createMany({
+          data: pkg.labors.map((pl) => {
+            const hours = pl.quantity ?? 1;
+            return {
+              repairTicketId: id,
+              name: pl.name,
+              hours,
+              unitRate: pl.unitRate,
+              totalPrice: Number(pl.unitRate) * hours,
+            };
+          }),
         });
       }
     });

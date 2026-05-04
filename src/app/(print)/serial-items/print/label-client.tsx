@@ -5,6 +5,7 @@ import { useEffect } from "react";
 interface Label {
   code: string;
   productName: string;
+  source: "SALE" | "REPAIR";
   soldAt: string;
   warrantyEnds: string | null;
   qrDataUrl: string;
@@ -123,6 +124,18 @@ export function LabelClient({ labels, company, auto }: Props) {
           color: #222;
           line-height: 1.2;
         }
+        .label-source-badge {
+          display: inline-block;
+          font-size: 6pt;
+          font-weight: 700;
+          line-height: 1;
+          padding: 0.4mm 0.8mm;
+          border: 0.2mm solid #000;
+          border-radius: 0.6mm;
+          margin-right: 1mm;
+          vertical-align: middle;
+          letter-spacing: 0.05em;
+        }
       `}</style>
 
       {/* 화면 미리보기용 툴바 — 인쇄 시 자동 숨김 */}
@@ -179,9 +192,16 @@ export function LabelClient({ labels, company, auto }: Props) {
                 <img src={l.qrDataUrl} alt={l.code} />
               </div>
               <div className="label-text">
-                <div className="label-code">{l.code}</div>
+                <div className="label-code">
+                  {l.source === "REPAIR" && (
+                    <span className="label-source-badge">수리</span>
+                  )}
+                  {l.code}
+                </div>
                 <div className="label-name">{l.productName}</div>
-                <div className="label-date">구매일 : {l.soldAt}</div>
+                <div className="label-date">
+                  {l.source === "REPAIR" ? "접수일" : "구매일"} : {l.soldAt}
+                </div>
                 {l.warrantyEnds && (
                   <div className="label-date">보증일 : {l.warrantyEnds} 까지</div>
                 )}

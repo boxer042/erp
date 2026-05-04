@@ -65,6 +65,7 @@ export async function POST(
     return NextResponse.json({ error: "승인 가능한 상태가 아닙니다" }, { status: 400 });
   }
 
+  // 일회용 보장 — 승인 즉시 토큰 무효화. 같은 링크 재방문 시 GET은 만료/missing 처리.
   const updated = await prisma.repairTicket.update({
     where: { id: ticket.id },
     data: {
@@ -72,6 +73,8 @@ export async function POST(
       approvalMethod: "REMOTE" as RepairApprovalMethod,
       approvedAt: new Date(),
       approvedByName: body?.name?.trim() || null,
+      approvalToken: null,
+      approvalTokenExpiresAt: null,
     },
   });
   return NextResponse.json({ success: true, ticketNo: updated.ticketNo });

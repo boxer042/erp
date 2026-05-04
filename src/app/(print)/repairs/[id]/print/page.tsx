@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { RepairStatementPdf, type RepairStatementData } from "@/components/repair-statement-pdf";
+import { calcRepairTotals } from "@/lib/repair";
 
 async function loadCompany() {
   const company = await prisma.companyInfo.findUnique({
@@ -50,19 +51,13 @@ export default async function RepairPrintPage({
   const deviceLine =
     ticket.serialItem?.product?.name ?? ticket.customerMachine?.name ?? null;
 
-  const td = ticket.totalDiscount || "0";
-  const usedTotal = ticket.parts.reduce(
-    (s, p) => s + Number(p.totalPrice),
-    0,
-  );
-  const laborTotal = ticket.labors.reduce(
-    (s, l) => s + Number(l.totalPrice),
-    0,
-  );
-  const subtotal = usedTotal + laborTotal + Number(ticket.diagnosisFee);
-  const discountAmount = td.endsWith("%")
-    ? Math.round((subtotal * (parseFloat(td) || 0)) / 100)
-    : parseInt(td.replace(/,/g, ""), 10) || 0;
+  // 인쇄용 parts 는 위 쿼리에서 이미 USED 만 필터됨 → 모두 USED 로 간주해 calcRepairTotals 에 전달
+  const totals = calcRepairTotals({
+    parts: ticket.parts.map((p) => ({ totalPrice: p.totalPrice, status: "USED" as const })),
+    labors: ticket.labors,
+    diagnosisFee: ticket.diagnosisFee,
+    totalDiscount: ticket.totalDiscount,
+  });
 
   const repair: RepairStatementData = {
     ticketNo: ticket.ticketNo,
@@ -90,8 +85,8 @@ export default async function RepairPrintPage({
       totalPrice: l.totalPrice.toString(),
     })),
     diagnosisFee: Number(ticket.diagnosisFee),
-    totalDiscount: discountAmount,
-    finalAmount: Number(ticket.finalAmount) > 0 ? Number(ticket.finalAmount) : Math.max(0, subtotal - discountAmount),
+    totalDiscount: totals.discountAmount,
+    finalAmount: Number(ticket.finalAmount) > 0 ? Number(ticket.finalAmount) : totals.finalTotal,
     repairWarrantyMonths: ticket.repairWarrantyMonths,
     repairWarrantyEnds: ticket.repairWarrantyEnds
       ? format(ticket.repairWarrantyEnds, "yyyy-MM-dd")

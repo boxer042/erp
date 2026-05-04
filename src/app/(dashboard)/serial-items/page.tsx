@@ -30,6 +30,8 @@ interface SerialItemRow {
   id: string;
   code: string;
   status: "ACTIVE" | "RETURNED" | "SCRAPPED";
+  source: "SALE" | "REPAIR";
+  displayName: string | null;
   soldAt: string;
   warrantyEnds: string | null;
   product: { id: string; name: string; sku: string } | null;
@@ -190,13 +192,27 @@ export default function SerialItemsPage() {
                       onCheckedChange={() => toggleOne(it.id)}
                     />
                   </TableCell>
-                  <TableCell className="font-mono">{it.code}</TableCell>
+                  <TableCell className="font-mono">
+                    <div className="flex items-center gap-1.5">
+                      {it.source === "REPAIR" && (
+                        <Badge variant="outline" className="text-[10px]">수리</Badge>
+                      )}
+                      <span>{it.code}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {it.product ? (
                       <div className="flex flex-col">
                         <span>{it.product.name}</span>
                         <span className="text-xs text-muted-foreground">
                           {it.product.sku}
+                        </span>
+                      </div>
+                    ) : it.displayName ? (
+                      <div className="flex flex-col">
+                        <span>{it.displayName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          외부 기기
                         </span>
                       </div>
                     ) : (

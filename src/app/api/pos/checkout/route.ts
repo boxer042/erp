@@ -47,6 +47,8 @@ interface CheckoutBody {
   rentalId?: string | null;
   repairTicketData?: RepairTicketData | null;
   rentalRecords?: RentalRecord[] | null;
+  /** 결제 직전 발번된 SerialItem 코드들 — 서버에서 OrderItem 과 매칭해 orderItemId 연결 */
+  labelCodes?: string[];
 }
 
 function genNo(prefix: string) {
@@ -280,6 +282,37 @@ export async function POST(request: NextRequest) {
           where: { id: item.id },
           data: { unitCostSnapshot },
         });
+      }
+
+      // 발번된 SerialItem 들을 OrderItem 과 매칭 — 결제 직전 발번된 라벨에 orderItemId 채움.
+      // 같은 productId 의 SerialItem 들을 수량만큼 OrderItem 1개에 묶음 (단순화: 1 productId → 1 OrderItem).
+      if (body.labelCodes && body.labelCodes.length > 0) {
+        const serials = await tx.serialItem.findMany({
+          where: { code: { in: body.labelCodes }, orderItemId: null },
+          select: { id: true, productId: true },
+        });
+        const orderItemByProductId = new Map<string, string>();
+        for (const oi of order.items) {
+          if (oi.productId && !orderItemByProductId.has(oi.productId)) {
+            orderItemByProductId.set(oi.productId, oi.id);
+          }
+        }
+        const updates: Promise<unknown>[] = [];
+        for (const s of serials) {
+          if (!s.productId) continue; // 외부 기기 라벨 (수리) 은 OrderItem 매칭 대상 아님
+          const orderItemId = orderItemByProductId.get(s.productId);
+          if (!orderItemId) continue;
+          updates.push(
+            tx.serialItem.update({
+              where: { id: s.id },
+              data: {
+                orderItemId,
+                customerId: body.customerId ?? undefined,
+              },
+            }),
+          );
+        }
+        if (updates.length > 0) await Promise.all(updates);
       }
 
       // 기존 RepairTicket 픽업/결제 — body.repairTicketId 단독 (repairTicketData 없음)
