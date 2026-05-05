@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { fmtKRW } from "./_helpers";
 import type { RepairPart } from "./_types";
-import { PriceInputDialog } from "@/app/(pos)/pos/v2/_components/price-input-dialog";
+import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 
 interface ProductOption {
   id: string;
@@ -248,19 +248,35 @@ function PartRow({
 
   return (
     <div
-      className={`flex flex-col gap-2 border-b border-zinc-50 px-4 py-3 last:border-b-0 sm:px-5 ${
+      className={`flex flex-col gap-3 border-b border-zinc-50 px-4 py-3 last:border-b-0 sm:px-5 ${
         isLost ? "opacity-60" : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col">
-          <span
-            className={`line-clamp-1 text-[14px] font-medium text-zinc-900 ${
-              isLost ? "line-through" : ""
-            }`}
-          >
-            {part.product.name}
-          </span>
+      {/* 1행: 이름/SKU + USED/LOST(상품명 영역 우측 끝) + 삭제 — 토글은 상품명 영역 안, 휴지통은 별도 우측 */}
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <span
+              className={`line-clamp-1 text-[14px] font-semibold text-zinc-900 ${
+                isLost ? "line-through" : ""
+              }`}
+            >
+              {part.product.name}
+            </span>
+            {!readonly && (
+              <button
+                type="button"
+                onClick={() => update.mutate({ status: isLost ? "USED" : "LOST" })}
+                className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
+                  isLost
+                    ? "bg-rose-100 text-rose-700"
+                    : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                {isLost ? "LOST" : "USED"}
+              </button>
+            )}
+          </div>
           <span className="font-mono text-[11px] text-zinc-400">
             {part.product.sku}
           </span>
@@ -285,13 +301,31 @@ function PartRow({
           </button>
         )}
       </div>
+
+      {/* 2행: 단가 (클릭 가능, 좌측) + 수량 ± (중앙) + 라인 합계 (우측) — 카트 라인 row 와 동일 */}
       <div className="flex items-center justify-between gap-2">
+        {/* 단가 — 클릭 시 가격 다이얼로그 */}
+        <button
+          type="button"
+          onClick={() => !readonly && setPriceOpen(true)}
+          disabled={readonly}
+          className="flex flex-col items-start rounded-lg px-2 py-1 text-left hover:bg-zinc-50 active:bg-zinc-100 disabled:hover:bg-transparent"
+        >
+          <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+            단가
+          </span>
+          <span className="text-[15px] font-semibold tabular-nums text-zinc-900">
+            {fmtKRW(part.unitPrice)}
+          </span>
+        </button>
+
+        {/* 수량 ± */}
         <div className="flex items-center gap-1">
           <button
             type="button"
             disabled={readonly || Number(qty) <= 1}
             onClick={() => setQtyAndCommit(Number(qty) - 1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-semibold text-zinc-700 disabled:opacity-30 hover:bg-zinc-200"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-semibold text-zinc-700 hover:bg-zinc-200 disabled:opacity-30"
           >
             −
           </button>
@@ -308,42 +342,20 @@ function PartRow({
             type="button"
             disabled={readonly}
             onClick={() => setQtyAndCommit(Number(qty) + 1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-semibold text-zinc-700 disabled:opacity-30 hover:bg-zinc-200"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-semibold text-zinc-700 hover:bg-zinc-200 disabled:opacity-30"
           >
             +
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          {!readonly && (
-            <button
-              type="button"
-              onClick={() => update.mutate({ status: isLost ? "USED" : "LOST" })}
-              className={`h-7 rounded-full px-3 text-[11px] font-semibold ${
-                isLost
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-emerald-100 text-emerald-700"
-              }`}
-            >
-              {isLost ? "LOST" : "USED"}
-            </button>
-          )}
-          {/* 단가 — 클릭 시 가격 다이얼로그 */}
-          <button
-            type="button"
-            onClick={() => !readonly && setPriceOpen(true)}
-            disabled={readonly}
-            className="flex flex-col items-end rounded-md px-2 py-0.5 text-right hover:bg-zinc-50 disabled:hover:bg-transparent"
-          >
-            <span className="text-[10px] uppercase tracking-wider text-zinc-400">
-              단가
-            </span>
-            <span className="text-[12px] font-medium tabular-nums text-zinc-700">
-              {fmtKRW(part.unitPrice)}
-            </span>
-          </button>
-          <span className="min-w-[80px] text-right text-[14px] font-semibold tabular-nums text-zinc-900">
+
+        {/* 라인 합계 */}
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-400">
+            합계
+          </div>
+          <div className="text-[15px] font-bold tabular-nums text-zinc-900">
             {fmtKRW(part.totalPrice)}
-          </span>
+          </div>
         </div>
       </div>
 

@@ -348,6 +348,8 @@ model ProductCategory {
 
   products        Product[]
   channelMappings ChannelCategoryMapping[]
+  // 새 수리 접수 시 선택한 카테고리 (RepairTicket.repairCategoryId)
+  repairTickets   RepairTicket[]           @relation("RepairCategory")
 
   @@map("product_categories")
 }
@@ -1229,6 +1231,17 @@ enum RepairPartStatus {
   LOST   // 손실 (수리 실패·교체로 망가짐) — 청구 제외, 재고는 차감 유지 → 매출원가 손실
 }
 
+// 수리 취소 사유 — 분석/고객응대용
+enum RepairCancelReason {
+  CUSTOMER_DECLINED   // 손님이 거절 (견적 본 후 진행 안 함)
+  CUSTOMER_NO_SHOW    // 손님 미반환 (맡겼는데 안 찾으러 옴)
+  SHOP_GAVE_UP        // 매장 포기 (수리 불가 판정)
+  PARTS_UNAVAILABLE   // 부속 수급 불가
+  SOLD_AS_PRODUCT     // 수리 대신 상품 구매로 전환 (같은 또는 다른 제품) — 보존 가치 있음
+  MISTAKE             // 잘못 생성 (실수로 만든 티켓 — 진단·자료 무의미)
+  OTHER               // 기타 (cancelMemo 참조)
+}
+
 model RepairTicket {
   id                     String                @id @default(uuid())
   ticketNo               String                @unique @map("ticket_no")
@@ -1274,6 +1287,18 @@ model RepairTicket {
   // 작업자 지정
   assignedToId           String?               @map("assigned_to_id")
   assignedTo             User?                 @relation("RepairAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  // 취소 정보 (status=CANCELLED 일 때만 의미)
+  cancelReason           RepairCancelReason?   @map("cancel_reason")
+  cancelMemo             String?               @map("cancel_memo") // OTHER 사유 또는 추가 설명
+  cancelledAt            DateTime?             @map("cancelled_at")
+  // 미등록 손님 추적 — POS 의 어떤 카트 세션에서 만들어졌는지 (등록 손님이면 customerId 로 충분)
+  // 클라이언트 sessions.repairTicketIds 추적이 끊겨도 DB 에서 복원 가능. 세션 자체가 사라지면 NULL.
+  posSessionId           String?               @map("pos_session_id")
+  posSession             PosSession?           @relation(fields: [posSessionId], references: [id], onDelete: SetNull)
+  // 새 수리 접수 시 선택한 상품 카테고리 — 수리 진행 페이지의 "카테고리" 검색 모드에서 사용.
+  // null = "기타" (카테고리 미지정 또는 없는 항목)
+  repairCategoryId       String?               @map("repair_category_id")
+  repairCategory         ProductCategory?      @relation("RepairCategory", fields: [repairCategoryId], references: [id], onDelete: SetNull)
   memo                   String?
   createdById            String                @map("created_by_id")
   createdBy              User                  @relation(fields: [createdById], references: [id])
@@ -1290,6 +1315,8 @@ model RepairTicket {
   @@index([assignedToId])
   @@index([parentRepairTicketId])
   @@index([serialItemId])
+  @@index([posSessionId])
+  @@index([repairCategoryId])
   @@map("repair_tickets")
 }
 
@@ -1458,6 +1485,8 @@ model Rental {
   overdueAmount    Decimal             @default(0) @map("overdue_amount") @db.Decimal(15, 2)
   finalAmount      Decimal             @default(0) @map("final_amount") @db.Decimal(15, 2)
   paymentMethod    OrderPaymentMethod? @map("payment_method")
+  /** 픽업/접수 시각 — 카트에서 임대 라인을 추가한 순간 캡처. 시간대별 임대 트래픽 분석용. */
+  checkoutAt       DateTime?           @map("checkout_at")
   memo             String?
   createdById      String              @map("created_by_id")
   createdBy        User                @relation(fields: [createdById], references: [id])
@@ -1470,6 +1499,7 @@ model Rental {
   @@index([assetId])
   @@index([status])
   @@index([startDate, endDate])
+  @@index([checkoutAt])
   @@map("rentals")
 }
 
@@ -1722,14 +1752,21 @@ model PosSession {
   quotationFingerprint   String? @map("quotation_fingerprint")
   labelCodes             Json?   @map("label_codes")
   labelFingerprint       String? @map("label_fingerprint")
-  repairTicketIds        Json?   @map("repair_ticket_ids") // string[]
+  repairTicketIds        Json?   @map("repair_ticket_ids") // string[] — deprecated, RepairTicket.posSessionId 로 대체. 호환성 유지를 위해 잠시 보존
   openRepairCount        Int?    @map("open_repair_count")
   // 동기화 메타
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
+  // soft delete — 다른 기기가 옛 sessionStorage 데이터로 sync 해서 부활하는 것을 막기 위함.
+  // null = active. 값 있으면 GET 응답에서 제외 + POST 시 그 id 로 들어온 upsert 거부.
+  deletedAt              DateTime? @map("deleted_at")
+
+  // 역참조 — 이 세션에서 만든 미등록 손님의 수리 티켓들 (등록 손님은 customer.repairs 로)
+  repairTickets          RepairTicket[]
 
   @@index([userId])
   @@index([userId, updatedAt])
   @@index([customerId])
+  @@index([deletedAt])
   @@map("pos_sessions")
 }

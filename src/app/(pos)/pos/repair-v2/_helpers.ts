@@ -12,15 +12,28 @@ export function calcFinal(ticket: RepairTicketDetail): number {
 
 // 다음 가능한 액션 — 기존 RepairWorkView 와 동일한 흐름
 export interface ActionDef {
-  action: "diagnose" | "quote" | "approve" | "start" | "ready" | "pickup" | "cancel";
+  action:
+    | "diagnose"
+    | "quote"
+    | "approve"
+    | "start"
+    | "ready"
+    | "pickup"
+    | "cart"
+    | "cancel";
   label: string;
   primary?: boolean; // 큰 메인 버튼인지
   destructive?: boolean;
 }
 
+/**
+ * @param canSendToCart v2 손님 페이지 안에서 호출 시 true — 픽업 대신 "카트에 추가" 노출.
+ *                     repair-v2 standalone 진입 시 false — 자체 PickupSheet 사용 (v1 호환).
+ */
 export function nextActions(
   status: RepairStatus,
   type: "ON_SITE" | "DROP_OFF",
+  canSendToCart = false,
 ): ActionDef[] {
   const list: ActionDef[] = [];
   if (status === "RECEIVED") {
@@ -42,7 +55,13 @@ export function nextActions(
     list.push({ action: "ready", label: "수리 완료", primary: true });
     list.push({ action: "cancel", label: "취소", destructive: true });
   } else if (status === "READY") {
-    list.push({ action: "pickup", label: "픽업 / 결제", primary: true });
+    if (canSendToCart) {
+      // v2 흐름: 카트에 라인 추가 → 다른 상품/임대와 함께 한 번에 결제
+      list.push({ action: "cart", label: "카트에 추가", primary: true });
+    } else {
+      // 기존 흐름: 자체 픽업 결제
+      list.push({ action: "pickup", label: "픽업 / 결제", primary: true });
+    }
   }
   return list;
 }

@@ -89,6 +89,7 @@ interface Product {
     inventory: { quantity: string } | null;
   }>;
   isActive: boolean;
+  autoMapped: boolean;
   unitCost: number | null;
   inventory: { quantity: string; safetyStock: string } | null;
   productMappings: ProductMapping[];
@@ -125,6 +126,7 @@ export default function ProductsPage() {
 
   const [showLowStock, setShowLowStock] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [showAutoMapped, setShowAutoMapped] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
 
   const [safetyOpen, setSafetyOpen] = useState(false);
@@ -138,12 +140,13 @@ export default function ProductsPage() {
   const categories = categoriesQuery.data ?? [];
 
   const productsQuery = useQuery({
-    queryKey: queryKeys.products.list({ search: appliedSearch, categoryId: selectedCategoryId, showBulk }),
+    queryKey: queryKeys.products.list({ search: appliedSearch, categoryId: selectedCategoryId, showBulk, showAutoMapped }),
     queryFn: () => {
       const params = new URLSearchParams({ search: appliedSearch });
       if (selectedCategoryId) params.set("categoryId", selectedCategoryId);
       // 토글 ON: 벌크 SKU만, OFF(기본): 일반 SKU만
       if (showBulk) params.set("isBulk", "true");
+      if (showAutoMapped) params.set("autoMapped", "1");
       return apiGet<Product[]>(`/api/products?${params.toString()}`);
     },
   });
@@ -246,6 +249,13 @@ export default function ProductsPage() {
             >
               벌크만 보기
             </Badge>
+            <Badge
+              variant={showAutoMapped ? "success" : "outline"}
+              className="cursor-pointer select-none h-[22px] px-2.5 text-[12px]"
+              onClick={() => setShowAutoMapped((v) => !v)}
+            >
+              자동생성만
+            </Badge>
           </>
         }
       />
@@ -337,6 +347,9 @@ export default function ProductsPage() {
                             {isCanonical && (
                               <Badge variant="default" className="text-[10px] px-1 py-0">그룹</Badge>
                             )}
+                            {product.autoMapped && (
+                              <Badge variant="success" className="text-[10px] px-1 py-0">자동</Badge>
+                            )}
                           </Link>
                         </div>
                       </div>
@@ -347,7 +360,11 @@ export default function ProductsPage() {
                     <TableCell className="text-right text-muted-foreground">₩{formatPrice(bd.tax)}</TableCell>
                     <TableCell className="text-right font-medium">
                       {bd.total === 0 ? (
-                        <Badge variant="warning">미설정</Badge>
+                        product.autoMapped ? (
+                          <Badge variant="outline" className="text-[11px]">담당자 문의</Badge>
+                        ) : (
+                          <Badge variant="warning">미설정</Badge>
+                        )
                       ) : (
                         <>₩{formatPrice(bd.total)}</>
                       )}

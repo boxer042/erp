@@ -56,6 +56,7 @@ export async function GET(
         orderBy: { createdAt: "asc" },
       },
       createdBy: { select: { id: true, name: true } },
+      repairCategory: { select: { id: true, name: true } },
     },
   });
   if (!ticket) return NextResponse.json({ error: "찾을 수 없음" }, { status: 404 });
@@ -123,6 +124,9 @@ export async function PUT(
           ? { assignedToId: d.assignedToId || null }
           : {}),
         ...(d.memo !== undefined ? { memo: d.memo?.trim() || null } : {}),
+        ...(d.repairCategoryId !== undefined
+          ? { repairCategoryId: d.repairCategoryId || null }
+          : {}),
       },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
@@ -130,6 +134,7 @@ export async function PUT(
           select: { id: true, code: true, source: true, displayName: true },
         },
         assignedTo: { select: { id: true, name: true } },
+        repairCategory: { select: { id: true, name: true } },
       },
     });
     return NextResponse.json(ticket);

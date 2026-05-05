@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Layout } from "lucide-react";
+import { Archive, Layout, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ import {
   toVatPrice,
 } from "@/components/product";
 import { ProductInfoEditSheet } from "@/components/product/edit/product-info-edit-sheet";
+import { ProductMergeDialog } from "@/components/product/merge-dialog";
 import { ProductMappingEditSheet } from "@/components/product/edit/product-mapping-edit-sheet";
 import { ProductCostsEditSheet } from "@/components/product/edit/product-costs-edit-sheet";
 import { ProductChannelPricingEditSheet } from "@/components/product/edit/product-channel-pricing-edit-sheet";
@@ -67,6 +68,7 @@ export default function ProductDetailPage() {
   const [channelEditOpen, setChannelEditOpen] = useState(false);
   const [specsEditOpen, setSpecsEditOpen] = useState(false);
   const [setComponentsEditOpen, setSetComponentsEditOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
   const productQuery = useQuery({
     queryKey: queryKeys.products.detail(id),
@@ -105,6 +107,17 @@ export default function ProductDetailPage() {
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "비활성 처리 실패"),
+  });
+
+  const clearAutoMappedMutation = useMutation({
+    mutationFn: () => apiMutate(`/api/products/${id}`, "PATCH", { autoMapped: false }),
+    onSuccess: () => {
+      toast.success("검토 완료로 표시했습니다");
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
   if (productQuery.isPending) return null; // loading.tsx 가 처리
@@ -208,6 +221,31 @@ export default function ProductDetailPage() {
               </>
             }
           />
+
+          {product.autoMapped && (
+            <div className="rounded-lg border border-primary/40 bg-brand-muted/40 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-sm min-w-0">
+                <span className="font-medium text-primary">자동 생성된 상품입니다.</span>{" "}
+                <span className="text-muted-foreground">
+                  SKU/이름/판매가를 검토한 뒤 [검토 완료]를 눌러주세요. 다른 상품과 같은 품목이라면 [합치기]로 통합할 수 있습니다.
+                </span>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" variant="outline" className="h-8" onClick={() => setMergeDialogOpen(true)}>
+                  합치기
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8"
+                  onClick={() => clearAutoMappedMutation.mutate()}
+                  disabled={clearAutoMappedMutation.isPending}
+                >
+                  {clearAutoMappedMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  검토 완료
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* 1. 개요 */}
           <ProductKpiCards product={product} cardFeeRate={cardFeeRate} />
@@ -455,6 +493,13 @@ export default function ProductDetailPage() {
         open={setComponentsEditOpen}
         onOpenChange={setSetComponentsEditOpen}
         product={product}
+      />
+      <ProductMergeDialog
+        open={mergeDialogOpen}
+        onOpenChange={setMergeDialogOpen}
+        sourceProductId={product.id}
+        sourceProductName={product.name}
+        onMerged={(targetId) => router.push(`/products/${targetId}`)}
       />
     </div>
   );

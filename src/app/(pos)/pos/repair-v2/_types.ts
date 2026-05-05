@@ -32,6 +32,19 @@ export interface RepairTicketRow {
     displayName: string | null;
   } | null;
   assignedTo: { id: string; name: string } | null;
+  repairCategory: { id: string; name: string } | null;
+  // 취소 정보 — status === "CANCELLED" 일 때만 의미
+  cancelReason:
+    | "CUSTOMER_DECLINED"
+    | "CUSTOMER_NO_SHOW"
+    | "SHOP_GAVE_UP"
+    | "PARTS_UNAVAILABLE"
+    | "SOLD_AS_PRODUCT"
+    | "MISTAKE"
+    | "OTHER"
+    | null;
+  cancelMemo: string | null;
+  cancelledAt: string | null;
   _count: { parts: number; labors: number };
 }
 
@@ -68,6 +81,17 @@ export interface RepairTicketDetail {
   diagnosisFee: string;
   totalDiscount: string;
   finalAmount: string;
+  cancelReason:
+    | "CUSTOMER_DECLINED"
+    | "CUSTOMER_NO_SHOW"
+    | "SHOP_GAVE_UP"
+    | "PARTS_UNAVAILABLE"
+    | "SOLD_AS_PRODUCT"
+    | "MISTAKE"
+    | "OTHER"
+    | null;
+  cancelMemo: string | null;
+  cancelledAt: string | null;
   repairWarrantyMonths: number | null;
   repairWarrantyEnds: string | null;
   customer: { id: string; name: string; phone: string | null } | null;
@@ -88,6 +112,8 @@ export interface RepairTicketDetail {
     imageUrl: string | null;
   } | null;
   repairProductText: string | null;
+  // 수리 카테고리 — 새 수리 접수 시 선택. null = "기타"
+  repairCategory: { id: string; name: string } | null;
   assignedTo: { id: string; name: string } | null;
   parentRepairTicket: {
     id: string;

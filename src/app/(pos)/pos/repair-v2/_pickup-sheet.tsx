@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { fmtKRW } from "./_helpers";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
 const PAYMENTS: { value: PaymentMethod; label: string; sub?: string }[] = [
@@ -33,6 +34,7 @@ function PickupSheetBody({
   onConfirm,
   loading,
 }: Props) {
+  useBodyScrollLock();
   const [method, setMethod] = useState<PaymentMethod>("CARD");
 
   return (

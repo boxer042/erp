@@ -51,6 +51,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
               unitRate: i.rentalMeta!.dailyRate,
               rentalAmount: i.unitPrice * i.quantity,
               depositAmount: i.rentalMeta!.depositAmount,
+              checkoutAt: i.rentalMeta!.checkoutAt,
             };
           })
       : undefined;

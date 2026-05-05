@@ -17,6 +17,8 @@ export interface RentalMeta {
   depositAmount?: number;
   startDate?: string;  // "yyyy-MM-dd" — 체크아웃 시 설정
   endDate?: string;    // "yyyy-MM-dd" — 체크아웃 시 설정
+  /** 카트 추가 시점 ISO timestamp — Rental.checkoutAt 으로 저장됨 (시간대별 임대 트래픽 분석용) */
+  checkoutAt?: string;
 }
 
 export interface CartItem {
@@ -52,8 +54,14 @@ export interface CartSession {
   quotationFingerprint?: string;   // 발행 시점 카트 지문 — 카트 변경 감지용
   labelCodes?: string[];           // 마지막 발번 라벨 코드 목록
   labelFingerprint?: string;       // 발번 시점 카트 지문
-  repairTicketIds?: string[];      // 이 세션에서 시작한 수리 티켓 ID들 (미등록 고객 추적용)
+  repairTicketIds?: string[];      // deprecated — RepairTicket.posSessionId 로 이관됨
   openRepairCount?: number;        // 진행중 수리 건수 — 워크스페이스가 동기화 (헤더 표시용)
+  /**
+   * 마지막 client mutation 시각 — server 의 last-write-wins 비교에 사용.
+   * 다른 기기가 polling 으로 자기 옛 상태를 server 에 덮어쓰는 것을 방지하는 핵심 필드.
+   * mutation 안 한 다른 기기는 이 값 그대로 server 에 보냄 → server 는 자기 updatedAt 과 같으니 update 거부.
+   */
+  updatedAt?: string;
 }
 
 interface AddOptions {
@@ -83,6 +91,8 @@ interface SessionsContextValue {
   setSessionQuotation: (quotationId: string, fingerprint: string, sessionId?: string) => void;
   setSessionLabels: (codes: string[], fingerprint: string, sessionId?: string) => void;
   addSessionRepairTicket: (ticketId: string, sessionId?: string) => void;
+  /** 전체 목록 동기화 — 서버 ticketsQuery 의 결과로 stale ID 제거용 */
+  setSessionRepairTicketIds: (ticketIds: string[], sessionId?: string) => void;
   setSessionOpenRepairCount: (count: number, sessionId?: string) => void;
   clear: (sessionId?: string) => void;
   totalItemCount: number;
@@ -130,6 +140,29 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   // sessions 의 최신 ref — polling/debounce 안에서 stale state 방지
   const sessionsRef = useRef<CartSession[]>([]);
   sessionsRef.current = sessions;
+  // 클라이언트 mutation counter — sync 도중 sessions 가 변경되었는지 비교용 (race guard).
+  // setState 의 비동기 schedule 로 sessionsRef 가 즉시 업데이트되지 않을 수 있어,
+  // 모든 mutation 함수가 호출 즉시 increment 하는 wrapper 를 거치게 해서 race window 를 차단.
+  const mutationCountRef = useRef(0);
+  // 사용자 mutation 전용 setSessions — sync 응답 처리는 직접 setSessions 사용.
+  // 핵심: 변경/신규 session 의 updatedAt 자동 갱신 → server last-write-wins 가 정확히 동작.
+  // 다른 기기가 polling 으로 자기 옛 상태 보낼 때, 그 session 의 updatedAt 은 옛 값 → server 거부.
+  const mutateSessions = useCallback(
+    (updater: (prev: CartSession[]) => CartSession[]) => {
+      mutationCountRef.current++;
+      setSessions((prev) => {
+        const next = updater(prev);
+        const now = new Date().toISOString();
+        return next.map((s) => {
+          const old = prev.find((p) => p.id === s.id);
+          // 신규(old 없음) 이거나 reference 가 다르면(변경됨) updatedAt 갱신
+          if (!old || old !== s) return { ...s, updatedAt: now };
+          return s;
+        });
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     try {
@@ -144,9 +177,12 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {}
-    const initial = makeSession(1);
-    setSessions([initial]);
-    setActiveId(initial.id);
+    // 빈 상태로 시작 — 사용자가 명시적으로 새 손님을 만들 때만 세션 생성.
+    // 자동 makeSession 은 새 기기/브라우저 진입마다 빈 미등록 세션이 서버에 push 되어
+    // 다른 기기에 sync 되는 부작용이 있어 제거. v1 의 사이드바·카트 흐름은 ensureSessionId()
+    // 가 사용자가 메뉴 클릭한 시점에 addSession 을 호출하므로 영향 없음.
+    setSessions([]);
+    setActiveId("");
     setHydrated(true);
   }, []);
 
@@ -169,11 +205,11 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
 
     const sync = async () => {
       try {
+        const beforeMutationCount = mutationCountRef.current;
         const body = {
           sessions: sessionsRef.current,
           deletedIds: Array.from(removedIdsRef.current),
         };
-        // sync 시도 — 호출 직전 deletedIds 캡처
         const sentDeleted = body.deletedIds;
         const res = await fetch("/api/pos/sessions", {
           method: "POST",
@@ -181,30 +217,39 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify(body),
         });
         if (!res.ok) return;
-        const serverSessions: (CartSession & { updatedAt?: string })[] = await res.json();
+        const payload = (await res.json()) as {
+          sessions: (CartSession & { updatedAt?: string })[];
+          rejectedIds: string[];
+        };
         if (cancelled) return;
 
-        // 응답 = 서버 최종 상태. 클라이언트에 반영.
-        // 단 sync 도중 새로 추가된 deletedIds 는 보존.
+        if (mutationCountRef.current !== beforeMutationCount) {
+          debouncePushRef.current?.();
+          return;
+        }
+
         for (const id of sentDeleted) removedIdsRef.current.delete(id);
 
-        // 첫 sync 완료 — 이후부터 push 가능
+        // 다른 기기가 삭제한 세션 — 클라이언트 sessionStorage 에서도 제거 (부활 방지)
+        if (payload.rejectedIds && payload.rejectedIds.length > 0) {
+          for (const id of payload.rejectedIds) removedIdsRef.current.delete(id);
+        }
+
         serverHydratedRef.current = true;
 
-        // 같은 데이터면 setState 안 함 (불필요한 리렌더 + 무한 polling 루프 방지).
-        // ID 만 비교하면 다른 기기에서 변경한 items 가 반영 안 됨 → JSON 전체 비교.
         const local = sessionsRef.current;
-        const serverNormalized = serverSessions.map(migrateSession);
+        const serverNormalized = payload.sessions.map(migrateSession);
         const sameAsLocal =
           JSON.stringify(local) === JSON.stringify(serverNormalized);
         if (!sameAsLocal) {
           setSessions(serverNormalized);
-          // activeId 가 사라진 세션이면 첫 번째로 fallback
-          const stillExists = serverSessions.some(
+          const stillExists = payload.sessions.some(
             (s) => s.id === activeIdRef.current,
           );
-          if (!stillExists && serverSessions.length > 0) {
-            setActiveId(serverSessions[0].id);
+          if (!stillExists && payload.sessions.length > 0) {
+            setActiveId(payload.sessions[0].id);
+          } else if (payload.sessions.length === 0) {
+            setActiveId("");
           }
         }
       } catch {
@@ -248,7 +293,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
 
   const addSession = useCallback(() => {
     let createdId = "";
-    setSessions((prev) => {
+    mutateSessions((prev) => {
       const next = makeSession(prev.length + 1);
       createdId = next.id;
       setActiveId(next.id);
@@ -258,19 +303,16 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeSession = useCallback((id: string) => {
-    setSessions((prev) => {
-      if (prev.length <= 1) {
-        // 마지막 세션이면 비우기만 (clear 와 동일 — 서버에서 삭제하지 않음)
-        return prev.map((s) =>
-          s.id === id
-            ? { ...s, items: [], customerId: undefined, customerName: undefined, customerPhone: undefined, totalDiscount: "0", shippingCost: "0", quotationId: undefined, quotationFingerprint: undefined, labelCodes: undefined, labelFingerprint: undefined }
-            : s
-        );
-      }
-      // 서버에서도 삭제 — 다음 sync 에 deletedIds 로 보냄
+    mutateSessions((prev) => {
+      // 서버에서도 삭제 — 다음 sync 에 deletedIds 로 보냄. 마지막 세션이어도 진짜 삭제 (빈 그리드 허용).
       removedIdsRef.current.add(id);
       const next = prev.filter((s) => s.id !== id);
-      setActiveId((cur) => (cur === id ? next[Math.max(0, prev.findIndex((s) => s.id === id) - 1)].id : cur));
+      setActiveId((cur) => {
+        if (cur !== id) return cur;
+        if (next.length === 0) return "";
+        const idx = prev.findIndex((s) => s.id === id);
+        return next[Math.max(0, idx - 1)]?.id ?? next[0].id;
+      });
       return next;
     });
   }, []);
@@ -283,7 +325,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       opts?: AddOptions
     ) => {
       const targetId = opts?.sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => {
           if (it.productId && it.itemType === "product") {
             const existing = s.items.find((p) => p.productId === it.productId);
@@ -331,7 +373,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const remove = useCallback(
     (cartItemId: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.filter((p) => p.cartItemId !== cartItemId),
@@ -344,7 +386,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const updateQty = useCallback(
     (cartItemId: string, qty: number, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) => {
@@ -361,7 +403,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const updateUnitPrice = useCallback(
     (cartItemId: string, unitPrice: number, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
@@ -378,7 +420,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const updateDiscount = useCallback(
     (cartItemId: string, discount: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) => (p.cartItemId === cartItemId ? { ...p, discount } : p)),
@@ -391,7 +433,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const toggleZeroRate = useCallback(
     (cartItemId: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
@@ -406,7 +448,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const updateRentalDates = useCallback(
     (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
@@ -431,7 +473,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       sessionId?: string
     ) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
@@ -456,7 +498,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     (id: string, name: string, phone?: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
       let ticketIdsToUpgrade: string[] = [];
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => {
           // 이 세션이 만들었던 미등록 수리 티켓들 — 결제 전이면 customerId 자동 채워줌
           ticketIdsToUpgrade = s.repairTicketIds ?? [];
@@ -485,7 +527,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const clearCustomer = useCallback(
     (sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           customerId: undefined,
@@ -500,7 +542,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const setSessionDiscount = useCallback(
     (discount: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({ ...s, totalDiscount: discount }))
       );
     },
@@ -510,7 +552,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const setSessionShipping = useCallback(
     (amount: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({ ...s, shippingCost: amount }))
       );
     },
@@ -520,7 +562,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const setSessionQuotation = useCallback(
     (quotationId: string, fingerprint: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           quotationId,
@@ -534,7 +576,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const setSessionLabels = useCallback(
     (codes: string[], fingerprint: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           labelCodes: codes,
@@ -548,7 +590,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const addSessionRepairTicket = useCallback(
     (ticketId: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => {
           const existing = s.repairTicketIds ?? [];
           if (existing.includes(ticketId)) return s;
@@ -559,10 +601,29 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     [activeId]
   );
 
+  const setSessionRepairTicketIds = useCallback(
+    (ticketIds: string[], sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      mutateSessions((prev) =>
+        updateSession(prev, targetId, (s) => {
+          const existing = s.repairTicketIds ?? [];
+          // 같은 집합이면 no-op
+          if (
+            existing.length === ticketIds.length &&
+            existing.every((id) => ticketIds.includes(id))
+          )
+            return s;
+          return { ...s, repairTicketIds: ticketIds };
+        }),
+      );
+    },
+    [activeId],
+  );
+
   const setSessionOpenRepairCount = useCallback(
     (count: number, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => {
           if (s.openRepairCount === count) return s;
           return { ...s, openRepairCount: count };
@@ -575,7 +636,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   const clear = useCallback(
     (sessionId?: string) => {
       const targetId = sessionId ?? activeId;
-      setSessions((prev) =>
+      mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: [],
@@ -633,12 +694,13 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       setSessionQuotation,
       setSessionLabels,
       addSessionRepairTicket,
+      setSessionRepairTicketIds,
       setSessionOpenRepairCount,
       clear,
       totalItemCount,
       getSession,
     }),
-    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateUnitPrice, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionOpenRepairCount, clear, totalItemCount, getSession]
+    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateUnitPrice, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionRepairTicketIds, setSessionOpenRepairCount, clear, totalItemCount, getSession]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

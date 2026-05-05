@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const customerId = searchParams.get("customerId");
   const assignedToId = searchParams.get("assignedToId");
   const serialItemId = searchParams.get("serialItemId");
+  const posSessionId = searchParams.get("posSessionId");
   const excludeId = searchParams.get("excludeId");
   const search = searchParams.get("search")?.trim() ?? "";
   const ids = searchParams.get("ids")?.split(",").filter(Boolean) ?? [];
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
     ...(customerId ? { customerId } : {}),
     ...(assignedToId ? { assignedToId } : {}),
     ...(serialItemId ? { serialItemId } : {}),
+    ...(posSessionId ? { posSessionId } : {}),
     ...(excludeId ? { id: { not: excludeId } } : {}),
     ...(ids.length > 0 ? { id: { in: ids } } : {}),
     ...(search
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
         select: { id: true, code: true, source: true, displayName: true },
       },
       assignedTo: { select: { id: true, name: true } },
+      repairCategory: { select: { id: true, name: true } },
       _count: { select: { parts: true, labors: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -90,8 +93,13 @@ export async function POST(request: NextRequest) {
       diagnosisFee: data.diagnosisFee,
       repairWarrantyMonths: warrantyMonths,
       parentRepairTicketId: data.parentRepairTicketId || null,
-      assignedToId: data.assignedToId || null,
+      // 담당자 기본값 — 명시 미지정 시 현재 user 가 기본 담당자
+      assignedToId: data.assignedToId ?? user.id,
       memo: data.memo?.trim() || null,
+      // 미등록 손님 (customerId=null) 일 때 카트 세션 매핑 — 클라이언트 추적 끊겨도 DB 에서 복원 가능
+      posSessionId: data.customerId ? null : data.posSessionId || null,
+      // 수리 카테고리 — null 이면 "기타"
+      repairCategoryId: data.repairCategoryId || null,
       createdById: user.id,
     },
     include: {

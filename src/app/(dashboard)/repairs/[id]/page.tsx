@@ -102,7 +102,8 @@ interface RepairTicketDetail {
   finalAmount: string;
   repairWarrantyMonths: number | null;
   repairWarrantyEnds: string | null;
-  customer: { id: string; name: string; phone: string | null };
+  // POS v2 가 미등록 손님 ticket 을 만들 수 있어 nullable. customer null + posSessionId 매핑.
+  customer: { id: string; name: string; phone: string | null } | null;
   customerMachine: { id: string; name: string } | null;
   serialItem: {
     id: string;
@@ -121,6 +122,19 @@ interface RepairTicketDetail {
   revisits: Array<{ id: string; ticketNo: string; status: RepairStatus; receivedAt: string }>;
   parts: RepairPart[];
   labors: RepairLabor[];
+  // POS v2 추가 — 카테고리 + 취소 사유/메모
+  repairCategory: { id: string; name: string } | null;
+  cancelReason:
+    | "CUSTOMER_DECLINED"
+    | "CUSTOMER_NO_SHOW"
+    | "SHOP_GAVE_UP"
+    | "PARTS_UNAVAILABLE"
+    | "SOLD_AS_PRODUCT"
+    | "MISTAKE"
+    | "OTHER"
+    | null;
+  cancelMemo: string | null;
+  cancelledAt: string | null;
 }
 
 const STATUS_LABEL: Record<RepairStatus, string> = {
@@ -302,19 +316,35 @@ function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
       <CardHeader className="pb-3">
         <CardTitle className="text-sm">고객 / 기기</CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+      <CardContent className="grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
         <div className="flex flex-col gap-0.5">
           <span className="text-xs text-muted-foreground">고객</span>
-          <span className="flex items-center gap-1 font-medium">
-            <User className="size-3.5 text-muted-foreground" />
-            {ticket.customer.name}
-          </span>
-          {ticket.customer.phone && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Phone className="size-3" />
-              {ticket.customer.phone}
+          {ticket.customer ? (
+            <>
+              <span className="flex items-center gap-1 font-medium">
+                <User className="size-3.5 text-muted-foreground" />
+                {ticket.customer.name}
+              </span>
+              {ticket.customer.phone && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Phone className="size-3" />
+                  {ticket.customer.phone}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <User className="size-3.5" /> 미등록
             </span>
           )}
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-muted-foreground">카테고리</span>
+          <span className="font-medium">
+            {ticket.repairCategory?.name ?? (
+              <span className="text-muted-foreground">기타</span>
+            )}
+          </span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-xs text-muted-foreground">기기 / 시리얼</span>
@@ -346,8 +376,42 @@ function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
           )}
         </div>
       </CardContent>
+      {/* 취소 정보 — CANCELLED 상태일 때만 */}
+      {ticket.status === "CANCELLED" && (ticket.cancelReason || ticket.cancelMemo) && (
+        <CardContent className="border-t pt-3">
+          <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs">
+            <XCircle className="size-3.5 shrink-0 text-rose-600" />
+            <div className="flex flex-col gap-0.5">
+              <span className="font-semibold">취소 사유</span>
+              <span className="text-muted-foreground">
+                {ticket.cancelReason ? cancelReasonLabel(ticket.cancelReason) : null}
+                {ticket.cancelReason && ticket.cancelMemo ? " — " : null}
+                {ticket.cancelMemo}
+                {ticket.cancelledAt && (
+                  <span className="ml-2 font-mono text-[10px]">
+                    {format(new Date(ticket.cancelledAt), "yyyy-MM-dd HH:mm")}
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
+}
+
+function cancelReasonLabel(reason: string): string {
+  const map: Record<string, string> = {
+    CUSTOMER_DECLINED: "손님 거절",
+    CUSTOMER_NO_SHOW: "손님 미반환",
+    SHOP_GAVE_UP: "매장 포기",
+    PARTS_UNAVAILABLE: "부속 수급 불가",
+    SOLD_AS_PRODUCT: "상품 구매로 전환",
+    MISTAKE: "잘못 생성",
+    OTHER: "기타",
+  };
+  return map[reason] ?? reason;
 }
 
 // ──────── 증상 / 진단 / 수리메모 ────────

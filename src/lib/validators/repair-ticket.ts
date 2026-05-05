@@ -12,6 +12,10 @@ export const repairTicketCreateSchema = z.object({
   parentRepairTicketId: z.string().nullable().optional(),
   assignedToId: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),
+  // 미등록 손님 ticket 의 카트 세션 매핑 (sessions.repairTicketIds 추적 끊김 대비 DB 보존)
+  posSessionId: z.string().nullable().optional(),
+  // 수리 카테고리 (ProductCategory.id) — null 이면 "기타"
+  repairCategoryId: z.string().nullable().optional(),
 });
 
 export type RepairTicketCreateInput = z.infer<typeof repairTicketCreateSchema>;
@@ -31,6 +35,7 @@ export const repairTicketUpdateSchema = z.object({
   repairWarrantyMonths: z.coerce.number().int().min(0).nullable().optional(),
   assignedToId: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),
+  repairCategoryId: z.string().nullable().optional(),
 });
 
 export type RepairTicketUpdateInput = z.infer<typeof repairTicketUpdateSchema>;

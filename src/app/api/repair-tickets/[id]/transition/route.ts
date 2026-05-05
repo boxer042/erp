@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { calcRepairTotals, genApprovalToken } from "@/lib/repair";
 import { restoreRepairPart } from "@/lib/repair-inventory";
-import type { RepairApprovalMethod, OrderPaymentMethod } from "@prisma/client";
+import type {
+  RepairApprovalMethod,
+  OrderPaymentMethod,
+  RepairCancelReason,
+} from "@prisma/client";
 
 type Action =
   | "diagnose"
@@ -227,9 +231,29 @@ export async function POST(
           { status: 400 },
         );
       }
+
+      const cancelReason = (body?.cancelReason as RepairCancelReason | undefined) ?? null;
+      const cancelMemo = (body?.cancelMemo as string | undefined)?.trim() || null;
+
+      // 보존 가치 판단 — 다음 중 하나라도 해당하면 데이터 보존(soft delete = CANCELLED)
+      //   1. 등록 고객 (분쟁/통계 대응)
+      //   2. 시리얼 라벨 부착됨 (기기 단위 평생 추적 — 다음 수리 시 SerialHistoryCard)
+      //   3. LOST 부속 있음 (회계상 매출원가 손실 기록)
+      //   4. 진단비 청구됨 (세무상 매출 5년 보존)
+      //   5. PICKED_UP 이력 — cancel 자체가 차단되어 이 분기 안 옴
+      //   6. 사유 = SOLD_AS_PRODUCT (상품 구매로 전환 — 마케팅/통계 가치 큼)
+      // 위 모두 미해당 → 추적 의미 0 → 자동 hard delete.
+      const hasLostParts = ticket.parts.some((p) => p.status === "LOST");
+      const hasArchivalValue =
+        !!ticket.customerId ||
+        !!ticket.serialItemId ||
+        hasLostParts ||
+        Number(ticket.diagnosisFee) > 0 ||
+        cancelReason === "SOLD_AS_PRODUCT";
+      const autoHardDelete = !hasArchivalValue;
+
       // 거절·취소 — USED 부속만 재고 복원. LOST 는 이미 손실 처리된 부속이므로 그대로 남김
       // (다시 차감되면 손실 추적이 어긋남). 진단비만 청구.
-      // 토큰은 더 이상 의미 없으므로 정리.
       await prisma.$transaction(async (tx) => {
         for (const part of ticket.parts) {
           if (part.status !== "USED") continue;
@@ -247,16 +271,28 @@ export async function POST(
             data: { consumedAt: null, unitCostSnapshot: null },
           });
         }
-        await tx.repairTicket.update({
-          where: { id },
-          data: {
-            status: "CANCELLED",
-            approvalToken: null,
-            approvalTokenExpiresAt: null,
-          },
-        });
+
+        if (autoHardDelete) {
+          // RepairPart 는 onDelete: Cascade 라 자동 삭제됨
+          await tx.repairTicket.delete({ where: { id } });
+        } else {
+          await tx.repairTicket.update({
+            where: { id },
+            data: {
+              status: "CANCELLED",
+              cancelReason: cancelReason ?? null,
+              cancelMemo,
+              cancelledAt: new Date(),
+              approvalToken: null,
+              approvalTokenExpiresAt: null,
+            },
+          });
+        }
       });
-      return NextResponse.json({ success: true });
+      return NextResponse.json({
+        success: true,
+        hardDeleted: autoHardDelete,
+      });
     }
 
     return NextResponse.json({ error: "알 수 없는 action" }, { status: 400 });

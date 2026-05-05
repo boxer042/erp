@@ -44,6 +44,17 @@ interface RepairTicketRow {
   customerMachine: { id: string; name: string } | null;
   serialItem: { id: string; code: string } | null;
   assignedTo: { id: string; name: string } | null;
+  repairCategory: { id: string; name: string } | null;
+  cancelReason:
+    | "CUSTOMER_DECLINED"
+    | "CUSTOMER_NO_SHOW"
+    | "SHOP_GAVE_UP"
+    | "PARTS_UNAVAILABLE"
+    | "SOLD_AS_PRODUCT"
+    | "MISTAKE"
+    | "OTHER"
+    | null;
+  cancelMemo: string | null;
   _count: { parts: number; labors: number };
 }
 
@@ -100,13 +111,59 @@ function RepairsSkeletonRows({ rows = 8 }: { rows?: number }) {
   );
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+type CancelReasonValue =
+  | "ALL"
+  | "CUSTOMER_DECLINED"
+  | "CUSTOMER_NO_SHOW"
+  | "SHOP_GAVE_UP"
+  | "PARTS_UNAVAILABLE"
+  | "SOLD_AS_PRODUCT"
+  | "MISTAKE"
+  | "OTHER";
+
+const CANCEL_REASON_FILTERS: { value: CancelReasonValue; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "SOLD_AS_PRODUCT", label: "상품 전환" },
+  { value: "CUSTOMER_DECLINED", label: "손님 거절" },
+  { value: "CUSTOMER_NO_SHOW", label: "미반환" },
+  { value: "SHOP_GAVE_UP", label: "매장 포기" },
+  { value: "PARTS_UNAVAILABLE", label: "부속 부족" },
+  { value: "MISTAKE", label: "잘못 생성" },
+  { value: "OTHER", label: "기타" },
+];
+
+const REPAIR_CANCEL_REASON_LABEL: Record<string, string> = {
+  CUSTOMER_DECLINED: "손님 거절",
+  CUSTOMER_NO_SHOW: "손님 미반환",
+  SHOP_GAVE_UP: "매장 포기",
+  PARTS_UNAVAILABLE: "부속 수급 불가",
+  SOLD_AS_PRODUCT: "상품 구매로 전환",
+  MISTAKE: "잘못 생성",
+  OTHER: "기타",
+};
+
 export default function RepairsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<RepairStatus | "OPEN" | "ALL">("OPEN");
+  // 카테고리 필터 — "" = 전체, "__none__" = 카테고리 없음(기타)
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  // 취소 사유 필터 — statusFilter === "CANCELLED" 일 때만 의미
+  const [cancelReasonFilter, setCancelReasonFilter] = useState<CancelReasonValue>("ALL");
+
+  const categoriesQuery = useQuery<CategoryOption[]>({
+    queryKey: ["categories", "for-repair-filter"],
+    queryFn: () => apiGet<CategoryOption[]>("/api/categories"),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const ticketsQuery = useQuery({
-    queryKey: ["repairs", "list", { search, statusFilter }],
+    queryKey: ["repairs", "list", { search, statusFilter, categoryFilter }],
     queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
@@ -117,16 +174,28 @@ export default function RepairsPage() {
   });
 
   const tickets = useMemo(() => {
-    const all = ticketsQuery.data ?? [];
+    let all = ticketsQuery.data ?? [];
     if (statusFilter === "OPEN") {
-      return all.filter((t) => t.status !== "PICKED_UP" && t.status !== "CANCELLED");
+      all = all.filter((t) => t.status !== "PICKED_UP" && t.status !== "CANCELLED");
+    }
+    // 카테고리 필터 — 클라이언트 사이드 (간단)
+    if (categoryFilter === "__none__") {
+      all = all.filter((t) => !t.repairCategory);
+    } else if (categoryFilter) {
+      all = all.filter((t) => t.repairCategory?.id === categoryFilter);
+    }
+    // 취소사유 필터 — CANCELLED 상태일 때만
+    if (statusFilter === "CANCELLED" && cancelReasonFilter !== "ALL") {
+      all = all.filter((t) => t.cancelReason === cancelReasonFilter);
     }
     return all;
-  }, [ticketsQuery.data, statusFilter]);
+  }, [ticketsQuery.data, statusFilter, categoryFilter, cancelReasonFilter]);
 
   return (
     <div className="flex h-full flex-col">
       <DataTableToolbar
+        onAdd={() => router.push("/repairs/stats")}
+        addLabel="통계"
         search={{
           value: search,
           onChange: setSearch,
@@ -136,21 +205,53 @@ export default function RepairsPage() {
         onRefresh={() => ticketsQuery.refetch()}
         loading={ticketsQuery.isFetching}
         filters={
-          <div className="flex h-[30px] items-center gap-1 rounded-md border border-border bg-card px-1 text-[13px]">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setStatusFilter(f.value)}
-                className={cn(
-                  "rounded px-2 py-0.5 transition-colors",
-                  statusFilter === f.value
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex h-[30px] items-center gap-1 rounded-md border border-border bg-card px-1 text-[13px]">
+              {STATUS_FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setStatusFilter(f.value)}
+                  className={cn(
+                    "rounded px-2 py-0.5 transition-colors",
+                    statusFilter === f.value
+                      ? "bg-secondary text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {/* 카테고리 필터 */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="h-[30px] rounded-md border border-border bg-card px-2 text-[13px]"
+            >
+              <option value="">카테고리 전체</option>
+              <option value="__none__">기타 (미지정)</option>
+              {(categoriesQuery.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            {/* 취소사유 필터 — CANCELLED 일 때만 노출 */}
+            {statusFilter === "CANCELLED" && (
+              <select
+                value={cancelReasonFilter}
+                onChange={(e) =>
+                  setCancelReasonFilter(e.target.value as CancelReasonValue)
+                }
+                className="h-[30px] rounded-md border border-border bg-card px-2 text-[13px]"
               >
-                {f.label}
-              </button>
-            ))}
+                {CANCEL_REASON_FILTERS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.value === "ALL" ? "사유 전체" : r.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         }
       />
@@ -161,6 +262,7 @@ export default function RepairsPage() {
               <TableHead>상태</TableHead>
               <TableHead>수리번호</TableHead>
               <TableHead>유형</TableHead>
+              <TableHead>카테고리</TableHead>
               <TableHead>고객</TableHead>
               <TableHead>증상 / 기기</TableHead>
               <TableHead>접수일</TableHead>
@@ -172,7 +274,7 @@ export default function RepairsPage() {
               <RepairsSkeletonRows />
             ) : tickets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                   수리 티켓이 없습니다
                 </TableCell>
               </TableRow>
@@ -181,7 +283,7 @@ export default function RepairsPage() {
                 <TableRow
                   key={t.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/pos/repairs/${t.id}`)}
+                  onClick={() => router.push(`/pos/repair-v2/${t.id}`)}
                 >
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
@@ -195,6 +297,15 @@ export default function RepairsPage() {
                         <><Wrench className="size-3" /> 맡김</>
                       )}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {t.repairCategory ? (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {t.repairCategory.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">기타</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">

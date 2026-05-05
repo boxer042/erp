@@ -19,7 +19,8 @@ import { calcFinal, nextActions, fmtKRW } from "../_helpers";
 import { PartsSection } from "../_parts-section";
 import { LaborsSection } from "../_labors-section";
 import { PickupSheet } from "../_pickup-sheet";
-import { PriceInputDialog } from "@/app/(pos)/pos/v2/_components/price-input-dialog";
+import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
+import { BottomSheet } from "@/app/(pos)/pos/_components/bottom-sheet";
 
 /** 라우트 진입점 — params 받아 RepairV2Detail 에 위임. */
 export default function RepairV2DetailPage({
@@ -35,17 +36,34 @@ interface RepairV2DetailProps {
   ticketId: string;
   /** ← 버튼 클릭 — 미제공이면 router.push("/pos/repair-v2") 로 fallback */
   onBack?: () => void;
+  /**
+   * READY 상태에서 "카트에 추가" 버튼을 누르면 호출.
+   * 미제공이면 자체 PickupSheet 가 결제 처리 (repair-v2 standalone 호환).
+   * v2 손님 페이지(수리 탭) 가 이 prop 으로 카트에 라인 추가 + 카트 시트 열기.
+   */
+  onAddToCart?: (ticket: RepairTicketDetail, finalAmount: number) => void;
+  /** v2 손님 페이지에서 임베드할 때 — 부모가 자체 헤더(뒤로 + ticketNo + 상태)를 그리므로 자체 헤더 숨김 */
+  hideHeader?: boolean;
+  /** 고객 카드 클릭 — 부모(customer page) 가 손님 액션 시트(CustomerActionSheet) 열기 */
+  onCustomerClick?: () => void;
 }
 
 /**
  * 수리 v2 작업 화면 — repair-v2 라우트와 v2 손님 페이지(수리 탭) 가 공유.
- * shadcn 0개. 부속·공임·진단비·할인·픽업까지 풀 기능.
+ * shadcn 0개. 부속·공임·진단비·할인 입력 + (onAddToCart 있으면 카트 통합 결제, 없으면 자체 픽업).
  */
-export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
+export function RepairV2Detail({
+  ticketId,
+  onBack,
+  onAddToCart,
+  hideHeader,
+  onCustomerClick,
+}: RepairV2DetailProps) {
   const id = ticketId;
   const router = useRouter();
   const qc = useQueryClient();
   const [pickupOpen, setPickupOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const ticketQuery = useQuery({
     queryKey: ["repair-v2", "detail", id],
@@ -55,17 +73,25 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["repair-v2", "detail", id] });
     qc.invalidateQueries({ queryKey: ["repair-v2", "list"] });
+    // POS v2 손님 페이지의 수리 리스트 (useRepairSync) — 새로고침 없이 즉시 반영
+    qc.invalidateQueries({ queryKey: ["pos-v2", "repairs"] });
     // 어드민/POS 기존 페이지도 함께
     qc.invalidateQueries({ queryKey: ["repairs"] });
   };
 
-  const transitionMutation = useMutation({
-    mutationFn: (vars: { action: string; payload?: Record<string, unknown> }) =>
+  const goBack = onBack ?? (() => router.push("/pos/repair-v2"));
+
+  const transitionMutation = useMutation<
+    { success: boolean; hardDeleted?: boolean },
+    Error,
+    { action: string; payload?: Record<string, unknown> }
+  >({
+    mutationFn: (vars) =>
       apiMutate(`/api/repair-tickets/${id}/transition`, "POST", {
         action: vars.action,
         ...(vars.payload ?? {}),
       }),
-    onSuccess: (_, vars) => {
+    onSuccess: (data, vars) => {
       const labels: Record<string, string> = {
         diagnose: "진단 시작",
         quote: "견적 확정",
@@ -75,18 +101,25 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
         pickup: "픽업/결제 완료",
         cancel: "취소 처리됨",
       };
+      // 미등록 + MISTAKE 자동 hard delete 시 — 목록으로 복귀
+      if (vars.action === "cancel" && data.hardDeleted) {
+        toast.success("티켓이 영구 삭제됨");
+        setCancelOpen(false);
+        invalidate();
+        goBack();
+        return;
+      }
       toast.success(labels[vars.action] ?? "처리되었습니다");
       setPickupOpen(false);
+      setCancelOpen(false);
       invalidate();
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
-  const goBack = onBack ?? (() => router.push("/pos/repair-v2"));
-
   if (ticketQuery.isPending) {
-    return <DetailSkeleton onBack={goBack} />;
+    return <DetailSkeleton onBack={goBack} hideHeader={hideHeader} />;
   }
   if (ticketQuery.isError || !ticketQuery.data) {
     return (
@@ -108,7 +141,7 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
   const t = ticketQuery.data;
   const meta = STATUS_META[t.status];
   const readonly = t.status === "PICKED_UP" || t.status === "CANCELLED";
-  const actions = nextActions(t.status, t.type);
+  const actions = nextActions(t.status, t.type, !!onAddToCart);
   const finalAmount = calcFinal(t);
   const totals = calcRepairTotals({
     parts: t.parts,
@@ -122,7 +155,13 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
       setPickupOpen(true);
       return;
     }
-    if (action === "cancel" && !confirm("정말 취소하시겠습니까? 사용된 부속은 재고로 복원됩니다.")) {
+    if (action === "cart") {
+      // 카트에 라인 추가 — 부모(v2 손님 페이지) 가 처리
+      onAddToCart?.(t, finalAmount);
+      return;
+    }
+    if (action === "cancel") {
+      setCancelOpen(true);
       return;
     }
     transitionMutation.mutate({ action });
@@ -130,59 +169,61 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
 
   return (
     <div className="flex h-full flex-col bg-zinc-50">
-      {/* 상단 — 뒤로 + 티켓번호 + 상태 */}
-      <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-6">
-          <button
-            type="button"
-            onClick={goBack}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200"
-            aria-label="뒤로"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M12 4l-6 6 6 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className={`size-2 rounded-full ${meta.dot}`} />
-              <span className="text-[12px] font-semibold text-zinc-700">
-                {meta.label}
-              </span>
-              {t.type === "ON_SITE" && (
-                <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                  즉시
+      {/* 상단 — 뒤로 + 티켓번호 + 상태. v2 손님 페이지 임베드 시엔 부모가 그림 (hideHeader). */}
+      {!hideHeader && (
+        <header className="shrink-0 border-b border-zinc-200 bg-white">
+          <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              onClick={goBack}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200"
+              aria-label="뒤로"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M12 4l-6 6 6 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className={`size-2 rounded-full ${meta.dot}`} />
+                <span className="text-[12px] font-semibold text-zinc-700">
+                  {meta.label}
                 </span>
-              )}
+                {t.type === "ON_SITE" && (
+                  <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                    즉시
+                  </span>
+                )}
+              </div>
+              <span className="font-mono text-[13px] text-zinc-500">
+                {t.ticketNo}
+              </span>
             </div>
-            <span className="font-mono text-[13px] text-zinc-500">
-              {t.ticketNo}
-            </span>
+            <button
+              type="button"
+              onClick={() => window.open(`/repairs/${t.id}/print`, "_blank")}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 active:bg-zinc-200"
+              aria-label="내역서"
+              title="내역서 출력"
+            >
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M5 4h10v4H5zM5 12h10v4H5zM3 8h14v4H3z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => window.open(`/repairs/${t.id}/print`, "_blank")}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 active:bg-zinc-200"
-            aria-label="내역서"
-            title="내역서 출력"
-          >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M5 4h10v4H5zM5 12h10v4H5zM3 8h14v4H3z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* 본문 */}
       <main className="flex-1 overflow-y-auto">
@@ -218,7 +259,7 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
           />
 
           {/* 고객 / 기기 */}
-          <CustomerDeviceCard ticket={t} />
+          <CustomerDeviceCard ticket={t} onCustomerClick={onCustomerClick} />
 
           {/* 가져온 기기 — 시리얼/검색/직접입력 3모드 */}
           <ProductLinkCard ticket={t} readonly={readonly} onChanged={invalidate} />
@@ -254,23 +295,29 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
 
           {/* 종료 상태 메시지 */}
           {readonly && (
-            <div
-              className={`rounded-2xl border px-4 py-3 text-[13px] ${
-                t.status === "PICKED_UP"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                  : "border-rose-200 bg-rose-50 text-rose-900"
-              }`}
-            >
-              {t.status === "PICKED_UP"
-                ? `수리 완료 — ${fmtKRW(t.finalAmount)}${
-                    t.repairWarrantyEnds
-                      ? ` · 보증 ~${format(
-                          new Date(t.repairWarrantyEnds),
-                          "yyyy-MM-dd",
-                        )}`
-                      : ""
-                  }`
-                : "취소된 수리"}
+            <div className="flex flex-col gap-2">
+              <div
+                className={`rounded-2xl border px-4 py-3 text-[13px] ${
+                  t.status === "PICKED_UP"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : "border-rose-200 bg-rose-50 text-rose-900"
+                }`}
+              >
+                {t.status === "PICKED_UP"
+                  ? `수리 완료 — ${fmtKRW(t.finalAmount)}${
+                      t.repairWarrantyEnds
+                        ? ` · 보증 ~${format(
+                            new Date(t.repairWarrantyEnds),
+                            "yyyy-MM-dd",
+                          )}`
+                        : ""
+                    }`
+                  : `취소된 수리${t.cancelReason ? ` — ${cancelReasonLabel(t.cancelReason)}` : ""}${t.cancelMemo ? ` (${t.cancelMemo})` : ""}`}
+              </div>
+              {/* CANCELLED 상태에서만 영구 삭제 가능 (PICKED_UP 은 매출 기록이라 보존) */}
+              {t.status === "CANCELLED" && (
+                <HardDeleteButton ticketId={t.id} ticketNo={t.ticketNo} onDeleted={goBack} />
+              )}
             </div>
           )}
 
@@ -314,6 +361,31 @@ export function RepairV2Detail({ ticketId, onBack }: RepairV2DetailProps) {
           transitionMutation.mutate({
             action: "pickup",
             payload: { paymentMethod },
+          })
+        }
+        loading={transitionMutation.isPending}
+      />
+
+      {/* 취소 사유 시트 */}
+      <CancelSheet
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        isUnregistered={!t.customer}
+        hasArchivalValue={
+          !!t.customer ||
+          !!t.serialItem ||
+          t.parts.some((p) => p.status === "LOST") ||
+          Number(t.diagnosisFee) > 0
+        }
+        parts={t.parts.map((p) => ({
+          id: p.id,
+          name: p.product.name,
+          status: p.status,
+        }))}
+        onConfirm={(reason, memo) =>
+          transitionMutation.mutate({
+            action: "cancel",
+            payload: { cancelReason: reason, cancelMemo: memo },
           })
         }
         loading={transitionMutation.isPending}
@@ -395,24 +467,59 @@ function Pill({
 }
 
 // ──── 고객 / 담당 / 접수 (기기는 별도 ProductLinkCard) ────
-function CustomerDeviceCard({ ticket }: { ticket: RepairTicketDetail }) {
+function CustomerDeviceCard({
+  ticket,
+  onCustomerClick,
+}: {
+  ticket: RepairTicketDetail;
+  onCustomerClick?: () => void;
+}) {
+  // onCustomerClick 있으면 고객 영역만 클릭 가능 — 헤더 손님 썸네일과 동일한 시트 트리거
+  const customerContent = ticket.customer ? (
+    <div className="flex min-w-0 flex-col">
+      <span className="line-clamp-1 text-[15px] font-semibold text-zinc-900">
+        {ticket.customer.name}
+      </span>
+      {ticket.customer.phone && (
+        <span className="font-mono text-[12px] text-zinc-500">
+          {ticket.customer.phone}
+        </span>
+      )}
+    </div>
+  ) : (
+    <span className="text-[14px] text-zinc-400">미등록</span>
+  );
+
   return (
     <Card>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="고객">
-          {ticket.customer ? (
-            <div className="flex flex-col">
-              <span className="text-[15px] font-semibold text-zinc-900">
-                {ticket.customer.name}
-              </span>
-              {ticket.customer.phone && (
-                <span className="font-mono text-[12px] text-zinc-500">
-                  {ticket.customer.phone}
-                </span>
-              )}
-            </div>
+          {onCustomerClick ? (
+            <button
+              type="button"
+              onClick={onCustomerClick}
+              className="-mx-2 -my-1 flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-zinc-100 active:bg-zinc-200"
+            >
+              {customerContent}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                className="shrink-0 text-zinc-400"
+                aria-hidden
+              >
+                <path
+                  d="M3.5 5.5l3.5 3.5 3.5-3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
           ) : (
-            <span className="text-[14px] text-zinc-400">미등록</span>
+            customerContent
           )}
         </Field>
         <Field label="담당">
@@ -433,7 +540,7 @@ function CustomerDeviceCard({ ticket }: { ticket: RepairTicketDetail }) {
 }
 
 // ──── 가져온 기기 — 시리얼/검색/직접입력 ────
-type DeviceMode = "SERIAL" | "SEARCH" | "TEXT";
+type DeviceMode = "SERIAL" | "CATEGORY" | "SEARCH" | "TEXT";
 
 interface SerialItemSearchResult {
   id: string;
@@ -471,10 +578,11 @@ function ProductLinkCard({
         ? "TEXT"
         : "SERIAL";
   const [mode, setMode] = useState<DeviceMode>(initialMode);
-  const [editing, setEditing] = useState(false);
 
   const hasLink =
     !!ticket.serialItem || !!ticket.repairProduct || !!ticket.repairProductText;
+  // 카테고리 모드는 등록 고객일 때만 활성 — 미등록 고객은 누르지 못함
+  const categoryEnabled = !!ticket.customer;
 
   const update = useMutation({
     mutationFn: (data: {
@@ -484,7 +592,6 @@ function ProductLinkCard({
     }) => apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", data),
     onSuccess: () => {
       toast.success("기기 정보 저장됨");
-      setEditing(false);
       onChanged();
     },
     onError: (err) =>
@@ -506,101 +613,237 @@ function ProductLinkCard({
           <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
             가져온 기기
           </span>
-          {!readonly && (
-            <div className="flex items-center gap-2">
-              {hasLink && (
-                <button
-                  type="button"
-                  onClick={clearLink}
-                  disabled={update.isPending}
-                  className="text-[11px] font-medium text-zinc-500 underline-offset-2 hover:underline"
-                >
-                  초기화
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setEditing((v) => !v)}
-                className="text-[11px] font-semibold text-zinc-700 underline-offset-2 hover:underline"
-              >
-                {editing ? "닫기" : hasLink ? "변경" : "연결"}
-              </button>
-            </div>
+          {!readonly && hasLink && (
+            <button
+              type="button"
+              onClick={clearLink}
+              disabled={update.isPending}
+              className="text-[11px] font-medium text-zinc-500 underline-offset-2 hover:underline"
+            >
+              초기화
+            </button>
           )}
         </div>
 
-        {/* 표시 영역 */}
+        {/* 연결된 기기 표시 (있을 때만) */}
         {ticket.serialItem ? (
           <SerialDisplay item={ticket.serialItem} />
         ) : ticket.repairProduct ? (
           <SearchProductDisplay product={ticket.repairProduct} />
         ) : ticket.repairProductText ? (
           <TextDisplay text={ticket.repairProductText} />
-        ) : (
-          <div className="rounded-xl bg-zinc-50 p-3 text-center text-[12px] text-zinc-500">
-            연결된 기기 없음 — 우측 [연결] 로 시리얼·상품·자유입력 등록
-          </div>
-        )}
+        ) : null}
 
-        {/* 편집 영역 */}
-        {!readonly && editing && (
+        {/* 검색/입력 영역 — 항상 표시 (readonly 가 아니면) */}
+        {!readonly && (
           <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-            {/* 모드 토글 */}
-            <div className="grid grid-cols-3 gap-1.5">
+            {/* 모드 토글 — 시리얼 / 카테고리 / 상품명 / 직접입력 */}
+            <div className="grid grid-cols-4 gap-1.5">
               {(
                 [
-                  { v: "SERIAL", label: "시리얼" },
-                  { v: "SEARCH", label: "상품 검색" },
-                  { v: "TEXT", label: "직접 입력" },
+                  { v: "SERIAL", label: "시리얼", enabled: true },
+                  { v: "CATEGORY", label: "카테고리", enabled: categoryEnabled },
+                  { v: "SEARCH", label: "상품명", enabled: true },
+                  { v: "TEXT", label: "직접입력", enabled: true },
                 ] as const
-              ).map((b) => (
-                <button
-                  key={b.v}
-                  type="button"
-                  onClick={() => setMode(b.v)}
-                  className={`flex h-9 items-center justify-center rounded-lg text-[12px] font-semibold transition-colors ${
-                    mode === b.v
-                      ? "bg-zinc-900 text-white"
-                      : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-100"
-                  }`}
-                >
-                  {b.label}
-                </button>
-              ))}
+              ).map((b) => {
+                const disabled = !b.enabled;
+                return (
+                  <button
+                    key={b.v}
+                    type="button"
+                    onClick={() => !disabled && setMode(b.v)}
+                    disabled={disabled}
+                    title={disabled ? "등록 고객만 사용 가능" : undefined}
+                    className={`flex h-9 items-center justify-center rounded-lg text-[12px] font-semibold transition-colors ${
+                      mode === b.v
+                        ? "bg-zinc-900 text-white"
+                        : disabled
+                          ? "bg-zinc-100 text-zinc-300"
+                          : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-100"
+                    }`}
+                  >
+                    {b.label}
+                  </button>
+                );
+              })}
             </div>
 
             {mode === "SERIAL" && (
-              <SerialModeForm
+              <SerialModeForm ticketId={ticket.id} onSaved={onChanged} />
+            )}
+            {mode === "CATEGORY" && categoryEnabled && (
+              <CategoryModeForm
                 ticketId={ticket.id}
-                onSaved={() => {
-                  setEditing(false);
-                  onChanged();
-                }}
+                customerId={ticket.customer!.id}
+                categoryId={ticket.repairCategory?.id ?? null}
+                categoryName={ticket.repairCategory?.name ?? "기타"}
+                onSaved={onChanged}
               />
             )}
             {mode === "SEARCH" && (
-              <SearchModeForm
-                ticketId={ticket.id}
-                onSaved={() => {
-                  setEditing(false);
-                  onChanged();
-                }}
-              />
+              <SearchModeForm ticketId={ticket.id} onSaved={onChanged} />
             )}
             {mode === "TEXT" && (
               <TextModeForm
                 ticketId={ticket.id}
                 initialValue={ticket.repairProductText ?? ""}
-                onSaved={() => {
-                  setEditing(false);
-                  onChanged();
-                }}
+                onSaved={onChanged}
               />
             )}
           </div>
         )}
       </div>
     </Card>
+  );
+}
+
+// 카테고리 모드 — 등록 고객의 구매/수리 이력 + 그 카테고리 카탈로그 검색
+// repairCategoryId=null (기타) 이면 전체 카탈로그 검색
+function CategoryModeForm({
+  ticketId,
+  customerId,
+  categoryId,
+  categoryName,
+  onSaved,
+}: {
+  ticketId: string;
+  customerId: string;
+  categoryId: string | null;
+  categoryName: string;
+  onSaved: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim();
+
+  // 등록 고객의 구매·수리 이력 (이 카테고리 내)
+  const historyQuery = useQuery<
+    Array<{ id: string; name: string; sku: string }>
+  >({
+    queryKey: ["repair-v2", "category-history", customerId, categoryId ?? "all"],
+    queryFn: () =>
+      apiGet<Array<{ id: string; name: string; sku: string }>>(
+        `/api/customers/${customerId}/repair-devices${
+          categoryId ? `?categoryId=${categoryId}` : ""
+        }`,
+      ),
+    staleTime: 1000 * 60,
+  });
+
+  // 카테고리 안 카탈로그 검색 (또는 전체)
+  const productsQuery = useQuery<
+    Array<{ id: string; name: string; sku: string; imageUrl: string | null }>
+  >({
+    queryKey: ["repair-v2", "category-search", categoryId ?? "all", trimmed],
+    queryFn: () => {
+      const sp = new URLSearchParams();
+      if (categoryId) sp.set("categoryId", categoryId);
+      if (trimmed) sp.set("search", trimmed);
+      sp.set("limit", "15");
+      sp.set("excludeVariants", "true");
+      return apiGet(`/api/products?${sp.toString()}`);
+    },
+    staleTime: 1000 * 30,
+  });
+
+  const save = useMutation({
+    mutationFn: (productId: string) =>
+      apiMutate(`/api/repair-tickets/${ticketId}`, "PUT", {
+        repairProductId: productId,
+        repairProductText: null,
+        serialItemId: null,
+      }),
+    onSuccess: () => {
+      toast.success("기기 연결됨");
+      onSaved();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+  });
+
+  const history = historyQuery.data ?? [];
+  const products = productsQuery.data ?? [];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5 px-1 text-[11px] text-zinc-500">
+        <span className="rounded-full bg-zinc-200 px-2 py-0.5 font-semibold text-zinc-700">
+          {categoryName}
+        </span>
+        <span>안에서 이 고객의 이력 + 카탈로그 검색</span>
+      </div>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="상품명·SKU 검색"
+        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] outline-none focus:border-zinc-400"
+      />
+      {/* 이 고객 이력 — 검색 전 우선 표시 */}
+      {history.length > 0 && trimmed.length === 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            이 고객의 이력
+          </span>
+          {history.map((p) => (
+            <button
+              key={`h-${p.id}`}
+              type="button"
+              onClick={() => save.mutate(p.id)}
+              disabled={save.isPending}
+              className="flex items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-left ring-1 ring-zinc-200 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50"
+            >
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="line-clamp-1 text-[13px] font-medium text-zinc-900">
+                  {p.name}
+                </span>
+                <span className="font-mono text-[11px] text-zinc-500">
+                  {p.sku}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {/* 카탈로그 검색 결과 */}
+      {(trimmed.length > 0 || history.length === 0) && (
+        <div className="flex flex-col gap-1">
+          {trimmed.length > 0 && (
+            <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              검색 결과
+            </span>
+          )}
+          {productsQuery.isPending ? (
+            <span className="px-1 py-3 text-center text-[12px] text-zinc-400">
+              검색 중…
+            </span>
+          ) : products.length === 0 ? (
+            <span className="px-1 py-3 text-center text-[12px] text-zinc-400">
+              {trimmed ? "결과 없음" : "검색해주세요"}
+            </span>
+          ) : (
+            products.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => save.mutate(p.id)}
+                disabled={save.isPending}
+                className="flex items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-left ring-1 ring-zinc-200 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50"
+              >
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="line-clamp-1 text-[13px] font-medium text-zinc-900">
+                    {p.name}
+                  </span>
+                  <span className="font-mono text-[11px] text-zinc-500">
+                    {p.sku}
+                  </span>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1206,8 +1449,10 @@ function NotesCard({
   const [symptom, setSymptom] = useState(ticket.symptom ?? "");
   const [diagnosis, setDiagnosis] = useState(ticket.diagnosis ?? "");
   const [repairNotes, setRepairNotes] = useState(ticket.repairNotes ?? "");
+  // "저장됨" 인디케이터 — saveMutation 성공 후 잠시 노출
+  const [savedFlash, setSavedFlash] = useState(false);
 
-  const dirty =
+  const isDirty = () =>
     symptom !== (ticket.symptom ?? "") ||
     diagnosis !== (ticket.diagnosis ?? "") ||
     repairNotes !== (ticket.repairNotes ?? "");
@@ -1220,12 +1465,31 @@ function NotesCard({
         repairNotes,
       }),
     onSuccess: () => {
-      toast.success("저장됨");
+      setSavedFlash(true);
+      // 3초 후 사라짐 — toast 안 띄움 (조용한 자동 저장)
+      window.setTimeout(() => setSavedFlash(false), 3000);
       onSaved();
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "저장 실패"),
   });
+
+  // onBlur 시 dirty 면 저장. 다른 필드로 focus 이동해도 동일 mutation 한번만 발화 (mutationFn 내부에서 최신 state 사용).
+  const handleBlur = () => {
+    if (readonly) return;
+    if (saveMutation.isPending) return;
+    if (!isDirty()) return;
+    saveMutation.mutate();
+  };
+
+  // 상단 인디케이터 상태
+  const status: "idle" | "saving" | "saved" | "dirty" = saveMutation.isPending
+    ? "saving"
+    : savedFlash
+      ? "saved"
+      : isDirty()
+        ? "dirty"
+        : "idle";
 
   return (
     <Card>
@@ -1235,6 +1499,7 @@ function NotesCard({
           hint="고객 호소"
           value={symptom}
           onChange={setSymptom}
+          onBlur={handleBlur}
           readonly={readonly}
           placeholder="예: 누수 발생, 호스 연결부 새는 듯"
         />
@@ -1243,6 +1508,7 @@ function NotesCard({
           hint="직원 확인"
           value={diagnosis}
           onChange={setDiagnosis}
+          onBlur={handleBlur}
           readonly={readonly}
           placeholder="예: 체크밸브 마모"
         />
@@ -1251,21 +1517,56 @@ function NotesCard({
           hint="내부"
           value={repairNotes}
           onChange={setRepairNotes}
+          onBlur={handleBlur}
           readonly={readonly}
           placeholder="작업 메모"
         />
-        {!readonly && dirty && (
-          <button
-            type="button"
-            onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
-            className="self-end rounded-full bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-60"
-          >
-            {saveMutation.isPending ? "저장 중…" : "저장"}
-          </button>
+        {/* 하단 인디케이터 — 항상 자리 차지 (idle 일 땐 빈 공간) 해서 입력 필드 위치 안 흔들림 */}
+        {!readonly && (
+          <div className="flex h-4 items-center justify-end">
+            {status !== "idle" && <SaveStatus status={status} />}
+          </div>
         )}
       </div>
     </Card>
+  );
+}
+
+function SaveStatus({
+  status,
+}: {
+  status: "saving" | "saved" | "dirty";
+}) {
+  if (status === "saving") {
+    return (
+      <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+        <span className="size-1.5 animate-pulse rounded-full bg-zinc-400" />
+        저장 중…
+      </span>
+    );
+  }
+  if (status === "saved") {
+    return (
+      <span className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path
+            d="M2.5 6l2.5 2.5L9.5 3.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        저장됨
+      </span>
+    );
+  }
+  // dirty
+  return (
+    <span className="flex items-center gap-1.5 text-[11px] text-amber-600">
+      <span className="size-1.5 rounded-full bg-amber-500" />
+      입력 후 다른 곳을 누르면 저장됩니다
+    </span>
   );
 }
 
@@ -1274,6 +1575,7 @@ function NotesField({
   hint,
   value,
   onChange,
+  onBlur,
   readonly,
   placeholder,
 }: {
@@ -1281,6 +1583,7 @@ function NotesField({
   hint: string;
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   readonly: boolean;
   placeholder: string;
 }) {
@@ -1295,6 +1598,7 @@ function NotesField({
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         disabled={readonly}
         placeholder={placeholder}
         rows={2}
@@ -1415,41 +1719,388 @@ function Card({ children }: { children: React.ReactNode }) {
   );
 }
 
-function DetailSkeleton({ onBack }: { onBack: () => void }) {
+function DetailSkeleton({
+  onBack,
+  hideHeader,
+}: {
+  onBack: () => void;
+  hideHeader?: boolean;
+}) {
   return (
     <div className="flex h-full flex-col bg-zinc-50">
-      <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-6">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700"
-            aria-label="뒤로"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M12 4l-6 6 6 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          <div className="flex flex-1 flex-col gap-1">
-            <div className="h-3 w-20 animate-pulse rounded bg-zinc-100" />
-            <div className="h-3 w-32 animate-pulse rounded bg-zinc-100" />
+      {/* 자체 헤더 — v2 customer page 임베드 시엔 부모가 그림 (hideHeader). */}
+      {!hideHeader && (
+        <header className="shrink-0 border-b border-zinc-200 bg-white">
+          <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700"
+              aria-label="뒤로"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M12 4l-6 6 6 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <div className="flex flex-1 flex-col gap-1">
+              <div className="h-3 w-20 animate-pulse rounded bg-zinc-100" />
+              <div className="h-3 w-32 animate-pulse rounded bg-zinc-100" />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4 sm:p-6">
-          <div className="h-32 animate-pulse rounded-2xl bg-zinc-200" />
-          <div className="h-24 animate-pulse rounded-2xl bg-white" />
-          <div className="h-48 animate-pulse rounded-2xl bg-white" />
+          {/* SummaryCard 골격 — 합계 영역 */}
+          <div className="flex flex-col gap-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-100">
+            <div className="flex items-center justify-between">
+              <div className="h-3 w-12 animate-pulse rounded bg-zinc-100" />
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-100" />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
+              <div className="h-4 w-16 animate-pulse rounded bg-zinc-100" />
+            </div>
+            <div className="mt-1 flex items-center justify-between border-t border-zinc-100 pt-2">
+              <div className="h-4 w-16 animate-pulse rounded bg-zinc-100" />
+              <div className="h-5 w-24 animate-pulse rounded bg-zinc-100" />
+            </div>
+          </div>
+          {/* 손님/기기 카드 */}
+          <div className="flex flex-col gap-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-100">
+            <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
+            <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
+          </div>
+          {/* 부속 / 공임 섹션 */}
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col gap-3 rounded-2xl bg-white p-4 ring-1 ring-zinc-100"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-12 animate-pulse rounded bg-zinc-100" />
+                <div className="h-7 w-16 animate-pulse rounded-full bg-zinc-100" />
+              </div>
+              <div className="h-3 w-full animate-pulse rounded bg-zinc-100" />
+              <div className="h-3 w-2/3 animate-pulse rounded bg-zinc-100" />
+            </div>
+          ))}
         </div>
       </main>
     </div>
+  );
+}
+
+// ──── 취소 사유 시트 ────
+type CancelReason =
+  | "CUSTOMER_DECLINED"
+  | "CUSTOMER_NO_SHOW"
+  | "SHOP_GAVE_UP"
+  | "PARTS_UNAVAILABLE"
+  | "SOLD_AS_PRODUCT"
+  | "MISTAKE"
+  | "OTHER";
+
+const CANCEL_REASONS: { value: CancelReason; label: string; desc: string }[] = [
+  { value: "MISTAKE", label: "잘못 생성", desc: "실수로 만든 티켓 — 미등록 고객은 자동 영구 삭제" },
+  { value: "SOLD_AS_PRODUCT", label: "상품 구매로 전환", desc: "수리 대신 같은/다른 제품 구매 — 통계 보존" },
+  { value: "CUSTOMER_DECLINED", label: "손님 거절", desc: "견적 본 후 진행 거부" },
+  { value: "CUSTOMER_NO_SHOW", label: "손님 미반환", desc: "맡겼는데 안 찾으러 옴" },
+  { value: "SHOP_GAVE_UP", label: "매장 포기", desc: "수리 불가 판정" },
+  { value: "PARTS_UNAVAILABLE", label: "부속 수급 불가", desc: "부속을 구할 수 없음" },
+  { value: "OTHER", label: "기타", desc: "메모로 사유 기록" },
+];
+
+function cancelReasonLabel(reason: CancelReason | string): string {
+  return CANCEL_REASONS.find((r) => r.value === reason)?.label ?? reason;
+}
+
+// ──── 영구 삭제 버튼 (CANCELLED 상태에서만) ────
+function HardDeleteButton({
+  ticketId,
+  ticketNo,
+  onDeleted,
+}: {
+  ticketId: string;
+  ticketNo: string;
+  onDeleted: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const qc = useQueryClient();
+  const del = useMutation({
+    mutationFn: () => apiMutate(`/api/repair-tickets/${ticketId}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("영구 삭제됨");
+      // 호출 측 caches 모두 무효화 — RepairMode 의 useRepairSync, repair-v2 list, 어드민 repairs
+      qc.invalidateQueries({ queryKey: ["pos-v2", "repairs"] });
+      qc.invalidateQueries({ queryKey: ["repair-v2", "list"] });
+      qc.invalidateQueries({ queryKey: ["repair-v2", "detail", ticketId] });
+      qc.invalidateQueries({ queryKey: ["repairs"] });
+      onDeleted();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+
+  if (confirming) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
+        <span className="text-[12px] text-rose-900">
+          {ticketNo} 영구 삭제 — 되돌릴 수 없습니다
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            disabled={del.isPending}
+            className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 ring-1 ring-zinc-200"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={() => del.mutate()}
+            disabled={del.isPending}
+            className="rounded-full bg-rose-600 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
+          >
+            {del.isPending ? "삭제…" : "확인"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className="flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-rose-200 bg-white text-[13px] font-medium text-rose-700 hover:bg-rose-50"
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path
+          d="M3 4h8M5 4V3h4v1M4 4v8h6V4"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      영구 삭제
+    </button>
+  );
+}
+
+interface CancelPart {
+  id: string;
+  name: string;
+  status: "USED" | "LOST";
+}
+
+function CancelSheet({
+  open,
+  onOpenChange,
+  isUnregistered,
+  hasArchivalValue,
+  parts,
+  onConfirm,
+  loading,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  isUnregistered: boolean;
+  hasArchivalValue: boolean;
+  parts: CancelPart[];
+  onConfirm: (reason: CancelReason, memo: string) => void;
+  loading?: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <CancelSheetBody
+      onOpenChange={onOpenChange}
+      isUnregistered={isUnregistered}
+      hasArchivalValue={hasArchivalValue}
+      parts={parts}
+      onConfirm={onConfirm}
+      loading={loading}
+    />
+  );
+}
+
+function CancelSheetBody({
+  onOpenChange,
+  isUnregistered,
+  hasArchivalValue,
+  parts,
+  onConfirm,
+  loading,
+}: {
+  onOpenChange: (v: boolean) => void;
+  isUnregistered: boolean;
+  /** 보존 가치(시리얼/LOST/진단비/등록고객) 가 하나라도 있으면 true → 항상 soft delete */
+  hasArchivalValue: boolean;
+  parts: CancelPart[];
+  onConfirm: (reason: CancelReason, memo: string) => void;
+  loading?: boolean;
+}) {
+  const [reason, setReason] = useState<CancelReason>(
+    isUnregistered ? "MISTAKE" : "CUSTOMER_DECLINED",
+  );
+  const [memo, setMemo] = useState("");
+  // 사유에 따라 동적 — SOLD_AS_PRODUCT 는 사유 자체가 보존 가치 있어 hard delete 안 됨
+  const willHardDelete = !hasArchivalValue && reason !== "SOLD_AS_PRODUCT";
+
+  return (
+    <BottomSheet
+      open
+      onOpenChange={(o) => !loading && onOpenChange(o)}
+      title="수리 취소"
+      locked={loading}
+      footer={
+        <button
+          type="button"
+          onClick={() => onConfirm(reason, memo)}
+          disabled={loading}
+          className={`flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60 ${
+            willHardDelete ? "bg-rose-600" : "bg-zinc-900"
+          }`}
+        >
+          {loading && (
+            <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          )}
+          {willHardDelete ? "영구 삭제" : "취소 처리 (기록 보존)"}
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-4 pt-2">
+        {/* 부속 확인 — 부속 등록되어 있을 때만 (USED/LOST 상태 한번 더 점검) */}
+        {parts.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-amber-700">
+                <path
+                  d="M7 2L1 12h12L7 2z"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+                <path d="M7 6v3M7 10.5v0.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span className="text-[12px] font-semibold text-amber-900">
+                부속 {parts.length}건 — USED/LOST 상태를 다시 확인하세요
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-800">
+              <span className="font-semibold">USED</span> 는 재고로 복원되고,{" "}
+              <span className="font-semibold">LOST</span> 는 손실로 기록됩니다. 잘못된 상태로 취소하면 재고/회계가 어긋날 수 있습니다.
+            </p>
+            <div className="flex flex-col gap-1">
+              {parts.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5"
+                >
+                  <span
+                    className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
+                      p.status === "LOST"
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    {p.status}
+                  </span>
+                  <span className="line-clamp-1 text-[12px] text-zinc-800">
+                    {p.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => !loading && onOpenChange(false)}
+              disabled={loading}
+              className="self-start text-[11px] font-semibold text-amber-900 underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              ← 닫고 부속 카드에서 수정
+            </button>
+          </div>
+        )}
+
+        {/* 안내 — 사유에 따라 동적 */}
+        <div
+          className={`rounded-xl px-4 py-3 text-[12px] ${
+            willHardDelete ? "bg-rose-50 text-rose-900" : "bg-zinc-50 text-zinc-600"
+          }`}
+        >
+          {willHardDelete ? (
+            <>
+              <span className="font-semibold text-rose-700">영구 삭제</span> — 미등록 + 시리얼/LOST 부속/진단비 모두 없음. 사유와 무관하게 row 자체를 삭제합니다.
+            </>
+          ) : reason === "SOLD_AS_PRODUCT" ? (
+            <>
+              <span className="font-semibold text-emerald-700">기록 보존</span> — &quot;상품 구매로 전환&quot; 은 마케팅·통계 가치가 있어 사유 보존. row 는 CANCELLED 상태로 남습니다.
+            </>
+          ) : (
+            <>USED 부속은 재고 복원, LOST 부속은 손실 유지, 진단비는 기록 보존. 시리얼·등록고객 등 추적 가치가 있어 row 는 CANCELLED 상태로 남습니다.</>
+          )}
+        </div>
+
+        {/* 사유 선택 */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+            사유
+          </span>
+          <div className="flex flex-col gap-1.5">
+            {CANCEL_REASONS.map((r) => {
+              const active = reason === r.value;
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => setReason(r.value)}
+                  className={`flex flex-col gap-0.5 rounded-2xl border-2 p-3 text-left transition-colors ${
+                    active
+                      ? "border-zinc-900 bg-zinc-50"
+                      : "border-zinc-200 bg-white hover:border-zinc-300"
+                  }`}
+                >
+                  <span
+                    className={`text-[14px] font-semibold ${
+                      active ? "text-zinc-900" : "text-zinc-700"
+                    }`}
+                  >
+                    {r.label}
+                  </span>
+                  <span className="text-[11px] text-zinc-500">{r.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 메모 */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+            메모 {reason === "OTHER" && <span className="text-rose-600">(필수)</span>}
+          </span>
+          <textarea
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="추가 설명 (선택)"
+            rows={2}
+            className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-[13px] outline-none focus:border-zinc-400 focus:bg-white"
+          />
+        </div>
+      </div>
+    </BottomSheet>
   );
 }
 

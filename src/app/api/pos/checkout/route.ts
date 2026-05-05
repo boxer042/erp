@@ -32,6 +32,8 @@ interface RentalRecord {
   unitRate: number;
   rentalAmount: number;
   depositAmount?: number;
+  /** ISO timestamp — 카트에서 임대 추가한 순간 (시간대별 임대 분석용). 없으면 서버 now() */
+  checkoutAt?: string;
 }
 
 interface CheckoutBody {
@@ -420,14 +422,43 @@ export async function POST(request: NextRequest) {
       if (body.rentalRecords && body.rentalRecords.length > 0 && body.customerId) {
         let firstRentalId: string | null = null;
         for (const r of body.rentalRecords) {
+          const start = new Date(r.startDate);
+          const end = new Date(r.endDate);
+
+          // 같은 자산 행 잠금 — 동시 결제·예약 race 방지
+          await tx.rentalAsset.update({
+            where: { id: r.assetId },
+            data: { updatedAt: new Date() },
+          });
+
+          // 점유 중복 검사 — ACTIVE/OVERDUE/RESERVED 와 겹치면 차단
+          const conflict = await tx.rental.findFirst({
+            where: {
+              assetId: r.assetId,
+              status: { in: ["ACTIVE", "OVERDUE", "RESERVED"] },
+              startDate: { lte: end },
+              endDate: { gte: start },
+            },
+            select: { rentalNo: true, startDate: true, endDate: true },
+          });
+          if (conflict) {
+            const e = new Error("RENTAL_OVERLAP");
+            (
+              e as Error & {
+                conflict?: typeof conflict & { assetId: string };
+              }
+            ).conflict = { ...conflict, assetId: r.assetId };
+            throw e;
+          }
+
           const rental = await tx.rental.create({
             data: {
               rentalNo: genNo("RNT"),
               assetId: r.assetId,
               customerId: body.customerId,
               status: "ACTIVE",
-              startDate: new Date(r.startDate),
-              endDate: new Date(r.endDate),
+              startDate: start,
+              endDate: end,
               rateType: "DAILY",
               unitRate: r.unitRate,
               totalUnits: r.totalDays,
@@ -437,6 +468,7 @@ export async function POST(request: NextRequest) {
               overdueAmount: 0,
               finalAmount: r.rentalAmount,
               paymentMethod: body.paymentMethod ?? null,
+              checkoutAt: r.checkoutAt ? new Date(r.checkoutAt) : new Date(),
               createdById: user.id,
             },
           });
@@ -474,6 +506,20 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ kind: "order", id: result.id, no: result.orderNo }, { status: 201 });
   } catch (e) {
+    if (e instanceof Error && e.message === "RENTAL_OVERLAP") {
+      const conflict = (e as Error & {
+        conflict?: {
+          assetId: string;
+          rentalNo: string;
+          startDate: Date;
+          endDate: Date;
+        };
+      }).conflict;
+      return NextResponse.json(
+        { error: "선택한 임대 기간이 기존 임대와 겹칩니다", conflict },
+        { status: 409 },
+      );
+    }
     const msg = e instanceof Error ? e.message : "주문 확정 실패";
     return NextResponse.json({ error: msg }, { status: 400 });
   }

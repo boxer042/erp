@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -91,6 +92,7 @@ interface Order {
   commissionAmount: string;
   channel: { name: string; code: string };
   createdBy: { name: string };
+  repairTicket: { id: string; ticketNo: string; status: string } | null;
   _count: { items: number };
 }
 
@@ -185,6 +187,7 @@ const nextActions: Record<string, { action: string; label: string; icon: typeof 
 };
 
 export default function OrdersPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
@@ -491,7 +494,24 @@ export default function OrdersPage() {
             ) : (
               orders.map((order) => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.orderNo}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span>{order.orderNo}</span>
+                      {order.repairTicket && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/pos/repair-v2/${order.repairTicket!.id}`);
+                          }}
+                          className="rounded-full bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-800 hover:bg-amber-200"
+                          title={`수리 ${order.repairTicket.ticketNo} 로 이동`}
+                        >
+                          🔧 {order.repairTicket.ticketNo}
+                        </button>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell><Badge variant="outline">{order.channel.name}</Badge></TableCell>
                   <TableCell>{order.customerName || "-"}</TableCell>
                   <TableCell>{new Date(order.orderDate).toLocaleDateString("ko-KR")}</TableCell>

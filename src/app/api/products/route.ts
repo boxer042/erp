@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   const isBulk = searchParams.get("isBulk"); // "true" | "false" | null (기본: false 필터)
   const categoryId = searchParams.get("categoryId");
   const excludeVariants = searchParams.get("excludeVariants") === "true"; // POS 등에서 변형 상품 가리기
+  const autoMapped = searchParams.get("autoMapped") === "1";
 
   const products = await prisma.product.findMany({
     where: {
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
           : { isBulk: false }),
       ...(categoryId ? { categoryId } : {}),
       ...(excludeVariants ? { canonicalProductId: null } : {}),
+      ...(autoMapped ? { autoMapped: true } : {}),
     },
     include: {
       inventory: { select: { quantity: true, safetyStock: true } },

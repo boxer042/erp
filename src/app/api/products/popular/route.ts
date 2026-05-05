@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
       name: true,
       sku: true,
       brand: true,
+      spec: true,
       sellingPrice: true,
       imageUrl: true,
       taxType: true,

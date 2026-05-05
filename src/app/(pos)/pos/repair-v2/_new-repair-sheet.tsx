@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 interface Customer {
   id: string;
@@ -15,6 +16,8 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: (ticketId: string) => void;
+  /** 미등록 손님일 때 ticket 의 카트 세션 매핑 — DB 에 영구 추적 (선택) */
+  posSessionId?: string;
 }
 
 /**
@@ -27,8 +30,10 @@ export function NewRepairSheet(props: Props) {
   return <NewRepairSheetBody {...props} />;
 }
 
-function NewRepairSheetBody({ onOpenChange, onCreated }: Props) {
-  const [type, setType] = useState<"ON_SITE" | "DROP_OFF">("DROP_OFF");
+function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
+  useBodyScrollLock();
+  // 즉시수리가 더 흔해서 디폴트
+  const [type, setType] = useState<"ON_SITE" | "DROP_OFF">("ON_SITE");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [device, setDevice] = useState("");
@@ -54,6 +59,8 @@ function NewRepairSheetBody({ onOpenChange, onCreated }: Props) {
           customerId: selectedCustomer?.id ?? null,
           repairProductText: device.trim() || null,
           symptom: symptom.trim() || null,
+          // 미등록 손님이면 카트 세션 매핑 — 등록 손님은 customerId 가 매핑 역할
+          posSessionId: selectedCustomer ? null : posSessionId ?? null,
         },
       );
       // ON_SITE 면 자동으로 REPAIRING 으로 (사용자 의도: 즉시는 그 자리에서 작업)
@@ -120,16 +127,16 @@ function NewRepairSheetBody({ onOpenChange, onCreated }: Props) {
             <Section label="유형">
               <div className="grid grid-cols-2 gap-2">
                 <TypeOption
-                  active={type === "DROP_OFF"}
-                  onClick={() => setType("DROP_OFF")}
-                  title="맡김"
-                  desc="며칠 보관 후 픽업"
-                />
-                <TypeOption
                   active={type === "ON_SITE"}
                   onClick={() => setType("ON_SITE")}
                   title="즉시"
                   desc="현장에서 바로 수리"
+                />
+                <TypeOption
+                  active={type === "DROP_OFF"}
+                  onClick={() => setType("DROP_OFF")}
+                  title="맡김"
+                  desc="며칠 보관 후 픽업"
                 />
               </div>
             </Section>

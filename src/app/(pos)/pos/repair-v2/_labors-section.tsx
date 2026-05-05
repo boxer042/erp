@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
 import { fmtKRW } from "./_helpers";
 import type { RepairLabor } from "./_types";
-import { PriceInputDialog } from "@/app/(pos)/pos/v2/_components/price-input-dialog";
+import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 
 /**
  * 공임 섹션 — 인라인 추가/삭제. 모바일 친화: 숫자키패드, 큰 입력.

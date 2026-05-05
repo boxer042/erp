@@ -195,6 +195,15 @@
   animation: global-loading-slide 1.1s ease-in-out infinite;
 }
 
+/* ─── POS 로딩 바 — 헤더 border-b 자리에 정확히 얹힘 (1.5px) ─── */
+@keyframes pos-loading-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.pos-loading-bar-anim {
+  animation: pos-loading-slide 1.0s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
 /* ─── 상품 메인(product-hero) 진입 애니메이션 ─── */
 /* 첫 마운트 시 28px 아래에서 위로 슬라이드 + fade-in. */
 /* hero-info 자식들에 stagger delay 부여, hero-image 는 별도 트랙. */
@@ -253,5 +262,10 @@
   @page {
     size: A4;
     margin: 12mm;
+  }
+  /* 통계 리포트 — 카드/차트가 페이지 경계에서 끊기지 않게 */
+  .stats-print-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

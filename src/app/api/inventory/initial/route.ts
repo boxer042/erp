@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { initialInventorySchema } from "@/lib/validators/initial-inventory";
 import { computeMovingAverage } from "@/lib/cost";
 import { guardAdmin } from "@/lib/api-auth";
+import { createAutoMappedProductForSupplierProduct } from "@/lib/mapping-helpers";
 
 // 초기 등록 이력 조회
 export async function GET(request: NextRequest) {
@@ -170,6 +171,14 @@ export async function POST(request: NextRequest) {
         supplierProductId = sp.id;
         supplierProductName = sp.name;
         created.push({ supplierProductId: sp.id, name: sp.name });
+
+        const { productId } = await createAutoMappedProductForSupplierProduct(tx, sp);
+        const newMapping = await tx.productMapping.create({
+          data: { supplierProductId: sp.id, productId, conversionRate: 1 },
+          select: { supplierProductId: true, productId: true, conversionRate: true },
+        });
+        if (!mappingsBySp.has(sp.id)) mappingsBySp.set(sp.id, []);
+        mappingsBySp.get(sp.id)!.push(newMapping);
       } else if (supplierProductId) {
         const sp = await tx.supplierProduct.update({
           where: { id: supplierProductId },

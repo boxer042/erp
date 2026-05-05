@@ -1,0 +1,751 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ChevronLeft,
+  Wrench,
+  CheckCircle,
+  XCircle,
+  Activity,
+  TrendingUp,
+  Download,
+  Clock,
+  Printer,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { format, startOfMonth, startOfWeek, startOfYear, subDays } from "date-fns";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import { apiGet } from "@/lib/api-client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+
+const STATUS_LABEL: Record<string, string> = {
+  RECEIVED: "접수",
+  DIAGNOSING: "진단중",
+  QUOTED: "견적대기",
+  APPROVED: "승인",
+  REPAIRING: "수리중",
+  READY: "인계대기",
+  PICKED_UP: "수리완료",
+  CANCELLED: "취소",
+};
+
+const CANCEL_REASON_LABEL: Record<string, string> = {
+  CUSTOMER_DECLINED: "손님 거절",
+  CUSTOMER_NO_SHOW: "손님 미반환",
+  SHOP_GAVE_UP: "매장 포기",
+  PARTS_UNAVAILABLE: "부속 수급 불가",
+  SOLD_AS_PRODUCT: "상품 구매로 전환",
+  MISTAKE: "잘못 생성",
+  OTHER: "기타",
+};
+
+const PIE_COLORS = [
+  "#10b981",
+  "#3b82f6",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#ec4899",
+];
+
+interface ProductStat {
+  productId: string | null;
+  productName: string;
+  sku: string;
+  count: number;
+  failures: number;
+  failureRate: number;
+}
+
+interface AssigneeStat {
+  assigneeId: string | null;
+  assigneeName: string;
+  count: number;
+  avgDays: number | null;
+}
+
+interface Stats {
+  total: number;
+  active: number;
+  completed: number;
+  cancelled: number;
+  byStatus: { status: string; count: number }[];
+  byCancelReason: { reason: string | null; count: number }[];
+  byCategory: { categoryId: string | null; categoryName: string; count: number }[];
+  byProduct: ProductStat[];
+  avgRepairDays: { avgDays: number | null; completedCount: number };
+  revenueByMonth: { month: string; revenue: string; count: number }[];
+  byAssignee: AssigneeStat[];
+  soldAsProductByMonth: { month: string; count: number }[];
+}
+
+type RangePreset = "ALL" | "THIS_WEEK" | "THIS_MONTH" | "THIS_YEAR" | "LAST_30D" | "CUSTOM";
+
+const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "THIS_WEEK", label: "이번 주" },
+  { value: "THIS_MONTH", label: "이번 달" },
+  { value: "LAST_30D", label: "최근 30일" },
+  { value: "THIS_YEAR", label: "올해" },
+  { value: "CUSTOM", label: "직접 선택" },
+];
+
+function presetToRange(preset: RangePreset): { from: string; to: string } {
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  if (preset === "THIS_WEEK") {
+    return { from: format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"), to: todayStr };
+  }
+  if (preset === "THIS_MONTH") {
+    return { from: format(startOfMonth(today), "yyyy-MM-dd"), to: todayStr };
+  }
+  if (preset === "LAST_30D") {
+    return { from: format(subDays(today, 30), "yyyy-MM-dd"), to: todayStr };
+  }
+  if (preset === "THIS_YEAR") {
+    return { from: format(startOfYear(today), "yyyy-MM-dd"), to: todayStr };
+  }
+  return { from: "", to: "" };
+}
+
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+export default function RepairStatsPage() {
+  const router = useRouter();
+  const [preset, setPreset] = useState<RangePreset>("ALL");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  // 상품 ranking 전용 카테고리 필터 ("" = 전체, "__none__" = 기타)
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>("");
+
+  const range = useMemo(() => {
+    if (preset === "CUSTOM") return { from: customFrom, to: customTo };
+    if (preset === "ALL") return { from: "", to: "" };
+    return presetToRange(preset);
+  }, [preset, customFrom, customTo]);
+
+  const categoriesQuery = useQuery<CategoryOption[]>({
+    queryKey: ["categories", "for-stats"],
+    queryFn: () => apiGet<CategoryOption[]>("/api/categories"),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const statsQuery = useQuery<Stats>({
+    queryKey: ["repairs", "stats", range.from, range.to, productCategoryFilter],
+    queryFn: () => {
+      const sp = new URLSearchParams();
+      if (range.from) sp.set("from", range.from);
+      if (range.to) sp.set("to", range.to);
+      if (productCategoryFilter)
+        sp.set("productRankingCategoryId", productCategoryFilter);
+      const qs = sp.toString();
+      return apiGet<Stats>(`/api/repair-tickets/stats${qs ? `?${qs}` : ""}`);
+    },
+    staleTime: 1000 * 30,
+  });
+
+  const stats = statsQuery.data;
+  const completionRate = stats && stats.total > 0
+    ? ((stats.completed / stats.total) * 100).toFixed(1)
+    : "0";
+  const cancelRate = stats && stats.total > 0
+    ? ((stats.cancelled / stats.total) * 100).toFixed(1)
+    : "0";
+  const soldAsProductCount =
+    stats?.byCancelReason.find((r) => r.reason === "SOLD_AS_PRODUCT")?.count ?? 0;
+  const conversionRate = stats && stats.cancelled > 0
+    ? ((soldAsProductCount / stats.cancelled) * 100).toFixed(1)
+    : "0";
+
+  // 차트 데이터 — 시간 역순 → 정순 (시계열은 좌→우)
+  const monthlyTrend = useMemo(
+    () =>
+      (stats?.soldAsProductByMonth ?? [])
+        .slice()
+        .reverse()
+        .map((r) => ({ month: r.month.slice(2), count: r.count })),
+    [stats?.soldAsProductByMonth],
+  );
+  const cancelReasonChart = useMemo(
+    () =>
+      (stats?.byCancelReason ?? []).map((r) => ({
+        name: r.reason ? CANCEL_REASON_LABEL[r.reason] ?? r.reason : "(미지정)",
+        value: r.count,
+      })),
+    [stats?.byCancelReason],
+  );
+  const categoryChart = useMemo(
+    () =>
+      (stats?.byCategory ?? [])
+        .slice()
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+        .map((r) => ({ name: r.categoryName, count: r.count })),
+    [stats?.byCategory],
+  );
+  const revenueChart = useMemo(
+    () =>
+      (stats?.revenueByMonth ?? []).map((r) => ({
+        month: r.month.slice(2),
+        revenue: Math.round(Number(r.revenue) / 1000), // 천원 단위
+        count: r.count,
+      })),
+    [stats?.revenueByMonth],
+  );
+  const totalRevenue = useMemo(
+    () =>
+      (stats?.revenueByMonth ?? []).reduce(
+        (sum, r) => sum + Number(r.revenue),
+        0,
+      ),
+    [stats?.revenueByMonth],
+  );
+
+  const downloadCsv = () => {
+    const sp = new URLSearchParams();
+    if (range.from) sp.set("from", range.from);
+    if (range.to) sp.set("to", range.to);
+    const qs = sp.toString();
+    window.location.href = `/api/repair-tickets/export${qs ? `?${qs}` : ""}`;
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => router.push("/repairs")}
+          aria-label="뒤로"
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <h1 className="text-lg font-semibold">수리 통계</h1>
+        <div className="ml-auto flex gap-2 print:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => window.print()}
+          >
+            <Printer className="size-3.5" />
+            PDF / 인쇄
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={downloadCsv}
+          >
+            <Download className="size-3.5" />
+            CSV
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-5">
+        {/* 기간 필터 — 인쇄 시 숨기고 선택 범위만 표시 */}
+        <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
+          <div className="flex h-[30px] items-center gap-1 rounded-md border border-border bg-card px-1 text-[13px]">
+            {RANGE_PRESETS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPreset(p.value)}
+                className={`rounded px-2 py-0.5 transition-colors ${
+                  preset === p.value
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {preset === "CUSTOM" && (
+            <div className="flex items-center gap-1">
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-[30px] w-[140px] text-[13px]"
+              />
+              <span className="text-[12px] text-muted-foreground">~</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-[30px] w-[140px] text-[13px]"
+              />
+            </div>
+          )}
+          {range.from && range.to && (
+            <span className="text-[11px] text-muted-foreground">
+              {range.from} ~ {range.to}
+            </span>
+          )}
+        </div>
+        {/* 인쇄 전용 헤더 — 화면에선 숨김 */}
+        <div className="mb-4 hidden print:block">
+          <h2 className="text-xl font-bold">수리 통계 리포트</h2>
+          <p className="text-sm text-muted-foreground">
+            기간: {range.from && range.to ? `${range.from} ~ ${range.to}` : "전체"}
+            {" · "}
+            출력일: {format(new Date(), "yyyy-MM-dd HH:mm")}
+          </p>
+        </div>
+
+        {statsQuery.isPending ? (
+          <StatsSkeleton />
+        ) : !stats ? (
+          <div className="text-sm text-muted-foreground">통계를 불러올 수 없습니다</div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {/* KPI 카드 */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <KpiCard
+                icon={<Wrench className="size-4" />}
+                label="총 수리"
+                value={stats.total.toLocaleString("ko-KR")}
+                hint="기간 내"
+              />
+              <KpiCard
+                icon={<Activity className="size-4" />}
+                label="진행중"
+                value={stats.active.toLocaleString("ko-KR")}
+                tone="active"
+              />
+              <KpiCard
+                icon={<CheckCircle className="size-4" />}
+                label="완료"
+                value={stats.completed.toLocaleString("ko-KR")}
+                hint={`완료율 ${completionRate}%`}
+                tone="success"
+              />
+              <KpiCard
+                icon={<XCircle className="size-4" />}
+                label="취소"
+                value={stats.cancelled.toLocaleString("ko-KR")}
+                hint={`취소율 ${cancelRate}%`}
+                tone="danger"
+              />
+              <KpiCard
+                icon={<TrendingUp className="size-4" />}
+                label="상품 전환"
+                value={soldAsProductCount.toLocaleString("ko-KR")}
+                hint={`취소 중 ${conversionRate}%`}
+                tone="info"
+              />
+              <KpiCard
+                icon={<Clock className="size-4" />}
+                label="평균 수리 기간"
+                value={
+                  stats.avgRepairDays.avgDays != null
+                    ? `${stats.avgRepairDays.avgDays.toFixed(1)}일`
+                    : "—"
+                }
+                hint={`완료 ${stats.avgRepairDays.completedCount.toLocaleString("ko-KR")}건`}
+              />
+            </div>
+
+            {/* 차트 — 카테고리 막대 + 취소사유 파이 (2열) */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Card className="stats-print-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">카테고리별 빈도 (top 10)</CardTitle>
+                </CardHeader>
+                <CardContent className="h-64">
+                  {categoryChart.length === 0 ? (
+                    <EmptyChart />
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={categoryChart} layout="vertical" margin={{ left: 60 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" allowDecimals={false} />
+                        <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="stats-print-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">취소 사유 분포</CardTitle>
+                </CardHeader>
+                <CardContent className="h-64">
+                  {cancelReasonChart.length === 0 ? (
+                    <EmptyChart hint="취소된 수리 없음" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={cancelReasonChart}
+                          dataKey="value"
+                          nameKey="name"
+                          outerRadius={80}
+                          label={(entry) => `${entry.name} ${entry.value}`}
+                          labelLine={false}
+                        >
+                          {cancelReasonChart.map((_, i) => (
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 상품 전환 월별 추이 — 라인 */}
+            <Card className="stats-print-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  상품 구매로 전환 — 최근 12개월 추이
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-56">
+                {monthlyTrend.length === 0 ? (
+                  <EmptyChart hint="전환 사례가 쌓이면 표시됩니다" />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthlyTrend}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 월별 수리 매출 — 막대 차트 */}
+            <Card className="stats-print-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  월별 수리 매출 — 총 ₩{totalRevenue.toLocaleString("ko-KR")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-56">
+                {revenueChart.length === 0 ? (
+                  <EmptyChart hint="완료된 수리 매출이 쌓이면 표시됩니다" />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={revenueChart}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} unit="천" />
+                      <Tooltip
+                        formatter={(value) =>
+                          `₩${(Number(value) * 1000).toLocaleString("ko-KR")}`
+                        }
+                      />
+                      <Bar
+                        dataKey="revenue"
+                        fill="#10b981"
+                        radius={[4, 4, 0, 0]}
+                        name="매출 (천원)"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 담당자별 처리 ranking */}
+            <Card className="stats-print-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  담당자별 처리 (top 10) — 완료된 수리 기준
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.byAssignee.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    담당자 지정된 완료 수리가 없습니다
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8">#</TableHead>
+                        <TableHead>담당자</TableHead>
+                        <TableHead className="text-right">완료 건수</TableHead>
+                        <TableHead className="text-right">평균 처리 기간</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.byAssignee.map((a, i) => (
+                        <TableRow key={a.assigneeId ?? i}>
+                          <TableCell className="text-muted-foreground">
+                            {i + 1}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {a.assigneeName}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {a.count.toLocaleString("ko-KR")}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {a.avgDays != null
+                              ? `${a.avgDays.toFixed(1)}일`
+                              : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 상품 ranking — 수리 빈도 + 실패율 */}
+            <Card className="stats-print-card">
+              <CardHeader className="pb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-sm">
+                    상품별 수리 빈도 (top 20) — 실패율 = 매장 포기 + 부속 수급 불가
+                  </CardTitle>
+                  <select
+                    value={productCategoryFilter}
+                    onChange={(e) => setProductCategoryFilter(e.target.value)}
+                    className="h-[28px] rounded-md border border-border bg-card px-2 text-[12px]"
+                  >
+                    <option value="">카테고리 전체</option>
+                    <option value="__none__">기타 (미지정)</option>
+                    {(categoriesQuery.data ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {stats.byProduct.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    repairProductId 매핑된 수리 ticket 이 없습니다
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8">#</TableHead>
+                        <TableHead>상품</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead className="text-right">수리 건수</TableHead>
+                        <TableHead className="text-right">실패</TableHead>
+                        <TableHead className="text-right">실패율</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.byProduct.map((p, i) => (
+                        <TableRow key={p.productId ?? i}>
+                          <TableCell className="text-muted-foreground">
+                            {i + 1}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {p.productName}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {p.sku}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {p.count.toLocaleString("ko-KR")}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-rose-600">
+                            {p.failures.toLocaleString("ko-KR")}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            <span
+                              className={
+                                p.failureRate >= 30
+                                  ? "font-semibold text-rose-600"
+                                  : p.failureRate >= 15
+                                    ? "text-amber-600"
+                                    : "text-muted-foreground"
+                              }
+                            >
+                              {p.failureRate.toFixed(1)}%
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 상태별 분포 — 보조 표 */}
+            <Card className="stats-print-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">상태별 분포</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>상태</TableHead>
+                      <TableHead className="text-right">건수</TableHead>
+                      <TableHead className="text-right">비율</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.byStatus.map((g) => (
+                      <TableRow key={g.status}>
+                        <TableCell>{STATUS_LABEL[g.status] ?? g.status}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {g.count.toLocaleString("ko-KR")}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {stats.total > 0
+                            ? ((g.count / stats.total) * 100).toFixed(1)
+                            : "0"}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "success" | "danger" | "info" | "active";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "text-emerald-700"
+      : tone === "danger"
+        ? "text-rose-700"
+        : tone === "info"
+          ? "text-amber-700"
+          : tone === "active"
+            ? "text-blue-700"
+            : "text-foreground";
+  return (
+    <Card className="stats-print-card">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {icon}
+          <span>{label}</span>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-3">
+        <div className={`text-2xl font-bold tabular-nums ${toneClass}`}>{value}</div>
+        {hint && (
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyChart({ hint }: { hint?: string }) {
+  return (
+    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+      {hint ?? "데이터 없음"}
+    </div>
+  );
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-3 w-16" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-7 w-20" />
+              <Skeleton className="mt-1 h-3 w-12" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-4 w-32" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-56 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {Array.from({ length: 2 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-32 w-full" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}

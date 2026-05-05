@@ -162,6 +162,7 @@ export interface ProductDetail {
   memo: string | null;
   assemblyTemplateId?: string | null;
   isActive?: boolean;
+  autoMapped?: boolean;
   createdAt?: string;
   updatedAt?: string;
   inventory: { quantity: string; safetyStock: string; avgCost?: string | null } | null;

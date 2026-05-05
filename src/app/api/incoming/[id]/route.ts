@@ -5,6 +5,7 @@ import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
 import { incomingSchema } from "@/lib/validators/incoming";
 import { computeShippingNetPerUnit } from "@/lib/incoming-shipping";
 import { recalcIncomingExpense } from "@/lib/incoming-recalc";
+import { ensureMappingForSupplierProducts } from "@/lib/mapping-helpers";
 
 export async function GET(
   _request: NextRequest,
@@ -483,6 +484,20 @@ export async function PUT(
   );
 
   await prisma.$transaction(async (tx) => {
+    // 0. 자동 매핑 안전망 — 매핑 없는 SP에 자동 Product/Mapping 생성
+    const spIdsForEnsure = Array.from(new Set(incoming.items.map((i) => i.supplierProductId)));
+    await ensureMappingForSupplierProducts(tx, spIdsForEnsure);
+
+    // ensure 이후 productMappings 재조회 (트랜잭션 시작 전 incoming.items 캐시는 stale)
+    const refreshedSps = await tx.supplierProduct.findMany({
+      where: { id: { in: spIdsForEnsure } },
+      select: {
+        id: true,
+        productMappings: { select: { productId: true, conversionRate: true } },
+      },
+    });
+    const mappingsBySpId = new Map(refreshedSps.map((sp) => [sp.id, sp.productMappings]));
+
     // 1. 상태 변경
     await tx.incoming.update({
       where: { id },
@@ -549,7 +564,7 @@ export async function PUT(
       const totalQty = rows.reduce((s, r) => s + r.qty, 0);
       const unitCostSnapshot = groupAvgBySpId.get(supplierProductId)!;
       const canonicalItem = rows[0].item;
-      const mappings = canonicalItem.supplierProduct.productMappings;
+      const mappings = mappingsBySpId.get(supplierProductId) ?? canonicalItem.supplierProduct.productMappings;
 
       if (mappings.length === 0) {
         orphanLots.push({ supplierProductId, totalQty, unitCost: unitCostSnapshot, canonicalItemId: canonicalItem.id });

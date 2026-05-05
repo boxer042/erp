@@ -875,7 +875,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const data: { sku?: string; name?: string; imageUrl?: string | null } = {};
+  const data: { sku?: string; name?: string; imageUrl?: string | null; autoMapped?: boolean } = {};
   if (typeof body.sku === "string" && body.sku.trim().length > 0) {
     data.sku = body.sku.trim();
   }
@@ -884,6 +884,9 @@ export async function PATCH(
   }
   if (typeof body.imageUrl === "string" || body.imageUrl === null) {
     data.imageUrl = body.imageUrl;
+  }
+  if (typeof body.autoMapped === "boolean") {
+    data.autoMapped = body.autoMapped;
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "수정할 필드가 없습니다" }, { status: 400 });

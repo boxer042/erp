@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
     include: {
       channel: { select: { name: true, code: true } },
       createdBy: { select: { name: true } },
+      // POS 수리 결제 / 픽업 결제로 연결된 RepairTicket — ERP 에서 어떤 수리에서 왔는지 추적용
+      repairTicket: { select: { id: true, ticketNo: true, status: true } },
       _count: { select: { items: true } },
     },
     orderBy: { createdAt: "desc" },

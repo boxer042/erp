@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useIsFetching, useIsMutating } from "@tanstack/react-query";
 
 export function GlobalLoadingBar() {
+  const pathname = usePathname();
+  // POS 라우트는 자체 PosLoadingBar 가 담당 (디자인 톤 다름)
+  const isPos = pathname?.startsWith("/pos") ?? false;
+
   const fetching = useIsFetching();
   const mutating = useIsMutating();
   const active = fetching + mutating > 0;
@@ -20,7 +25,7 @@ export function GlobalLoadingBar() {
     return () => clearTimeout(t);
   }, [active]);
 
-  if (!visible) return null;
+  if (!visible || isPos) return null;
 
   return (
     <div
