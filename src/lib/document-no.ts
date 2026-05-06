@@ -4,6 +4,7 @@ export const DOC_PREFIX = {
   QUOTATION: "QUO",
   STATEMENT: "STM",
   REPAIR: "R",
+  PURCHASE_ORDER: "PO",
 } as const;
 
 export function generateDocumentNo(prefix: string, date: Date = new Date()): string {
@@ -17,3 +18,4 @@ export function generateDocumentNo(prefix: string, date: Date = new Date()): str
 export const generateQuotationNo = (date?: Date) => generateDocumentNo(DOC_PREFIX.QUOTATION, date);
 export const generateStatementNo = (date?: Date) => generateDocumentNo(DOC_PREFIX.STATEMENT, date);
 export const generateRepairTicketNo = (date?: Date) => generateDocumentNo(DOC_PREFIX.REPAIR, date);
+export const generatePurchaseOrderNo = (date?: Date) => generateDocumentNo(DOC_PREFIX.PURCHASE_ORDER, date);

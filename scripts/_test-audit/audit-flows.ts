@@ -57,7 +57,7 @@ async function audit() {
       where: {
         status: "PICKED_UP",
         repairProductText: { startsWith: T },
-        orders: { none: {} },
+        order: null,
       },
     });
     info(`PICKED_UP orphan 수리 (Order 미연결): ${orphanTickets}건`);

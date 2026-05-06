@@ -22,9 +22,15 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => ["incoming", "list", params ?? {}] as const,
     detail: (id: string) => ["incoming", "detail", id] as const,
   },
+  purchaseOrders: {
+    all: ["purchase-orders"] as const,
+    list: (params?: Record<string, unknown>) => ["purchase-orders", "list", params ?? {}] as const,
+    detail: (id: string) => ["purchase-orders", "detail", id] as const,
+  },
   orders: {
     all: ["orders"] as const,
     list: (params?: Record<string, unknown>) => ["orders", "list", params ?? {}] as const,
+    board: (params?: Record<string, unknown>) => ["orders", "board", params ?? {}] as const,
     detail: (id: string) => ["orders", "detail", id] as const,
   },
   expenses: {
@@ -124,5 +130,9 @@ export const queryKeys = {
   ledger: {
     suppliers: (params?: Record<string, unknown>) => ["ledger", "suppliers", params ?? {}] as const,
     customers: (params?: Record<string, unknown>) => ["ledger", "customers", params ?? {}] as const,
+  },
+  auditLogs: {
+    all: ["audit-logs"] as const,
+    list: (params?: Record<string, unknown>) => ["audit-logs", "list", params ?? {}] as const,
   },
 } as const;

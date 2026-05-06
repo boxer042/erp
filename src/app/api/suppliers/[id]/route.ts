@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supplierSchema } from "@/lib/validators/supplier";
 import { Prisma } from "@prisma/client";
+import { recordAudit } from "@/lib/audit";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
   _request: NextRequest,
@@ -102,6 +104,15 @@ export async function PUT(
       }
     }
 
+    const auditUser = await getCurrentUser();
+    await recordAudit(tx, {
+      userId: auditUser?.id ?? null,
+      entity: "Supplier",
+      entityId: id,
+      action: "UPDATE",
+      meta: { name: data.name, paymentMethod: data.paymentMethod },
+    });
+
     return tx.supplier.findUnique({ where: { id }, include: { contacts: true } });
   });
 
@@ -117,5 +128,15 @@ export async function DELETE(
     where: { id },
     data: { isActive: false },
   });
+
+  const auditUser = await getCurrentUser();
+  await recordAudit(prisma, {
+    userId: auditUser?.id ?? null,
+    entity: "Supplier",
+    entityId: id,
+    action: "DELETE",
+    meta: { softDelete: true },
+  });
+
   return NextResponse.json({ success: true });
 }

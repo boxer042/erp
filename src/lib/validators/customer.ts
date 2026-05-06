@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidBusinessNumber } from "@/lib/utils";
 
 /**
  * 고객 폼 검증 — 개인/기업 분기.
@@ -38,6 +39,12 @@ export const customerSchema = z
           path: ["businessNumber"],
           code: z.ZodIssueCode.custom,
           message: "사업자번호는 10자리 숫자여야 합니다 (000-00-00000)",
+        });
+      } else if (!isValidBusinessNumber(digits)) {
+        ctx.addIssue({
+          path: ["businessNumber"],
+          code: z.ZodIssueCode.custom,
+          message: "사업자번호 체크섬이 올바르지 않습니다 (입력 오류일 수 있음)",
         });
       }
     }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supplierPaymentUpdateSchema } from "@/lib/validators/supplier";
 import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
+import { recordAudit } from "@/lib/audit";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
   _request: NextRequest,
@@ -66,6 +68,20 @@ export async function PUT(
 
     // balance 재계산
     await rebalanceSupplierLedger(tx, existing.supplierId);
+
+    const auditUser = await getCurrentUser();
+    await recordAudit(tx, {
+      userId: auditUser?.id ?? null,
+      entity: "SupplierPayment",
+      entityId: id,
+      action: "UPDATE",
+      meta: {
+        supplierId: existing.supplierId,
+        oldAmount: Number(existing.amount),
+        newAmount: amount,
+        paymentDate: data.paymentDate,
+      },
+    });
   });
 
   return NextResponse.json({ success: true });
@@ -88,6 +104,15 @@ export async function DELETE(
     });
     await tx.supplierPayment.delete({ where: { id } });
     await rebalanceSupplierLedger(tx, existing.supplierId);
+
+    const auditUser = await getCurrentUser();
+    await recordAudit(tx, {
+      userId: auditUser?.id ?? null,
+      entity: "SupplierPayment",
+      entityId: id,
+      action: "DELETE",
+      meta: { supplierId: existing.supplierId, amount: Number(existing.amount) },
+    });
   });
 
   return NextResponse.json({ success: true });

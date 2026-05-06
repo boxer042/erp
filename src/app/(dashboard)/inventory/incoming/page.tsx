@@ -56,7 +56,10 @@ export default function IncomingPage() {
 function IncomingPageInner() {
   const searchParams = useSearchParams();
   const incomingIdParam = searchParams.get("incomingId");
+  const purchaseOrderIdParam = searchParams.get("purchaseOrderId");
   const queryClient = useQueryClient();
+  // 현재 등록 시트가 발주 기반인지 — 입고 등록 후 비워짐
+  const [linkedPurchaseOrderId, setLinkedPurchaseOrderId] = useState<string | null>(null);
 
   // 등록 시트
   const [panelOpen, setPanelOpen] = useState(true);
@@ -527,6 +530,7 @@ function IncomingPageInner() {
           discountAmount: String(discPerUnit),
           itemShippingCost: item.itemShippingCost.trim() === "" ? null : item.itemShippingCost,
           itemShippingIsTaxable: item.itemShippingIsTaxable,
+          purchaseOrderItemId: item.purchaseOrderItemId || undefined,
         };
       });
 
@@ -538,6 +542,7 @@ function IncomingPageInner() {
         shippingIsTaxable,
         shippingDeducted,
         items: resolvedItems,
+        purchaseOrderId: linkedPurchaseOrderId || undefined,
       };
 
       return editingId
@@ -549,8 +554,10 @@ function IncomingPageInner() {
       toast.success(wasEditing ? "입고가 수정되었습니다" : "입고가 등록되었습니다");
       setCreateOpen(false);
       setEditingId(null);
+      setLinkedPurchaseOrderId(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.supplierProducts.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseOrders.all });
       if (wasEditing) openDetail(wasEditing);
     },
     onError: (err) => {
@@ -569,6 +576,89 @@ function IncomingPageInner() {
       openDetail(incomingIdParam);
     }
   }, [incomingIdParam, openDetail]);
+
+  // 딥링크: ?purchaseOrderId= 쿼리가 있으면 발주 데이터로 등록 Sheet 자동 열기
+  useEffect(() => {
+    if (!purchaseOrderIdParam) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const po = await apiGet<{
+          id: string;
+          supplier: { id: string; name: string };
+          items: Array<{
+            id: string;
+            quantity: string;
+            receivedQty: string;
+            // PENDING 입고로 이미 등록된 양 — 잔량 계산 시 차감해 이중 입고 방지
+            pendingQty: number;
+            unitPrice: string;
+            supplierProduct: {
+              id: string;
+              name: string;
+              spec: string | null;
+              supplierCode: string | null;
+              unitOfMeasure: string;
+            };
+          }>;
+        }>(`/api/purchase-orders/${purchaseOrderIdParam}`);
+        if (cancelled) return;
+        // 잔량 = 발주수량 - 확정입고 - 진행중 입고(PENDING)
+        const remainingItems = po.items
+          .map((it) => {
+            const remain = Math.max(
+              0,
+              parseFloat(it.quantity) - parseFloat(it.receivedQty) - (it.pendingQty ?? 0)
+            );
+            return { it, remain };
+          })
+          .filter(({ remain }) => remain > 0);
+
+        if (remainingItems.length === 0) {
+          toast.info("이 발주서는 잔량이 없어 추가 입고할 수 없습니다 (진행 중인 입고 포함)");
+          return;
+        }
+
+        setSelectedSupplierId(po.supplier.id);
+        setSelectedSupplierName(po.supplier.name);
+        setIncomingDate(new Date().toISOString().split("T")[0]);
+        setUnitPriceVatIncluded(false);
+        setVatInputBuffer(null);
+        setVatRawByIdx({});
+        setMemo("");
+        setShippingCost("");
+        setShippingSupply("");
+        setShippingIsTaxable(true);
+        setShippingDeducted(false);
+        setItems(
+          remainingItems.map(({ it, remain }) => ({
+            supplierProductId: it.supplierProduct.id,
+            supplierProductName: it.supplierProduct.name,
+            supplierCode: it.supplierProduct.supplierCode ?? "",
+            spec: it.supplierProduct.spec ?? "",
+            unitOfMeasure: it.supplierProduct.unitOfMeasure,
+            quantity: String(remain),
+            unitPrice: String(parseFloat(it.unitPrice)),
+            supplyAmount: String(remain * parseFloat(it.unitPrice)),
+            discount: "",
+            originalPrice: String(parseFloat(it.unitPrice)),
+            memo: "",
+            itemShippingCost: "",
+            itemShippingIsTaxable: true,
+            purchaseOrderItemId: it.id,
+          }))
+        );
+        setLinkedPurchaseOrderId(po.id);
+        setEditingId(null);
+        setCreateOpen(true);
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "발주서를 불러오지 못했습니다");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [purchaseOrderIdParam]);
 
   const confirmMutation = useMutation({
     mutationFn: (id: string) => apiMutate(`/api/incoming/${id}`, "PUT", { action: "confirm" }),
@@ -888,7 +978,15 @@ function IncomingPageInner() {
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-sm">{inc.supplier.name}</span>
-                            <Badge variant={statusVariants[inc.status]} className="text-[10px] h-5">{statusLabels[inc.status]}</Badge>
+                            <div className="flex items-center gap-1">
+                              {inc.purchaseOrder && (
+                                <Badge variant="outline" className="text-[10px] h-5 border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800">발주분</Badge>
+                              )}
+                              {inc.supplierReturn && (
+                                <Badge variant="outline" className="text-[10px] h-5 border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">교환분</Badge>
+                              )}
+                              <Badge variant={statusVariants[inc.status]} className="text-[10px] h-5">{statusLabels[inc.status]}</Badge>
+                            </div>
                           </div>
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>{new Date(inc.incomingDate).toLocaleDateString("ko-KR")}</span>

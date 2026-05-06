@@ -44,7 +44,7 @@ export async function GET(
         orderBy: { createdAt: "asc" },
       },
       labors: { orderBy: { createdAt: "asc" } },
-      orders: {
+      order: {
         select: {
           id: true,
           orderNo: true,
@@ -53,7 +53,6 @@ export async function GET(
           status: true,
           createdAt: true,
         },
-        orderBy: { createdAt: "asc" },
       },
       createdBy: { select: { id: true, name: true } },
       repairCategory: { select: { id: true, name: true } },

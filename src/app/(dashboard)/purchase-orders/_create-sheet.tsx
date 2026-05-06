@@ -1,0 +1,391 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Plus, Trash2 } from "lucide-react";
+
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import {
+  jmToast as toast,
+  JmButton,
+  JmCombobox,
+  type JmComboboxItem,
+  JmDrawer,
+  JmDrawerBody,
+  JmDrawerContent,
+  JmDrawerFooter,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmFormField,
+  JmIconButton,
+  JmInput,
+  JmNumberInput,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
+
+import { QuickSupplierSheet, QuickSupplierProductSheet } from "@/components/quick-register-sheets";
+
+import {
+  emptyItem,
+  type PurchaseOrderFormState,
+  type PurchaseOrderItemForm,
+} from "./_types";
+
+interface SupplierLite { id: string; name: string; businessNumber: string | null }
+interface SupplierProductLite {
+  id: string;
+  name: string;
+  spec: string | null;
+  supplierCode: string | null;
+  unitPrice: string;
+  unitOfMeasure: string;
+  supplierId: string;
+}
+
+/**
+ * 발주 등록·수정 Drawer.
+ * - editingId 가 있으면 수정 모드 (PUT), 없으면 등록 (POST)
+ * - 거래처 선택 후 그 거래처의 공급상품만 로드
+ * - QuickSupplier* 빠른 등록 Sheet 는 shadcn 기반(외부) — JM 영역 안에 띄울 때 시각 차이가 있을 수 있음
+ */
+export function PurchaseOrderCreateSheet({
+  open,
+  onOpenChange,
+  form,
+  setForm,
+  editingId,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  form: PurchaseOrderFormState;
+  setForm: React.Dispatch<React.SetStateAction<PurchaseOrderFormState>>;
+  editingId: string | null;
+  onSaved: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const [quickSupplierOpen, setQuickSupplierOpen] = useState(false);
+  const [quickSupplierName, setQuickSupplierName] = useState("");
+  const [quickSpOpen, setQuickSpOpen] = useState(false);
+  const [quickSpName, setQuickSpName] = useState("");
+  const [quickSpRowIndex, setQuickSpRowIndex] = useState<number | null>(null);
+
+  const suppliersQuery = useQuery<SupplierLite[]>({
+    queryKey: queryKeys.suppliers.list(),
+    queryFn: () => apiGet<SupplierLite[]>("/api/suppliers"),
+    staleTime: 1000 * 60,
+    enabled: open,
+  });
+
+  const supplierProductsQuery = useQuery<SupplierProductLite[]>({
+    queryKey: queryKeys.supplierProducts.list({ supplierId: form.supplierId }),
+    queryFn: () =>
+      apiGet<SupplierProductLite[]>(
+        `/api/supplier-products?supplierId=${encodeURIComponent(form.supplierId)}`,
+      ),
+    enabled: open && !!form.supplierId,
+    staleTime: 1000 * 60,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (payload: {
+      supplierId: string;
+      orderDate: string;
+      expectedDate?: string;
+      memo?: string;
+      items: Array<{ supplierProductId: string; quantity: string; unitPrice: string; totalPrice: string; memo?: string }>;
+    }) =>
+      editingId
+        ? apiMutate(`/api/purchase-orders/${editingId}`, "PUT", payload)
+        : apiMutate("/api/purchase-orders", "POST", payload),
+    onSuccess: () => {
+      toast.success(editingId ? "발주가 수정되었습니다" : "발주가 등록되었습니다");
+      onSaved();
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : editingId ? "수정에 실패했습니다" : "등록에 실패했습니다");
+    },
+  });
+
+  const updateItem = (idx: number, patch: Partial<PurchaseOrderItemForm>) => {
+    setForm((prev) => {
+      const items = prev.items.slice();
+      items[idx] = { ...items[idx], ...patch };
+      const qty = parseFloat(items[idx].quantity || "0");
+      const price = parseFloat(items[idx].unitPrice || "0");
+      items[idx].totalPrice = qty > 0 && price >= 0 ? String(Math.round(qty * price)) : "";
+      return { ...prev, items };
+    });
+  };
+
+  const addRow = () => setForm((prev) => ({ ...prev, items: [...prev.items, emptyItem()] }));
+  const removeRow = (idx: number) =>
+    setForm((prev) =>
+      prev.items.length === 1
+        ? { ...prev, items: [emptyItem()] }
+        : { ...prev, items: prev.items.filter((_, i) => i !== idx) }
+    );
+
+  const totalAmount = useMemo(
+    () => form.items.reduce((s, it) => s + (parseFloat(it.totalPrice || "0") || 0), 0),
+    [form.items]
+  );
+
+  const handleSubmit = () => {
+    if (!form.supplierId) {
+      toast.error("거래처를 선택해주세요");
+      return;
+    }
+    const validItems = form.items.filter((it) => it.supplierProductId && it.quantity && it.unitPrice);
+    if (validItems.length === 0) {
+      toast.error("발주 항목을 1개 이상 추가해주세요");
+      return;
+    }
+    saveMutation.mutate({
+      supplierId: form.supplierId,
+      orderDate: form.orderDate,
+      expectedDate: form.expectedDate || undefined,
+      memo: form.memo || undefined,
+      items: validItems.map((it) => ({
+        supplierProductId: it.supplierProductId,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        totalPrice: it.totalPrice,
+        memo: it.memo || undefined,
+      })),
+    });
+  };
+
+  return (
+    <>
+      <JmDrawer open={open} onOpenChange={onOpenChange}>
+        <JmDrawerContent side="bottom" size="xl">
+          <JmDrawerHeader>
+            <JmDrawerTitle>{editingId ? "발주 수정" : "발주 등록"}</JmDrawerTitle>
+          </JmDrawerHeader>
+
+          <JmDrawerBody>
+            <div className="space-y-5">
+              {/* 헤더 정보 */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <JmFormField label="거래처" required>
+                  <JmCombobox<JmComboboxItem>
+                    items={(suppliersQuery.data ?? []).map((s) => ({
+                      id: s.id,
+                      label: s.name,
+                      description: s.businessNumber ?? undefined,
+                    }))}
+                    value={form.supplierId}
+                    onChange={(item) => {
+                      const sup = suppliersQuery.data?.find((s) => s.id === item.id);
+                      setForm((prev) => ({
+                        ...prev,
+                        supplierId: item.id,
+                        supplierName: sup?.name ?? item.label,
+                        items: item.id !== prev.supplierId ? [emptyItem()] : prev.items,
+                      }));
+                    }}
+                    clearable
+                    onClear={() =>
+                      setForm((prev) => ({ ...prev, supplierId: "", supplierName: "", items: [emptyItem()] }))
+                    }
+                    placeholder="거래처 선택..."
+                    searchPlaceholder="이름·사업자번호 검색"
+                    onCreateNew={(name) => {
+                      setQuickSupplierName(name);
+                      setQuickSupplierOpen(true);
+                    }}
+                  />
+                </JmFormField>
+                <JmFormField label="발주일" required>
+                  <JmInput
+                    type="date"
+                    value={form.orderDate}
+                    onChange={(e) => setForm((p) => ({ ...p, orderDate: e.target.value }))}
+                  />
+                </JmFormField>
+                <JmFormField label="예상 입고일">
+                  <JmInput
+                    type="date"
+                    value={form.expectedDate}
+                    onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))}
+                  />
+                </JmFormField>
+              </div>
+
+              {/* 항목 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">발주 항목 *</span>
+                  <JmButton
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={addRow}
+                    disabled={!form.supplierId}
+                  >
+                    <Plus />
+                    행 추가
+                  </JmButton>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-[var(--jm-border)]">
+                  <JmTable>
+                    <JmTableHeader>
+                      <JmTableRow>
+                        <JmTableHead>공급상품</JmTableHead>
+                        <JmTableHead className="w-[110px] text-right">수량</JmTableHead>
+                        <JmTableHead className="w-[140px] text-right">단가</JmTableHead>
+                        <JmTableHead className="w-[140px] text-right">소계</JmTableHead>
+                        <JmTableHead className="w-[200px]">메모</JmTableHead>
+                        <JmTableHead className="w-[40px]"></JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {form.items.map((it, idx) => (
+                        <JmTableRow key={idx} className="hover:bg-transparent">
+                          <JmTableCell className="align-top">
+                            {!form.supplierId ? (
+                              <span className="text-jm-xs text-[var(--jm-text-muted)]">먼저 거래처를 선택하세요</span>
+                            ) : (
+                              <JmCombobox<JmComboboxItem>
+                                items={(supplierProductsQuery.data ?? []).map((sp) => ({
+                                  id: sp.id,
+                                  label: sp.name + (sp.spec ? ` (${sp.spec})` : ""),
+                                  description: [
+                                    sp.supplierCode,
+                                    sp.unitPrice ? `₩${parseFloat(sp.unitPrice).toLocaleString("ko-KR")}` : null,
+                                  ].filter(Boolean).join(" · ") || undefined,
+                                }))}
+                                value={it.supplierProductId}
+                                size="sm"
+                                placeholder="공급상품 선택..."
+                                searchPlaceholder="품명·품번 검색"
+                                onChange={(item) => {
+                                  const sp = supplierProductsQuery.data?.find((s) => s.id === item.id);
+                                  if (!sp) return;
+                                  updateItem(idx, {
+                                    supplierProductId: sp.id,
+                                    supplierProductName: sp.name,
+                                    supplierCode: sp.supplierCode ?? null,
+                                    unitOfMeasure: sp.unitOfMeasure,
+                                    unitPrice: sp.unitPrice ? String(Math.round(parseFloat(sp.unitPrice))) : it.unitPrice,
+                                  });
+                                }}
+                                onCreateNew={(name) => {
+                                  setQuickSpName(name);
+                                  setQuickSpRowIndex(idx);
+                                  setQuickSpOpen(true);
+                                }}
+                              />
+                            )}
+                          </JmTableCell>
+                          <JmTableCell className="align-top">
+                            <JmNumberInput
+                              size="sm"
+                              clearable={false}
+                              value={it.quantity}
+                              onValueChange={(v) => updateItem(idx, { quantity: v })}
+                            />
+                          </JmTableCell>
+                          <JmTableCell className="align-top">
+                            <JmNumberInput
+                              size="sm"
+                              prefix="₩"
+                              clearable={false}
+                              value={it.unitPrice}
+                              onValueChange={(v) => updateItem(idx, { unitPrice: v })}
+                            />
+                          </JmTableCell>
+                          <JmTableCell className="text-right tabular-nums align-middle">
+                            {it.totalPrice ? `₩${parseFloat(it.totalPrice).toLocaleString("ko-KR")}` : "-"}
+                          </JmTableCell>
+                          <JmTableCell className="align-top">
+                            <JmInput
+                              size="sm"
+                              value={it.memo}
+                              onChange={(e) => updateItem(idx, { memo: e.target.value })}
+                              placeholder="(선택)"
+                            />
+                          </JmTableCell>
+                          <JmTableCell className="text-center align-middle">
+                            <JmIconButton
+                              size="sm"
+                              aria-label="행 삭제"
+                              onClick={() => removeRow(idx)}
+                            >
+                              <Trash2 />
+                            </JmIconButton>
+                          </JmTableCell>
+                        </JmTableRow>
+                      ))}
+                    </JmTableBody>
+                  </JmTable>
+                  <div className="flex items-center justify-between border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-2.5 text-jm-sm">
+                    <span className="text-jm-xs text-[var(--jm-text-muted)]">총 발주금액</span>
+                    <span className="font-bold tabular-nums">₩{totalAmount.toLocaleString("ko-KR")}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 메모 */}
+              <JmFormField label="발주 메모">
+                <JmInput
+                  value={form.memo}
+                  onChange={(e) => setForm((p) => ({ ...p, memo: e.target.value }))}
+                  placeholder="(선택) 발주 시 거래처에 전달할 메모 등"
+                />
+              </JmFormField>
+            </div>
+          </JmDrawerBody>
+
+          <JmDrawerFooter>
+            <JmButton variant="ghost" onClick={() => onOpenChange(false)}>
+              취소
+            </JmButton>
+            <JmButton onClick={handleSubmit} disabled={saveMutation.isPending}>
+              {saveMutation.isPending && <Loader2 className="animate-spin" />}
+              {saveMutation.isPending ? (editingId ? "수정 중..." : "등록 중...") : (editingId ? "수정" : "등록")}
+            </JmButton>
+          </JmDrawerFooter>
+        </JmDrawerContent>
+      </JmDrawer>
+
+      <QuickSupplierSheet
+        open={quickSupplierOpen}
+        onOpenChange={setQuickSupplierOpen}
+        defaultName={quickSupplierName}
+        onCreated={(s) => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all });
+          setForm((prev) => ({ ...prev, supplierId: s.id, supplierName: s.name, items: [emptyItem()] }));
+          setQuickSupplierOpen(false);
+        }}
+      />
+      <QuickSupplierProductSheet
+        open={quickSpOpen}
+        onOpenChange={setQuickSpOpen}
+        supplierId={form.supplierId}
+        supplierName={form.supplierName}
+        defaultName={quickSpName}
+        onCreated={(sp) => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.supplierProducts.all });
+          if (quickSpRowIndex !== null) {
+            updateItem(quickSpRowIndex, {
+              supplierProductId: sp.id,
+              supplierProductName: sp.name,
+              unitPrice: sp.unitPrice ? String(Math.round(parseFloat(sp.unitPrice))) : "",
+            });
+          }
+          setQuickSpOpen(false);
+        }}
+      />
+    </>
+  );
+}

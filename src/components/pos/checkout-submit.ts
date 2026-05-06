@@ -3,12 +3,24 @@ import { calcDiscountPerUnit } from "@/lib/utils";
 import type { CartSession } from "@/components/pos/sessions-context";
 
 export type CheckoutAction = "order" | "quotation" | "statement";
+export type FulfillmentType = "PICKUP" | "DELIVERY" | "SHIPPING";
+
+export interface ShippingInfo {
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  address?: string | null;
+  /** YYYY-MM-DD — 미지정 시 서버에서 주문일+1로 자동 계산 */
+  expectedShipDate?: string | null;
+}
 
 export interface CheckoutPayloadOptions {
   action: CheckoutAction;
   paymentMethod?: "CASH" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
   taxInvoiceRequested?: boolean;
   memo?: string | null;
+  /** 출고 방식 — 미지정/PICKUP 시 즉시 종결, DELIVERY/SHIPPING 은 ERP 워크보드 진입 */
+  fulfillmentType?: FulfillmentType;
+  shipping?: ShippingInfo;
 }
 
 export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayloadOptions) {
@@ -56,6 +68,13 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
           })
       : undefined;
 
+  // 수리/임대는 매장 인도라 항상 PICKUP 강제 (UI 에서 토글 안 보임)
+  const fulfillmentType: FulfillmentType =
+    repairItems.length > 0 || rentalItems.length > 0
+      ? "PICKUP"
+      : opts.fulfillmentType ?? "PICKUP";
+  const shipping = fulfillmentType === "PICKUP" ? null : opts.shipping ?? null;
+
   return {
     action: opts.action,
     customerId,
@@ -77,6 +96,11 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
     repairTicketData,
     repairTicketId: linkedRepairTicketId,
     rentalRecords,
+    fulfillmentType,
+    shippingRecipientName: shipping?.recipientName ?? null,
+    shippingRecipientPhone: shipping?.recipientPhone ?? null,
+    shippingAddress: shipping?.address ?? null,
+    expectedShipDate: shipping?.expectedShipDate ?? null,
     // 결제 직전 발번된 라벨 — 서버에서 OrderItem 과 매칭해 orderItemId 연결
     labelCodes: session.labelCodes ?? [],
   };

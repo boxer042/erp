@@ -58,6 +58,21 @@ export default async function PosReceiptPrintPage({
           ? { name: order.customer.name, phone: order.customer.phone }
           : null,
         channel: order.channel?.name ?? "오프라인",
+        fulfillmentType: order.fulfillmentType,
+        shippingAddress:
+          order.fulfillmentType === "PICKUP" ? null : order.shippingAddress,
+        recipientName:
+          order.fulfillmentType === "PICKUP"
+            ? null
+            : order.recipientName ?? order.customerName,
+        recipientPhone:
+          order.fulfillmentType === "PICKUP"
+            ? null
+            : order.recipientPhone ?? order.customerPhone,
+        expectedShipDate:
+          order.fulfillmentType === "PICKUP" || !order.expectedShipDate
+            ? null
+            : format(new Date(order.expectedShipDate), "yyyy-MM-dd"),
         lines,
         subtotal: Number(order.subtotalAmount),
         taxAmount: Number(order.taxAmount),

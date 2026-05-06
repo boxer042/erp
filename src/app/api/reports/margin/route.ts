@@ -20,7 +20,7 @@ import { guardAdmin } from "@/lib/api-auth";
 //   netProfit(summary) = supplyRevenue − costAmount − commissionAmt − cardFeeAmt − sellingCostAmt − opexAmount
 //   marginRate     = netProfit / supplyRevenue × 100
 
-const ACTIVE_STATUSES = ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"] as const;
+const ACTIVE_STATUSES = ["PREPARING", "SHIPPED", "COMPLETED"] as const;
 
 interface OrderSummary {
   id: string;

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { supplierPaymentSchema } from "@/lib/validators/supplier";
 import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -90,6 +91,14 @@ export async function POST(request: NextRequest) {
 
     // 백-입력(과거 일자로 결제)된 경우에도 잔액 컬럼을 정리
     await rebalanceSupplierLedger(tx, data.supplierId);
+
+    await recordAudit(tx, {
+      userId: user.id,
+      entity: "SupplierPayment",
+      entityId: payment.id,
+      action: "CREATE",
+      meta: { supplierId: data.supplierId, amount, method: data.method, paymentDate: data.paymentDate },
+    });
 
     return { payment, newBalance };
   });

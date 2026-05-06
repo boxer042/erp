@@ -39,6 +39,8 @@ import {
   FolderTree,
   SlidersHorizontal,
   QrCode,
+  ClipboardSignature,
+  ScrollText,
 } from "lucide-react";
 
 import {
@@ -123,6 +125,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "suppliers", label: "거래처", href: "/suppliers", icon: Truck },
       { id: "supplier-products", label: "거래처 상품", href: "/supplier-products", icon: PackageSearch },
+      { id: "purchase-orders", label: "발주", href: "/purchase-orders", icon: ClipboardSignature },
       { id: "incoming", label: "입고", href: "/inventory/incoming", icon: PackageOpen },
       { id: "returns", label: "반품", href: "/inventory/returns", icon: PackageMinus },
       { id: "supplier-ledger", label: "거래처 원장", href: "/suppliers/ledger", icon: Receipt },
@@ -142,6 +145,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "repair-services", label: "수리 서비스", href: "/repair-services", icon: Wrench },
       { id: "rental-assets", label: "임대 자산", href: "/rental-assets", icon: Container },
+      { id: "rentals-stats", label: "임대 통계", href: "/rentals/stats", icon: TrendingUp },
     ],
   },
   {
@@ -152,6 +156,7 @@ const navGroups: NavGroup[] = [
   },
   {
     items: [
+      { id: "audit-logs", label: "활동 로그", href: "/audit-logs", icon: ScrollText },
       { id: "settings", label: "설정", href: "/settings", icon: Settings },
     ],
   },

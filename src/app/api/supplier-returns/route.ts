@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supplierReturnSchema } from "@/lib/validators/return";
 import { getCurrentUser } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 
 function generateReturnNo() {
   const now = new Date();
@@ -147,6 +148,18 @@ export async function POST(request: NextRequest) {
           include: { supplierProduct: { select: { name: true, supplierCode: true } } },
         },
         exchangeIncoming: { select: { id: true, incomingNo: true, status: true } },
+      },
+    });
+
+    await recordAudit(tx, {
+      userId: user.id,
+      entity: "SupplierReturn",
+      entityId: created.id,
+      action: "CREATE",
+      meta: {
+        returnNo: created.returnNo,
+        supplierId: created.supplierId,
+        itemCount: created.items.length,
       },
     });
 

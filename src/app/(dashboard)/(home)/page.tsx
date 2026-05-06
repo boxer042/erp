@@ -108,7 +108,7 @@ export default async function DashboardPage() {
     prisma.order.groupBy({
       by: ["channelId"],
       where: {
-        status: { in: ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED"] },
+        status: { in: ["PREPARING", "SHIPPED", "COMPLETED"] },
         orderDate: { gte: startOfMonth },
       },
       _sum: { totalAmount: true, commissionAmount: true },

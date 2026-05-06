@@ -36,6 +36,26 @@ export function formatBusinessNumber(value: string): string {
   return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5, 10)}`;
 }
 
+/**
+ * 사업자번호 체크섬 검증 (국세청 알고리즘).
+ * - 10자리 입력만 검증. 길이 다르면 false.
+ * - 가중치 [1,3,7,1,3,7,1,3,5] 와 자릿수 곱 합산 + 8번째 자리 × 5 의 십의자리값 추가
+ * - 마지막 자리(체크 디지트)와 (10 - sum % 10) % 10 비교
+ *
+ * 참고: https://www.nts.go.kr 사업자등록번호 체계
+ */
+export function isValidBusinessNumber(value: string): boolean {
+  const d = digitsOnly(value);
+  if (d.length !== 10) return false;
+  const weights = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(d[i], 10) * weights[i];
+  // 8번째 자리 × 5 의 10의자리값을 추가
+  sum += Math.floor((parseInt(d[8], 10) * 5) / 10);
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === parseInt(d[9], 10);
+}
+
 /** 전화번호 표시: 01012345678 → 010-1234-5678, 0212345678 → 02-1234-5678 */
 export function formatPhone(value: string): string {
   const d = digitsOnly(value);

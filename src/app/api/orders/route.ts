@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { orderSchema } from "@/lib/validators/order";
 import { getCurrentUser } from "@/lib/auth";
+import type { OrderStatus, FulfillmentType, Prisma } from "@prisma/client";
+import { classifyBoardGroup, getKrToday } from "@/lib/orders/board";
+import { recordAudit } from "@/lib/audit";
 
 function generateOrderNo() {
   const now = new Date();
@@ -16,33 +19,80 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const channelId = searchParams.get("channelId");
+  const fulfillmentType = searchParams.get("fulfillmentType");
+  const view = searchParams.get("view"); // "board" | (default: list)
   const search = searchParams.get("search") || "";
 
+  const where: Prisma.OrderWhereInput = {
+    ...(status ? { status: status as OrderStatus } : {}),
+    ...(channelId ? { channelId } : {}),
+    ...(fulfillmentType
+      ? { fulfillmentType: fulfillmentType as FulfillmentType }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            { orderNo: { contains: search, mode: "insensitive" } },
+            { channelOrderNo: { contains: search, mode: "insensitive" } },
+            { customerName: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  // 워크보드 뷰: 출고 대상(PENDING/PREPARING/SHIPPED) 중 PICKUP 제외
+  if (view === "board") {
+    where.status = { in: ["PENDING", "PREPARING", "SHIPPED"] };
+    where.fulfillmentType = { in: ["DELIVERY", "SHIPPING"] };
+  }
+
   const orders = await prisma.order.findMany({
-    where: {
-      ...(status ? { status: status as never } : {}),
-      ...(channelId ? { channelId } : {}),
-      ...(search
-        ? {
-            OR: [
-              { orderNo: { contains: search, mode: "insensitive" as const } },
-              { channelOrderNo: { contains: search, mode: "insensitive" as const } },
-              { customerName: { contains: search, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
-    },
+    where,
     include: {
       channel: { select: { name: true, code: true } },
       createdBy: { select: { name: true } },
-      // POS 수리 결제 / 픽업 결제로 연결된 RepairTicket — ERP 에서 어떤 수리에서 왔는지 추적용
       repairTicket: { select: { id: true, ticketNo: true, status: true } },
+      items: {
+        select: {
+          id: true,
+          quantity: true,
+          product: { select: { name: true } },
+          serviceName: true,
+        },
+        take: 3,
+      },
       _count: { select: { items: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy:
+      view === "board"
+        ? // expectedShipDate null 을 끝에 두기 — 미정 주문은 "예정일 미정" 그룹으로 별도 분류
+          [
+            { expectedShipDate: { sort: "asc", nulls: "last" } },
+            { createdAt: "asc" },
+          ]
+        : { createdAt: "desc" },
   });
 
-  return NextResponse.json(orders);
+  if (view !== "board") {
+    return NextResponse.json(orders);
+  }
+
+  // board view: 그룹화 + daysOverdue 계산. KST 기준 오늘 UTC 자정 Date 사용
+  const today = getKrToday();
+  const grouped = {
+    overdue: [] as typeof orders,
+    today: [] as typeof orders,
+    unscheduled: [] as typeof orders,
+    shipped: [] as typeof orders,
+    thisWeek: [] as typeof orders,
+    future: [] as typeof orders,
+  };
+  for (const o of orders) {
+    const group = classifyBoardGroup(o.status, o.expectedShipDate, today);
+    if (!group) continue;
+    grouped[group].push(o);
+  }
+  return NextResponse.json({ groups: grouped, today: today.toISOString() });
 }
 
 export async function POST(request: NextRequest) {
@@ -69,6 +119,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "채널을 찾을 수 없습니다" }, { status: 404 });
   }
 
+  // 항목별 taxType 조회 — 면세/영세율 상품은 세액 0
+  const productIds = data.items.map((i) => i.productId).filter(Boolean);
+  const products = productIds.length
+    ? await prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, taxType: true },
+      })
+    : [];
+  const taxTypeById = new Map(products.map((p) => [p.id, p.taxType]));
+
   const items = data.items.map((item) => {
     const qty = parseFloat(item.quantity);
     const price = parseFloat(item.unitPrice);
@@ -77,27 +137,45 @@ export async function POST(request: NextRequest) {
       quantity: qty,
       unitPrice: price,
       totalPrice: qty * price,
+      _taxable: (taxTypeById.get(item.productId) ?? "TAXABLE") === "TAXABLE",
     };
   });
 
   const subtotalAmount = items.reduce((sum, i) => sum + i.totalPrice, 0);
+  const taxableSubtotal = items
+    .filter((i) => i._taxable)
+    .reduce((sum, i) => sum + i.totalPrice, 0);
   const discountAmount = parseFloat(data.discountAmount || "0");
   const shippingFee = parseFloat(data.shippingFee || "0");
-  const taxAmount = Math.round((subtotalAmount - discountAmount) * 0.1); // 부가세 10%
+  // 부가세 — 과세 항목 비율로 할인 안분 후 10%
+  const taxableRatio = subtotalAmount > 0 ? taxableSubtotal / subtotalAmount : 0;
+  const taxableNet = taxableSubtotal - discountAmount * taxableRatio;
+  const taxAmount = Math.round(Math.max(0, taxableNet) * 0.1);
   const totalAmount = subtotalAmount - discountAmount + shippingFee + taxAmount;
   const commissionAmount = channel
     ? Math.round(subtotalAmount * Number(channel.commissionRate))
     : 0;
 
+  // ERP 수동 등록은 PENDING 으로 시작 (재고 미차감 — prepare 액션에서 차감)
+  const isPickup = data.fulfillmentType === "PICKUP";
   const order = await prisma.order.create({
     data: {
       orderNo: generateOrderNo(),
       channelId: data.channelId || null,
       channelOrderNo: data.channelOrderNo || null,
+      customerId: data.customerId || null,
       customerName: data.customerName || null,
       customerPhone: data.customerPhone || null,
-      shippingAddress: data.shippingAddress || null,
+      recipientName: isPickup ? null : data.recipientName || null,
+      recipientPhone: isPickup ? null : data.recipientPhone || null,
+      shippingAddress: isPickup ? null : data.shippingAddress || null,
       orderDate: new Date(data.orderDate),
+      fulfillmentType: data.fulfillmentType,
+      expectedShipDate:
+        isPickup || !data.expectedShipDate
+          ? null
+          : new Date(data.expectedShipDate),
+      paymentMethod: data.paymentMethod ?? null,
       subtotalAmount,
       discountAmount,
       shippingFee,
@@ -106,13 +184,50 @@ export async function POST(request: NextRequest) {
       commissionAmount,
       memo: data.memo || null,
       createdById: user.id,
-      items: { create: items },
+      items: {
+        create: items.map(({ _taxable, ...it }) => it),
+      },
     },
     include: {
       channel: { select: { name: true } },
       items: {
         include: { product: { select: { name: true, sku: true } } },
       },
+    },
+  });
+
+  // UNPAID 면 customerLedger SALE 기록 (POS checkout 과 동일 정책)
+  if (data.paymentMethod === "UNPAID" && data.customerId) {
+    const last = await prisma.customerLedger.findFirst({
+      where: { customerId: data.customerId },
+      orderBy: { date: "desc" },
+    });
+    const prevBalance = last ? Number(last.balance) : 0;
+    await prisma.customerLedger.create({
+      data: {
+        customerId: data.customerId,
+        type: "SALE",
+        description: `주문 ${order.orderNo}`,
+        debitAmount: totalAmount,
+        creditAmount: 0,
+        balance: prevBalance + totalAmount,
+        referenceId: order.id,
+        referenceType: "ORDER",
+      },
+    });
+  }
+
+  await recordAudit(prisma, {
+    userId: user.id,
+    entity: "Order",
+    entityId: order.id,
+    action: "CREATE",
+    meta: {
+      orderNo: order.orderNo,
+      totalAmount,
+      itemCount: items.length,
+      paymentMethod: data.paymentMethod,
+      channelId: data.channelId,
     },
   });
 

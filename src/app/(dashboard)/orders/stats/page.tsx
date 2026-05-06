@@ -26,18 +26,36 @@ import {
 } from "recharts";
 
 import { apiGet } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmIconButton,
+  JmInput,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
+
+const Card = JmCard;
+const CardContent = JmCardContent;
+const CardHeader = JmCardHeader;
+const CardTitle = JmCardTitle;
+const Skeleton = JmSkeleton;
+const Button = JmButton;
+const Input = JmInput;
+const Table = JmTable;
+const TableBody = JmTableBody;
+const TableCell = JmTableCell;
+const TableHead = JmTableHead;
+const TableHeader = JmTableHeader;
+const TableRow = JmTableRow;
 
 const PAYMENT_LABEL: Record<string, string> = {
   CASH: "현금",
@@ -200,31 +218,30 @@ export default function SalesStatsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <Button
+      <div className="flex items-center gap-3 border-b border-[var(--jm-border)] px-5 py-3">
+        <JmIconButton
           variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+          size="sm"
           onClick={() => router.push("/orders")}
           aria-label="뒤로"
         >
           <ChevronLeft className="size-4" />
-        </Button>
+        </JmIconButton>
         <h1 className="text-lg font-semibold">매출 통계</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
         {/* 기간 필터 */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex h-[30px] items-center gap-1 rounded-md border border-border bg-card px-1 text-[13px]">
+          <div className="flex h-[30px] items-center gap-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-1 text-[13px]">
             {RANGE_PRESETS.map((p) => (
               <button
                 key={p.value}
                 onClick={() => setPreset(p.value)}
                 className={`rounded px-2 py-0.5 transition-colors ${
                   preset === p.value
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                    : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
                 }`}
               >
                 {p.label}
@@ -239,7 +256,7 @@ export default function SalesStatsPage() {
                 onChange={(e) => setCustomFrom(e.target.value)}
                 className="h-[30px] w-[140px] text-[13px]"
               />
-              <span className="text-[12px] text-muted-foreground">~</span>
+              <span className="text-[12px] text-[var(--jm-text-muted)]">~</span>
               <Input
                 type="date"
                 value={customTo}
@@ -249,7 +266,7 @@ export default function SalesStatsPage() {
             </div>
           )}
           {range.from && range.to && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[11px] text-[var(--jm-text-muted)]">
               {range.from} ~ {range.to}
             </span>
           )}
@@ -258,7 +275,7 @@ export default function SalesStatsPage() {
         {statsQuery.isPending ? (
           <SalesSkeleton />
         ) : !stats ? (
-          <p className="text-sm text-muted-foreground">통계 불러올 수 없음</p>
+          <p className="text-sm text-[var(--jm-text-muted)]">통계 불러올 수 없음</p>
         ) : (
           <div className="flex flex-col gap-5">
             {/* KPI */}
@@ -434,7 +451,7 @@ export default function SalesStatsPage() {
               </CardHeader>
               <CardContent>
                 {stats.byChannel.length === 0 ? (
-                  <p className="py-4 text-sm text-muted-foreground">데이터 없음</p>
+                  <p className="py-4 text-sm text-[var(--jm-text-muted)]">데이터 없음</p>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -465,7 +482,7 @@ export default function SalesStatsPage() {
                           <TableCell className="text-right tabular-nums font-semibold">
                             ₩{c.net.toLocaleString("ko-KR")}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                          <TableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                             ₩{Math.round(c.total / Math.max(1, c.count)).toLocaleString("ko-KR")}
                           </TableCell>
                         </TableRow>
@@ -483,7 +500,7 @@ export default function SalesStatsPage() {
               </CardHeader>
               <CardContent>
                 {stats.byCustomerType.length === 0 ? (
-                  <p className="py-4 text-sm text-muted-foreground">데이터 없음</p>
+                  <p className="py-4 text-sm text-[var(--jm-text-muted)]">데이터 없음</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     {stats.byCustomerType.map((g) => {
@@ -551,11 +568,11 @@ export default function SalesStatsPage() {
                     <TableBody>
                       {stats.topBusinessCustomers.map((c, i) => (
                         <TableRow key={c.customerId}>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-[var(--jm-text-muted)]">
                             {i + 1}
                           </TableCell>
                           <TableCell className="font-medium">{c.name}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
+                          <TableCell className="font-mono text-xs text-[var(--jm-text-muted)]">
                             {c.businessNumber ?? "-"}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
@@ -579,7 +596,7 @@ export default function SalesStatsPage() {
               </CardHeader>
               <CardContent>
                 {stats.topProducts.length === 0 ? (
-                  <p className="py-4 text-sm text-muted-foreground">데이터 없음</p>
+                  <p className="py-4 text-sm text-[var(--jm-text-muted)]">데이터 없음</p>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -595,15 +612,15 @@ export default function SalesStatsPage() {
                     <TableBody>
                       {stats.topProducts.map((p, i) => (
                         <TableRow key={p.productId ?? i}>
-                          <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                          <TableCell className="text-[var(--jm-text-muted)]">{i + 1}</TableCell>
                           <TableCell className="font-medium">{p.productName}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
+                          <TableCell className="font-mono text-xs text-[var(--jm-text-muted)]">
                             {p.sku}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {p.qty.toLocaleString("ko-KR")}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                          <TableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                             {p.orders.toLocaleString("ko-KR")}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
@@ -636,18 +653,18 @@ function KpiCard({
   hint?: string;
   tone?: "success";
 }) {
-  const toneClass = tone === "success" ? "text-emerald-700" : "text-foreground";
+  const toneClass = tone === "success" ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]";
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-[var(--jm-text-muted)]">
           {icon}
           <span>{label}</span>
         </div>
       </CardHeader>
       <CardContent className="pb-3">
         <div className={`text-2xl font-bold tabular-nums ${toneClass}`}>{value}</div>
-        {hint && <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>}
+        {hint && <div className="mt-0.5 text-[11px] text-[var(--jm-text-muted)]">{hint}</div>}
       </CardContent>
     </Card>
   );
@@ -655,7 +672,7 @@ function KpiCard({
 
 function EmptyChart() {
   return (
-    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+    <div className="flex h-full items-center justify-center text-xs text-[var(--jm-text-muted)]">
       데이터 없음
     </div>
   );

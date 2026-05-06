@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidBusinessNumber, digitsOnly } from "@/lib/utils";
 
 export const supplierContactSchema = z.object({
   id: z.string().optional(),
@@ -11,7 +12,17 @@ export const supplierContactSchema = z.object({
 
 export const supplierSchema = z.object({
   name: z.string().min(1, "거래처명을 입력해주세요"),
-  businessNumber: z.string().optional(),
+  businessNumber: z.string()
+    .optional()
+    .refine(
+      (v) => {
+        if (!v) return true;
+        const d = digitsOnly(v);
+        if (d.length === 0) return true;
+        return isValidBusinessNumber(d);
+      },
+      { message: "사업자번호 형식 또는 체크섬이 올바르지 않습니다" }
+    ),
   representative: z.string().optional(),
   phone: z.string().optional(),
   fax: z.string().optional(),

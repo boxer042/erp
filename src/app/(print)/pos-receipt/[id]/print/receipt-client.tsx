@@ -22,6 +22,11 @@ interface Data {
   };
   customer: { name: string; phone: string } | null;
   channel: string;
+  fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING";
+  shippingAddress: string | null;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  expectedShipDate: string | null;
   lines: Line[];
   subtotal: number;
   taxAmount: number;
@@ -36,6 +41,12 @@ const PAYMENT_LABEL: Record<string, string> = {
   TRANSFER: "계좌이체",
   UNPAID: "외상 (미수금)",
   MIXED: "복합",
+};
+
+const FULFILLMENT_LABEL: Record<string, string> = {
+  PICKUP: "매장 수령",
+  DELIVERY: "배달",
+  SHIPPING: "택배",
 };
 
 /**
@@ -176,6 +187,40 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
                 {PAYMENT_LABEL[data.paymentMethod] ?? data.paymentMethod}
               </span>
             </div>
+          )}
+          <div className="row">
+            <span className="label">출고</span>
+            <span className="val">
+              {FULFILLMENT_LABEL[data.fulfillmentType] ?? data.fulfillmentType}
+            </span>
+          </div>
+
+          {/* 배달/택배 — 받는사람·연락처·주소·출고예정일 */}
+          {data.fulfillmentType !== "PICKUP" && (
+            <>
+              {data.expectedShipDate && (
+                <div className="row">
+                  <span className="label">출고예정</span>
+                  <span className="val">{data.expectedShipDate}</span>
+                </div>
+              )}
+              {(data.recipientName || data.recipientPhone) && (
+                <div className="row">
+                  <span className="label">받는분</span>
+                  <span className="val">
+                    {[data.recipientName, data.recipientPhone]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </span>
+                </div>
+              )}
+              {data.shippingAddress && (
+                <div style={{ marginTop: "1mm", fontSize: "8pt" }}>
+                  <div style={{ color: "#333" }}>배송지</div>
+                  <div style={{ fontWeight: 600 }}>{data.shippingAddress}</div>
+                </div>
+              )}
+            </>
           )}
 
           <hr />

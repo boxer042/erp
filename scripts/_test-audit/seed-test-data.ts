@@ -154,10 +154,10 @@ async function main() {
   console.log(`✓ 상품 풀: ${products.length}개 (기존)`);
 
   // ── 5. 주문 20건 [T] — 다양 상태/채널/결제 ──────────────────────────
-  const STATUSES: ("PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED")[] = [
+  const STATUSES: ("PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED")[] = [
     "PENDING",
-    "CONFIRMED",
-    "DELIVERED",
+    "PREPARING",
+    "COMPLETED",
     "CANCELLED",
   ];
   const PAYMENTS: ("CASH" | "CARD" | "TRANSFER" | "UNPAID")[] = [

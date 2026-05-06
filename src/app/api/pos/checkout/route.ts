@@ -51,6 +51,17 @@ interface CheckoutBody {
   rentalRecords?: RentalRecord[] | null;
   /** 결제 직전 발번된 SerialItem 코드들 — 서버에서 OrderItem 과 매칭해 orderItemId 연결 */
   labelCodes?: string[];
+  /**
+   * 출고 방식 — POS 결제 시 픽업/배달/택배 선택.
+   * 미지정 시 PICKUP (매장 즉시 인도). DELIVERY/SHIPPING 은 ERP 워크보드로 진입.
+   */
+  fulfillmentType?: "PICKUP" | "DELIVERY" | "SHIPPING";
+  /** DELIVERY/SHIPPING 일 때 받는 사람·연락처·주소 (받는사람 이름은 customerName 재활용) */
+  shippingRecipientName?: string | null;
+  shippingRecipientPhone?: string | null;
+  shippingAddress?: string | null;
+  /** 출고 예정일 (YYYY-MM-DD). 미지정 시 주문일 + 1 영업일 자동 계산 */
+  expectedShipDate?: string | null;
 }
 
 function genNo(prefix: string) {
@@ -206,16 +217,51 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // 출고 방식 결정 — 수리/임대는 매장 인도라 항상 PICKUP, 그 외 명시값 또는 기본 PICKUP
+  const fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING" =
+    body.repairTicketId || body.repairTicketData || (body.rentalRecords && body.rentalRecords.length > 0)
+      ? "PICKUP"
+      : (body.fulfillmentType ?? "PICKUP");
+
+  // 픽업이면 즉시 종결(COMPLETED), 배달/택배면 워크보드 진입(PREPARING)
+  const orderStatus: "COMPLETED" | "PREPARING" =
+    fulfillmentType === "PICKUP" ? "COMPLETED" : "PREPARING";
+
+  // 출고 예정일 — 명시 없으면 주문일 + 1일 (배송/택배일 때만)
+  const expectedShipDate =
+    fulfillmentType === "PICKUP"
+      ? null
+      : body.expectedShipDate
+        ? new Date(body.expectedShipDate)
+        : (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            return d;
+          })();
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           orderNo: genNo("ORD"),
           channelId: null,
-          status: "CONFIRMED",
+          status: orderStatus,
+          fulfillmentType,
+          expectedShipDate,
           customerId: body.customerId || null,
+          // 등록 고객 스냅샷은 항상 등록 고객 정보로 보존 (받는 사람과 분리)
           customerName: body.customerName || null,
           customerPhone: body.customerPhone || null,
+          // 받는 사람은 별도 컬럼. 미입력 시 등록 고객 정보를 fallback 으로 채움
+          recipientName:
+            fulfillmentType === "PICKUP"
+              ? null
+              : body.shippingRecipientName || body.customerName || null,
+          recipientPhone:
+            fulfillmentType === "PICKUP"
+              ? null
+              : body.shippingRecipientPhone || body.customerPhone || null,
+          shippingAddress: body.shippingAddress || null,
           orderDate: new Date(),
           subtotalAmount: subtotal,
           discountAmount: 0,

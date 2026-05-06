@@ -11,6 +11,8 @@ export const incomingItemSchema = z.object({
   discountAmount: z.string().optional(),
   itemShippingCost: z.string().nullable().optional(),
   itemShippingIsTaxable: z.boolean().optional(),
+  // 발주서 기반 입고일 때, 어느 발주 항목에서 들어온 것인지 연결
+  purchaseOrderItemId: z.string().optional(),
 });
 
 export const incomingSchema = z.object({
@@ -20,6 +22,8 @@ export const incomingSchema = z.object({
   shippingCost: z.string().optional(),
   shippingIsTaxable: z.boolean().optional(),
   shippingDeducted: z.boolean().optional(),
+  // 발주서 기반 입고일 때 발주 ID
+  purchaseOrderId: z.string().optional(),
   items: z.array(incomingItemSchema).min(1, "입고 항목을 추가해주세요"),
 });
 

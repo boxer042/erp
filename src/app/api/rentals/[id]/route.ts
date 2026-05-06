@@ -11,7 +11,7 @@ export async function GET(
     include: {
       asset: true,
       customer: true,
-      orders: { select: { id: true, orderNo: true, totalAmount: true, paymentMethod: true, status: true, createdAt: true }, orderBy: { createdAt: "asc" } },
+      order: { select: { id: true, orderNo: true, totalAmount: true, paymentMethod: true, status: true, createdAt: true } },
       createdBy: { select: { name: true } },
     },
   });

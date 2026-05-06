@@ -25,6 +25,8 @@ export interface Incoming {
   supplier: { name: string };
   createdBy: { name: string };
   _count: { items: number };
+  purchaseOrder?: { id: string; poNo: string } | null;
+  supplierReturn?: { id: string; returnNo: string } | null;
   items: Array<{
     id: string;
     quantity: string;
@@ -87,4 +89,6 @@ export interface IncomingItemForm {
   itemShippingIsTaxable: boolean;  // 품목 운임 과세 여부
   isNew?: boolean;
   pendingSourceRow?: number;
+  // 발주 기반 입고 시 어느 발주 항목에서 들어온 것인지 연결
+  purchaseOrderItemId?: string;
 }

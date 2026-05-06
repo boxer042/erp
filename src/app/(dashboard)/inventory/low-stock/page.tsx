@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, PackageX, Package, Search, PackagePlus, ExternalLink } from "lucide-react";
+import { AlertTriangle, PackageX, Package, Search, PackagePlus, ExternalLink, ClipboardSignature } from "lucide-react";
+import { toast } from "sonner";
 
 import { apiGet } from "@/lib/api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+interface LowStockMapping {
+  supplierId: string;
+  supplierName: string;
+  supplierProductId: string;
+  supplierProductName: string;
+  supplierCode: string | null;
+  unitPrice: string;
+  conversionRate: number;
+  suggestedQty: number;
+}
 
 interface LowStockItem {
   productId: string;
@@ -33,6 +46,7 @@ interface LowStockItem {
   categoryId: string | null;
   categoryName: string | null;
   isOut: boolean;
+  mappings: LowStockMapping[];
 }
 
 interface Response {
@@ -149,7 +163,7 @@ export default function LowStockPage() {
                   <TableHead className="w-[90px] text-right">현재고</TableHead>
                   <TableHead className="w-[90px] text-right">안전재고</TableHead>
                   <TableHead className="w-[90px] text-right">부족분</TableHead>
-                  <TableHead className="w-[90px]">동작</TableHead>
+                  <TableHead className="w-[160px]">동작</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -215,19 +229,21 @@ export default function LowStockPage() {
                         −{it.shortage.toLocaleString("ko-KR")}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-[12px]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // 상품 상세에서 매핑된 거래처 확인 후 입고 등록
-                            router.push(`/products/${it.productId}`);
-                          }}
-                        >
-                          <ExternalLink className="size-3" />
-                          상세
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <PurchaseOrderButton item={it} router={router} />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1 px-2 text-[12px]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/products/${it.productId}`);
+                            }}
+                          >
+                            <ExternalLink className="size-3" />
+                            상세
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -333,10 +349,110 @@ function SkeletonRows() {
             </div>
           </TableCell>
           <TableCell>
-            <Skeleton className="h-7 w-14 rounded-md" />
+            <Skeleton className="h-7 w-28 rounded-md" />
           </TableCell>
         </TableRow>
       ))}
     </>
+  );
+}
+
+function PurchaseOrderButton({
+  item,
+  router,
+}: {
+  item: LowStockItem;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const navigate = (m: LowStockMapping) => {
+    const params = new URLSearchParams({
+      prefillSupplierId: m.supplierId,
+      prefillSupplierName: m.supplierName,
+      prefillSpId: m.supplierProductId,
+      prefillSpName: m.supplierProductName,
+      prefillQty: String(m.suggestedQty),
+      prefillUnitPrice: m.unitPrice,
+    });
+    router.push(`/purchase-orders?${params.toString()}`);
+  };
+
+  if (item.mappings.length === 0) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1 px-2 text-[12px]"
+        onClick={(e) => {
+          e.stopPropagation();
+          toast.info("매핑된 거래처가 없습니다. 상품 상세에서 매핑을 먼저 등록하세요.");
+          router.push(`/products/${item.productId}`);
+        }}
+      >
+        <ClipboardSignature className="size-3" />
+        발주
+      </Button>
+    );
+  }
+
+  if (item.mappings.length === 1) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1 px-2 text-[12px]"
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate(item.mappings[0]);
+        }}
+      >
+        <ClipboardSignature className="size-3" />
+        발주
+      </Button>
+    );
+  }
+
+  // 매핑 2개+ — popover 로 거래처 선택
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 px-2 text-[12px]"
+            onClick={(e) => e.stopPropagation()}
+          />
+        }
+      >
+        <ClipboardSignature className="size-3" />
+        발주
+      </PopoverTrigger>
+      <PopoverContent className="w-[260px] p-1" onClick={(e) => e.stopPropagation()}>
+        <div className="px-2 py-1.5 text-[11px] text-muted-foreground">발주할 거래처 선택</div>
+        {item.mappings.map((m, i) => (
+          <button
+            key={`${m.supplierId}-${m.supplierProductId}-${i}`}
+            type="button"
+            className="w-full text-left px-2 py-1.5 rounded-md text-[13px] hover:bg-muted/50 flex items-center justify-between gap-2"
+            onClick={() => {
+              setOpen(false);
+              navigate(m);
+            }}
+          >
+            <div className="flex flex-col min-w-0">
+              <span className="truncate font-medium">{m.supplierName}</span>
+              <span className="text-[11px] text-muted-foreground truncate">
+                {m.supplierProductName}{m.supplierCode ? ` · ${m.supplierCode}` : ""}
+              </span>
+            </div>
+            <span className="text-[11px] tabular-nums text-muted-foreground shrink-0">
+              {m.suggestedQty.toLocaleString("ko-KR")}개
+            </span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

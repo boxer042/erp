@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { z } from "zod";
 import { SUPPLIER_PAYMENT_METHODS } from "@/lib/validators/supplier";
 import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
+import { recordAudit } from "@/lib/audit";
 
 const customerPaymentSchema = z.object({
   customerId: z.string().min(1, "고객을 선택해주세요"),
@@ -94,6 +95,14 @@ export async function POST(request: NextRequest) {
     });
 
     await rebalanceCustomerLedger(tx, data.customerId);
+
+    await recordAudit(tx, {
+      userId: user.id,
+      entity: "CustomerPayment",
+      entityId: payment.id,
+      action: "CREATE",
+      meta: { customerId: data.customerId, amount, method: data.method, paymentDate: data.paymentDate },
+    });
 
     return { payment, newBalance };
   });

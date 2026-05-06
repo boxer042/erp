@@ -6,6 +6,9 @@ import { incomingSchema } from "@/lib/validators/incoming";
 import { computeShippingNetPerUnit } from "@/lib/incoming-shipping";
 import { recalcIncomingExpense } from "@/lib/incoming-recalc";
 import { ensureMappingForSupplierProducts } from "@/lib/mapping-helpers";
+import { recalcPurchaseOrderProgress } from "@/lib/purchase-order";
+import { recordAudit } from "@/lib/audit";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
   _request: NextRequest,
@@ -457,9 +460,24 @@ export async function PUT(
   }
 
   if (action === "cancel") {
-    const updated = await prisma.incoming.update({
-      where: { id },
-      data: { status: "CANCELLED" },
+    const auditUser = await getCurrentUser();
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.incoming.update({
+        where: { id },
+        data: { status: "CANCELLED" },
+      });
+      // 발주 기반 입고면 receivedQty 복원 + status 재계산
+      if (incoming.purchaseOrderId) {
+        await recalcPurchaseOrderProgress(tx, incoming.purchaseOrderId);
+      }
+      await recordAudit(tx, {
+        userId: auditUser?.id ?? null,
+        entity: "Incoming",
+        entityId: id,
+        action: "CANCEL",
+        meta: { from: incoming.status, to: "CANCELLED", incomingNo: incoming.incomingNo },
+      });
+      return u;
     });
     return NextResponse.json(updated);
   }
@@ -727,6 +745,26 @@ export async function PUT(
 
     // 4. 택배비 경비 자동 기록 — 헤더 운임 + 품목 직접 운임 합산 통합 헬퍼 호출
     await recalcIncomingExpense(tx, incoming.id);
+
+    // 5. 발주 기반 입고면 발주 진행률 재계산 (CONFIRMED 시점에 반영)
+    if (incoming.purchaseOrderId) {
+      await recalcPurchaseOrderProgress(tx, incoming.purchaseOrderId);
+    }
+
+    // 6. 활동 로그
+    const auditUser = await getCurrentUser();
+    await recordAudit(tx, {
+      userId: auditUser?.id ?? null,
+      entity: "Incoming",
+      entityId: incoming.id,
+      action: "CONFIRM",
+      meta: {
+        from: "PENDING",
+        to: "CONFIRMED",
+        incomingNo: incoming.incomingNo,
+        totalAmount: Number(incoming.totalAmount),
+      },
+    });
   }, { timeout: 30000, maxWait: 10000 });
 
   const updated = await prisma.incoming.findUnique({
@@ -758,6 +796,12 @@ export async function DELETE(
     return NextResponse.json({ error: "대기 상태의 입고만 삭제할 수 있습니다" }, { status: 400 });
   }
 
-  await prisma.incoming.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.incoming.delete({ where: { id } });
+    // PENDING 입고도 발주 status 에는 반영되어 있으므로 (PARTIAL → ?), 삭제 후 재계산
+    if (incoming.purchaseOrderId) {
+      await recalcPurchaseOrderProgress(tx, incoming.purchaseOrderId);
+    }
+  });
   return NextResponse.json({ success: true });
 }

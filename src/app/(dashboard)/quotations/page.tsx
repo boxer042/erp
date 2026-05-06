@@ -115,7 +115,7 @@ export default function QuotationsPage() {
   const [previewTarget, setPreviewTarget] = useState<{ id: string; quotationNo: string } | null>(null);
   /** 전환 다이얼로그 — null 이면 닫힘. 견적서 type 따라 옵션 분기 */
   const [convertDialog, setConvertDialog] = useState<QuotationRow | null>(null);
-  const [convertTarget, setConvertTarget] = useState<"statement" | "order" | "incoming">(
+  const [convertTarget, setConvertTarget] = useState<"statement" | "order" | "incoming" | "purchase_order">(
     "statement",
   );
   const [convertChannelId, setConvertChannelId] = useState("");
@@ -193,7 +193,7 @@ export default function QuotationsPage() {
   const convertMutation = useMutation<
     unknown,
     Error,
-    { id: string; target: "statement" | "order" | "incoming"; channelId?: string }
+    { id: string; target: "statement" | "order" | "incoming" | "purchase_order"; channelId?: string }
   >({
     mutationFn: ({ id, target, channelId }) =>
       apiMutate(`/api/quotations/${id}/convert`, "POST", { target, channelId }),
@@ -203,7 +203,9 @@ export default function QuotationsPage() {
           ? "거래명세표"
           : vars.target === "order"
             ? "주문"
-            : "입고";
+            : vars.target === "purchase_order"
+              ? "발주"
+              : "입고";
       toast.success(`${label}로 전환됨`);
       refresh();
     },
@@ -222,7 +224,8 @@ export default function QuotationsPage() {
       return;
     }
     setConvertDialog(q);
-    setConvertTarget(q.type === "SALES" ? "statement" : "incoming");
+    // SALES → 거래명세표 (기본), PURCHASE → 발주 (정상 흐름: RFQ → 발주 → 입고)
+    setConvertTarget(q.type === "SALES" ? "statement" : "purchase_order");
     setConvertChannelId("");
   };
 
@@ -423,16 +426,36 @@ export default function QuotationsPage() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConvertTarget("incoming")}
-                    className="col-span-2 rounded-md border border-primary bg-secondary p-3 text-left text-sm"
-                  >
-                    <div className="font-semibold">입고</div>
-                    <div className="text-xs text-muted-foreground">
-                      매입 견적서 → Incoming 생성
-                    </div>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setConvertTarget("purchase_order")}
+                      className={`rounded-md border p-3 text-left text-sm ${
+                        convertTarget === "purchase_order"
+                          ? "border-primary bg-secondary"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="font-semibold">발주 (권장)</div>
+                      <div className="text-xs text-muted-foreground">
+                        RFQ → 발주 → 입고 정상 흐름
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConvertTarget("incoming")}
+                      className={`rounded-md border p-3 text-left text-sm ${
+                        convertTarget === "incoming"
+                          ? "border-primary bg-secondary"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="font-semibold">입고 (직접)</div>
+                      <div className="text-xs text-muted-foreground">
+                        발주 단계 건너뛰고 즉시 입고
+                      </div>
+                    </button>
+                  </>
                 )}
               </div>
             </div>

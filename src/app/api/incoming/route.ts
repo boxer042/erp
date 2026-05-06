@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { incomingSchema } from "@/lib/validators/incoming";
 import { getCurrentUser } from "@/lib/auth";
+import { recalcPurchaseOrderProgress } from "@/lib/purchase-order";
 
 function generateIncomingNo() {
   const now = new Date();
@@ -33,6 +34,10 @@ export async function GET(request: NextRequest) {
       supplier: { select: { name: true } },
       createdBy: { select: { name: true } },
       _count: { select: { items: true } },
+      purchaseOrder: { select: { id: true, poNo: true } },
+      // 교환분 표시용 — 이 입고가 어떤 SupplierReturn 의 교환분으로 들어왔는지
+      // (SupplierReturn.exchangeIncomingId 가 이 입고를 가리키면 매칭)
+      supplierReturn: { select: { id: true, returnNo: true } },
       items: {
         select: {
           id: true,
@@ -93,6 +98,7 @@ export async function POST(request: NextRequest) {
       discountAmount,
       itemShippingCost,
       itemShippingIsTaxable: item.itemShippingIsTaxable ?? true,
+      purchaseOrderItemId: item.purchaseOrderItemId || null,
     };
   });
 
@@ -100,6 +106,20 @@ export async function POST(request: NextRequest) {
   const incomingNo = generateIncomingNo();
 
   const incoming = await prisma.$transaction(async (tx) => {
+    // 발주 기반 입고 검증 — purchaseOrderId 가 있으면 발주서 상태와 거래처 일치 체크
+    if (data.purchaseOrderId) {
+      const po = await tx.purchaseOrder.findUnique({
+        where: { id: data.purchaseOrderId },
+        select: { status: true, supplierId: true },
+      });
+      if (!po) throw new Error("발주서를 찾을 수 없습니다");
+      if (po.supplierId !== data.supplierId) throw new Error("발주서의 거래처와 일치하지 않습니다");
+      const terminalStatuses = ["CANCELLED", "CLOSED", "RECEIVED", "PARTIAL_COMPLETED"];
+      if (terminalStatuses.includes(po.status)) {
+        throw new Error("종료된 발주서로는 입고할 수 없습니다");
+      }
+    }
+
     // 1. 입고 생성
     const created = await tx.incoming.create({
       data: {
@@ -111,6 +131,7 @@ export async function POST(request: NextRequest) {
         shippingIsTaxable: data.shippingIsTaxable ?? false,
         shippingDeducted: data.shippingDeducted ?? false,
         memo: data.memo || null,
+        purchaseOrderId: data.purchaseOrderId || null,
         createdById: user.id,
         items: {
           create: items.map((i) => ({
@@ -122,6 +143,7 @@ export async function POST(request: NextRequest) {
             totalPrice: i.totalPrice,
             itemShippingCost: i.itemShippingCost,
             itemShippingIsTaxable: i.itemShippingIsTaxable,
+            purchaseOrderItemId: i.purchaseOrderItemId,
           })),
         },
       },
@@ -209,6 +231,12 @@ export async function POST(request: NextRequest) {
       }
     }
     await Promise.all(priceOps);
+
+    // 발주 기반 입고면 status 갱신 (PENDING 등록 시에도 PARTIAL 로 전환).
+    // receivedQty 자체는 CONFIRMED 시점에 누적됨 — 헬퍼에서 분리 계산.
+    if (data.purchaseOrderId) {
+      await recalcPurchaseOrderProgress(tx, data.purchaseOrderId);
+    }
 
     return created;
   });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supplierSchema } from "@/lib/validators/supplier";
 import { guardUser } from "@/lib/api-auth";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const [, deny] = await guardUser();
+  const [user, deny] = await guardUser();
   if (deny) return deny;
   const body = await request.json();
   const parsed = supplierSchema.safeParse(body);
@@ -68,6 +69,14 @@ export async function POST(request: NextRequest) {
       } : {}),
     },
     include: { contacts: true },
+  });
+
+  await recordAudit(prisma, {
+    userId: user.id,
+    entity: "Supplier",
+    entityId: supplier.id,
+    action: "CREATE",
+    meta: { name: supplier.name, paymentMethod: supplier.paymentMethod },
   });
 
   return NextResponse.json(supplier, { status: 201 });

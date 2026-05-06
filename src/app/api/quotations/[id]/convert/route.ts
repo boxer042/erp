@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { generateStatementNo, generateDocumentNo } from "@/lib/document-no";
+import { generateStatementNo, generateDocumentNo, generatePurchaseOrderNo } from "@/lib/document-no";
 
 /**
- * 견적서 전환 — Statement / Order / Incoming 으로 복제 + 원본 status=CONVERTED.
+ * 견적서 전환 — Statement / Order / Incoming / PurchaseOrder 로 복제 + 원본 status=CONVERTED.
  *
- * - target=statement: 모든 SALES 견적서 → Statement (판매 거래명세표)
- * - target=order:     SALES 견적서 → Order (POS 채널) — 채널 ID 또는 채널 코드 명시 필수
- * - target=incoming:  PURCHASE 견적서 → Incoming (입고)
+ * - target=statement:      모든 SALES 견적서 → Statement (판매 거래명세표)
+ * - target=order:          SALES 견적서 → Order (POS 채널) — 채널 ID 또는 채널 코드 명시 필수
+ * - target=incoming:       PURCHASE 견적서 → Incoming (입고, 발주 건너뜀)
+ * - target=purchase_order: PURCHASE 견적서 → PurchaseOrder (정상 흐름: RFQ → 발주 → 입고)
  *
- * 자유 입력 라인(productId·supplierProductId 없음)은 Order/Incoming 전환 시 거부.
+ * 자유 입력 라인(productId·supplierProductId 없음)은 Order/Incoming/PurchaseOrder 전환 시 거부.
  */
 export async function POST(
   request: NextRequest,
@@ -19,12 +20,12 @@ export async function POST(
   const user = await requireAuth();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  const target = body?.target as "statement" | "order" | "incoming" | undefined;
+  const target = body?.target as "statement" | "order" | "incoming" | "purchase_order" | undefined;
   const channelId = body?.channelId as string | undefined;
 
-  if (!target || !["statement", "order", "incoming"].includes(target)) {
+  if (!target || !["statement", "order", "incoming", "purchase_order"].includes(target)) {
     return NextResponse.json(
-      { error: "target 은 statement / order / incoming 중 하나여야 합니다" },
+      { error: "target 은 statement / order / incoming / purchase_order 중 하나여야 합니다" },
       { status: 400 },
     );
   }
@@ -209,6 +210,59 @@ export async function POST(
       return created;
     });
     return NextResponse.json(incoming, { status: 201 });
+  }
+
+  if (target === "purchase_order") {
+    if (quotation.type !== "PURCHASE") {
+      return NextResponse.json(
+        { error: "매입 견적서만 발주로 전환할 수 있습니다" },
+        { status: 400 },
+      );
+    }
+    if (!quotation.supplierId) {
+      return NextResponse.json(
+        { error: "거래처가 없는 견적서는 발주로 전환할 수 없습니다" },
+        { status: 400 },
+      );
+    }
+    const freeLines = quotation.items.filter((i) => !i.supplierProductId);
+    if (freeLines.length > 0) {
+      return NextResponse.json(
+        {
+          error: `공급상품 매핑 안 된 자유 입력 라인 ${freeLines.length}건 — 발주 전환 전 매핑 필요`,
+          freeLineNames: freeLines.map((l) => l.name),
+        },
+        { status: 400 },
+      );
+    }
+
+    const po = await prisma.$transaction(async (tx) => {
+      const created = await tx.purchaseOrder.create({
+        data: {
+          poNo: generatePurchaseOrderNo(),
+          supplierId: quotation.supplierId!,
+          status: "DRAFT",
+          orderDate: new Date(),
+          totalAmount: quotation.totalAmount,
+          quotationId: quotation.id,
+          memo: quotation.memo,
+          createdById: user.id,
+          items: {
+            create: quotation.items.map((it, idx) => ({
+              supplierProductId: it.supplierProductId!,
+              quantity: it.quantity,
+              unitPrice: it.unitPrice,
+              totalPrice: it.totalPrice,
+              memo: it.memo,
+              sortOrder: it.sortOrder ?? idx,
+            })),
+          },
+        },
+      });
+      await tx.quotation.update({ where: { id }, data: { status: "CONVERTED" } });
+      return created;
+    });
+    return NextResponse.json(po, { status: 201 });
   }
 
   return NextResponse.json({ error: "지원하지 않는 target" }, { status: 400 });

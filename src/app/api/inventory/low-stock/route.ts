@@ -47,20 +47,62 @@ export async function GET() {
     LIMIT 500
   `;
 
-  const items = rows.map((r) => ({
-    productId: r.product_id,
-    name: r.name,
-    sku: r.sku,
-    brand: r.brand,
-    spec: r.spec,
-    quantity: Number(r.quantity),
-    safetyStock: Number(r.safety_stock),
-    shortage: Math.max(0, Number(r.safety_stock) - Number(r.quantity)),
-    unitOfMeasure: r.unit_of_measure,
-    categoryId: r.category_id,
-    categoryName: r.category_name,
-    isOut: Number(r.quantity) === 0,
-  }));
+  // 매핑된 거래처/공급상품 일괄 조회 (N+1 방지)
+  const productIds = rows.map((r) => r.product_id);
+  const mappings = productIds.length === 0
+    ? []
+    : await prisma.productMapping.findMany({
+        where: { productId: { in: productIds } },
+        select: {
+          productId: true,
+          conversionRate: true,
+          supplierProduct: {
+            select: {
+              id: true,
+              name: true,
+              supplierCode: true,
+              unitPrice: true,
+              unitOfMeasure: true,
+              supplier: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
+  const mappingsByProductId = new Map<string, typeof mappings>();
+  for (const m of mappings) {
+    if (!mappingsByProductId.has(m.productId)) mappingsByProductId.set(m.productId, []);
+    mappingsByProductId.get(m.productId)!.push(m);
+  }
+
+  const items = rows.map((r) => {
+    const shortage = Math.max(0, Number(r.safety_stock) - Number(r.quantity));
+    const mappingList = (mappingsByProductId.get(r.product_id) ?? []).map((m) => ({
+      supplierId: m.supplierProduct.supplier.id,
+      supplierName: m.supplierProduct.supplier.name,
+      supplierProductId: m.supplierProduct.id,
+      supplierProductName: m.supplierProduct.name,
+      supplierCode: m.supplierProduct.supplierCode,
+      unitPrice: m.supplierProduct.unitPrice.toString(),
+      conversionRate: Number(m.conversionRate),
+      // 부족분(판매단위)을 환산비율로 역산 → 발주해야 할 공급상품 수량
+      suggestedQty: Number(m.conversionRate) > 0 ? Math.ceil(shortage / Number(m.conversionRate)) : shortage,
+    }));
+    return {
+      productId: r.product_id,
+      name: r.name,
+      sku: r.sku,
+      brand: r.brand,
+      spec: r.spec,
+      quantity: Number(r.quantity),
+      safetyStock: Number(r.safety_stock),
+      shortage,
+      unitOfMeasure: r.unit_of_measure,
+      categoryId: r.category_id,
+      categoryName: r.category_name,
+      isOut: Number(r.quantity) === 0,
+      mappings: mappingList,
+    };
+  });
 
   const summary = {
     totalCount: items.length,

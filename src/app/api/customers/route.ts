@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { customerSchema } from "@/lib/validators/customer";
 import { guardUser } from "@/lib/api-auth";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const [, deny] = await guardUser();
+  const [user, deny] = await guardUser();
   if (deny) return deny;
   const body = await request.json();
   const parsed = customerSchema.safeParse(body);
@@ -103,6 +104,14 @@ export async function POST(request: NextRequest) {
       contactPhone: isBusiness ? data.contactPhone || null : null,
       contactPosition: isBusiness ? data.contactPosition || null : null,
     },
+  });
+
+  await recordAudit(prisma, {
+    userId: user.id,
+    entity: "Customer",
+    entityId: customer.id,
+    action: "CREATE",
+    meta: { name: customer.name, type: customer.type },
   });
 
   return NextResponse.json(customer, { status: 201 });

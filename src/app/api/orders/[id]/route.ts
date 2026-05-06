@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { computeSellingCostPerUnit } from "@/lib/selling-cost";
 import { fifoConsume, ensureBulkStock } from "@/lib/inventory/fifo";
+import { orderUpdateSchema } from "@/lib/validators/order";
+import { recordAudit } from "@/lib/audit";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
   _request: NextRequest,
@@ -77,8 +80,8 @@ export async function PUT(
     return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  // 주문 확정 가드: 대표 상품(canonical)이 그대로 있으면 차단 — 변형 확정 후 재시도
-  if (action === "confirm") {
+  // 주문 확정(prepare) 가드: 대표 상품(canonical)이 그대로 있으면 차단 — 변형 확정 후 재시도
+  if (action === "prepare") {
     const unresolved = order.items.filter(
       (i) => i.product && i.product.isCanonical,
     );
@@ -94,13 +97,14 @@ export async function PUT(
     }
   }
 
+  // 4단계 워크플로: PENDING → PREPARING → SHIPPED → COMPLETED + 취소/반품
+  // prepare 액션이 기존 confirm 의 재고 차감 로직을 흡수
   const statusTransitions: Record<string, { from: string; to: string }> = {
-    confirm: { from: "PENDING", to: "CONFIRMED" },
-    prepare: { from: "CONFIRMED", to: "PREPARING" },
+    prepare: { from: "PENDING", to: "PREPARING" },
     ship: { from: "PREPARING", to: "SHIPPED" },
-    deliver: { from: "SHIPPED", to: "DELIVERED" },
+    complete: { from: "SHIPPED", to: "COMPLETED" },
     cancel: { from: "PENDING", to: "CANCELLED" },
-    return: { from: "DELIVERED", to: "RETURNED" },
+    return: { from: "COMPLETED", to: "RETURNED" },
   };
 
   const transition = statusTransitions[action];
@@ -108,8 +112,8 @@ export async function PUT(
     return NextResponse.json({ error: "유효하지 않은 액션입니다" }, { status: 400 });
   }
 
-  // cancel은 PENDING, CONFIRMED에서 가능
-  if (action === "cancel" && !["PENDING", "CONFIRMED"].includes(order.status)) {
+  // cancel은 PENDING / PREPARING 에서 가능 (재고 차감된 PREPARING 도 복원해서 취소)
+  if (action === "cancel" && !["PENDING", "PREPARING"].includes(order.status)) {
     return NextResponse.json({ error: "취소할 수 없는 상태입니다" }, { status: 400 });
   } else if (action !== "cancel" && order.status !== transition.from) {
     return NextResponse.json(
@@ -118,8 +122,8 @@ export async function PUT(
     );
   }
 
-  // === 확인 시 재고 차감 + cost snapshot ===
-  if (action === "confirm") {
+  // === prepare 시 재고 차감 + cost snapshot (기존 confirm 로직과 동일) ===
+  if (action === "prepare") {
     // 채널 수수료율 + 오프라인(channelId IS NULL) 이면 현재 카드수수료율 (트랜잭션 외에서 fetch)
     const channelCommRate = order.channel ? Number(order.channel.commissionRate) : 0;
     const isOffline = order.channelId == null;
@@ -156,7 +160,7 @@ export async function PUT(
       }
 
       await prisma.$transaction(async (tx) => {
-        await tx.order.update({ where: { id }, data: { status: "CONFIRMED" } });
+        await tx.order.update({ where: { id }, data: { status: "PREPARING" } });
 
         // FIFO 로트 소진 + orderItemId로 LotConsumption 생성
         const fifoForOrderItem = async (
@@ -321,18 +325,32 @@ export async function PUT(
   }
 
   // === 취소/반품 시 재고 복원 ===
-  // avgCost 정책: 옵션 1(보수적) — quantity만 복원, avgCost는 그대로.
-  // 출고는 이동평균을 변경하지 않으므로, 그 출고를 되돌리는 것도 마찬가지로 변경 없음.
-  // 반품 상품의 재판매 가능성 검수는 별도 운영 단계 (필요 시 ADJUSTMENT_MINUS로 폐기 처리).
+  // PENDING 은 재고 차감 안 된 상태이므로 그냥 상태만 변경.
+  // PREPARING/SHIPPED/COMPLETED 는 차감됐으므로 LotConsumption 복원 + Inventory 복원.
   if (action === "cancel" || action === "return") {
-    const wasConfirmed = order.status !== "PENDING"; // PENDING이면 재고 차감 안 됨
+    const wasStockDeducted = order.status !== "PENDING";
+    const auditUser = await getCurrentUser();
     await prisma.$transaction(async (tx) => {
+      const targetStatus = action === "cancel" ? "CANCELLED" : "RETURNED";
       await tx.order.update({
         where: { id },
-        data: { status: action === "cancel" ? "CANCELLED" : "RETURNED" },
+        data: { status: targetStatus },
+      });
+      await recordAudit(tx, {
+        userId: auditUser?.id ?? null,
+        entity: "Order",
+        entityId: id,
+        action: action === "cancel" ? "CANCEL" : "STATUS_CHANGE",
+        meta: {
+          from: order.status,
+          to: targetStatus,
+          orderNo: order.orderNo,
+          totalAmount: Number(order.totalAmount),
+          stockRestored: wasStockDeducted,
+        },
       });
 
-      if (wasConfirmed) {
+      if (wasStockDeducted) {
         // 모든 OrderItem 의 LotConsumption 을 한 번에 조회 (N+1 방지)
         const itemIds = order.items.map((i) => i.id);
         const allConsumptions = await tx.lotConsumption.findMany({
@@ -386,12 +404,123 @@ export async function PUT(
     return NextResponse.json(updated);
   }
 
-  // 일반 상태 전이 (prepare, ship, deliver)
-  const updated = await prisma.order.update({
-    where: { id },
-    data: { status: transition.to as never },
+  // 일반 상태 전이 (ship, complete) — prepare/cancel/return 은 위에서 별도 처리.
+  // ship 액션은 trackingCarrier/Number 함께 저장 가능 (UI 의 송장 입력 dialog 와 연동).
+  const trackingPatch =
+    action === "ship"
+      ? {
+          ...(typeof body.trackingCarrier === "string"
+            ? { trackingCarrier: body.trackingCarrier || null }
+            : {}),
+          ...(typeof body.trackingNumber === "string"
+            ? { trackingNumber: body.trackingNumber || null }
+            : {}),
+        }
+      : {};
+  const auditUserShip = await getCurrentUser();
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.order.update({
+      where: { id },
+      data: { status: transition.to as never, ...trackingPatch },
+    });
+    await recordAudit(tx, {
+      userId: auditUserShip?.id ?? null,
+      entity: "Order",
+      entityId: id,
+      action: "STATUS_CHANGE",
+      meta: {
+        from: order.status,
+        to: transition.to,
+        action,
+        orderNo: order.orderNo,
+      },
+    });
+    return u;
   });
 
+  return NextResponse.json(updated);
+}
+
+/**
+ * 주문 일반 수정 — 출고 정보(예정일·주소·받는사람·메모 등) 편집.
+ * 종결 상태(COMPLETED/CANCELLED/RETURNED)는 잠금. 항목·금액 편집은 미지원.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+  const parsed = orderUpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    select: { id: true, status: true },
+  });
+  if (!order) {
+    return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (
+    order.status === "COMPLETED" ||
+    order.status === "CANCELLED" ||
+    order.status === "RETURNED"
+  ) {
+    return NextResponse.json(
+      { error: `${order.status} 상태에서는 수정할 수 없습니다` },
+      { status: 400 },
+    );
+  }
+
+  const data = parsed.data;
+  // fulfillmentType=PICKUP 으로 변경 시 expectedShipDate / shippingAddress / recipient 정리.
+  // PICKUP 은 매장 인도라 그 데이터들이 의미 없음 → 데이터 정합성 보호.
+  const isPickup = data.fulfillmentType === "PICKUP";
+  const updated = await prisma.order.update({
+    where: { id },
+    data: {
+      ...(data.fulfillmentType !== undefined
+        ? { fulfillmentType: data.fulfillmentType }
+        : {}),
+      ...(isPickup
+        ? {
+            expectedShipDate: null,
+            shippingAddress: null,
+            recipientName: null,
+            recipientPhone: null,
+          }
+        : {
+            ...(data.expectedShipDate !== undefined
+              ? {
+                  expectedShipDate: data.expectedShipDate
+                    ? new Date(data.expectedShipDate)
+                    : null,
+                }
+              : {}),
+            ...(data.shippingAddress !== undefined
+              ? { shippingAddress: data.shippingAddress || null }
+              : {}),
+            ...(data.recipientName !== undefined
+              ? { recipientName: data.recipientName || null }
+              : {}),
+            ...(data.recipientPhone !== undefined
+              ? { recipientPhone: data.recipientPhone || null }
+              : {}),
+          }),
+      ...(data.channelOrderNo !== undefined
+        ? { channelOrderNo: data.channelOrderNo || null }
+        : {}),
+      ...(data.memo !== undefined ? { memo: data.memo || null } : {}),
+      ...(data.trackingCarrier !== undefined
+        ? { trackingCarrier: data.trackingCarrier || null }
+        : {}),
+      ...(data.trackingNumber !== undefined
+        ? { trackingNumber: data.trackingNumber || null }
+        : {}),
+    },
+  });
   return NextResponse.json(updated);
 }
 
