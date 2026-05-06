@@ -93,17 +93,15 @@ export function ProductsMode({
   });
 
   const products = productsQuery.data ?? [];
-  const productItems = useMemo(
-    () => session.items.filter((i) => i.itemType === "product"),
-    [session.items],
-  );
   // 미니카트 합계는 전체 카트 (상품+임대+수리) — 결제는 전체 항목 결제
   const totals = useMemo(
     () => calcCartTotals(session),
     [session],
   );
   const cartCount = session.items.length;
-  const otherCount = cartCount - productItems.length;
+  const productCount = session.items.filter((i) => i.itemType === "product").length;
+  const repairCount = session.items.filter((i) => i.itemType === "repair").length;
+  const rentalCount = session.items.filter((i) => i.itemType === "rental").length;
 
   const addToCart = (p: ProductLite, unitPrice: number) => {
     // 비교 기준선 — listPrice 우선, 없으면 sellingPrice 사용 (= 카트 추가 시점에 보이던 판매가)
@@ -142,8 +140,8 @@ export function ProductsMode({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       {/* 상단 — 카테고리 썸네일 (검색은 글로벌 헤더로 이동) */}
-      <header className="shrink-0 overflow-hidden border-b border-zinc-100 bg-white">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+      <header className="shrink-0 overflow-hidden border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+        <div className="px-4 sm:px-6">
           <CategoryChips
             categories={categoriesQuery.data ?? []}
             selectedId={categoryId}
@@ -155,15 +153,15 @@ export function ProductsMode({
 
       {/* 본문 — 그리드 */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-3 py-3 sm:px-4 sm:py-4">
+        <div className="px-3 py-3 sm:px-4 sm:py-4">
           {/* 자주 쓰는 상품 — 전체 카테고리 일 때만 */}
           {categoryId === "" && (popularQuery.data?.length ?? 0) > 0 && (
             <section className="mb-4 flex flex-col gap-2">
               <div className="flex items-baseline gap-2 px-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   자주 쓰는 상품
                 </span>
-                <span className="text-[10px] text-zinc-400">최근 30일 기준</span>
+                <span className="text-[10px] text-[var(--jm-text-subtle)]">최근 30일 기준</span>
               </div>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4">
                 {(popularQuery.data ?? []).map((p) => (
@@ -175,7 +173,7 @@ export function ProductsMode({
                   />
                 ))}
               </div>
-              <div className="my-2 h-px bg-zinc-100" />
+              <div className="my-2 h-px bg-[var(--jm-surface-muted)]" />
             </section>
           )}
 
@@ -183,7 +181,7 @@ export function ProductsMode({
             <GridSkeleton />
           ) : products.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <span className="text-[14px] text-zinc-500">
+              <span className="text-[14px] text-[var(--jm-text-muted)]">
                 해당 카테고리에 상품이 없습니다
               </span>
             </div>
@@ -206,14 +204,14 @@ export function ProductsMode({
 
       {/* 하단 — 미니 카트바 (sticky) */}
       {cartCount > 0 && (
-        <div className="shrink-0 border-t border-zinc-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-stretch gap-2 px-4 py-2.5 sm:px-6">
+        <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)]">
+          <div className="flex items-stretch gap-2 px-4 py-2.5 sm:px-6">
             <button
               type="button"
               onClick={() => setCartOpen(true)}
-              className="flex flex-1 items-center gap-2 rounded-2xl bg-zinc-100 px-4 py-3 text-left transition-colors active:bg-zinc-200"
+              className="flex flex-1 items-center gap-2 rounded-2xl bg-[var(--jm-surface-muted)] px-4 py-3 text-left transition-colors active:bg-[var(--jm-border)]"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface)]">
                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
                   <path
                     d="M4 7h12l-1.3 9a1.5 1.5 0 0 1-1.5 1.3H6.8a1.5 1.5 0 0 1-1.5-1.3L4 7zM7 7V5a3 3 0 0 1 6 0v2"
@@ -225,15 +223,14 @@ export function ProductsMode({
                 </svg>
               </div>
               <div className="flex min-w-0 flex-col">
-                <span className="text-[10px] uppercase tracking-wider text-zinc-500">
-                  카트 {cartCount}건
-                  {otherCount > 0 && (
-                    <span className="ml-1 text-zinc-400">
-                      (상품 {productItems.length} · 외 {otherCount})
-                    </span>
-                  )}
+                <span className="text-[11px] tabular-nums text-[var(--jm-text-muted)]">
+                  상품 {productCount}
+                  <span className="mx-1.5 text-[var(--jm-text-disabled)]">·</span>
+                  수리 {repairCount}
+                  <span className="mx-1.5 text-[var(--jm-text-disabled)]">·</span>
+                  임대 {rentalCount}
                 </span>
-                <span className="text-[15px] font-bold tabular-nums text-zinc-900">
+                <span className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
                   ₩{totals.total.toLocaleString("ko-KR")}
                 </span>
               </div>
@@ -241,7 +238,7 @@ export function ProductsMode({
             <button
               type="button"
               onClick={() => setPaymentOpen(true)}
-              className="rounded-2xl bg-zinc-900 px-5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
+              className="rounded-2xl bg-[var(--jm-action)] px-5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
             >
               결제
             </button>
@@ -328,13 +325,13 @@ function GridSkeleton() {
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-zinc-100"
+          className="flex flex-col overflow-hidden rounded-2xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]"
         >
-          <div className="aspect-square w-full animate-pulse bg-zinc-100" />
+          <div className="aspect-square w-full animate-pulse bg-[var(--jm-surface-muted)]" />
           <div className="flex flex-col gap-1.5 p-2.5">
-            <div className="h-3.5 w-full animate-pulse rounded bg-zinc-100" />
-            <div className="h-3 w-1/2 animate-pulse rounded bg-zinc-100" />
-            <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
+            <div className="h-3.5 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
           </div>
         </div>
       ))}

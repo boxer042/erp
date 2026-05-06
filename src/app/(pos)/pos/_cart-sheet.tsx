@@ -132,7 +132,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               onCheckout();
             }}
             disabled={items.length === 0}
-            className="flex h-14 w-full items-center justify-between rounded-2xl bg-zinc-900 px-5 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-[var(--jm-action)] px-5 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
           >
             <span>{items.length}건 결제</span>
             <span className="tabular-nums">
@@ -143,7 +143,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
       >
         <div className="-mx-5 flex flex-col">
           {items.length === 0 ? (
-            <div className="px-5 py-12 text-center text-[13px] text-zinc-400">
+            <div className="px-5 py-12 text-center text-[13px] text-[var(--jm-text-subtle)]">
               카트가 비어 있습니다
             </div>
           ) : (
@@ -154,7 +154,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
         </div>
 
         {items.length > 0 && (
-          <div className="mt-4 flex flex-col gap-2.5 rounded-2xl bg-zinc-50 p-4">
+          <div className="mt-4 flex flex-col gap-2.5 rounded-2xl bg-[var(--jm-bg)] p-4">
             <Row label="공급가액" value={totals.net} />
             <Row label="세액 (VAT)" value={totals.vat} />
             {totals.shippingNet > 0 && (
@@ -170,10 +170,10 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
                 tone="warn"
               />
             )}
-            <div className="my-1 h-px bg-zinc-200" />
+            <div className="my-1 h-px bg-[var(--jm-border)]" />
             <div className="flex items-baseline justify-between">
-              <span className="text-[15px] font-semibold text-zinc-900">합계</span>
-              <span className="text-[22px] font-bold tabular-nums text-zinc-900">
+              <span className="text-[15px] font-semibold text-[var(--jm-text)]">합계</span>
+              <span className="text-[22px] font-bold tabular-nums text-[var(--jm-text)]">
                 ₩{totals.total.toLocaleString("ko-KR")}
               </span>
             </div>
@@ -242,14 +242,14 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               pending={issuingKind === "quotation"}
             />
             {cartChangedSinceQuotation && (
-              <p className="col-span-4 -mb-1 mt-1 px-1 text-[11px] text-amber-700">
+              <p className="col-span-4 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
                 ⚠ 카트가 발행 후 변경됨 — 견적서 버튼 다시 눌러 재발행
               </p>
             )}
           </div>
         )}
         {items.length > 0 && !session.customerId && (
-          <p className="mt-2 px-1 text-[11px] text-amber-700">
+          <p className="mt-2 px-1 text-[11px] text-[var(--jm-warning-fg)]">
             견적서 발행은 고객 연결이 필요합니다 (결제 시트에서 연결)
           </p>
         )}
@@ -301,20 +301,20 @@ function ActionButton({
       disabled={disabled}
       className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-center transition-colors ${
         active
-          ? "bg-emerald-50 ring-1 ring-emerald-300"
-          : "bg-white ring-1 ring-zinc-200 active:bg-zinc-50"
+          ? "bg-[var(--jm-success-bg)] ring-1 ring-emerald-300"
+          : "bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] active:bg-[var(--jm-bg)]"
       } disabled:opacity-40`}
     >
       <span
         className={`text-[11px] font-semibold ${
-          active ? "text-emerald-800" : "text-zinc-900"
+          active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"
         }`}
       >
         {label}
       </span>
       <span
         className={`max-w-full truncate px-1 text-[10px] tabular-nums ${
-          active ? "text-emerald-700" : "text-zinc-500"
+          active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text-muted)]"
         }`}
       >
         {pending ? "진행중…" : sub}
@@ -334,10 +334,10 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between">
-      <span className="text-[13px] text-zinc-600">{label}</span>
+      <span className="text-[13px] text-[var(--jm-text-muted)]">{label}</span>
       <span
         className={`text-[14px] font-semibold tabular-nums ${
-          tone === "warn" ? "text-rose-600" : "text-zinc-900"
+          tone === "warn" ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]"
         }`}
       >
         {value < 0 ? "−" : ""}₩{Math.abs(value).toLocaleString("ko-KR")}

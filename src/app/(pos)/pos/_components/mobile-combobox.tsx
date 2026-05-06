@@ -68,14 +68,14 @@ function Body<T>({
       : items.filter((it) => (filterFn ? filterFn(it, q.trim()) : false));
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--jm-surface)]">
       {/* 헤더 */}
-      <header className="shrink-0 border-b border-zinc-100 bg-white">
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
         <div className="flex items-center gap-2 px-3 py-2">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="닫기"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -98,7 +98,7 @@ function Body<T>({
               onQueryChange?.(e.target.value);
             }}
             placeholder={placeholder}
-            className="h-11 flex-1 rounded-xl bg-zinc-100 px-4 text-[15px] outline-none placeholder:text-zinc-400 focus:bg-zinc-50"
+            className="h-11 flex-1 rounded-xl bg-[var(--jm-surface-muted)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:bg-[var(--jm-bg)]"
           />
           {q && (
             <button
@@ -108,7 +108,7 @@ function Body<T>({
                 onQueryChange?.("");
                 inputRef.current?.focus();
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)]"
               aria-label="지우기"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -123,7 +123,7 @@ function Body<T>({
           )}
         </div>
         {title && (
-          <div className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          <div className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
             {title}
           </div>
         )}
@@ -135,12 +135,12 @@ function Body<T>({
           <SkeletonList />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
-            <span className="text-[14px] text-zinc-500">{emptyText}</span>
+            <span className="text-[14px] text-[var(--jm-text-muted)]">{emptyText}</span>
             {onCreate && q.trim() && (
               <button
                 type="button"
                 onClick={() => onCreate(q.trim())}
-                className="flex h-11 items-center gap-2 rounded-full bg-zinc-900 px-5 text-[14px] font-semibold text-white"
+                className="flex h-11 items-center gap-2 rounded-full bg-[var(--jm-action)] px-5 text-[14px] font-semibold text-white"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path
@@ -164,7 +164,7 @@ function Body<T>({
                     onSelect(it);
                     onOpenChange(false);
                   }}
-                  className="flex w-full items-center gap-3 border-b border-zinc-50 px-4 py-3 text-left active:bg-zinc-50 sm:hover:bg-zinc-50"
+                  className="flex w-full items-center gap-3 border-b border-[var(--jm-border)] px-4 py-3 text-left active:bg-[var(--jm-bg)] sm:hover:bg-[var(--jm-bg)]"
                 >
                   {renderItem(it)}
                 </button>
@@ -176,7 +176,7 @@ function Body<T>({
                 <button
                   type="button"
                   onClick={() => onCreate(q.trim())}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-100 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-200"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--jm-surface-muted)] text-[13px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path
@@ -203,12 +203,12 @@ function SkeletonList() {
       {Array.from({ length: 6 }).map((_, i) => (
         <li
           key={i}
-          className="flex items-center gap-3 border-b border-zinc-50 px-4 py-3"
+          className="flex items-center gap-3 border-b border-[var(--jm-border)] px-4 py-3"
         >
-          <div className="size-10 animate-pulse rounded-full bg-zinc-100" />
+          <div className="size-10 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
           <div className="flex flex-1 flex-col gap-1.5">
-            <div className="h-3.5 w-1/2 animate-pulse rounded bg-zinc-100" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
+            <div className="h-3.5 w-1/2 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+            <div className="h-3 w-1/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
           </div>
         </li>
       ))}

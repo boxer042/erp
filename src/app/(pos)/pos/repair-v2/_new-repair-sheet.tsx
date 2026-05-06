@@ -94,19 +94,19 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
       />
 
       {/* 바텀 시트 */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col rounded-t-3xl bg-white shadow-2xl">
+      <div className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col rounded-t-3xl bg-[var(--jm-surface)] shadow-2xl">
         {/* 핸들 */}
         <div className="flex shrink-0 justify-center pt-3">
-          <div className="h-1 w-10 rounded-full bg-zinc-300" />
+          <div className="h-1 w-10 rounded-full bg-[var(--jm-border-strong)]" />
         </div>
 
         {/* 헤더 */}
         <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-3">
-          <h2 className="text-[18px] font-bold text-zinc-900">새 수리</h2>
+          <h2 className="text-[18px] font-bold text-[var(--jm-text)]">새 수리</h2>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 active:bg-zinc-200"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="닫기"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -144,12 +144,12 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
             {/* 고객 */}
             <Section label="고객" optional>
               {selectedCustomer ? (
-                <div className="flex items-center justify-between rounded-xl bg-zinc-100 px-4 py-3">
+                <div className="flex items-center justify-between rounded-xl bg-[var(--jm-surface-muted)] px-4 py-3">
                   <div className="flex flex-col">
-                    <span className="text-[15px] font-semibold text-zinc-900">
+                    <span className="text-[15px] font-semibold text-[var(--jm-text)]">
                       {selectedCustomer.name}
                     </span>
-                    <span className="font-mono text-[12px] text-zinc-500">
+                    <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
                       {selectedCustomer.phone}
                     </span>
                   </div>
@@ -159,7 +159,7 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
                       setSelectedCustomer(null);
                       setCustomerSearch("");
                     }}
-                    className="text-[12px] font-medium text-zinc-500 underline-offset-2 hover:underline"
+                    className="text-[12px] font-medium text-[var(--jm-text-muted)] underline-offset-2 hover:underline"
                   >
                     변경
                   </button>
@@ -172,16 +172,16 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
                     placeholder="이름 또는 전화 검색"
-                    className="h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-[15px] outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white"
+                    className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
                   />
                   {customerSearch.length > 0 && (
                     <div className="mt-2 flex flex-col gap-1">
                       {customersQuery.isPending ? (
-                        <div className="px-3 py-2 text-[13px] text-zinc-400">
+                        <div className="px-3 py-2 text-[13px] text-[var(--jm-text-subtle)]">
                           검색 중…
                         </div>
                       ) : customersQuery.data?.length === 0 ? (
-                        <div className="rounded-xl bg-zinc-50 px-3 py-3 text-[13px] text-zinc-500">
+                        <div className="rounded-xl bg-[var(--jm-bg)] px-3 py-3 text-[13px] text-[var(--jm-text-muted)]">
                           일치하는 고객 없음 — 미등록으로 진행하거나 고객 페이지에서 등록하세요
                         </div>
                       ) : (
@@ -190,12 +190,12 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
                             key={c.id}
                             type="button"
                             onClick={() => setSelectedCustomer(c)}
-                            className="flex items-center justify-between rounded-xl px-3 py-2.5 text-left hover:bg-zinc-100 active:bg-zinc-200"
+                            className="flex items-center justify-between rounded-xl px-3 py-2.5 text-left hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
                           >
-                            <span className="text-[14px] font-medium text-zinc-900">
+                            <span className="text-[14px] font-medium text-[var(--jm-text)]">
                               {c.name}
                             </span>
-                            <span className="font-mono text-[12px] text-zinc-500">
+                            <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
                               {c.phone}
                             </span>
                           </button>
@@ -214,9 +214,9 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
                 value={device}
                 onChange={(e) => setDevice(e.target.value)}
                 placeholder="예: Sony A7M4 (Black)"
-                className="h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-[15px] outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white"
+                className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
               />
-              <p className="mt-1.5 text-[12px] text-zinc-500">
+              <p className="mt-1.5 text-[12px] text-[var(--jm-text-muted)]">
                 상세 페이지에서 시리얼 코드/카탈로그 매핑으로 정밀화 가능
               </p>
             </Section>
@@ -228,19 +228,19 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
                 onChange={(e) => setSymptom(e.target.value)}
                 placeholder="고객이 호소하는 증상"
                 rows={3}
-                className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-[15px] outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white"
+                className="w-full resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
               />
             </Section>
           </div>
         </div>
 
         {/* 하단 액션 — sticky */}
-        <div className="shrink-0 border-t border-zinc-100 bg-white px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
+        <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
           <button
             type="button"
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
           >
             {createMutation.isPending && (
               <Spinner className="size-4 text-white" />
@@ -265,11 +265,11 @@ function Section({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           {label}
         </span>
         {optional && (
-          <span className="text-[10px] text-zinc-400">선택</span>
+          <span className="text-[10px] text-[var(--jm-text-subtle)]">선택</span>
         )}
       </div>
       {children}
@@ -294,16 +294,16 @@ function TypeOption({
       onClick={onClick}
       className={`flex flex-col gap-1 rounded-2xl border-2 p-4 text-left transition-colors ${
         active
-          ? "border-zinc-900 bg-zinc-50"
-          : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300"
+          ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+          : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text-muted)] hover:border-[var(--jm-border-strong)]"
       }`}
     >
       <span
-        className={`text-[16px] font-semibold ${active ? "text-zinc-900" : ""}`}
+        className={`text-[16px] font-semibold ${active ? "text-[var(--jm-text)]" : ""}`}
       >
         {title}
       </span>
-      <span className="text-[12px] text-zinc-500">{desc}</span>
+      <span className="text-[12px] text-[var(--jm-text-muted)]">{desc}</span>
     </button>
   );
 }

@@ -91,14 +91,14 @@ export default function CustomerProfilePage({
   }
   if (detailQuery.isError || !detailQuery.data) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-zinc-50 p-6 text-center">
-        <span className="text-[15px] font-semibold text-zinc-900">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
+        <span className="text-[15px] font-semibold text-[var(--jm-text)]">
           고객을 찾을 수 없습니다
         </span>
         <button
           type="button"
           onClick={() => router.push("/pos")}
-          className="h-10 rounded-full bg-zinc-900 px-5 text-[13px] font-semibold text-white"
+          className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-[13px] font-semibold text-white"
         >
           POS 로
         </button>
@@ -110,14 +110,14 @@ export default function CustomerProfilePage({
   const c = d.customer;
 
   return (
-    <div className="flex h-full flex-col bg-zinc-50">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       {/* 헤더 */}
-      <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2.5 sm:px-6">
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+        <div className="flex items-center gap-2 px-3 py-2.5 sm:px-6">
           <button
             type="button"
             onClick={() => router.back()}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
             aria-label="뒤로"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -133,21 +133,21 @@ export default function CustomerProfilePage({
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex items-center gap-1.5">
               {c.type === "BUSINESS" && (
-                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--jm-warning-fg)]">
                   기업
                 </span>
               )}
-              <span className="line-clamp-1 text-[16px] font-bold text-zinc-900">
+              <span className="line-clamp-1 text-[16px] font-bold text-[var(--jm-text)]">
                 {c.name}
               </span>
             </div>
-            <span className="font-mono text-[12px] text-zinc-500">{c.phone}</span>
+            <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">{c.phone}</span>
           </div>
         </div>
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 p-4 sm:p-6">
           {/* 1. 기본 정보 */}
           <Section title="기본 정보">
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
@@ -182,7 +182,7 @@ export default function CustomerProfilePage({
                   !c.fax &&
                   !c.businessType &&
                   !c.businessItem && (
-                    <span className="col-span-2 text-[12px] text-zinc-400">
+                    <span className="col-span-2 text-[12px] text-[var(--jm-text-subtle)]">
                       추가 사업자 정보 없음 — 어드민에서 입력 가능
                     </span>
                   )}
@@ -212,18 +212,18 @@ export default function CustomerProfilePage({
               <div className="flex flex-col gap-2 text-[13px]">
                 {c.address && (
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                       {c.type === "BUSINESS" ? "사업장 주소" : "주소"}
                     </span>
-                    <span className="text-zinc-900">{c.address}</span>
+                    <span className="text-[var(--jm-text)]">{c.address}</span>
                   </div>
                 )}
                 {c.shippingAddress && (
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-success-fg)]">
                       배송지 주소 (다름)
                     </span>
-                    <span className="text-zinc-900">{c.shippingAddress}</span>
+                    <span className="text-[var(--jm-text)]">{c.shippingAddress}</span>
                   </div>
                 )}
               </div>
@@ -233,12 +233,12 @@ export default function CustomerProfilePage({
           {/* 2. 잔액 */}
           <Section title="잔액">
             <div className="flex items-baseline justify-between">
-              <span className="text-[13px] text-zinc-600">미수금</span>
+              <span className="text-[13px] text-[var(--jm-text-muted)]">미수금</span>
               <span
                 className={`text-[20px] font-bold tabular-nums ${
                   Number(d.stats.outstandingAmount) > 0
-                    ? "text-rose-600"
-                    : "text-zinc-900"
+                    ? "text-[var(--jm-danger-fg)]"
+                    : "text-[var(--jm-text)]"
                 }`}
               >
                 ₩{Number(d.stats.outstandingAmount).toLocaleString("ko-KR")}
@@ -349,7 +349,7 @@ export default function CustomerProfilePage({
           {/* 8. 메모 */}
           <Section title="메모">
             {c.memo && (
-              <div className="mb-2 rounded-lg bg-zinc-50 px-3 py-2 text-[13px] text-zinc-700">
+              <div className="mb-2 rounded-lg bg-[var(--jm-bg)] px-3 py-2 text-[13px] text-[var(--jm-text)]">
                 {c.memo}
               </div>
             )}
@@ -383,8 +383,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl bg-white p-4 ring-1 ring-zinc-100">
-      <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+    <section className="rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]">
+      <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {title}
       </h3>
       {children}
@@ -405,11 +405,11 @@ function Field({
 }) {
   return (
     <div className={`flex flex-col gap-0.5 ${fullWidth ? "col-span-2" : ""}`}>
-      <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+      <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
       <span
-        className={`line-clamp-1 text-[13px] text-zinc-900 ${mono ? "font-mono" : ""}`}
+        className={`line-clamp-1 text-[13px] text-[var(--jm-text)] ${mono ? "font-mono" : ""}`}
       >
         {value}
       </span>
@@ -427,16 +427,16 @@ function StatCard({
   amount: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-2xl bg-white p-3 ring-1 ring-zinc-100">
-      <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+    <div className="flex flex-col gap-0.5 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]">
+      <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
-      <span className="text-[18px] font-bold tabular-nums text-zinc-900">
+      <span className="text-[18px] font-bold tabular-nums text-[var(--jm-text)]">
         {count.toLocaleString("ko-KR")}
-        <span className="ml-0.5 text-[11px] font-normal text-zinc-400">건</span>
+        <span className="ml-0.5 text-[11px] font-normal text-[var(--jm-text-subtle)]">건</span>
       </span>
       {amount && (
-        <span className="text-[11px] font-medium tabular-nums text-zinc-500">
+        <span className="text-[11px] font-medium tabular-nums text-[var(--jm-text-muted)]">
           ₩{Number(amount).toLocaleString("ko-KR")}
         </span>
       )}
@@ -461,19 +461,19 @@ function Row({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
-        onClick ? "hover:bg-zinc-50 active:bg-zinc-100" : ""
+        onClick ? "hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]" : ""
       }`}
     >
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-1 text-[13px] font-medium text-zinc-900">
+        <span className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
           {primary}
         </span>
         {secondary && (
-          <span className="line-clamp-1 text-[11px] text-zinc-500">{secondary}</span>
+          <span className="line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">{secondary}</span>
         )}
       </div>
       {tail && (
-        <span className="shrink-0 text-[12px] font-semibold tabular-nums text-zinc-700">
+        <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--jm-text)]">
           {tail}
         </span>
       )}
@@ -483,7 +483,7 @@ function Row({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-zinc-50 px-3 py-4 text-center text-[12px] text-zinc-400">
+    <div className="rounded-lg bg-[var(--jm-bg)] px-3 py-4 text-center text-[12px] text-[var(--jm-text-subtle)]">
       {children}
     </div>
   );
@@ -505,16 +505,16 @@ function repairStatusLabel(status: string): string {
 
 function ProfileSkeleton() {
   return (
-    <div className="flex h-full flex-col bg-zinc-50">
-      <header className="shrink-0 border-b border-zinc-200 bg-white px-3 py-2.5">
-        <div className="h-10 w-40 animate-pulse rounded bg-zinc-100" />
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2.5">
+        <div className="h-10 w-40 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
       </header>
       <main className="flex-1 overflow-hidden p-4">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
+        <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-32 animate-pulse rounded-2xl bg-white ring-1 ring-zinc-100"
+              className="h-32 animate-pulse rounded-2xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]"
             />
           ))}
         </div>

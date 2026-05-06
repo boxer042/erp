@@ -78,12 +78,12 @@ export function PartsSection({
     .reduce((s, p) => s + Number(p.totalPrice), 0);
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white">
+    <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)]">
       {/* 헤더 */}
-      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 sm:px-5">
+      <div className="flex items-center justify-between border-b border-[var(--jm-border)] px-4 py-3 sm:px-5">
         <div className="flex items-baseline gap-2">
-          <span className="text-[15px] font-semibold text-zinc-900">사용 부속</span>
-          <span className="text-[12px] text-zinc-400">
+          <span className="text-[15px] font-semibold text-[var(--jm-text)]">사용 부속</span>
+          <span className="text-[12px] text-[var(--jm-text-subtle)]">
             {parts.length === 0 ? "—" : `${parts.length}건`}
           </span>
         </div>
@@ -91,7 +91,7 @@ export function PartsSection({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="flex h-9 items-center gap-1 rounded-full bg-zinc-100 px-4 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-200"
+            className="flex h-9 items-center gap-1 rounded-full bg-[var(--jm-surface-muted)] px-4 text-[13px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path
@@ -108,7 +108,7 @@ export function PartsSection({
 
       {/* 추가 영역 — 인라인 검색 + 결과 리스트 */}
       {adding && !readonly && (
-        <div className="border-b border-zinc-100 bg-zinc-50 p-3 sm:p-4">
+        <div className="border-b border-[var(--jm-border)] bg-[var(--jm-bg)] p-3 sm:p-4">
           <div className="flex gap-2">
             <input
               type="text"
@@ -116,7 +116,7 @@ export function PartsSection({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="상품명 또는 SKU 검색"
-              className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-[14px] outline-none focus:border-zinc-400"
+              className="h-11 flex-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
             />
             <button
               type="button"
@@ -124,18 +124,18 @@ export function PartsSection({
                 setAdding(false);
                 setSearch("");
               }}
-              className="rounded-xl px-4 text-[13px] text-zinc-500 hover:bg-zinc-100"
+              className="rounded-xl px-4 text-[13px] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]"
             >
               취소
             </button>
           </div>
           <div className="mt-2 flex flex-col gap-1">
             {productsQuery.isPending ? (
-              <div className="px-3 py-2 text-[13px] text-zinc-400">
+              <div className="px-3 py-2 text-[13px] text-[var(--jm-text-subtle)]">
                 불러오는 중…
               </div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-xl bg-white px-3 py-3 text-[13px] text-zinc-500">
+              <div className="rounded-xl bg-[var(--jm-surface)] px-3 py-3 text-[13px] text-[var(--jm-text-muted)]">
                 결과 없음
               </div>
             ) : (
@@ -145,17 +145,17 @@ export function PartsSection({
                   type="button"
                   disabled={addMutation.isPending}
                   onClick={() => addMutation.mutate(p)}
-                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2.5 text-left hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-50"
+                  className="flex items-center justify-between rounded-xl bg-[var(--jm-surface)] px-3 py-2.5 text-left hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
                 >
                   <div className="flex min-w-0 flex-col">
-                    <span className="line-clamp-1 text-[14px] font-medium text-zinc-900">
+                    <span className="line-clamp-1 text-[14px] font-medium text-[var(--jm-text)]">
                       {p.name}
                     </span>
-                    <span className="font-mono text-[11px] text-zinc-400">
+                    <span className="font-mono text-[11px] text-[var(--jm-text-subtle)]">
                       {p.sku}
                     </span>
                   </div>
-                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-zinc-700">
+                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[var(--jm-text)]">
                     {fmtKRW(parseFloat(p.sellingPrice) || 0)}
                   </span>
                 </button>
@@ -168,7 +168,7 @@ export function PartsSection({
       {/* 행 리스트 */}
       <div className="flex flex-col">
         {parts.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[13px] text-zinc-400 sm:px-5">
+          <div className="px-4 py-8 text-center text-[13px] text-[var(--jm-text-subtle)] sm:px-5">
             추가된 부속이 없습니다
           </div>
         ) : (
@@ -186,11 +186,11 @@ export function PartsSection({
 
       {/* 합계 */}
       {parts.length > 0 && (
-        <div className="flex items-center justify-end gap-4 border-t border-zinc-100 px-4 py-3 text-[13px] sm:px-5">
+        <div className="flex items-center justify-end gap-4 border-t border-[var(--jm-border)] px-4 py-3 text-[13px] sm:px-5">
           {lostTotal > 0 && (
-            <span className="text-rose-600">손실 −{fmtKRW(lostTotal)}</span>
+            <span className="text-[var(--jm-danger-fg)]">손실 −{fmtKRW(lostTotal)}</span>
           )}
-          <span className="font-semibold tabular-nums text-zinc-900">
+          <span className="font-semibold tabular-nums text-[var(--jm-text)]">
             청구 {fmtKRW(usedTotal)}
           </span>
         </div>
@@ -249,7 +249,7 @@ function PartRow({
 
   return (
     <div
-      className={`flex flex-col gap-3 border-b border-zinc-50 px-4 py-3 last:border-b-0 sm:px-5 ${
+      className={`flex flex-col gap-3 border-b border-[var(--jm-border)] px-4 py-3 last:border-b-0 sm:px-5 ${
         isLost ? "opacity-60" : ""
       }`}
     >
@@ -258,7 +258,7 @@ function PartRow({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <span
-              className={`line-clamp-1 text-[14px] font-semibold text-zinc-900 ${
+              className={`line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)] ${
                 isLost && !part.billLost ? "line-through" : ""
               }`}
             >
@@ -272,8 +272,8 @@ function PartRow({
                   onClick={() => update.mutate({ billLost: !part.billLost })}
                   className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
                     part.billLost
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-zinc-100 text-zinc-500"
+                      ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
+                      : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
                   }`}
                   title={
                     part.billLost
@@ -290,8 +290,8 @@ function PartRow({
                   onClick={() => update.mutate({ status: isLost ? "USED" : "LOST" })}
                   className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
                     isLost
-                      ? "bg-rose-100 text-rose-700"
-                      : "bg-emerald-100 text-emerald-700"
+                      ? "bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]"
+                      : "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
                   }`}
                 >
                   {isLost ? "LOST" : "USED"}
@@ -299,7 +299,7 @@ function PartRow({
               )}
             </div>
           </div>
-          <span className="font-mono text-[11px] text-zinc-400">
+          <span className="font-mono text-[11px] text-[var(--jm-text-subtle)]">
             {part.product.sku}
           </span>
         </div>
@@ -308,7 +308,7 @@ function PartRow({
             type="button"
             onClick={() => del.mutate()}
             disabled={del.isPending}
-            className="shrink-0 text-zinc-300 hover:text-rose-600"
+            className="shrink-0 text-[var(--jm-text-disabled)] hover:text-[var(--jm-danger-fg)]"
             aria-label="삭제"
           >
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -331,12 +331,12 @@ function PartRow({
           type="button"
           onClick={() => !readonly && setPriceOpen(true)}
           disabled={readonly}
-          className="flex flex-col items-start rounded-lg px-2 py-1 text-left hover:bg-zinc-50 active:bg-zinc-100 disabled:hover:bg-transparent"
+          className="flex flex-col items-start rounded-lg px-2 py-1 text-left hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)] disabled:hover:bg-transparent"
         >
-          <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
             단가
           </span>
-          <span className="text-[15px] font-semibold tabular-nums text-zinc-900">
+          <span className="text-[15px] font-semibold tabular-nums text-[var(--jm-text)]">
             {fmtKRW(part.unitPrice)}
           </span>
         </button>
@@ -347,7 +347,7 @@ function PartRow({
             type="button"
             disabled={readonly || Number(qty) <= 1}
             onClick={() => setQtyAndCommit(Number(qty) - 1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-semibold text-zinc-700 hover:bg-zinc-200 disabled:opacity-30"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[18px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)] disabled:opacity-30"
           >
             −
           </button>
@@ -358,13 +358,13 @@ function PartRow({
             onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))}
             onBlur={() => setQtyAndCommit(parseInt(qty, 10) || 1)}
             disabled={readonly}
-            className="h-9 w-12 rounded-md text-center text-[15px] font-semibold tabular-nums outline-none focus:bg-zinc-50"
+            className="h-9 w-12 rounded-md text-center text-[15px] font-semibold tabular-nums outline-none focus:bg-[var(--jm-bg)]"
           />
           <button
             type="button"
             disabled={readonly}
             onClick={() => setQtyAndCommit(Number(qty) + 1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-semibold text-zinc-700 hover:bg-zinc-200 disabled:opacity-30"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[18px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)] disabled:opacity-30"
           >
             +
           </button>
@@ -372,10 +372,10 @@ function PartRow({
 
         {/* 라인 합계 */}
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-400">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
             합계
           </div>
-          <div className="text-[15px] font-bold tabular-nums text-zinc-900">
+          <div className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
             {fmtKRW(part.totalPrice)}
           </div>
         </div>

@@ -92,7 +92,7 @@ function Body({
           type="button"
           onClick={confirm}
           disabled={!selectedId}
-          className="flex h-14 w-full items-center justify-center rounded-2xl bg-zinc-900 text-[16px] font-semibold text-white disabled:opacity-40"
+          className="flex h-14 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white disabled:opacity-40"
         >
           확정
         </button>
@@ -100,11 +100,11 @@ function Body({
     >
       <div className="flex flex-col gap-2 pt-2">
         {productQuery.isPending ? (
-          <div className="py-8 text-center text-[12px] text-zinc-400">
+          <div className="py-8 text-center text-[12px] text-[var(--jm-text-subtle)]">
             불러오는 중…
           </div>
         ) : variants.length === 0 ? (
-          <div className="py-8 text-center text-[12px] text-zinc-400">
+          <div className="py-8 text-center text-[12px] text-[var(--jm-text-subtle)]">
             등록된 변형이 없습니다 — 상품 페이지에서 추가
           </div>
         ) : (
@@ -117,8 +117,8 @@ function Body({
                 onClick={() => setSelectedId(v.id)}
                 className={`flex items-center gap-3 rounded-2xl border-2 p-3 text-left transition-colors ${
                   active
-                    ? "border-zinc-900 bg-zinc-50"
-                    : "border-zinc-200 bg-white hover:border-zinc-300"
+                    ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                 }`}
               >
                 {v.imageUrl ? (
@@ -126,10 +126,10 @@ function Body({
                   <img
                     src={v.imageUrl}
                     alt={v.name}
-                    className="size-12 shrink-0 rounded-xl bg-zinc-100 object-cover"
+                    className="size-12 shrink-0 rounded-xl bg-[var(--jm-surface-muted)] object-cover"
                   />
                 ) : (
-                  <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-400">
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                       <path
                         d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
@@ -141,21 +141,21 @@ function Body({
                   </div>
                 )}
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                  <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                     {v.name}
                   </span>
-                  <span className="font-mono text-[11px] text-zinc-500">
+                  <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                     {v.sku}
                   </span>
                   {v.variableComponents && v.variableComponents.length > 0 && (
-                    <span className="line-clamp-1 mt-0.5 text-[11px] text-zinc-600">
+                    <span className="line-clamp-1 mt-0.5 text-[11px] text-[var(--jm-text-muted)]">
                       {v.variableComponents
                         .map((c) => `${c.slotLabel}: ${c.componentName}`)
                         .join(" · ")}
                     </span>
                   )}
                 </div>
-                <span className="shrink-0 text-[14px] font-semibold tabular-nums text-zinc-900">
+                <span className="shrink-0 text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
                   ₩{(parseFloat(v.sellingPrice) || 0).toLocaleString("ko-KR")}
                 </span>
               </button>

@@ -97,14 +97,14 @@ export default function PosV2HomePage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-zinc-50">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--jm-bg)]">
       {/* 헤더 — 햄버거 + 타이틀 + 카운트 */}
-      <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2.5 sm:px-6">
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+        <div className="flex items-center gap-2 px-3 py-2.5 sm:px-6">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="메뉴"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -116,10 +116,10 @@ export default function PosV2HomePage() {
               />
             </svg>
           </button>
-          <h1 className="flex-1 text-[20px] font-bold tracking-tight text-zinc-900">
+          <h1 className="flex-1 text-[20px] font-bold tracking-tight text-[var(--jm-text)]">
             POS
           </h1>
-          <span className="text-[12px] text-zinc-500">
+          <span className="text-[12px] text-[var(--jm-text-muted)]">
             {sessions.length === 0 ? "비어있음" : `진행 ${sessions.length}`}
           </span>
         </div>
@@ -127,7 +127,7 @@ export default function PosV2HomePage() {
 
       {/* 본문 — 손님 카드 그리드 */}
       <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
+        <div className="px-4 py-4 sm:px-6">
           {sessions.length === 0 ? (
             <EmptyState
               onUnregistered={startUnregistered}
@@ -140,7 +140,7 @@ export default function PosV2HomePage() {
                 <div className="mb-3 flex flex-col gap-2">
                   <div className="relative">
                     <svg
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--jm-text-subtle)]"
                       width="16"
                       height="16"
                       viewBox="0 0 20 20"
@@ -154,7 +154,7 @@ export default function PosV2HomePage() {
                       value={gridFilter}
                       onChange={(e) => setGridFilter(e.target.value)}
                       placeholder="이름·전화·사업자번호"
-                      className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 text-[14px] outline-none focus:border-zinc-400"
+                      className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-9 pr-3 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
                     />
                   </div>
                   <div className="flex gap-1.5 overflow-x-auto">
@@ -174,15 +174,15 @@ export default function PosV2HomePage() {
                           onClick={() => setGridTypeFilter(opt.v)}
                           className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
                             active
-                              ? "bg-zinc-900 text-white"
-                              : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50"
+                              ? "bg-[var(--jm-action)] text-white"
+                              : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-bg)]"
                           }`}
                         >
                           {opt.label}
                         </button>
                       );
                     })}
-                    <div className="ml-1 flex shrink-0 gap-1 rounded-full bg-zinc-100 p-0.5">
+                    <div className="ml-1 flex shrink-0 gap-1 rounded-full bg-[var(--jm-surface-muted)] p-0.5">
                       {(
                         [
                           { v: "recent", label: "최근" },
@@ -196,8 +196,8 @@ export default function PosV2HomePage() {
                           onClick={() => setGridSort(opt.v)}
                           className={`rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
                             gridSort === opt.v
-                              ? "bg-white text-zinc-900 shadow-sm"
-                              : "text-zinc-500 hover:text-zinc-900"
+                              ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
+                              : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
                           }`}
                         >
                           {opt.label}
@@ -214,14 +214,14 @@ export default function PosV2HomePage() {
                           setGridTypeFilter("ALL");
                           setGridSort("recent");
                         }}
-                        className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium text-zinc-500 hover:text-zinc-900"
+                        className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
                       >
                         초기화
                       </button>
                     )}
                   </div>
                   {filteredSessions.length !== sessions.length && (
-                    <p className="text-[11px] text-zinc-500">
+                    <p className="text-[11px] text-[var(--jm-text-muted)]">
                       {filteredSessions.length} / {sessions.length} 표시
                     </p>
                   )}
@@ -229,7 +229,7 @@ export default function PosV2HomePage() {
               )}
 
               {filteredSessions.length === 0 ? (
-                <div className="py-12 text-center text-[13px] text-zinc-500">
+                <div className="py-12 text-center text-[13px] text-[var(--jm-text-muted)]">
                   조건에 맞는 손님이 없습니다
                 </div>
               ) : (
@@ -262,7 +262,7 @@ export default function PosV2HomePage() {
           <button
             type="button"
             onClick={startWithCustomerLink}
-            className="flex h-12 items-center gap-2 rounded-full bg-white px-5 text-zinc-900 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200 transition-transform active:scale-95"
+            className="flex h-12 items-center gap-2 rounded-full bg-[var(--jm-surface)] px-5 text-[var(--jm-text)] shadow-lg shadow-[var(--jm-shadow-md)] ring-1 ring-[var(--jm-border)] transition-transform active:scale-95"
           >
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
               <circle
@@ -284,7 +284,7 @@ export default function PosV2HomePage() {
           <button
             type="button"
             onClick={startUnregistered}
-            className="flex h-14 items-center gap-2 rounded-full bg-zinc-900 px-5 text-white shadow-lg shadow-zinc-900/25 transition-transform active:scale-95"
+            className="flex h-14 items-center gap-2 rounded-full bg-[var(--jm-action)] px-5 text-white shadow-lg shadow-[var(--jm-shadow-lg)] transition-transform active:scale-95"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -366,7 +366,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center gap-6 py-20 text-center">
-      <div className="flex size-20 items-center justify-center rounded-3xl bg-zinc-100">
+      <div className="flex size-20 items-center justify-center rounded-3xl bg-[var(--jm-surface-muted)]">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
           <circle
             cx="12"
@@ -384,10 +384,10 @@ function EmptyState({
         </svg>
       </div>
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-[18px] font-bold text-zinc-900">
+        <h2 className="text-[18px] font-bold text-[var(--jm-text)]">
           진행중인 손님이 없습니다
         </h2>
-        <p className="text-[13px] text-zinc-500">
+        <p className="text-[13px] text-[var(--jm-text-muted)]">
           손님이 매장에 들어오면 시작해주세요
         </p>
       </div>
@@ -395,7 +395,7 @@ function EmptyState({
         <button
           type="button"
           onClick={onUnregistered}
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[15px] font-semibold text-white"
+          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white"
         >
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
             <path
@@ -410,7 +410,7 @@ function EmptyState({
         <button
           type="button"
           onClick={onSearch}
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white text-[15px] font-semibold text-zinc-900 ring-1 ring-zinc-200"
+          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-surface)] text-[15px] font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)]"
         >
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
             <circle
@@ -436,34 +436,34 @@ function EmptyState({
 
 function Skeleton() {
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-zinc-50">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--jm-bg)]">
       {/* 헤더 — [☰메뉴][POS][진행 N] 골격 */}
-      <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2.5 sm:px-6">
-          <div className="size-10 shrink-0 animate-pulse rounded-full bg-zinc-100" />
-          <div className="h-5 w-12 animate-pulse rounded bg-zinc-100" />
-          <div className="ml-auto h-3 w-14 animate-pulse rounded bg-zinc-100" />
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+        <div className="flex items-center gap-2 px-3 py-2.5 sm:px-6">
+          <div className="size-10 shrink-0 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
+          <div className="h-5 w-12 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="ml-auto h-3 w-14 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
         </div>
       </header>
       {/* 본문 — 손님 카드 그리드 */}
       <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
+        <div className="px-4 py-4 sm:px-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="flex h-32 flex-col gap-3 rounded-2xl bg-white p-4 ring-1 ring-zinc-100"
+                className="flex h-32 flex-col gap-3 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]"
               >
                 <div className="flex items-center gap-3">
-                  <div className="size-12 animate-pulse rounded-full bg-zinc-100" />
+                  <div className="size-12 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
                   <div className="flex flex-1 flex-col gap-1.5">
-                    <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
-                    <div className="h-3 w-1/2 animate-pulse rounded bg-zinc-100" />
+                    <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
                   </div>
                 </div>
                 <div className="mt-auto flex gap-1.5">
-                  <div className="h-5 w-12 animate-pulse rounded-full bg-zinc-100" />
-                  <div className="h-5 w-12 animate-pulse rounded-full bg-zinc-100" />
+                  <div className="h-5 w-12 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
+                  <div className="h-5 w-12 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
                 </div>
               </div>
             ))}

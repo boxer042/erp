@@ -56,11 +56,11 @@ export function LaborsSection({
   const total = labors.reduce((s, l) => s + Number(l.totalPrice), 0);
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white">
-      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 sm:px-5">
+    <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)]">
+      <div className="flex items-center justify-between border-b border-[var(--jm-border)] px-4 py-3 sm:px-5">
         <div className="flex items-baseline gap-2">
-          <span className="text-[15px] font-semibold text-zinc-900">공임</span>
-          <span className="text-[12px] text-zinc-400">
+          <span className="text-[15px] font-semibold text-[var(--jm-text)]">공임</span>
+          <span className="text-[12px] text-[var(--jm-text-subtle)]">
             {labors.length === 0 ? "—" : `${labors.length}건`}
           </span>
         </div>
@@ -68,7 +68,7 @@ export function LaborsSection({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="flex h-9 items-center gap-1 rounded-full bg-zinc-100 px-4 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-200"
+            className="flex h-9 items-center gap-1 rounded-full bg-[var(--jm-surface-muted)] px-4 text-[13px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path
@@ -84,7 +84,7 @@ export function LaborsSection({
       </div>
 
       {adding && !readonly && (
-        <div className="border-b border-zinc-100 bg-zinc-50 p-3 sm:p-4">
+        <div className="border-b border-[var(--jm-border)] bg-[var(--jm-bg)] p-3 sm:p-4">
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
               type="text"
@@ -92,7 +92,7 @@ export function LaborsSection({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="공임명 (예: 분해/조립)"
-              className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-[14px] outline-none focus:border-zinc-400"
+              className="h-11 flex-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
             />
             <input
               type="text"
@@ -101,7 +101,7 @@ export function LaborsSection({
               onChange={(e) => setRate(e.target.value.replace(/[^\d,]/g, ""))}
               onFocus={(e) => e.currentTarget.select()}
               placeholder="₩ 금액"
-              className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-right text-[15px] tabular-nums outline-none focus:border-zinc-400 sm:w-36"
+              className="h-11 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[15px] tabular-nums outline-none focus:border-[var(--jm-border-strong)] sm:w-36"
             />
           </div>
           <div className="mt-2 flex justify-end gap-2">
@@ -112,7 +112,7 @@ export function LaborsSection({
                 setName("");
                 setRate("");
               }}
-              className="rounded-xl px-4 py-2 text-[13px] text-zinc-500 hover:bg-zinc-100"
+              className="rounded-xl px-4 py-2 text-[13px] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]"
             >
               취소
             </button>
@@ -120,7 +120,7 @@ export function LaborsSection({
               type="button"
               disabled={!name.trim() || !rate || add.isPending}
               onClick={() => add.mutate()}
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+              className="rounded-xl bg-[var(--jm-action)] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
             >
               {add.isPending ? "추가 중…" : "추가"}
             </button>
@@ -130,7 +130,7 @@ export function LaborsSection({
 
       <div className="flex flex-col">
         {labors.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[13px] text-zinc-400 sm:px-5">
+          <div className="px-4 py-8 text-center text-[13px] text-[var(--jm-text-subtle)] sm:px-5">
             추가된 공임이 없습니다
           </div>
         ) : (
@@ -149,8 +149,8 @@ export function LaborsSection({
       </div>
 
       {labors.length > 0 && (
-        <div className="flex justify-end border-t border-zinc-100 px-4 py-3 text-[13px] sm:px-5">
-          <span className="font-semibold tabular-nums text-zinc-900">
+        <div className="flex justify-end border-t border-[var(--jm-border)] px-4 py-3 text-[13px] sm:px-5">
+          <span className="font-semibold tabular-nums text-[var(--jm-text)]">
             합계 {fmtKRW(total)}
           </span>
         </div>
@@ -188,17 +188,17 @@ function LaborRow({
   });
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-zinc-50 px-4 py-3 last:border-b-0 sm:px-5">
-      <span className="line-clamp-1 flex-1 text-[14px] font-medium text-zinc-900">
+    <div className="flex items-center justify-between gap-3 border-b border-[var(--jm-border)] px-4 py-3 last:border-b-0 sm:px-5">
+      <span className="line-clamp-1 flex-1 text-[14px] font-medium text-[var(--jm-text)]">
         {labor.name}
       </span>
       <button
         type="button"
         onClick={() => !readonly && setPriceOpen(true)}
         disabled={readonly}
-        className="rounded-md px-2 py-1 text-right hover:bg-zinc-50 disabled:hover:bg-transparent"
+        className="rounded-md px-2 py-1 text-right hover:bg-[var(--jm-bg)] disabled:hover:bg-transparent"
       >
-        <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+        <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
           {fmtKRW(labor.totalPrice)}
         </span>
       </button>
@@ -207,7 +207,7 @@ function LaborRow({
           type="button"
           onClick={onDelete}
           disabled={isDeleting}
-          className="text-zinc-300 hover:text-rose-600"
+          className="text-[var(--jm-text-disabled)] hover:text-[var(--jm-danger-fg)]"
           aria-label="삭제"
         >
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">

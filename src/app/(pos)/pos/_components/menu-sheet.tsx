@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "./bottom-sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { JmThemeToggle } from "@/jm";
+import { usePosTheme } from "./pos-theme-wrapper";
 
 interface Props {
   open: boolean;
@@ -24,6 +25,7 @@ export function MenuSheet({
   onRentalManagement,
 }: Props) {
   const router = useRouter();
+  const { theme, setTheme } = usePosTheme();
   const go = (href: string) => {
     onOpenChange(false);
     router.push(href);
@@ -90,7 +92,7 @@ export function MenuSheet({
           />
         )}
 
-        <div className="my-2 h-px bg-zinc-100" />
+        <div className="my-2 h-px bg-[var(--jm-surface-muted)]" />
 
         <Item
           icon={
@@ -107,15 +109,15 @@ export function MenuSheet({
           desc="대시보드·설정·리포트"
           onClick={() => go("/")}
         />
-        <div className="my-2 h-px bg-zinc-100" />
+        <div className="my-2 h-px bg-[var(--jm-surface-muted)]" />
 
-        {/* 테마 토글 — shadcn 컴포넌트지만 외부 시스템이라 그대로 사용 */}
+        {/* 테마 토글 — jm 시스템 라이트/다크/auto */}
         <div className="flex items-center justify-between rounded-2xl px-3 py-2">
           <div className="flex flex-col">
-            <span className="text-[14px] font-semibold text-zinc-900">테마</span>
-            <span className="text-[12px] text-zinc-500">밝기 모드 전환</span>
+            <span className="text-[14px] font-semibold text-[var(--jm-text)]">테마</span>
+            <span className="text-[12px] text-[var(--jm-text-muted)]">라이트 / 다크 / 시스템</span>
           </div>
-          <ThemeToggle />
+          <JmThemeToggle value={theme} onChange={setTheme} />
         </div>
       </div>
     </BottomSheet>
@@ -137,21 +139,21 @@ function Item({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors active:bg-zinc-100 sm:hover:bg-zinc-50"
+      className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors active:bg-[var(--jm-surface-muted)] sm:hover:bg-[var(--jm-bg)]"
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text)]">
         {icon}
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[14px] font-semibold text-zinc-900">{label}</span>
-        {desc && <span className="text-[12px] text-zinc-500">{desc}</span>}
+        <span className="text-[14px] font-semibold text-[var(--jm-text)]">{label}</span>
+        {desc && <span className="text-[12px] text-[var(--jm-text-muted)]">{desc}</span>}
       </div>
       <svg
         width="16"
         height="16"
         viewBox="0 0 16 16"
         fill="none"
-        className="shrink-0 text-zinc-300"
+        className="shrink-0 text-[var(--jm-text-disabled)]"
       >
         <path
           d="M6 4l4 4-4 4"

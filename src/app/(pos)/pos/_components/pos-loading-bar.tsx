@@ -32,9 +32,9 @@ export function PosLoadingBar() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-x-0 top-0 z-[60] h-[2px] overflow-hidden bg-zinc-100"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[60] h-[2px] overflow-hidden bg-[var(--jm-surface-muted)]"
     >
-      <div className="pos-loading-bar-anim h-full w-1/3 bg-zinc-900" />
+      <div className="pos-loading-bar-anim h-full w-1/3 bg-[var(--jm-action)]" />
     </div>
   );
 }

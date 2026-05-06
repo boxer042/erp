@@ -133,14 +133,14 @@ export default function PosV2CustomerPage({
 
   if (!session) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-zinc-50 p-6 text-center">
-        <span className="text-[15px] font-semibold text-zinc-900">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
+        <span className="text-[15px] font-semibold text-[var(--jm-text)]">
           손님 세션을 찾을 수 없습니다
         </span>
         <button
           type="button"
           onClick={() => router.push("/pos")}
-          className="h-10 rounded-full bg-zinc-900 px-5 text-[13px] font-semibold text-white"
+          className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-[13px] font-semibold text-white"
         >
           손님 그리드로
         </button>
@@ -153,15 +153,15 @@ export default function PosV2CustomerPage({
   const palette = deriveTempColor(session.id);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-zinc-50">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--jm-bg)]">
       {/* 상단 헤더 — detail 유무로 두 레이아웃 */}
-      <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-3 py-2.5 sm:px-6">
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+        <div className="flex items-center gap-3 px-3 py-2.5 sm:px-6">
           {/* 좌측: 뒤로 — detail 시엔 detail 해제, 일반 시엔 손님 그리드로 */}
           <button
             type="button"
             onClick={() => (detail ? setDetail(null) : router.push("/pos"))}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="뒤로"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -188,13 +188,13 @@ export default function PosV2CustomerPage({
               <button
                 type="button"
                 onClick={() => setCustomerActionOpen(true)}
-                className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-zinc-50 active:bg-zinc-100"
+                className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
                 aria-label="손님"
               >
                 {isRegistered ? (
                   <>
                     {session.customerType === "BUSINESS" ? (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                           <path
                             d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
@@ -206,28 +206,28 @@ export default function PosV2CustomerPage({
                         </svg>
                       </div>
                     ) : (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
                         {(session.customerName ?? "?").charAt(0)}
                       </div>
                     )}
                     <div className="flex min-w-0 max-w-[140px] flex-col">
                       <div className="flex items-center gap-1">
                         {session.customerType === "BUSINESS" && (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                          <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
                             기업
                           </span>
                         )}
-                        <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                        <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                           {session.customerName}
                         </span>
                       </div>
                       {session.customerType === "BUSINESS" &&
                       session.customerBusinessNumber ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
                           {session.customerBusinessNumber}
                         </span>
                       ) : session.customerPhone ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
                           {session.customerPhone}
                         </span>
                       ) : null}
@@ -243,10 +243,10 @@ export default function PosV2CustomerPage({
                       </span>
                     </div>
                     <div className="flex min-w-0 flex-col">
-                      <span className="text-[14px] font-semibold text-zinc-900">
+                      <span className="text-[14px] font-semibold text-[var(--jm-text)]">
                         미등록 손님
                       </span>
-                      <span className="font-mono text-[11px] text-zinc-500">
+                      <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                         #{code}
                       </span>
                     </div>
@@ -258,10 +258,10 @@ export default function PosV2CustomerPage({
             // 일반 모드 — 좌측: 모드 타이틀, (상품모드일 땐 중앙: 검색창), 우측: 손님
             <>
               <div className="flex shrink-0 flex-col">
-                <span className="text-[14px] font-semibold text-zinc-900">
+                <span className="text-[14px] font-semibold text-[var(--jm-text)]">
                   {MODE_LABELS[mode]}
                 </span>
-                <span className="text-[11px] text-zinc-500">
+                <span className="text-[11px] text-[var(--jm-text-muted)]">
                   {MODE_SUBLABELS[mode]}
                 </span>
               </div>
@@ -269,7 +269,7 @@ export default function PosV2CustomerPage({
                 <button
                   type="button"
                   onClick={() => setProductSearchOpen(true)}
-                  className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-zinc-100 px-4 text-left text-[13px] text-zinc-500 hover:bg-zinc-200 active:bg-zinc-200"
+                  className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--jm-surface-muted)] px-4 text-left text-[13px] text-[var(--jm-text-muted)] hover:bg-[var(--jm-border)] active:bg-[var(--jm-border)]"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
                     <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
@@ -283,13 +283,13 @@ export default function PosV2CustomerPage({
               <button
                 type="button"
                 onClick={() => setCustomerActionOpen(true)}
-                className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-zinc-50 active:bg-zinc-100"
+                className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
                 aria-label="손님"
               >
                 {isRegistered ? (
                   <>
                     {session.customerType === "BUSINESS" ? (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                           <path
                             d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
@@ -301,28 +301,28 @@ export default function PosV2CustomerPage({
                         </svg>
                       </div>
                     ) : (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
                         {(session.customerName ?? "?").charAt(0)}
                       </div>
                     )}
                     <div className="flex min-w-0 max-w-[140px] flex-col">
                       <div className="flex items-center gap-1">
                         {session.customerType === "BUSINESS" && (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                          <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
                             기업
                           </span>
                         )}
-                        <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                        <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                           {session.customerName}
                         </span>
                       </div>
                       {session.customerType === "BUSINESS" &&
                       session.customerBusinessNumber ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
                           {session.customerBusinessNumber}
                         </span>
                       ) : session.customerPhone ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
                           {session.customerPhone}
                         </span>
                       ) : null}
@@ -338,10 +338,10 @@ export default function PosV2CustomerPage({
                       </span>
                     </div>
                     <div className="flex min-w-0 flex-col">
-                      <span className="text-[14px] font-semibold text-zinc-900">
+                      <span className="text-[14px] font-semibold text-[var(--jm-text)]">
                         미등록 손님
                       </span>
-                      <span className="font-mono text-[11px] text-zinc-500">
+                      <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                         #{code}
                       </span>
                     </div>
@@ -487,13 +487,13 @@ export default function PosV2CustomerPage({
                 router.push("/pos");
               }
             }}
-            className="m-4 self-end rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-zinc-900 shadow"
+            className="m-4 self-end rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--jm-text)] shadow"
           >
             닫기
           </button>
           <iframe
             src={`/serial-items/print?codes=${labelCodes.join(",")}`}
-            className="mx-auto mb-4 size-full max-h-[88vh] max-w-3xl rounded-2xl bg-white shadow-2xl"
+            className="mx-auto mb-4 size-full max-h-[88vh] max-w-3xl rounded-2xl bg-[var(--jm-surface)] shadow-2xl"
             title="라벨 미리보기"
           />
         </div>
@@ -554,8 +554,8 @@ function RepairTicketHeader({ ticketId }: { ticketId: string }) {
   if (!q.data) {
     return (
       <div className="flex flex-col gap-1">
-        <div className="h-3 w-20 animate-pulse rounded bg-zinc-200" />
-        <div className="h-3 w-24 animate-pulse rounded bg-zinc-200" />
+        <div className="h-3 w-20 animate-pulse rounded bg-[var(--jm-border)]" />
+        <div className="h-3 w-24 animate-pulse rounded bg-[var(--jm-border)]" />
       </div>
     );
   }
@@ -565,16 +565,16 @@ function RepairTicketHeader({ ticketId }: { ticketId: string }) {
     <div className="flex min-w-0 flex-col">
       <div className="flex items-center gap-1.5">
         <span className={`size-2 rounded-full ${meta.dot}`} />
-        <span className="text-[12px] font-semibold text-zinc-700">
+        <span className="text-[12px] font-semibold text-[var(--jm-text)]">
           {meta.label}
         </span>
         {t.type === "ON_SITE" && (
-          <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+          <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
             즉시
           </span>
         )}
       </div>
-      <span className="font-mono text-[13px] text-zinc-500">{t.ticketNo}</span>
+      <span className="font-mono text-[13px] text-[var(--jm-text-muted)]">{t.ticketNo}</span>
     </div>
   );
 }
@@ -587,18 +587,18 @@ function ProductHeader({ productId }: { productId: string }) {
   if (!q.data) {
     return (
       <div className="flex flex-col gap-1">
-        <div className="h-4 w-32 animate-pulse rounded bg-zinc-200" />
-        <div className="h-3 w-20 animate-pulse rounded bg-zinc-200" />
+        <div className="h-4 w-32 animate-pulse rounded bg-[var(--jm-border)]" />
+        <div className="h-3 w-20 animate-pulse rounded bg-[var(--jm-border)]" />
       </div>
     );
   }
   return (
     <div className="flex min-w-0 flex-col">
-      <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
         {q.data.name}
       </span>
       {q.data.sku && (
-        <span className="font-mono text-[11px] text-zinc-500">{q.data.sku}</span>
+        <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">{q.data.sku}</span>
       )}
     </div>
   );
@@ -608,39 +608,39 @@ function ProductHeader({ productId }: { productId: string }) {
 // 헤더 + 본문 + BottomTabBar 골격을 그대로 보여줘 layout shift 최소화.
 function CustomerPageSkeleton() {
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-zinc-50">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--jm-bg)]">
       {/* 헤더 골격 */}
-      <header className="shrink-0 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-3 py-2.5 sm:px-6">
-          <div className="size-10 shrink-0 rounded-full bg-zinc-100" />
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+        <div className="flex items-center gap-3 px-3 py-2.5 sm:px-6">
+          <div className="size-10 shrink-0 rounded-full bg-[var(--jm-surface-muted)]" />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="h-3.5 w-20 animate-pulse rounded bg-zinc-100" />
-            <div className="h-3 w-32 animate-pulse rounded bg-zinc-100" />
+            <div className="h-3.5 w-20 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+            <div className="h-3 w-32 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="size-10 shrink-0 animate-pulse rounded-full bg-zinc-100" />
+            <div className="size-10 shrink-0 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
             <div className="flex flex-col gap-1">
-              <div className="h-3.5 w-20 animate-pulse rounded bg-zinc-100" />
-              <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
+              <div className="h-3.5 w-20 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+              <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
           </div>
         </div>
       </header>
       {/* 본문 — 상품 그리드 톤 */}
       <main className="min-h-0 flex-1 overflow-hidden">
-        <div className="mx-auto max-w-3xl px-3 py-3 sm:px-4 sm:py-4">
-          <div className="mb-3 h-11 w-full animate-pulse rounded-xl bg-zinc-100" />
+        <div className="px-3 py-3 sm:px-4 sm:py-4">
+          <div className="mb-3 h-11 w-full animate-pulse rounded-xl bg-[var(--jm-surface-muted)]" />
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="overflow-hidden rounded-2xl bg-white ring-1 ring-zinc-100"
+                className="overflow-hidden rounded-2xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]"
               >
-                <div className="aspect-square w-full animate-pulse bg-zinc-100" />
+                <div className="aspect-square w-full animate-pulse bg-[var(--jm-surface-muted)]" />
                 <div className="space-y-1.5 p-2.5">
-                  <div className="h-3.5 w-full animate-pulse rounded bg-zinc-100" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-zinc-100" />
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
+                  <div className="h-3.5 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
                 </div>
               </div>
             ))}
@@ -648,7 +648,7 @@ function CustomerPageSkeleton() {
         </div>
       </main>
       {/* BottomTabBar 골격 — 4개 셀 (메뉴 + 상품/수리/임대) */}
-      <nav className="shrink-0 border-t border-zinc-200 bg-white">
+      <nav className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)]">
         <div
           className="grid"
           style={{
@@ -661,8 +661,8 @@ function CustomerPageSkeleton() {
               key={i}
               className="flex flex-col items-center gap-1.5 pb-2 pt-3"
             >
-              <div className="size-5 animate-pulse rounded bg-zinc-100" />
-              <div className="h-2.5 w-8 animate-pulse rounded bg-zinc-100" />
+              <div className="size-5 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+              <div className="h-2.5 w-8 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
           ))}
         </div>

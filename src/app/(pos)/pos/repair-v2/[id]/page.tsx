@@ -123,14 +123,14 @@ export function RepairV2Detail({
   }
   if (ticketQuery.isError || !ticketQuery.data) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-zinc-50 p-6 text-center">
-        <span className="text-[15px] font-semibold text-zinc-900">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
+        <span className="text-[15px] font-semibold text-[var(--jm-text)]">
           수리 티켓을 찾을 수 없습니다
         </span>
         <button
           type="button"
           onClick={goBack}
-          className="h-10 rounded-full bg-zinc-900 px-5 text-[13px] font-semibold text-white"
+          className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-[13px] font-semibold text-white"
         >
           뒤로
         </button>
@@ -168,15 +168,15 @@ export function RepairV2Detail({
   };
 
   return (
-    <div className="flex h-full flex-col bg-zinc-50">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       {/* 상단 — 뒤로 + 티켓번호 + 상태. v2 손님 페이지 임베드 시엔 부모가 그림 (hideHeader). */}
       {!hideHeader && (
-        <header className="shrink-0 border-b border-zinc-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-6">
+        <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+          <div className="flex items-center gap-2 px-4 py-3 sm:px-6">
             <button
               type="button"
               onClick={goBack}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
               aria-label="뒤로"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -192,23 +192,23 @@ export function RepairV2Detail({
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex items-center gap-1.5">
                 <span className={`size-2 rounded-full ${meta.dot}`} />
-                <span className="text-[12px] font-semibold text-zinc-700">
+                <span className="text-[12px] font-semibold text-[var(--jm-text)]">
                   {meta.label}
                 </span>
                 {t.type === "ON_SITE" && (
-                  <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                  <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                     즉시
                   </span>
                 )}
               </div>
-              <span className="font-mono text-[13px] text-zinc-500">
+              <span className="font-mono text-[13px] text-[var(--jm-text-muted)]">
                 {t.ticketNo}
               </span>
             </div>
             <button
               type="button"
               onClick={() => window.open(`/repairs/${t.id}/print`, "_blank")}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 active:bg-zinc-200"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
               aria-label="내역서"
               title="내역서 출력"
             >
@@ -227,7 +227,7 @@ export function RepairV2Detail({
 
       {/* 본문 */}
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 p-4 sm:p-6">
           {/* 시리얼 기준 수리 이력 — 같은 시리얼의 다른 RepairTicket 들 */}
           {t.serialItem && (
             <SerialHistoryCard
@@ -299,8 +299,8 @@ export function RepairV2Detail({
               <div
                 className={`rounded-2xl border px-4 py-3 text-[13px] ${
                   t.status === "PICKED_UP"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                    : "border-rose-200 bg-rose-50 text-rose-900"
+                    ? "border-[var(--jm-success-bg)] bg-[var(--jm-success-bg)] text-emerald-900"
+                    : "border-[var(--jm-danger-bg)] bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]"
                 }`}
               >
                 {t.status === "PICKED_UP"
@@ -328,8 +328,8 @@ export function RepairV2Detail({
 
       {/* 하단 액션 바 — sticky */}
       {actions.length > 0 && (
-        <div className="shrink-0 border-t border-zinc-200 bg-white px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:px-6">
-          <div className="mx-auto flex max-w-3xl items-stretch gap-2">
+        <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:px-6">
+          <div className="flex items-stretch gap-2">
             {actions.map((a) => (
               <button
                 key={a.action}
@@ -338,10 +338,10 @@ export function RepairV2Detail({
                 onClick={() => triggerAction(a.action)}
                 className={`h-13 flex-1 rounded-2xl text-[15px] font-semibold transition-transform active:scale-[0.99] disabled:opacity-60 ${
                   a.primary
-                    ? "bg-zinc-900 text-white"
+                    ? "bg-[var(--jm-action)] text-white"
                     : a.destructive
-                      ? "border border-rose-200 bg-white text-rose-700 hover:bg-rose-50"
-                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                      ? "border border-[var(--jm-danger-bg)] bg-[var(--jm-surface)] text-[var(--jm-danger-fg)] hover:bg-[var(--jm-danger-bg)]"
+                      : "border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] hover:bg-[var(--jm-bg)]"
                 } ${a.primary ? "py-4" : "py-3.5"}`}
               >
                 {a.label}
@@ -413,7 +413,7 @@ function SummaryCard({
   laborsCount: number;
 }) {
   return (
-    <div className="rounded-2xl bg-zinc-900 p-5 text-white">
+    <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
       <div className="text-[12px] font-semibold uppercase tracking-wider text-white/60">
         최종 청구
       </div>
@@ -452,7 +452,7 @@ function Pill({
   return (
     <div
       className={`flex flex-col rounded-xl px-3 py-2 ${
-        tone === "warn" ? "bg-amber-500/20" : "bg-white/10"
+        tone === "warn" ? "bg-[var(--jm-warning-bg)]0/20" : "bg-[var(--jm-surface)]/10"
       }`}
     >
       <div className="text-[10px] uppercase tracking-wider text-white/60">
@@ -477,17 +477,17 @@ function CustomerDeviceCard({
   // onCustomerClick 있으면 고객 영역만 클릭 가능 — 헤더 손님 썸네일과 동일한 시트 트리거
   const customerContent = ticket.customer ? (
     <div className="flex min-w-0 flex-col">
-      <span className="line-clamp-1 text-[15px] font-semibold text-zinc-900">
+      <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
         {ticket.customer.name}
       </span>
       {ticket.customer.phone && (
-        <span className="font-mono text-[12px] text-zinc-500">
+        <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
           {ticket.customer.phone}
         </span>
       )}
     </div>
   ) : (
-    <span className="text-[14px] text-zinc-400">미등록</span>
+    <span className="text-[14px] text-[var(--jm-text-subtle)]">미등록</span>
   );
 
   return (
@@ -498,7 +498,7 @@ function CustomerDeviceCard({
             <button
               type="button"
               onClick={onCustomerClick}
-              className="-mx-2 -my-1 flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-zinc-100 active:bg-zinc-200"
+              className="-mx-2 -my-1 flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             >
               {customerContent}
               <svg
@@ -506,7 +506,7 @@ function CustomerDeviceCard({
                 height="14"
                 viewBox="0 0 14 14"
                 fill="none"
-                className="shrink-0 text-zinc-400"
+                className="shrink-0 text-[var(--jm-text-subtle)]"
                 aria-hidden
               >
                 <path
@@ -523,14 +523,14 @@ function CustomerDeviceCard({
           )}
         </Field>
         <Field label="담당">
-          <span className="text-[14px] text-zinc-700">
+          <span className="text-[14px] text-[var(--jm-text)]">
             {ticket.assignedTo?.name ?? (
-              <span className="text-zinc-400">미지정</span>
+              <span className="text-[var(--jm-text-subtle)]">미지정</span>
             )}
           </span>
         </Field>
         <Field label="접수">
-          <span className="text-[14px] text-zinc-700">
+          <span className="text-[14px] text-[var(--jm-text)]">
             {format(new Date(ticket.receivedAt), "yyyy-MM-dd HH:mm")}
           </span>
         </Field>
@@ -610,7 +610,7 @@ function ProductLinkCard({
     <Card>
       <div className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             가져온 기기
           </span>
           {!readonly && hasLink && (
@@ -618,7 +618,7 @@ function ProductLinkCard({
               type="button"
               onClick={clearLink}
               disabled={update.isPending}
-              className="text-[11px] font-medium text-zinc-500 underline-offset-2 hover:underline"
+              className="text-[11px] font-medium text-[var(--jm-text-muted)] underline-offset-2 hover:underline"
             >
               초기화
             </button>
@@ -636,7 +636,7 @@ function ProductLinkCard({
 
         {/* 검색/입력 영역 — 항상 표시 (readonly 가 아니면) */}
         {!readonly && (
-          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3">
             {/* 모드 토글 — 시리얼 / 카테고리 / 상품명 / 직접입력 */}
             <div className="grid grid-cols-4 gap-1.5">
               {(
@@ -657,10 +657,10 @@ function ProductLinkCard({
                     title={disabled ? "등록 고객만 사용 가능" : undefined}
                     className={`flex h-9 items-center justify-center rounded-lg text-[12px] font-semibold transition-colors ${
                       mode === b.v
-                        ? "bg-zinc-900 text-white"
+                        ? "bg-[var(--jm-action)] text-white"
                         : disabled
-                          ? "bg-zinc-100 text-zinc-300"
-                          : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-100"
+                          ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text-disabled)]"
+                          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
                     }`}
                   >
                     {b.label}
@@ -766,8 +766,8 @@ function CategoryModeForm({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-1.5 px-1 text-[11px] text-zinc-500">
-        <span className="rounded-full bg-zinc-200 px-2 py-0.5 font-semibold text-zinc-700">
+      <div className="flex items-center gap-1.5 px-1 text-[11px] text-[var(--jm-text-muted)]">
+        <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 font-semibold text-[var(--jm-text)]">
           {categoryName}
         </span>
         <span>안에서 이 고객의 이력 + 카탈로그 검색</span>
@@ -777,12 +777,12 @@ function CategoryModeForm({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="상품명·SKU 검색"
-        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] outline-none focus:border-zinc-400"
+        className="h-11 w-full rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
       />
       {/* 이 고객 이력 — 검색 전 우선 표시 */}
       {history.length > 0 && trimmed.length === 0 && (
         <div className="flex flex-col gap-1">
-          <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+          <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
             이 고객의 이력
           </span>
           {history.map((p) => (
@@ -791,13 +791,13 @@ function CategoryModeForm({
               type="button"
               onClick={() => save.mutate(p.id)}
               disabled={save.isPending}
-              className="flex items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-left ring-1 ring-zinc-200 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-[var(--jm-surface)] px-3 py-2.5 text-left ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)] disabled:opacity-50"
             >
               <div className="flex min-w-0 flex-1 flex-col">
-                <span className="line-clamp-1 text-[13px] font-medium text-zinc-900">
+                <span className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
                   {p.name}
                 </span>
-                <span className="font-mono text-[11px] text-zinc-500">
+                <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                   {p.sku}
                 </span>
               </div>
@@ -809,16 +809,16 @@ function CategoryModeForm({
       {(trimmed.length > 0 || history.length === 0) && (
         <div className="flex flex-col gap-1">
           {trimmed.length > 0 && (
-            <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
               검색 결과
             </span>
           )}
           {productsQuery.isPending ? (
-            <span className="px-1 py-3 text-center text-[12px] text-zinc-400">
+            <span className="px-1 py-3 text-center text-[12px] text-[var(--jm-text-subtle)]">
               검색 중…
             </span>
           ) : products.length === 0 ? (
-            <span className="px-1 py-3 text-center text-[12px] text-zinc-400">
+            <span className="px-1 py-3 text-center text-[12px] text-[var(--jm-text-subtle)]">
               {trimmed ? "결과 없음" : "검색해주세요"}
             </span>
           ) : (
@@ -828,13 +828,13 @@ function CategoryModeForm({
                 type="button"
                 onClick={() => save.mutate(p.id)}
                 disabled={save.isPending}
-                className="flex items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-left ring-1 ring-zinc-200 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-[var(--jm-surface)] px-3 py-2.5 text-left ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)] disabled:opacity-50"
               >
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-[13px] font-medium text-zinc-900">
+                  <span className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
                     {p.name}
                   </span>
-                  <span className="font-mono text-[11px] text-zinc-500">
+                  <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                     {p.sku}
                   </span>
                 </div>
@@ -858,9 +858,9 @@ function SerialDisplay({
   const warrantyActive =
     item.warrantyEnds && new Date(item.warrantyEnds) > new Date();
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-zinc-900 p-3 text-white">
+    <div className="flex flex-col gap-2 rounded-xl bg-[var(--jm-action)] p-3 text-white">
       <div className="flex items-center gap-3">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface)]/10">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.4" />
             <rect x="6" y="6" width="3" height="3" fill="currentColor" />
@@ -875,7 +875,7 @@ function SerialDisplay({
           </span>
           <span className="line-clamp-1 text-[14px] font-semibold">{displayName}</span>
         </div>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold">
+        <span className="rounded-full bg-[var(--jm-surface)]/15 px-2 py-0.5 text-[10px] font-bold">
           {isRepairLabel ? "수리 라벨" : "우리 판매"}
         </span>
       </div>
@@ -906,7 +906,7 @@ function SearchProductDisplay({
   product: NonNullable<RepairTicketDetail["repairProduct"]>;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-zinc-50 p-3">
+    <div className="flex items-center gap-3 rounded-xl bg-[var(--jm-bg)] p-3">
       {product.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -915,7 +915,7 @@ function SearchProductDisplay({
           className="size-12 shrink-0 rounded-lg object-cover"
         />
       ) : (
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-400">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--jm-surface)] text-[var(--jm-text-subtle)]">
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
             <path
               d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
@@ -927,12 +927,12 @@ function SearchProductDisplay({
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+        <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
           {product.name}
         </span>
-        <span className="font-mono text-[11px] text-zinc-500">{product.sku}</span>
+        <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">{product.sku}</span>
       </div>
-      <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+      <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text)]">
         카탈로그
       </span>
     </div>
@@ -941,8 +941,8 @@ function SearchProductDisplay({
 
 function TextDisplay({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-zinc-50 p-3">
-      <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-400">
+    <div className="flex items-center gap-3 rounded-xl bg-[var(--jm-bg)] p-3">
+      <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--jm-surface)] text-[var(--jm-text-subtle)]">
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
           <path
             d="M4 5h12M4 10h12M4 15h8"
@@ -952,10 +952,10 @@ function TextDisplay({ text }: { text: string }) {
           />
         </svg>
       </div>
-      <span className="line-clamp-2 flex-1 text-[14px] font-medium text-zinc-900">
+      <span className="line-clamp-2 flex-1 text-[14px] font-medium text-[var(--jm-text)]">
         {text}
       </span>
-      <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+      <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text)]">
         외부 기기
       </span>
     </div>
@@ -1000,7 +1000,7 @@ function SerialModeForm({
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="예: 250903-0001"
-        className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-3 font-mono text-[14px] outline-none focus:border-zinc-400"
+        className="h-11 flex-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 font-mono text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.nativeEvent.isComposing && code.trim()) {
             lookup.mutate();
@@ -1011,7 +1011,7 @@ function SerialModeForm({
         type="button"
         onClick={() => lookup.mutate()}
         disabled={!code.trim() || lookup.isPending}
-        className="h-11 rounded-xl bg-zinc-900 px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+        className="h-11 rounded-xl bg-[var(--jm-action)] px-4 text-[13px] font-semibold text-white disabled:opacity-50"
       >
         {lookup.isPending ? "조회…" : "조회·연결"}
       </button>
@@ -1060,14 +1060,14 @@ function SearchModeForm({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="상품명 또는 SKU 검색"
-        className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[14px] outline-none focus:border-zinc-400"
+        className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
       />
       {query.trim().length > 0 && (
-        <div className="flex max-h-60 flex-col gap-1 overflow-y-auto rounded-xl bg-white ring-1 ring-zinc-200">
+        <div className="flex max-h-60 flex-col gap-1 overflow-y-auto rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]">
           {productsQuery.isPending ? (
-            <div className="px-3 py-3 text-[13px] text-zinc-400">검색 중…</div>
+            <div className="px-3 py-3 text-[13px] text-[var(--jm-text-subtle)]">검색 중…</div>
           ) : (productsQuery.data ?? []).length === 0 ? (
-            <div className="px-3 py-3 text-[13px] text-zinc-500">결과 없음</div>
+            <div className="px-3 py-3 text-[13px] text-[var(--jm-text-muted)]">결과 없음</div>
           ) : (
             (productsQuery.data ?? []).slice(0, 30).map((p) => (
               <button
@@ -1075,7 +1075,7 @@ function SearchModeForm({
                 type="button"
                 onClick={() => link.mutate(p.id)}
                 disabled={link.isPending}
-                className="flex items-center gap-3 px-3 py-2.5 text-left hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-50"
+                className="flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
               >
                 {p.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -1085,7 +1085,7 @@ function SearchModeForm({
                     className="size-9 shrink-0 rounded-md object-cover"
                   />
                 ) : (
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-400">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
                     <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
                       <path
                         d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
@@ -1097,10 +1097,10 @@ function SearchModeForm({
                   </div>
                 )}
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-[13px] font-medium text-zinc-900">
+                  <span className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
                     {p.name}
                   </span>
-                  <span className="font-mono text-[10px] text-zinc-500">
+                  <span className="font-mono text-[10px] text-[var(--jm-text-muted)]">
                     {p.sku}
                   </span>
                 </div>
@@ -1145,13 +1145,13 @@ function TextModeForm({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="예: Sony A7M4 Black"
-        className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[14px] outline-none focus:border-zinc-400"
+        className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
       />
       <button
         type="button"
         onClick={() => save.mutate()}
         disabled={!value.trim() || save.isPending}
-        className="h-11 rounded-xl bg-zinc-900 text-[13px] font-semibold text-white disabled:opacity-50"
+        className="h-11 rounded-xl bg-[var(--jm-action)] text-[13px] font-semibold text-white disabled:opacity-50"
       >
         {save.isPending ? "저장…" : "저장"}
       </button>
@@ -1184,33 +1184,33 @@ function SerialHistoryCard({
   const history = historyQuery.data ?? [];
   if (historyQuery.isPending) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-        <div className="mb-2 h-4 w-32 animate-pulse rounded bg-zinc-100" />
-        <div className="h-12 animate-pulse rounded bg-zinc-100" />
+      <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
+        <div className="mb-2 h-4 w-32 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+        <div className="h-12 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
       </div>
     );
   }
   if (history.length === 0) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+      <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
         <div className="mb-1 flex items-baseline gap-2">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             이 기기 수리 이력
           </span>
-          <span className="font-mono text-[10px] text-zinc-400">{serialCode}</span>
+          <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">{serialCode}</span>
         </div>
-        <span className="text-[12px] text-zinc-400">이전 수리 이력 없음</span>
+        <span className="text-[12px] text-[var(--jm-text-subtle)]">이전 수리 이력 없음</span>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+    <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
       <div className="mb-2 flex items-baseline gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           이 기기 수리 이력 ({history.length})
         </span>
-        <span className="font-mono text-[10px] text-zinc-400">{serialCode}</span>
+        <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">{serialCode}</span>
       </div>
       <div className="flex flex-col gap-1.5">
         {history.map((h) => (
@@ -1218,28 +1218,28 @@ function SerialHistoryCard({
             key={h.id}
             type="button"
             onClick={() => onClickTicket(h.id)}
-            className="flex items-start justify-between gap-3 rounded-xl bg-zinc-50 px-3 py-2.5 text-left transition-colors hover:bg-zinc-100 active:bg-zinc-200"
+            className="flex items-start justify-between gap-3 rounded-xl bg-[var(--jm-bg)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
           >
             <div className="flex min-w-0 flex-col">
               <div className="flex items-center gap-1.5">
                 <span className={`size-1.5 rounded-full ${STATUS_META[h.status].dot}`} />
-                <span className="text-[11px] font-semibold text-zinc-700">
+                <span className="text-[11px] font-semibold text-[var(--jm-text)]">
                   {STATUS_META[h.status].label}
                 </span>
-                <span className="font-mono text-[11px] text-zinc-400">
+                <span className="font-mono text-[11px] text-[var(--jm-text-subtle)]">
                   {h.ticketNo}
                 </span>
               </div>
               {h.symptom && (
-                <span className="line-clamp-1 mt-0.5 text-[12px] text-zinc-600">
+                <span className="line-clamp-1 mt-0.5 text-[12px] text-[var(--jm-text-muted)]">
                   {h.symptom}
                 </span>
               )}
             </div>
-            <div className="shrink-0 text-right text-[10px] text-zinc-400">
+            <div className="shrink-0 text-right text-[10px] text-[var(--jm-text-subtle)]">
               {format(new Date(h.receivedAt), "yyyy-MM-dd")}
               {h.pickedUpAt && (
-                <div className="text-zinc-300">
+                <div className="text-[var(--jm-text-disabled)]">
                   완료 {format(new Date(h.pickedUpAt), "MM-dd")}
                 </div>
               )}
@@ -1262,29 +1262,29 @@ function RevisitCard({
   onClickTicket: (id: string) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+    <div className="rounded-2xl border border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] p-4">
       <div className="flex flex-col gap-2">
         {parent && (
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
               재수리 — 원본 티켓
             </span>
             <button
               type="button"
               onClick={() => onClickTicket(parent.id)}
-              className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-left transition-colors hover:bg-amber-100/50"
+              className="flex items-center justify-between rounded-xl bg-[var(--jm-surface)] px-3 py-2 text-left transition-colors hover:bg-[var(--jm-warning-bg)]/50"
             >
               <div className="flex items-center gap-2">
                 <span className={`size-1.5 rounded-full ${STATUS_META[parent.status].dot}`} />
-                <span className="font-mono text-[12px] font-semibold text-zinc-900">
+                <span className="font-mono text-[12px] font-semibold text-[var(--jm-text)]">
                   {parent.ticketNo}
                 </span>
-                <span className="text-[11px] text-zinc-600">
+                <span className="text-[11px] text-[var(--jm-text-muted)]">
                   {STATUS_META[parent.status].label}
                 </span>
               </div>
               {parent.repairWarrantyEnds && (
-                <span className="text-[11px] text-zinc-500">
+                <span className="text-[11px] text-[var(--jm-text-muted)]">
                   보증 ~{format(new Date(parent.repairWarrantyEnds), "yyyy-MM-dd")}
                 </span>
               )}
@@ -1293,7 +1293,7 @@ function RevisitCard({
         )}
         {revisits.length > 0 && (
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
               연관 재수리 {revisits.length}
             </span>
             <div className="flex flex-col gap-1">
@@ -1302,18 +1302,18 @@ function RevisitCard({
                   key={r.id}
                   type="button"
                   onClick={() => onClickTicket(r.id)}
-                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-left transition-colors hover:bg-amber-100/50"
+                  className="flex items-center justify-between rounded-xl bg-[var(--jm-surface)] px-3 py-2 text-left transition-colors hover:bg-[var(--jm-warning-bg)]/50"
                 >
                   <div className="flex items-center gap-2">
                     <span className={`size-1.5 rounded-full ${STATUS_META[r.status].dot}`} />
-                    <span className="font-mono text-[12px] font-semibold text-zinc-900">
+                    <span className="font-mono text-[12px] font-semibold text-[var(--jm-text)]">
                       {r.ticketNo}
                     </span>
-                    <span className="text-[11px] text-zinc-600">
+                    <span className="text-[11px] text-[var(--jm-text-muted)]">
                       {STATUS_META[r.status].label}
                     </span>
                   </div>
-                  <span className="text-[11px] text-zinc-500">
+                  <span className="text-[11px] text-[var(--jm-text-muted)]">
                     {format(new Date(r.receivedAt), "MM-dd HH:mm")}
                   </span>
                 </button>
@@ -1366,14 +1366,14 @@ function PackagesCard({
     return (
       <Card>
         <div className="flex flex-col gap-2">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             패키지
           </span>
           <div className="flex gap-1.5">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="h-9 w-24 animate-pulse rounded-full bg-zinc-100"
+                className="h-9 w-24 animate-pulse rounded-full bg-[var(--jm-surface-muted)]"
               />
             ))}
           </div>
@@ -1386,7 +1386,7 @@ function PackagesCard({
   return (
     <Card>
       <div className="flex flex-col gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           패키지 빠른 추가
         </span>
         <div className="flex flex-wrap gap-1.5">
@@ -1399,13 +1399,13 @@ function PackagesCard({
                 type="button"
                 disabled={apply.isPending}
                 onClick={() => apply.mutate(p.id)}
-                className="flex h-10 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 text-[12px] transition-colors hover:border-zinc-900 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-50"
+                className="flex h-10 items-center gap-1.5 rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-[12px] transition-colors hover:border-[var(--jm-action)] hover:bg-[var(--jm-bg)] active:scale-[0.98] disabled:opacity-50"
               >
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                   <path d="M7 3v8M3 7h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
-                <span className="font-semibold text-zinc-900">{p.name}</span>
-                <span className="text-zinc-500">
+                <span className="font-semibold text-[var(--jm-text)]">{p.name}</span>
+                <span className="text-[var(--jm-text-muted)]">
                   ({partsCount > 0 && `부속 ${partsCount}`}
                   {partsCount > 0 && laborsCount > 0 && " · "}
                   {laborsCount > 0 && `공임 ${laborsCount}`})
@@ -1428,7 +1428,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
       {children}
@@ -1539,15 +1539,15 @@ function SaveStatus({
 }) {
   if (status === "saving") {
     return (
-      <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-        <span className="size-1.5 animate-pulse rounded-full bg-zinc-400" />
+      <span className="flex items-center gap-1.5 text-[11px] text-[var(--jm-text-muted)]">
+        <span className="size-1.5 animate-pulse rounded-full bg-[var(--jm-text-subtle)]" />
         저장 중…
       </span>
     );
   }
   if (status === "saved") {
     return (
-      <span className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+      <span className="flex items-center gap-1.5 text-[11px] text-[var(--jm-success-fg)]">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
           <path
             d="M2.5 6l2.5 2.5L9.5 3.5"
@@ -1563,8 +1563,8 @@ function SaveStatus({
   }
   // dirty
   return (
-    <span className="flex items-center gap-1.5 text-[11px] text-amber-600">
-      <span className="size-1.5 rounded-full bg-amber-500" />
+    <span className="flex items-center gap-1.5 text-[11px] text-[var(--jm-warning-fg)]">
+      <span className="size-1.5 rounded-full bg-[var(--jm-warning-bg)]0" />
       입력 후 다른 곳을 누르면 저장됩니다
     </span>
   );
@@ -1590,10 +1590,10 @@ function NotesField({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           {label}
         </span>
-        <span className="text-[10px] text-zinc-400">{hint}</span>
+        <span className="text-[10px] text-[var(--jm-text-subtle)]">{hint}</span>
       </div>
       <textarea
         value={value}
@@ -1602,7 +1602,7 @@ function NotesField({
         disabled={readonly}
         placeholder={placeholder}
         rows={2}
-        className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-[14px] outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white disabled:opacity-70"
+        className="w-full resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3 text-[14px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)] disabled:opacity-70"
       />
     </div>
   );
@@ -1657,22 +1657,22 @@ function FeesAndDiscountCard({
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               진단비
             </span>
             <button
               type="button"
               onClick={() => !readonly && setFeeOpen(true)}
               disabled={readonly}
-              className="flex h-12 items-center justify-end rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-right text-[16px] font-semibold tabular-nums text-zinc-900 transition-colors hover:bg-white hover:border-zinc-400 disabled:opacity-70"
+              className="flex h-12 items-center justify-end rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-right text-[16px] font-semibold tabular-nums text-[var(--jm-text)] transition-colors hover:bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)] disabled:opacity-70"
             >
               {currentFee > 0 ? fmtKRW(currentFee) : (
-                <span className="text-zinc-400">탭하여 입력</span>
+                <span className="text-[var(--jm-text-subtle)]">탭하여 입력</span>
               )}
             </button>
           </div>
           <div className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               전체 할인
             </span>
             <input
@@ -1682,7 +1682,7 @@ function FeesAndDiscountCard({
               onFocus={(e) => e.currentTarget.select()}
               disabled={readonly}
               placeholder="5000 또는 10%"
-              className="h-12 rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-right text-[16px] outline-none focus:border-zinc-400 focus:bg-white disabled:opacity-70"
+              className="h-12 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-right text-[16px] outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)] disabled:opacity-70"
             />
           </div>
         </div>
@@ -1691,7 +1691,7 @@ function FeesAndDiscountCard({
             type="button"
             onClick={() => saveDiscount.mutate()}
             disabled={saveDiscount.isPending}
-            className="self-end rounded-full bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-60"
+            className="self-end rounded-full bg-[var(--jm-action)] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-60"
           >
             {saveDiscount.isPending ? "저장 중…" : "저장"}
           </button>
@@ -1713,7 +1713,7 @@ function FeesAndDiscountCard({
 // ──── 카드 컨테이너 (raw) ────
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
+    <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4 sm:p-5">
       {children}
     </div>
   );
@@ -1727,15 +1727,15 @@ function DetailSkeleton({
   hideHeader?: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col bg-zinc-50">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       {/* 자체 헤더 — v2 customer page 임베드 시엔 부모가 그림 (hideHeader). */}
       {!hideHeader && (
-        <header className="shrink-0 border-b border-zinc-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-6">
+        <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+          <div className="flex items-center gap-2 px-4 py-3 sm:px-6">
             <button
               type="button"
               onClick={onBack}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-700"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)]"
               aria-label="뒤로"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -1749,47 +1749,47 @@ function DetailSkeleton({
               </svg>
             </button>
             <div className="flex flex-1 flex-col gap-1">
-              <div className="h-3 w-20 animate-pulse rounded bg-zinc-100" />
-              <div className="h-3 w-32 animate-pulse rounded bg-zinc-100" />
+              <div className="h-3 w-20 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+              <div className="h-3 w-32 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
           </div>
         </header>
       )}
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 p-4 sm:p-6">
           {/* SummaryCard 골격 — 합계 영역 */}
-          <div className="flex flex-col gap-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-100">
+          <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]">
             <div className="flex items-center justify-between">
-              <div className="h-3 w-12 animate-pulse rounded bg-zinc-100" />
-              <div className="h-4 w-20 animate-pulse rounded bg-zinc-100" />
+              <div className="h-3 w-12 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+              <div className="h-4 w-20 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
             <div className="flex items-center justify-between">
-              <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
-              <div className="h-4 w-16 animate-pulse rounded bg-zinc-100" />
+              <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+              <div className="h-4 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
-            <div className="mt-1 flex items-center justify-between border-t border-zinc-100 pt-2">
-              <div className="h-4 w-16 animate-pulse rounded bg-zinc-100" />
-              <div className="h-5 w-24 animate-pulse rounded bg-zinc-100" />
+            <div className="mt-1 flex items-center justify-between border-t border-[var(--jm-border)] pt-2">
+              <div className="h-4 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+              <div className="h-5 w-24 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
           </div>
           {/* 손님/기기 카드 */}
-          <div className="flex flex-col gap-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-100">
-            <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
-            <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
+          <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]">
+            <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+            <div className="h-3 w-1/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
           </div>
           {/* 부속 / 공임 섹션 */}
           {Array.from({ length: 2 }).map((_, i) => (
             <div
               key={i}
-              className="flex flex-col gap-3 rounded-2xl bg-white p-4 ring-1 ring-zinc-100"
+              className="flex flex-col gap-3 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]"
             >
               <div className="flex items-center justify-between">
-                <div className="h-4 w-12 animate-pulse rounded bg-zinc-100" />
-                <div className="h-7 w-16 animate-pulse rounded-full bg-zinc-100" />
+                <div className="h-4 w-12 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+                <div className="h-7 w-16 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
               </div>
-              <div className="h-3 w-full animate-pulse rounded bg-zinc-100" />
-              <div className="h-3 w-2/3 animate-pulse rounded bg-zinc-100" />
+              <div className="h-3 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+              <div className="h-3 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
           ))}
         </div>
@@ -1851,8 +1851,8 @@ function HardDeleteButton({
 
   if (confirming) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
-        <span className="text-[12px] text-rose-900">
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-[var(--jm-danger-bg)] bg-[var(--jm-danger-bg)] p-3">
+        <span className="text-[12px] text-[var(--jm-danger-fg)]">
           {ticketNo} 영구 삭제 — 되돌릴 수 없습니다
         </span>
         <div className="flex gap-2">
@@ -1860,7 +1860,7 @@ function HardDeleteButton({
             type="button"
             onClick={() => setConfirming(false)}
             disabled={del.isPending}
-            className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 ring-1 ring-zinc-200"
+            className="rounded-full bg-[var(--jm-surface)] px-3 py-1.5 text-[12px] font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)]"
           >
             취소
           </button>
@@ -1868,7 +1868,7 @@ function HardDeleteButton({
             type="button"
             onClick={() => del.mutate()}
             disabled={del.isPending}
-            className="rounded-full bg-rose-600 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
+            className="rounded-full bg-[var(--jm-danger-solid)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
           >
             {del.isPending ? "삭제…" : "확인"}
           </button>
@@ -1880,7 +1880,7 @@ function HardDeleteButton({
     <button
       type="button"
       onClick={() => setConfirming(true)}
-      className="flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-rose-200 bg-white text-[13px] font-medium text-rose-700 hover:bg-rose-50"
+      className="flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-[var(--jm-danger-bg)] bg-[var(--jm-surface)] text-[13px] font-medium text-[var(--jm-danger-fg)] hover:bg-[var(--jm-danger-bg)]"
     >
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path
@@ -1967,7 +1967,7 @@ function CancelSheetBody({
           onClick={() => onConfirm(reason, memo)}
           disabled={loading}
           className={`flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60 ${
-            willHardDelete ? "bg-rose-600" : "bg-zinc-900"
+            willHardDelete ? "bg-[var(--jm-danger-solid)]" : "bg-[var(--jm-action)]"
           }`}
         >
           {loading && (
@@ -1983,9 +1983,9 @@ function CancelSheetBody({
       <div className="flex flex-col gap-4 pt-2">
         {/* 부속 확인 — 부속 등록되어 있을 때만 (USED/LOST 상태 한번 더 점검) */}
         {parts.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] px-4 py-3">
             <div className="flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-amber-700">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-[var(--jm-warning-fg)]">
                 <path
                   d="M7 2L1 12h12L7 2z"
                   stroke="currentColor"
@@ -1994,11 +1994,11 @@ function CancelSheetBody({
                 />
                 <path d="M7 6v3M7 10.5v0.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              <span className="text-[12px] font-semibold text-amber-900">
+              <span className="text-[12px] font-semibold text-[var(--jm-warning-fg)]">
                 부속 {parts.length}건 — USED/LOST 상태를 다시 확인하세요
               </span>
             </div>
-            <p className="text-[11px] text-amber-800">
+            <p className="text-[11px] text-[var(--jm-warning-fg)]">
               <span className="font-semibold">USED</span> 는 재고로 복원되고,{" "}
               <span className="font-semibold">LOST</span> 는 손실로 기록됩니다. 잘못된 상태로 취소하면 재고/회계가 어긋날 수 있습니다.
             </p>
@@ -2006,18 +2006,18 @@ function CancelSheetBody({
               {parts.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5"
+                  className="flex items-center gap-2 rounded-lg bg-[var(--jm-surface)] px-2.5 py-1.5"
                 >
                   <span
                     className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
                       p.status === "LOST"
-                        ? "bg-rose-100 text-rose-700"
-                        : "bg-emerald-100 text-emerald-700"
+                        ? "bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]"
+                        : "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
                     }`}
                   >
                     {p.status}
                   </span>
-                  <span className="line-clamp-1 text-[12px] text-zinc-800">
+                  <span className="line-clamp-1 text-[12px] text-[var(--jm-text)]">
                     {p.name}
                   </span>
                 </div>
@@ -2027,7 +2027,7 @@ function CancelSheetBody({
               type="button"
               onClick={() => !loading && onOpenChange(false)}
               disabled={loading}
-              className="self-start text-[11px] font-semibold text-amber-900 underline-offset-2 hover:underline disabled:opacity-50"
+              className="self-start text-[11px] font-semibold text-[var(--jm-warning-fg)] underline-offset-2 hover:underline disabled:opacity-50"
             >
               ← 닫고 부속 카드에서 수정
             </button>
@@ -2037,16 +2037,16 @@ function CancelSheetBody({
         {/* 안내 — 사유에 따라 동적 */}
         <div
           className={`rounded-xl px-4 py-3 text-[12px] ${
-            willHardDelete ? "bg-rose-50 text-rose-900" : "bg-zinc-50 text-zinc-600"
+            willHardDelete ? "bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]" : "bg-[var(--jm-bg)] text-[var(--jm-text-muted)]"
           }`}
         >
           {willHardDelete ? (
             <>
-              <span className="font-semibold text-rose-700">영구 삭제</span> — 미등록 + 시리얼/LOST 부속/진단비 모두 없음. 사유와 무관하게 row 자체를 삭제합니다.
+              <span className="font-semibold text-[var(--jm-danger-fg)]">영구 삭제</span> — 미등록 + 시리얼/LOST 부속/진단비 모두 없음. 사유와 무관하게 row 자체를 삭제합니다.
             </>
           ) : reason === "SOLD_AS_PRODUCT" ? (
             <>
-              <span className="font-semibold text-emerald-700">기록 보존</span> — &quot;상품 구매로 전환&quot; 은 마케팅·통계 가치가 있어 사유 보존. row 는 CANCELLED 상태로 남습니다.
+              <span className="font-semibold text-[var(--jm-success-fg)]">기록 보존</span> — &quot;상품 구매로 전환&quot; 은 마케팅·통계 가치가 있어 사유 보존. row 는 CANCELLED 상태로 남습니다.
             </>
           ) : (
             <>USED 부속은 재고 복원, LOST 부속은 손실 유지, 진단비는 기록 보존. 시리얼·등록고객 등 추적 가치가 있어 row 는 CANCELLED 상태로 남습니다.</>
@@ -2055,7 +2055,7 @@ function CancelSheetBody({
 
         {/* 사유 선택 */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             사유
           </span>
           <div className="flex flex-col gap-1.5">
@@ -2068,18 +2068,18 @@ function CancelSheetBody({
                   onClick={() => setReason(r.value)}
                   className={`flex flex-col gap-0.5 rounded-2xl border-2 p-3 text-left transition-colors ${
                     active
-                      ? "border-zinc-900 bg-zinc-50"
-                      : "border-zinc-200 bg-white hover:border-zinc-300"
+                      ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                      : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                   }`}
                 >
                   <span
                     className={`text-[14px] font-semibold ${
-                      active ? "text-zinc-900" : "text-zinc-700"
+                      active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
                     }`}
                   >
                     {r.label}
                   </span>
-                  <span className="text-[11px] text-zinc-500">{r.desc}</span>
+                  <span className="text-[11px] text-[var(--jm-text-muted)]">{r.desc}</span>
                 </button>
               );
             })}
@@ -2088,15 +2088,15 @@ function CancelSheetBody({
 
         {/* 메모 */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
-            메모 {reason === "OTHER" && <span className="text-rose-600">(필수)</span>}
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            메모 {reason === "OTHER" && <span className="text-[var(--jm-danger-fg)]">(필수)</span>}
           </span>
           <textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="추가 설명 (선택)"
             rows={2}
-            className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-[13px] outline-none focus:border-zinc-400 focus:bg-white"
+            className="w-full resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3 text-[13px] outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
           />
         </div>
       </div>

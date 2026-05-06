@@ -59,11 +59,11 @@ function Body({
         aria-label="닫기"
       />
       <div
-        className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-3xl bg-white shadow-2xl"
+        className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-3xl bg-[var(--jm-surface)] shadow-2xl"
         style={{ maxHeight }}
       >
         <div className="flex shrink-0 justify-center pt-3">
-          <div className="h-1 w-10 rounded-full bg-zinc-300" />
+          <div className="h-1 w-10 rounded-full bg-[var(--jm-border-strong)]" />
         </div>
         {title && (
           <div className="flex shrink-0 items-center gap-2 px-5 pb-2 pt-3">
@@ -72,7 +72,7 @@ function Body({
                 type="button"
                 onClick={() => !locked && onBack()}
                 disabled={locked}
-                className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-full text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] disabled:opacity-50"
                 aria-label="뒤로"
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -86,12 +86,12 @@ function Body({
                 </svg>
               </button>
             )}
-            <h2 className="flex-1 text-[18px] font-bold text-zinc-900">{title}</h2>
+            <h2 className="flex-1 text-[18px] font-bold text-[var(--jm-text)]">{title}</h2>
             <button
               type="button"
               onClick={() => !locked && onOpenChange(false)}
               disabled={locked}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)] disabled:opacity-50"
               aria-label="닫기"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -107,7 +107,7 @@ function Body({
         )}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
         {footer && (
-          <div className="shrink-0 border-t border-zinc-100 bg-white px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
+          <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
             {footer}
           </div>
         )}

@@ -1,0 +1,166 @@
+/**
+ * jm design tokens — scoped to [data-jm-scope].
+ * 다른 프로젝트에 이식할 때 이 파일만 들고 가면 됨.
+ * shadcn/ERP 토큰(--primary, --background 등)과 충돌 없음 (모두 --jm- prefix).
+ *
+ * 테마:
+ * - 기본 = light (data-jm-theme 미지정)
+ * - 명시적 dark = data-jm-theme="dark"
+ * - 명시적 light = data-jm-theme="light"
+ * - 시스템 따라가기 = data-jm-theme="auto" (prefers-color-scheme 존중)
+ */
+
+[data-jm-scope] {
+  /* surfaces */
+  --jm-bg: oklch(0.985 0 0);
+  --jm-surface: #ffffff;
+  --jm-surface-muted: oklch(0.96 0 0);
+  --jm-surface-subtle: oklch(0.98 0 0);
+
+  /* borders */
+  --jm-border: oklch(0.92 0 0);
+  --jm-border-strong: oklch(0.83 0 0);
+
+  /* text */
+  --jm-text: oklch(0.21 0 0);
+  --jm-text-muted: oklch(0.55 0 0);
+  --jm-text-subtle: oklch(0.71 0 0);
+  --jm-text-disabled: oklch(0.78 0 0);
+
+  /* primary action (CTA) */
+  --jm-action: oklch(0.21 0 0);
+  --jm-action-fg: #ffffff;
+  --jm-action-hover: oklch(0.27 0 0);
+  --jm-action-active: oklch(0.31 0 0);
+
+  /* semantic */
+  --jm-success-bg: oklch(0.95 0.05 145);
+  --jm-success-fg: oklch(0.4 0.13 145);
+  --jm-success-solid: oklch(0.6 0.15 145);
+  --jm-warning-bg: oklch(0.96 0.07 85);
+  --jm-warning-fg: oklch(0.45 0.15 85);
+  --jm-warning-solid: oklch(0.75 0.15 85);
+  --jm-danger-bg: oklch(0.95 0.05 25);
+  --jm-danger-fg: oklch(0.5 0.18 25);
+  --jm-danger-solid: oklch(0.6 0.2 25);
+  --jm-info-bg: oklch(0.95 0.04 240);
+  --jm-info-fg: oklch(0.45 0.15 240);
+  --jm-info-solid: oklch(0.6 0.15 240);
+
+  /* focus ring */
+  --jm-ring: oklch(0.21 0 0 / 0.25);
+
+  /* shadows */
+  --jm-shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+  --jm-shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
+  --jm-shadow-lg: 0 8px 24px oklch(0 0 0 / 0.1);
+
+  /* radius */
+  --jm-radius-sm: 0.5rem;
+  --jm-radius-md: 0.75rem;
+  --jm-radius-lg: 1rem;
+  --jm-radius-xl: 1.5rem;
+  --jm-radius-pill: 9999px;
+
+  /* font stack — host 프로젝트에서 --font-geist-sans / --font-pretendard 가 설정돼 있으면 자동으로 사용,
+     아니면 fallback 으로 우아하게 degrade. 다른 프로젝트로 이식 시 이 변수를 통째로 덮어써도 됨. */
+  --jm-font-sans:
+    var(--font-geist-sans, ui-sans-serif),
+    var(--font-pretendard, "Pretendard"),
+    system-ui,
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    sans-serif;
+  --jm-font-mono:
+    var(--font-geist-mono, ui-monospace),
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+/* ─── DARK THEME ─── */
+/* 명시적 dark + auto 모드(시스템이 dark)일 때 적용. 같은 토큰 키를 덮어쓰기만 함. */
+
+[data-jm-scope][data-jm-theme="dark"] {
+  /* surfaces — 진한 회색 톤. 순흑 대신 살짝 따뜻함 */
+  --jm-bg: oklch(0.16 0 0);
+  --jm-surface: oklch(0.20 0 0);
+  --jm-surface-muted: oklch(0.24 0 0);
+  --jm-surface-subtle: oklch(0.18 0 0);
+
+  /* borders */
+  --jm-border: oklch(0.28 0 0);
+  --jm-border-strong: oklch(0.40 0 0);
+
+  /* text */
+  --jm-text: oklch(0.94 0 0);
+  --jm-text-muted: oklch(0.68 0 0);
+  --jm-text-subtle: oklch(0.52 0 0);
+  --jm-text-disabled: oklch(0.40 0 0);
+
+  /* primary action — 라이트 surface 위 다크 액션이었던 것을 다크 surface 위 라이트 액션으로 반전 */
+  --jm-action: oklch(0.94 0 0);
+  --jm-action-fg: oklch(0.18 0 0);
+  --jm-action-hover: oklch(0.85 0 0);
+  --jm-action-active: oklch(0.78 0 0);
+
+  /* semantic — 어두운 배경에서도 충분한 채도/명도 차이로 식별되도록 */
+  --jm-success-bg: oklch(0.27 0.07 145);
+  --jm-success-fg: oklch(0.85 0.15 145);
+  --jm-success-solid: oklch(0.65 0.15 145);
+  --jm-warning-bg: oklch(0.30 0.08 85);
+  --jm-warning-fg: oklch(0.88 0.15 85);
+  --jm-warning-solid: oklch(0.78 0.15 85);
+  --jm-danger-bg: oklch(0.28 0.08 25);
+  --jm-danger-fg: oklch(0.85 0.18 25);
+  --jm-danger-solid: oklch(0.65 0.20 25);
+  --jm-info-bg: oklch(0.27 0.07 240);
+  --jm-info-fg: oklch(0.85 0.14 240);
+  --jm-info-solid: oklch(0.65 0.15 240);
+
+  /* focus ring — 라이트 액션 색에 맞춰 밝은 톤 */
+  --jm-ring: oklch(0.94 0 0 / 0.30);
+
+  /* shadows — 다크에선 더 강하게 (subtle shadow 안 보임) */
+  --jm-shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+  --jm-shadow-md: 0 2px 8px oklch(0 0 0 / 0.5);
+  --jm-shadow-lg: 0 8px 24px oklch(0 0 0 / 0.6);
+}
+
+/* auto 모드: prefers-color-scheme 따라감.
+   data-jm-theme="auto" 일 때 시스템이 dark 면 위 dark 토큰 적용. */
+@media (prefers-color-scheme: dark) {
+  [data-jm-scope][data-jm-theme="auto"] {
+    --jm-bg: oklch(0.16 0 0);
+    --jm-surface: oklch(0.20 0 0);
+    --jm-surface-muted: oklch(0.24 0 0);
+    --jm-surface-subtle: oklch(0.18 0 0);
+    --jm-border: oklch(0.28 0 0);
+    --jm-border-strong: oklch(0.40 0 0);
+    --jm-text: oklch(0.94 0 0);
+    --jm-text-muted: oklch(0.68 0 0);
+    --jm-text-subtle: oklch(0.52 0 0);
+    --jm-text-disabled: oklch(0.40 0 0);
+    --jm-action: oklch(0.94 0 0);
+    --jm-action-fg: oklch(0.18 0 0);
+    --jm-action-hover: oklch(0.85 0 0);
+    --jm-action-active: oklch(0.78 0 0);
+    --jm-success-bg: oklch(0.27 0.07 145);
+    --jm-success-fg: oklch(0.85 0.15 145);
+    --jm-success-solid: oklch(0.65 0.15 145);
+    --jm-warning-bg: oklch(0.30 0.08 85);
+    --jm-warning-fg: oklch(0.88 0.15 85);
+    --jm-warning-solid: oklch(0.78 0.15 85);
+    --jm-danger-bg: oklch(0.28 0.08 25);
+    --jm-danger-fg: oklch(0.85 0.18 25);
+    --jm-danger-solid: oklch(0.65 0.20 25);
+    --jm-info-bg: oklch(0.27 0.07 240);
+    --jm-info-fg: oklch(0.85 0.14 240);
+    --jm-info-solid: oklch(0.65 0.15 240);
+    --jm-ring: oklch(0.94 0 0 / 0.30);
+    --jm-shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+    --jm-shadow-md: 0 2px 8px oklch(0 0 0 / 0.5);
+    --jm-shadow-lg: 0 8px 24px oklch(0 0 0 / 0.6);
+  }
+}

@@ -25,6 +25,13 @@ const METHODS: { value: PaymentMethod; label: string; sub?: string }[] = [
   { value: "UNPAID", label: "외상", sub: "고객 미수금" },
 ];
 
+type FulfillmentType = "PICKUP" | "DELIVERY" | "SHIPPING";
+const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string; sub: string }[] = [
+  { value: "PICKUP", label: "매장 수령", sub: "즉시 인도" },
+  { value: "DELIVERY", label: "배달", sub: "당일·근거리" },
+  { value: "SHIPPING", label: "택배", sub: "ERP 출고 워크보드" },
+];
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -57,13 +64,13 @@ function CustomerCard({
 
   const inner = (
     <>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         고객
       </span>
       <div className="flex min-w-0 items-center gap-2.5">
         {isRegistered ? (
           session.customerType === "BUSINESS" ? (
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path
                   d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
@@ -75,7 +82,7 @@ function CustomerCard({
               </svg>
             </div>
           ) : (
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
               {(session.customerName ?? "?").charAt(0)}
             </div>
           )
@@ -93,33 +100,33 @@ function CustomerCard({
             <>
               <div className="flex items-center gap-1">
                 {session.customerType === "BUSINESS" && (
-                  <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                  <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
                     기업
                   </span>
                 )}
-                <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                   {session.customerName}
                 </span>
               </div>
               {session.customerType === "BUSINESS" &&
               session.customerBusinessNumber ? (
-                <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
                   {session.customerBusinessNumber}
                 </span>
               ) : session.customerPhone ? (
-                <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
                   {session.customerPhone}
                 </span>
               ) : null}
             </>
           ) : (
             <>
-              <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+              <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                 미등록 손님
               </span>
-              <span className="font-mono text-[11px] text-zinc-500">#{code}</span>
+              <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">#{code}</span>
               {required && (
-                <span className="line-clamp-1 text-[11px] text-amber-700">
+                <span className="line-clamp-1 text-[11px] text-[var(--jm-warning-fg)]">
                   연결 필요
                 </span>
               )}
@@ -132,7 +139,7 @@ function CustomerCard({
             height="14"
             viewBox="0 0 14 14"
             fill="none"
-            className="shrink-0 text-zinc-300"
+            className="shrink-0 text-[var(--jm-text-disabled)]"
             aria-hidden
           >
             <path
@@ -150,7 +157,7 @@ function CustomerCard({
 
   if (!onClick) {
     return (
-      <div className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3">
+      <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
         {inner}
       </div>
     );
@@ -160,7 +167,7 @@ function CustomerCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3 text-left transition-colors active:bg-zinc-100 sm:hover:bg-zinc-100"
+      className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3 text-left transition-colors active:bg-[var(--jm-surface-muted)] sm:hover:bg-[var(--jm-surface-muted)]"
     >
       {inner}
     </button>
@@ -173,12 +180,12 @@ function CustomerCard({
  */
 function CheckoutAtCard({ at }: { at: Date }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+    <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         결제시간
       </span>
       <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]">
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
             <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
             <path
@@ -191,10 +198,10 @@ function CheckoutAtCard({ at }: { at: Date }) {
           </svg>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+          <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
             {format(at, "HH:mm")}
           </span>
-          <span className="font-mono text-[11px] text-zinc-500">
+          <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
             {format(at, "M월 d일 (eee)", { locale: ko })}
           </span>
         </div>
@@ -245,6 +252,11 @@ function Body({
   const [taxInvoiceRequested, setTaxInvoiceRequested] = useState(false);
   // 결제시간 — 시트가 열린 순간 고정. Body 가 마운트될 때마다 새로 계산.
   const [paymentAt] = useState(() => new Date());
+  // 출고 방식 — 매장 수령(즉시 종결) / 배달 / 택배. 수리·임대 라인이 있으면 PICKUP 강제.
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("PICKUP");
+  const [shippingRecipientName, setShippingRecipientName] = useState("");
+  const [shippingRecipientPhone, setShippingRecipientPhone] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
 
   // 결제 대상 = 상품 + 임대 + 수리(미연결: repairTicketId 없는 즉석 수리). 수리는 자체 픽업 흐름이 별도라
   // RepairTicket 픽업은 RepairV2Detail 의 PickupSheet 에서 처리. 여기선 카트 라인만.
@@ -255,6 +267,10 @@ function Body({
   const totals = calcCartTotals({ ...session, items: allItems });
 
   const hasRentalOrRepair = rentalItems.length > 0 || repairItems.length > 0;
+  // 출고 방식 토글 노출 여부 — 수리/임대는 매장 인도라 PICKUP 강제 (토글 숨김)
+  const fulfillmentLocked = hasRentalOrRepair;
+  const effectiveFulfillment: FulfillmentType = fulfillmentLocked ? "PICKUP" : fulfillmentType;
+  const needsShippingInfo = effectiveFulfillment !== "PICKUP";
   // 모든 결제는 고객 등록을 권장 (통계/추적). skip 활성화 시 우회.
   const needsCustomer = !session.customerId && !skipCustomerLink;
   const requiresCustomer = hasRentalOrRepair && needsCustomer;
@@ -281,6 +297,14 @@ function Body({
         throw new Error(
           `변형 미확정 라인 ${unresolvedVariants.length}건 — 카트에서 먼저 변형을 선택하세요`,
         );
+      }
+      if (needsShippingInfo) {
+        if (!shippingAddress.trim()) {
+          throw new Error("배송지를 입력해주세요");
+        }
+        if (!shippingRecipientPhone.trim()) {
+          throw new Error("받는 사람 연락처를 입력해주세요");
+        }
       }
 
       // 1) 라벨 자동 발번 (trackable 상품에 한해)
@@ -317,6 +341,14 @@ function Body({
         action: "order",
         paymentMethod: method,
         taxInvoiceRequested,
+        fulfillmentType: effectiveFulfillment,
+        shipping: needsShippingInfo
+          ? {
+              recipientName: shippingRecipientName.trim() || session.customerName,
+              recipientPhone: shippingRecipientPhone.trim(),
+              address: shippingAddress.trim(),
+            }
+          : undefined,
       });
       return { ...result, labelCodes };
     },
@@ -382,7 +414,7 @@ function Body({
             requiresCustomerForUnpaid ||
             hasUnresolvedVariant
           }
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
         >
           {checkoutMutation.isPending && <Spinner />}₩
           {totals.total.toLocaleString("ko-KR")} 결제
@@ -391,7 +423,7 @@ function Body({
     >
       <div className="flex flex-col gap-5 pt-2">
         {/* 다크 합계 카드 */}
-        <div className="rounded-2xl bg-zinc-900 p-5 text-white">
+        <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
           <div className="text-[12px] font-semibold uppercase tracking-wider text-white/60">
             결제 금액
           </div>
@@ -415,17 +447,17 @@ function Body({
           {(rentalItems.length > 0 || repairItems.length > 0) && (
             <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
               {productItems.length > 0 && (
-                <span className="rounded-full bg-white/10 px-2.5 py-1">
+                <span className="rounded-full bg-[var(--jm-surface)]/10 px-2.5 py-1">
                   상품 {productItems.length}
                 </span>
               )}
               {rentalItems.length > 0 && (
-                <span className="rounded-full bg-white/10 px-2.5 py-1">
+                <span className="rounded-full bg-[var(--jm-surface)]/10 px-2.5 py-1">
                   임대 {rentalItems.length}
                 </span>
               )}
               {repairItems.length > 0 && (
-                <span className="rounded-full bg-white/10 px-2.5 py-1">
+                <span className="rounded-full bg-[var(--jm-surface)]/10 px-2.5 py-1">
                   수리 {repairItems.length}
                 </span>
               )}
@@ -452,8 +484,8 @@ function Body({
           {!session.customerId &&
             !skipCustomerLink &&
             (hasRentalOrRepair || method === "UNPAID") && (
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                <span className="text-[11px] text-amber-800">
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] px-3 py-2.5">
+                <span className="text-[11px] text-[var(--jm-warning-fg)]">
                   {hasRentalOrRepair
                     ? "임대/수리 기록 추적을 위해 고객 연결을 권장합니다"
                     : "외상은 미수금 추적을 위해 고객 연결이 필요합니다"}
@@ -463,7 +495,7 @@ function Body({
                   <button
                     type="button"
                     onClick={() => setSkipCustomerLink(true)}
-                    className="shrink-0 text-[11px] font-medium text-amber-900 underline-offset-2 hover:underline"
+                    className="shrink-0 text-[11px] font-medium text-[var(--jm-warning-fg)] underline-offset-2 hover:underline"
                   >
                     등록 없이 진행
                   </button>
@@ -473,14 +505,14 @@ function Body({
 
           {/* skip 활성 시 안내 */}
           {skipCustomerLink && (
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-zinc-50 px-3 py-2.5">
-              <span className="text-[11px] text-zinc-500">
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--jm-bg)] px-3 py-2.5">
+              <span className="text-[11px] text-[var(--jm-text-muted)]">
                 등록 없이 결제 — 통계/이력 추적 안 됨
               </span>
               <button
                 type="button"
                 onClick={() => setSkipCustomerLink(false)}
-                className="shrink-0 text-[11px] font-medium text-zinc-700 underline-offset-2 hover:underline"
+                className="shrink-0 text-[11px] font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
               >
                 취소
               </button>
@@ -491,14 +523,14 @@ function Body({
             !hasRentalOrRepair &&
             method !== "UNPAID" &&
             !skipCustomerLink && (
-              <p className="px-1 text-[11px] text-zinc-400">
+              <p className="px-1 text-[11px] text-[var(--jm-text-subtle)]">
                 고객 등록 시 구매 이력·통계가 자동 누적됩니다
               </p>
             )}
 
           {/* 변형 미확정 — 결제 차단 안내 */}
           {hasUnresolvedVariant && (
-            <div className="rounded-xl bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
+            <div className="rounded-xl bg-[var(--jm-warning-bg)] px-4 py-3 text-[12px] text-[var(--jm-warning-fg)]">
               ⚠ 변형 미확정 <strong>{unresolvedVariants.length}건</strong> — 카트로 돌아가 변형을 선택해주세요
             </div>
           )}
@@ -510,25 +542,25 @@ function Body({
               onClick={() => setTaxInvoiceRequested((v) => !v)}
               className={`flex items-center justify-between rounded-xl px-4 py-3 text-left transition-colors ${
                 taxInvoiceRequested
-                  ? "bg-emerald-50 ring-1 ring-emerald-300"
-                  : "bg-zinc-50 hover:bg-zinc-100"
+                  ? "bg-[var(--jm-success-bg)] ring-1 ring-emerald-300"
+                  : "bg-[var(--jm-bg)] hover:bg-[var(--jm-surface-muted)]"
               }`}
             >
               <div className="flex flex-col">
-                <span className="text-[13px] font-semibold text-zinc-900">
+                <span className="text-[13px] font-semibold text-[var(--jm-text)]">
                   세금계산서 발행 요청
                 </span>
-                <span className="text-[11px] text-zinc-500">
+                <span className="text-[11px] text-[var(--jm-text-muted)]">
                   결제 후 사장님이 별도 발행
                 </span>
               </div>
               <span
                 className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors ${
-                  taxInvoiceRequested ? "bg-emerald-500" : "bg-zinc-300"
+                  taxInvoiceRequested ? "bg-[var(--jm-success-bg)]0" : "bg-[var(--jm-border-strong)]"
                 }`}
               >
                 <span
-                  className={`size-5 rounded-full bg-white shadow transition-transform ${
+                  className={`size-5 rounded-full bg-[var(--jm-surface)] shadow transition-transform ${
                     taxInvoiceRequested ? "translate-x-5" : "translate-x-0"
                   }`}
                 />
@@ -538,7 +570,7 @@ function Body({
         </div>
 
         {method === "UNPAID" && session.customerId && (
-          <div className="flex items-center gap-2 rounded-xl bg-zinc-50 px-4 py-3 text-[12px] text-zinc-700">
+          <div className="flex items-center gap-2 rounded-xl bg-[var(--jm-bg)] px-4 py-3 text-[12px] text-[var(--jm-text)]">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" />
               <path d="M7 4v3.5M7 9.5v0.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -547,9 +579,90 @@ function Body({
           </div>
         )}
 
+        {/* 출고 방식 — 수리/임대 라인이 있으면 PICKUP 강제 (토글 숨김) */}
+        {!fulfillmentLocked && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+              출고 방식
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {FULFILLMENT_OPTIONS.map((opt) => {
+                const active = fulfillmentType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFulfillmentType(opt.value)}
+                    className={`flex flex-col gap-0.5 rounded-2xl border-2 p-3 text-left transition-colors ${
+                      active
+                        ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                        : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                    }`}
+                  >
+                    <span
+                      className={`text-[14px] font-semibold ${
+                        active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
+                      }`}
+                    >
+                      {opt.label}
+                    </span>
+                    <span className="text-[11px] text-[var(--jm-text-muted)]">{opt.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {needsShippingInfo && (
+              <div className="mt-2 flex flex-col gap-2 rounded-2xl bg-[var(--jm-bg)] p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-[var(--jm-text)]">
+                    {effectiveFulfillment === "DELIVERY" ? "배달지" : "택배 발송지"}
+                  </span>
+                  {session.customerId && (session.customerName || session.customerPhone) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShippingRecipientName(session.customerName ?? "");
+                        setShippingRecipientPhone(session.customerPhone ?? "");
+                      }}
+                      className="text-[11px] font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
+                    >
+                      고객 정보 채우기
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={shippingRecipientName}
+                  onChange={(e) => setShippingRecipientName(e.target.value)}
+                  placeholder="받는 사람 이름 (선택)"
+                  className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
+                />
+                <input
+                  type="tel"
+                  value={shippingRecipientPhone}
+                  onChange={(e) => setShippingRecipientPhone(e.target.value)}
+                  placeholder="받는 사람 연락처 *"
+                  className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
+                />
+                <textarea
+                  value={shippingAddress}
+                  onChange={(e) => setShippingAddress(e.target.value)}
+                  placeholder="주소 *"
+                  rows={2}
+                  className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
+                />
+                <span className="text-[11px] text-[var(--jm-text-muted)]">
+                  결제 후 ERP <strong>출고 워크보드</strong>로 자동 진입합니다
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 결제수단 */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             결제수단
           </span>
           <div className="grid grid-cols-2 gap-2">
@@ -562,19 +675,19 @@ function Body({
                   onClick={() => setMethod(m.value)}
                   className={`flex flex-col gap-0.5 rounded-2xl border-2 p-4 text-left transition-colors ${
                     active
-                      ? "border-zinc-900 bg-zinc-50"
-                      : "border-zinc-200 bg-white hover:border-zinc-300"
+                      ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                      : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                   }`}
                 >
                   <span
                     className={`text-[16px] font-semibold ${
-                      active ? "text-zinc-900" : "text-zinc-700"
+                      active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
                     }`}
                   >
                     {m.label}
                   </span>
                   {m.sub && (
-                    <span className="text-[11px] text-zinc-500">{m.sub}</span>
+                    <span className="text-[11px] text-[var(--jm-text-muted)]">{m.sub}</span>
                   )}
                 </button>
               );
@@ -584,9 +697,9 @@ function Body({
 
         {/* 고객 정보 */}
         {session.customerName && (
-          <div className="rounded-2xl bg-zinc-50 px-4 py-3 text-[13px]">
-            <span className="text-zinc-500">고객 </span>
-            <span className="font-semibold text-zinc-900">
+          <div className="rounded-2xl bg-[var(--jm-bg)] px-4 py-3 text-[13px]">
+            <span className="text-[var(--jm-text-muted)]">고객 </span>
+            <span className="font-semibold text-[var(--jm-text)]">
               {session.customerName}
             </span>
           </div>
@@ -610,7 +723,7 @@ function Pill({
   return (
     <div
       className={`flex flex-col rounded-xl px-3 py-2 ${
-        tone === "warn" ? "bg-amber-500/20" : "bg-white/10"
+        tone === "warn" ? "bg-[var(--jm-warning-bg)]0/20" : "bg-[var(--jm-surface)]/10"
       }`}
     >
       <div className="text-[10px] uppercase tracking-wider text-white/60">

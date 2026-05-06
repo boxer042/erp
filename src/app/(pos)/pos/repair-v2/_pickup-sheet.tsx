@@ -45,17 +45,17 @@ function PickupSheetBody({
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
         aria-label="닫기"
       />
-      <div className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col rounded-t-3xl bg-white shadow-2xl">
+      <div className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col rounded-t-3xl bg-[var(--jm-surface)] shadow-2xl">
         <div className="flex shrink-0 justify-center pt-3">
-          <div className="h-1 w-10 rounded-full bg-zinc-300" />
+          <div className="h-1 w-10 rounded-full bg-[var(--jm-border-strong)]" />
         </div>
         <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-3">
-          <h2 className="text-[18px] font-bold text-zinc-900">픽업 / 결제</h2>
+          <h2 className="text-[18px] font-bold text-[var(--jm-text)]">픽업 / 결제</h2>
           <button
             type="button"
             onClick={() => !loading && onOpenChange(false)}
             disabled={loading}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 disabled:opacity-50"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)] disabled:opacity-50"
             aria-label="닫기"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -71,7 +71,7 @@ function PickupSheetBody({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
           {/* 금액 강조 */}
-          <div className="rounded-2xl bg-zinc-900 p-5 text-white">
+          <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
             <div className="text-[12px] font-semibold uppercase tracking-wider text-white/60">
               청구 금액
             </div>
@@ -82,7 +82,7 @@ function PickupSheetBody({
 
           {/* 결제수단 — 큰 버튼 */}
           <div className="mt-5 flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               결제수단
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -95,19 +95,19 @@ function PickupSheetBody({
                     onClick={() => setMethod(p.value)}
                     className={`flex flex-col gap-0.5 rounded-2xl border-2 p-4 text-left transition-colors ${
                       active
-                        ? "border-zinc-900 bg-zinc-50"
-                        : "border-zinc-200 bg-white hover:border-zinc-300"
+                        ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                        : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                     }`}
                   >
                     <span
                       className={`text-[16px] font-semibold ${
-                        active ? "text-zinc-900" : "text-zinc-700"
+                        active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
                       }`}
                     >
                       {p.label}
                     </span>
                     {p.sub && (
-                      <span className="text-[11px] text-zinc-500">{p.sub}</span>
+                      <span className="text-[11px] text-[var(--jm-text-muted)]">{p.sub}</span>
                     )}
                   </button>
                 );
@@ -116,7 +116,7 @@ function PickupSheetBody({
           </div>
 
           {warrantyMonths != null && warrantyMonths > 0 && (
-            <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-[12px] text-emerald-900">
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--jm-success-bg)] px-3 py-2.5 text-[12px] text-emerald-900">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M3 7l3 3 5-6"
@@ -131,12 +131,12 @@ function PickupSheetBody({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-zinc-100 bg-white px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
+        <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
           <button
             type="button"
             onClick={() => onConfirm(method)}
             disabled={loading}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
           >
             {loading && (
               <svg

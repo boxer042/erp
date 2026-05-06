@@ -53,30 +53,30 @@ export function RentalMode({ session, onCustomerClick }: Props) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
+        <div className="px-4 py-4 sm:px-6">
           {/* 카트에 담긴 임대 라인 — 이번 세션에서 추가한 것 */}
           {rentalItems.length > 0 && (
             <section className="mb-4 flex flex-col gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                 담긴 임대 {rentalItems.length}
               </span>
               <div className="flex flex-col gap-2">
                 {rentalItems.map((it) => (
                   <div
                     key={it.cartItemId}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-3"
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--jm-bg)] px-4 py-3"
                   >
                     <div className="flex min-w-0 flex-col">
-                      <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                         {it.name}
                       </span>
                       {it.rentalMeta?.startDate && it.rentalMeta?.endDate && (
-                        <span className="text-[11px] text-zinc-500">
+                        <span className="text-[11px] text-[var(--jm-text-muted)]">
                           {it.rentalMeta.startDate} ~ {it.rentalMeta.endDate}
                         </span>
                       )}
                     </div>
-                    <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+                    <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
                       {fmtKRW(it.unitPrice)}
                     </span>
                   </div>
@@ -88,15 +88,15 @@ export function RentalMode({ session, onCustomerClick }: Props) {
           {/* 가용 자산 그리드 — 매장 전체 대시보드는 메뉴 → 임대관리 로 분리됨.
               여기서는 이번 손님 세션 카트에 담을 자산만 노출. */}
           <section className="flex flex-col gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               임대 가능 {assets.length}
             </span>
             {assetsQuery.isPending ? (
               <GridSkeleton />
             ) : assets.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
-                <span className="text-[14px] text-zinc-500">가용 자산이 없습니다</span>
-                <span className="text-[12px] text-zinc-400">
+                <span className="text-[14px] text-[var(--jm-text-muted)]">가용 자산이 없습니다</span>
+                <span className="text-[12px] text-[var(--jm-text-subtle)]">
                   다른 임대로 모두 나가있거나 등록된 자산이 없습니다
                 </span>
               </div>
@@ -148,15 +148,15 @@ function AssetCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-1.5 rounded-2xl bg-white p-3 text-left ring-1 ring-zinc-200 transition-all active:scale-[0.98] sm:hover:ring-zinc-300 sm:hover:shadow-sm"
+      className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-surface)] p-3 text-left ring-1 ring-[var(--jm-border)] transition-all active:scale-[0.98] sm:hover:ring-[var(--jm-border-strong)] sm:hover:shadow-sm"
     >
-      <span className="line-clamp-2 min-h-[2.4em] text-[13px] font-semibold leading-tight text-zinc-900">
+      <span className="line-clamp-2 min-h-[2.4em] text-[13px] font-semibold leading-tight text-[var(--jm-text)]">
         {asset.name}
       </span>
-      <span className="font-mono text-[10px] text-zinc-400">{asset.assetNo}</span>
-      <span className="mt-1 text-[14px] font-bold tabular-nums text-zinc-900">
+      <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">{asset.assetNo}</span>
+      <span className="mt-1 text-[14px] font-bold tabular-nums text-[var(--jm-text)]">
         {fmtKRW(dailyRate)}
-        <span className="ml-0.5 text-[10px] font-normal text-zinc-500">/일</span>
+        <span className="ml-0.5 text-[10px] font-normal text-[var(--jm-text-muted)]">/일</span>
       </span>
     </button>
   );
@@ -168,12 +168,12 @@ function GridSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col gap-2 rounded-2xl bg-white p-3 ring-1 ring-zinc-100"
+          className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]"
         >
-          <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
-          <div className="h-4 w-full animate-pulse rounded bg-zinc-100" />
-          <div className="h-3 w-1/2 animate-pulse rounded bg-zinc-100" />
-          <div className="mt-1 h-3.5 w-2/3 animate-pulse rounded bg-zinc-100" />
+          <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="h-4 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="h-3 w-1/2 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="mt-1 h-3.5 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
         </div>
       ))}
     </div>
@@ -281,7 +281,7 @@ function RentalSheetBody({
           type="button"
           onClick={handleAdd}
           disabled={!canAdd}
-          className="flex h-14 w-full items-center justify-between rounded-2xl bg-zinc-900 px-5 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+          className="flex h-14 w-full items-center justify-between rounded-2xl bg-[var(--jm-action)] px-5 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
         >
           <span>{days}일 카트 추가</span>
           <span className="tabular-nums">{fmtKRW(total)}</span>
@@ -297,7 +297,7 @@ function RentalSheetBody({
 
         {/* 기간 */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             기간
           </span>
           <div className="grid grid-cols-2 gap-2">
@@ -308,31 +308,31 @@ function RentalSheetBody({
             />
             <DateField label="종료" value={endDate} onChange={setEndDate} />
           </div>
-          <span className="text-[11px] text-zinc-400">{days}일 임대</span>
+          <span className="text-[11px] text-[var(--jm-text-subtle)]">{days}일 임대</span>
         </div>
 
         {/* 가격 요약 */}
-        <div className="flex flex-col gap-2 rounded-2xl bg-zinc-50 p-4">
+        <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-bg)] p-4">
           <div className="flex items-baseline justify-between">
-            <span className="text-[13px] text-zinc-600">일일가</span>
-            <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+            <span className="text-[13px] text-[var(--jm-text-muted)]">일일가</span>
+            <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
               {fmtKRW(dailyRate)}
-              <span className="ml-1 text-[11px] font-normal text-zinc-500">×{days}</span>
+              <span className="ml-1 text-[11px] font-normal text-[var(--jm-text-muted)]">×{days}</span>
             </span>
           </div>
           {deposit > 0 && (
             <div className="flex items-baseline justify-between">
-              <span className="text-[13px] text-zinc-600">보증금</span>
-              <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+              <span className="text-[13px] text-[var(--jm-text-muted)]">보증금</span>
+              <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
                 {fmtKRW(deposit)}
-                <span className="ml-1 text-[11px] font-normal text-zinc-500">반환</span>
+                <span className="ml-1 text-[11px] font-normal text-[var(--jm-text-muted)]">반환</span>
               </span>
             </div>
           )}
-          <div className="my-1 h-px bg-zinc-200" />
+          <div className="my-1 h-px bg-[var(--jm-border)]" />
           <div className="flex items-baseline justify-between">
-            <span className="text-[14px] font-semibold text-zinc-900">임대료</span>
-            <span className="text-[18px] font-bold tabular-nums text-zinc-900">
+            <span className="text-[14px] font-semibold text-[var(--jm-text)]">임대료</span>
+            <span className="text-[18px] font-bold tabular-nums text-[var(--jm-text)]">
               {fmtKRW(total)}
             </span>
           </div>
@@ -362,12 +362,12 @@ function CustomerCard({
 
   const inner = (
     <>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         고객
       </span>
       <div className="flex min-w-0 items-center gap-2.5">
         {isRegistered ? (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
             {(session.customerName ?? "?").charAt(0)}
           </div>
         ) : (
@@ -382,23 +382,23 @@ function CustomerCard({
         <div className="flex min-w-0 flex-1 flex-col">
           {isRegistered ? (
             <>
-              <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+              <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                 {session.customerName}
               </span>
               {session.customerPhone && (
-                <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
                   {session.customerPhone}
                 </span>
               )}
             </>
           ) : (
             <>
-              <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+              <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
                 미등록 손님
               </span>
-              <span className="font-mono text-[11px] text-zinc-500">#{code}</span>
+              <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">#{code}</span>
               {required && (
-                <span className="line-clamp-1 text-[11px] text-amber-700">
+                <span className="line-clamp-1 text-[11px] text-[var(--jm-warning-fg)]">
                   연결 필요
                 </span>
               )}
@@ -411,7 +411,7 @@ function CustomerCard({
             height="14"
             viewBox="0 0 14 14"
             fill="none"
-            className="shrink-0 text-zinc-300"
+            className="shrink-0 text-[var(--jm-text-disabled)]"
             aria-hidden
           >
             <path
@@ -429,7 +429,7 @@ function CustomerCard({
 
   if (!onClick) {
     return (
-      <div className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3">
+      <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
         {inner}
       </div>
     );
@@ -439,7 +439,7 @@ function CustomerCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3 text-left transition-colors active:bg-zinc-100 sm:hover:bg-zinc-100"
+      className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3 text-left transition-colors active:bg-[var(--jm-surface-muted)] sm:hover:bg-[var(--jm-surface-muted)]"
     >
       {inner}
     </button>
@@ -452,12 +452,12 @@ function CustomerCard({
  */
 function CheckoutAtCard({ at }: { at: Date }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+    <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         접수시간
       </span>
       <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]">
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
             <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
             <path
@@ -470,10 +470,10 @@ function CheckoutAtCard({ at }: { at: Date }) {
           </svg>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+          <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
             {format(at, "HH:mm")}
           </span>
-          <span className="font-mono text-[11px] text-zinc-500">
+          <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
             {format(at, "M월 d일 (eee)", { locale: ko })}
           </span>
         </div>
@@ -493,14 +493,14 @@ function DateField({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
       <input
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-12 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-[14px] tabular-nums outline-none focus:border-zinc-400 focus:bg-white"
+        className="h-12 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-3 text-[14px] tabular-nums outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
       />
     </label>
   );

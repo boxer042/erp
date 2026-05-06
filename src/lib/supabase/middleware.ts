@@ -25,9 +25,23 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch (err) {
+    // refresh token이 이미 사용되었거나 만료된 경우 등 — 세션을 비우고 비로그인 상태로 처리
+    // (Supabase가 던지는 AuthApiError는 ignore-listed라 콘솔에 노이즈로만 남음)
+    if (err && typeof err === "object" && "__isAuthError" in err) {
+      for (const cookie of request.cookies.getAll()) {
+        if (cookie.name.startsWith("sb-")) {
+          supabaseResponse.cookies.delete(cookie.name);
+        }
+      }
+    } else {
+      throw err;
+    }
+  }
 
   // 로그인 페이지가 아닌 곳에서 인증되지 않은 경우 리다이렉트
   if (
@@ -36,7 +50,9 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/auth") &&
     !request.nextUrl.pathname.startsWith("/access-denied") &&
     !request.nextUrl.pathname.startsWith("/repair/approve") &&
-    !request.nextUrl.pathname.startsWith("/api/public")
+    !request.nextUrl.pathname.startsWith("/api/public") &&
+    !request.nextUrl.pathname.startsWith("/external/po") &&
+    !request.nextUrl.pathname.startsWith("/jm")
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

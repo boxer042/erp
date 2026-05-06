@@ -68,6 +68,33 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 # ERP 프로젝트 가이드
 
+## ⚠️ 작업 영역 분기 — 이 가이드 vs jm 디자인 시스템
+
+이 프로젝트는 **두 개의 UI 시스템이 공존**합니다. 작업 영역에 따라 따를 규칙이 다릅니다.
+
+| 작업 영역 | 따를 규칙 |
+|---|---|
+| `src/app/(dashboard)/**` (ERP 백오피스) | **이 CLAUDE.md** (shadcn 기반 — 테이블·시트·색상·콤보박스 패턴) |
+| `src/app/(pos)/**`, `src/app/(jm)/**`, `src/jm/**` | **`src/jm/DESIGN.md`** + jm primitive 우선 |
+| `src/app/(print)/**` | 인쇄 전용 (자체 패턴, 양쪽 시스템 미적용) |
+| `src/components/ui/**` | shadcn 컴포넌트 — ERP 한정 사용 |
+
+**다음 키워드가 사용자 요청에 등장하면 jm 룰로 전환**:
+- "jm", "JM", "jm 디자인 시스템", "제이엠", "제이엠 디자인 시스템"
+- "POS", "포스" 페이지 작업
+- 파일 경로가 `src/jm/`, `src/app/(pos)/`, `src/app/(jm)/` 로 시작
+
+**jm 룰 요약** (전체는 [src/jm/DESIGN.md](src/jm/DESIGN.md) 참고):
+- 컴포넌트: `JmButton`, `JmCard`, `JmTable`, `JmCombobox`, `JmDrawer` 등 — 모두 `Jm` prefix
+- import: `@/jm` 또는 `@/jm/...`. shadcn `@/components/ui/*` import **금지**
+- 색상: `var(--jm-*)` CSS 변수만 사용. 하드코딩 zinc-*, hex 금지
+- 테마: `<JmScope theme="light|dark|auto">` 로 감싸 토큰 cascade
+- Portal popup (Combobox/Dialog 내부) 은 root 에 `data-jm-scope` 속성 필수
+
+이 분기를 어기면 (POS 에서 shadcn `<Button>` 쓴다든지) **시각 충돌 + 다크 모드 깨짐**. 작업 시작 전 영역 확인 필수.
+
+---
+
 ## 기술 스택
 
 - **프레임워크**: Next.js 16.2.1 (App Router, Turbopack)
@@ -85,40 +112,95 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ```
 src/
 ├── app/
-│   ├── (auth)/          # 로그인/회원가입 (비인증 레이아웃)
-│   ├── (dashboard)/     # 메인 앱 (인증 레이아웃)
-│   │   ├── suppliers/       # 거래처 관리
-│   │   ├── supplier-products/ # 거래처 상품
-│   │   ├── products/        # 판매상품, 세트, 매핑
-│   │   ├── inventory/       # 재고, 입고, 초기등록, 실사보정
-│   │   ├── orders/          # 주문
-│   │   ├── channels/        # 판매채널
-│   │   ├── pricing/         # 가격/마진
-│   │   └── settings/        # 설정
-│   ├── api/             # REST API 라우트
-│   └── auth/callback/   # Supabase OAuth 콜백
+│   ├── (auth)/             # 로그인/회원가입 (비인증 레이아웃)
+│   ├── (landing)/          # 공개 랜딩 (상품 노출)
+│   ├── (dashboard)/        # 백오피스 (인증 레이아웃)
+│   │   ├── (home)/             # 통합 대시보드
+│   │   ├── suppliers/          # 거래처 + ledger
+│   │   ├── supplier-products/  # 거래처 상품
+│   │   ├── customers/          # 고객(개인/기업) + ledger
+│   │   ├── products/           # 판매상품, 세트, 매핑, 카테고리, 브랜드, 스펙슬롯, 조립템플릿
+│   │   ├── inventory/          # 재고, 입고, 초기등록, 실사보정, 로트, 반품, 조립
+│   │   ├── orders/             # 주문 워크보드
+│   │   ├── purchase-orders/    # 발주 (RFQ → 발주 → 입고 흐름)
+│   │   ├── quotations/         # 견적서 (판매/매입)
+│   │   ├── statements/         # 거래명세표
+│   │   ├── tax-invoices/       # 세금계산서 발행 대기열
+│   │   ├── sales/              # 판매 이력
+│   │   ├── repairs/            # 수리 티켓 + 통계 + 보증
+│   │   ├── repair-services/    # 공임 프리셋 / 수리 패키지
+│   │   ├── rentals/            # 임대 + 통계
+│   │   ├── rental-assets/      # 임대 자산
+│   │   ├── serial-items/       # 시리얼 라벨
+│   │   ├── expenses/           # 지출
+│   │   ├── audit-logs/         # 감사 로그
+│   │   ├── reports/margin/     # 마진 리포트
+│   │   ├── channels/           # 판매채널
+│   │   └── settings/           # 회사정보 · 랜딩 · 미디어
+│   ├── (pos)/              # POS (모바일/태블릿 우선, repair-v2 / rentals / customer profile 통합)
+│   ├── (print)/            # 인쇄용 — 견적서, 거래명세표, 발주서, 영수증, 시리얼 라벨, 거래처 원장, 수리 영수증
+│   ├── repair/approve/     # 손님용 수리 승인 페이지 (토큰 기반, 비인증)
+│   ├── api/                # REST API 라우트
+│   └── auth/callback/      # Supabase OAuth 콜백
 ├── components/
-│   ├── ui/              # 기본 UI (shadcn/base-ui 기반)
-│   ├── layout/          # app-sidebar, breadcrumb, dashboard-shell
-│   ├── data-table/      # data-table-toolbar
-│   ├── providers.tsx              # QueryClientProvider 래퍼 (RootLayout 주입)
-│   ├── quick-register-sheets.tsx  # 거래처/공급상품/판매상품 빠른 등록 (공통)
-│   └── mapping-dialog.tsx         # 상품 매핑 다이얼로그
+│   ├── ui/                          # 기본 UI (shadcn/base-ui 기반)
+│   ├── layout/                      # app-sidebar, breadcrumb, dashboard-shell
+│   ├── data-table/                  # data-table-toolbar
+│   ├── pos/, repair/, assembly/     # POS·수리·조립 도메인 컴포넌트
+│   ├── product/, landing/           # 상품 미디어 / 랜딩 블록
+│   ├── new-product-form/            # 판매상품 등록 폼 (메인 + parts)
+│   ├── providers.tsx                # QueryClientProvider + GlobalLoadingBar
+│   ├── global-loading-bar.tsx       # React Query 활동 시 상단 progress
+│   ├── quick-register-sheets.tsx    # 거래처/공급상품/판매상품 빠른 등록
+│   ├── *-combobox.tsx               # supplier / supplier-product / product / customer / channel / brand / assembly-* combobox
+│   ├── mapping-sheet.tsx            # 공급상품→판매상품 매핑
+│   ├── quotation-sheet.tsx          # 견적서 등록/수정
+│   ├── statement-sheet.tsx          # 거래명세표 등록/수정
+│   ├── document-pdf.tsx             # 견적서·거래명세표 react-pdf 렌더러
+│   ├── document-print-dialog.tsx    # 인쇄/PDF 다운로드 다이얼로그
+│   ├── repair-statement-pdf.tsx     # 수리 영수증 PDF
+│   ├── supplier-items-pdf.tsx       # 입고 거래명세표 PDF
+│   ├── supplier-ledger-pdf.tsx      # 거래처 원장 PDF
+│   ├── shipping-history-card.tsx    # 주문 배송이력 카드
+│   ├── *-payment-dialog.tsx         # 거래처/고객 결제 등록
+│   ├── *-adjustment-dialog.tsx      # 거래처/고객 잔액 조정
+│   ├── media-picker-dialog.tsx, image-edit-dialog.tsx
+│   ├── inline-cell-product-search-mobile.tsx
+│   └── theme-toggle.tsx
 ├── lib/
-│   ├── prisma.ts        # PrismaClient 싱글턴
-│   ├── auth.ts          # getCurrentUser, requireAuth
-│   ├── constants.ts     # TAX_RATE, PAYMENT_METHODS, UNITS 등
-│   ├── utils.ts         # cn() (clsx + tailwind-merge)
-│   ├── api-client.ts    # apiGet/apiMutate + ApiError (모든 클라이언트 fetch는 여기 통과)
-│   ├── query-keys.ts    # React Query 도메인별 key factory
-│   ├── supabase/        # client.ts, server.ts, middleware.ts
-│   └── validators/      # Zod 스키마 (product, supplier, order 등)
-└── middleware.ts        # Supabase 세션 관리
+│   ├── prisma.ts, auth.ts, api-auth.ts        # PrismaClient 싱글턴 / requireAuth / guardAdmin
+│   ├── constants.ts                           # TAX_RATE, PAYMENT_METHODS, UNITS 등
+│   ├── utils.ts                               # cn, formatComma/parseComma, normalizeDiscountInput 등
+│   ├── api-client.ts                          # apiGet/apiMutate + ApiError
+│   ├── query-keys.ts                          # React Query 도메인별 key factory
+│   ├── document-no.ts                         # IN/ORD/QUO/STA/PO 등 문서번호 생성
+│   ├── audit.ts                               # 감사 로그 기록
+│   ├── inventory/fifo.ts                      # FIFO 로트 소진/복원 공용 헬퍼
+│   ├── orders/board.ts                        # 주문 워크보드 분류 로직
+│   ├── repair.ts, repair-inventory.ts         # 수리 합계 계산 / 부속 재고 차감·복원
+│   ├── purchase-order.ts                      # 발주 상태 전이 헬퍼
+│   ├── customer-ledger.ts, supplier-ledger.ts # 원장 잔액 재계산
+│   ├── incoming-recalc.ts, incoming-shipping.ts, cost.ts, cost-utils.ts, selling-cost.ts
+│   ├── product-mutations.ts, mapping-helpers.ts
+│   ├── card-fee-rate-helper.ts
+│   ├── serial-item-code.ts                    # YYMMDD-NNNN 시리얼 코드 발번
+│   ├── pdf-fonts.ts, html-utils.ts            # Pretendard 등록 / HTML 변환
+│   ├── landing-blocks-utils.ts, landing-export.ts, landing-icons.ts
+│   ├── use-body-scroll-lock.ts
+│   ├── supabase/                              # client.ts, server.ts, middleware.ts
+│   └── validators/                            # Zod 스키마 (product, supplier, order, quotation, statement, repair-ticket, customer, purchase-order, assembly, ...)
+└── middleware.ts                              # Supabase 세션 관리
 ```
 
 ## ⚠️ 필수 코드 패턴 (신규/수정 시 반드시 준수)
 
-> 아래 3가지 패턴은 2026-04 코드 최적화에서 정착시킨 것. 새 페이지/컴포넌트/API 라우트를 만들거나 기존 파일을 수정할 때 **항상 이 패턴을 따를 것**. 위반 시 곧장 기술 부채가 누적됨.
+> 아래 패턴은 2026-04 코드 최적화에서 정착시킨 것. 새 페이지/컴포넌트/API 라우트를 만들거나 기존 파일을 수정할 때 **항상 이 패턴을 따를 것**. 위반 시 곧장 기술 부채가 누적됨.
+>
+> **⚠️ 영역별 적용 범위**:
+> - **§1 (React Query) / §3 (Prisma N+1)**: 모든 영역 공통 — jm/POS 에서도 동일하게 적용
+> - **§2 (큰 파일 분리)**: 모든 영역 공통
+> - **§4 (테이블 — shadcn `<Table>`)**: ERP 대시보드 한정. POS/jm 에선 `JmTable` 사용 — [DESIGN.md](src/jm/DESIGN.md#5-컴포넌트-카탈로그) 참고
+> - **§5 (로딩 상태 UI)**: 패턴은 공통이나 컴포넌트가 다름 — jm 에선 `JmSkeleton` / `JmSpinner` 사용
 
 ### 1. 클라이언트 데이터 페칭 — React Query + apiGet/apiMutate
 
@@ -235,6 +317,8 @@ await Promise.all(ops);
 - N+1을 새로 도입하는 코드는 PR 단계에서 막기. 기존 N+1 발견 시 즉시 수정
 
 ### 4. 테이블 — 가로 스크롤은 shadcn `<Table>` 컴포넌트로 통일
+
+> **⚠️ ERP 대시보드(`(dashboard)/`) 한정.** POS/jm 영역에선 `JmTable` 사용 (`@/jm`). API 거의 동일하지만 토큰·스타일이 jm 시스템.
 
 **모든 리스트성 테이블은 반드시 shadcn `<Table>` 컴포넌트 사용.** 네이티브 `<table>` 요소 직접 사용 금지.
 
@@ -409,55 +493,129 @@ const open = async (id) => {
 
 ## 데이터베이스 스키마
 
-### 인증
+> 정확한 필드는 [prisma/schema.prisma](prisma/schema.prisma) 가 단일 출처. 아래는 도메인별 핵심 모델 + 흐름 요약.
+
+### 인증 / 감사
 - **User** — Supabase 연동, ADMIN/STAFF 역할
+- **AuditLog** — 주요 mutation 추적 (`/lib/audit.ts` 로 기록)
 
 ### 거래처
 - **Supplier** — 거래처 (사업자번호, 대표자, 전화, FAX, 이메일, 주소, 결제방식 CREDIT/PREPAID)
-- **SupplierContact** — 거래처 담당자 (이름, 휴대폰, 이메일, 직책) / Supplier 1:N
+- **SupplierContact** — 거래처 담당자 1:N
 - **SupplierProduct** — 거래처 공급상품 (품명, 품번, 단위, 단가, 통화)
 - **SupplierProductPriceHistory** — 공급상품 단가 변동 이력
 - **SupplierLedger** — 거래처 원장 (PURCHASE/PAYMENT/ADJUSTMENT/REFUND)
 - **SupplierPayment** — 거래처 결제 기록
+- **SupplierReturn / SupplierReturnItem** — 입고 반품. exchangeIncomingId 로 교환 입고 연결
+
+### 고객
+- **Customer** — `type` enum (INDIVIDUAL/BUSINESS) — 개인/기업 통합. 기업은 사업자번호·업태·종목·담당자 사용
+- **CustomerLedger** — 고객 원장 (SALE/RECEIPT/ADJUSTMENT/REFUND, debit/credit/balance)
+- **CustomerPayment** — 고객 입금/수금
+- **CustomerMachine** — 고객이 가져온 기기(브랜드, 모델, 시리얼). 수리 티켓에서 참조
+- **CustomerNote** — 고객별 메모/이력
 
 ### 상품
-- **Product** — 판매상품 (SKU, 바코드, 단위, 세금유형, 판매가, 세트여부)
+- **Product** — 판매상품 (SKU, 바코드, 단위, 세금유형, 판매가, 세트/조립 여부, 카테고리, 브랜드)
+- **Brand** — 브랜드 마스터
+- **ProductCategory** — 카테고리 (계층형, parentId)
+- **ChannelCategoryMapping** — 채널별 카테고리 매핑
+- **ProductSpecSlot / ProductSpecValue** — 상품 스펙 슬롯 + 값 (종류·정렬)
 - **ProductMapping** — 공급상품 → 판매상품 매핑 (환산비율 conversionRate)
-- **SetComponent** — 세트상품 구성 (상위상품 → 하위상품, 수량)
+- **SetComponent** — 세트/조립상품 구성 (상위 → 하위, slotLabelId 로 슬롯 식별)
 - **ChannelPricing** — 채널별 판매가
+- **ProductMedia** — 상품 이미지/영상 (kind, type)
 
 ### 재고 (로트 기반 FIFO)
-- **Inventory** — 상품별 현재 재고 (수량, 안전재고) / Product 1:1. `avgCost`는 deprecated 캐시값이며 실제 원가는 로트에서 계산
-- **InventoryMovement** — 재고 변동 이력 (INCOMING, OUTGOING, ADJUSTMENT_PLUS/MINUS, SET_CONSUME, SET_PRODUCE, RETURN, INITIAL, STOCKTAKE_PLUS/MINUS). 실사보정 시 `reason` (StocktakeReason enum) 기록
+- **Inventory** — 상품별 현재 재고 (수량, 안전재고) / Product 1:1. `avgCost`는 deprecated 캐시값
+- **InventoryMovement** — 재고 변동 이력 (INCOMING, OUTGOING, ADJUSTMENT_PLUS/MINUS, SET_CONSUME, SET_PRODUCE, RETURN, INITIAL, STOCKTAKE_PLUS/MINUS, ASSEMBLY_*, REPAIR_*, RENTAL_*)
 - **InventoryLot** — 입고/기초/조정으로 생성되는 재고 로트. 필드: `productId`(nullable=오르판), `supplierProductId`, `receivedQty/remainingQty`, `unitCost`, `receivedAt`, `source`(INCOMING/INITIAL/ADJUSTMENT)
-- **LotConsumption** — 주문 확정 시 FIFO로 소진한 로트 기록 (orderItemId ↔ lotId). 주문 취소/반품 시 복원에 사용
+- **LotConsumption** — FIFO로 소진한 로트 기록 (`orderItemId` 또는 `repairPartId` ↔ `lotId`). 주문/수리 취소·반품 시 복원
 
 ### 입고
-- **Incoming** — 입고 전표 (입고번호 IN[YYMMDD]-[4자리], PENDING→CONFIRMED→CANCELLED)
-- **IncomingItem** — 입고 품목 (공급상품, 수량, originalPrice 할인전단가, discountAmount 개당할인액, unitPrice 실제단가(세전), totalPrice 공급가액합계(세전), unitCostSnapshot 원가스냅샷)
+- **Incoming** — 입고 전표 (IN[YYMMDD]-[4자리], PENDING→CONFIRMED→CANCELLED). `purchaseOrderId` 로 발주와 연결
+- **IncomingItem** — 입고 품목. `purchaseOrderItemId` 로 발주 라인 추적
+
+### 발주 (Purchase Order)
+- **PurchaseOrder** — 발주 (PO[YYMMDD]-[4자리]). 흐름: `DRAFT → SENT → CONFIRMED → (PARTIAL → PARTIAL_RESENT → PARTIAL_REACCEPTED → PARTIAL_COMPLETED) → RECEIVED` / `CLOSED`(잔량 포기) / `CANCELLED`. 매입 견적서에서 전환 가능 (`quotationId`)
+- **PurchaseOrderItem** — 발주 품목. `receivedQty` 누적 → `quantity` 도달 시 자동 RECEIVED 전이
+
+### 견적서 / 거래명세표
+- **Quotation** — 판매(SALES) / 매입(PURCHASE) 통합. 상태: `DRAFT/SENT/ACCEPTED/REJECTED/EXPIRED/CONVERTED`. customer 또는 supplier 1개 연결. 자유 입력 라인(productId 없음) 허용
+- **QuotationItem** — 견적 품목 (productId/supplierProductId optional, listPrice/discountAmount/unitPrice/totalPrice)
+- **Statement / StatementItem** — 거래명세표 (STA 번호, 발행일). 견적서·주문에서 전환
 
 ### 주문
-- **Order** — 주문 (주문번호 ORD[YYMMDD]-[4자리], 채널, 고객정보, 수수료)
-- **OrderItem** — 주문 품목
+- **Order** — 주문 (ORD[YYMMDD]-[4자리])
+  - `status`: `PENDING`(접수, 재고 미차감) → `PREPARING`(준비, 재고 차감) → `SHIPPED`(발송) → `COMPLETED` + `CANCELLED` / `RETURNED`
+  - `fulfillmentType`: `PICKUP`(매장 수령, POS 즉시 종결) / `DELIVERY`(자체 배달) / `SHIPPING`(택배). PICKUP 은 워크보드 미노출
+  - `expectedShipDate`: 출고 예정일 (DELIVERY/SHIPPING 만). 워크보드의 지연/오늘/이번주 분류
+  - `repairTicketId` / `rentalId` (각각 `@unique`) — 수리·임대 결제 1:1 연결
+  - `quotationId` — 판매 견적서 전환 시 연결
+  - `recipientName/Phone/shippingAddress`, `trackingCarrier/Number` (택배)
+- **OrderItem** — `serviceName`(서비스 라인), `unitCostSnapshot`, `channelCommissionRateSnapshot`, `cardFeeRateSnapshot`, `sellingCostSnapshot`
+
+### POS
+- **PosSession** — 카트 세션 (디바이스간 sync). items JSON 저장, customerId optional, label, totalDiscount, shippingCost, quotationFingerprint, deletedAt(soft delete)
+
+### 수리 (Repair)
+- **RepairTicket** — 수리 티켓 (`type`: ON_SITE 즉시수리 / DROP_OFF 맡김수리)
+  - 상태: `RECEIVED → DIAGNOSING → QUOTED → APPROVED → REPAIRING → READY → PICKED_UP` / `CANCELLED`
+  - `approvalToken` — 손님용 승인 페이지(`/repair/approve/[token]`)에서 ON_SITE/REMOTE 승인
+  - `cancelReason` enum: CUSTOMER_DECLINED/NO_SHOW, SHOP_GAVE_UP, PARTS_UNAVAILABLE, SOLD_AS_PRODUCT, MISTAKE, OTHER
+  - `repairWarrantyMonths/Ends`, `parentRepairTicketId` (재수리)
+  - `serialItemId` (시리얼 라벨 연결), `customerMachineId` (등록 기기)
+- **RepairPart** — 부속 (재고 차감 + LotConsumption). `status` USED/LOST, `billLost` (LOST 청구 여부)
+- **RepairLabor** — 공임
+- **RepairLaborPreset** — 공임 프리셋 (자주 쓰는 작업)
+- **RepairPackage / RepairPackageLabor / RepairPackagePart** — 수리 패키지 (공임+부속 묶음)
+
+### 임대 (Rental)
+- **RentalAsset** — 임대 자산 (assetNo, brand/model/serial, dailyRate/monthlyRate, depositAmount, status: AVAILABLE/RENTED/MAINTENANCE/RETIRED)
+- **Rental** — 임대 계약 (RNT 번호, customer 1:N, asset 1:1 동시점). 상태: `RESERVED/ACTIVE/RETURNED/OVERDUE/CANCELLED`. POS 카트에서 발생한 경우 `Order.rentalId` 1:1
+
+### 시리얼 라벨
+- **SerialItem** — 코드 `YYMMDD-NNNN`. `source`: SALE(일반 판매) / REPAIR(외부 기기 수리 라벨). productId/displayName 둘 중 하나 필수. 보증/RepairTicket 연결
+
+### 조립 (Assembly)
+- **AssemblyTemplate / AssemblyTemplateSlot / AssemblySlotLabel** — 조립 템플릿 (슬롯 라벨로 부속 슬롯 정의)
+- **AssemblyPreset / AssemblyPresetItem** — 자주 쓰는 조립 프리셋
+- **Assembly / AssemblyComponentConsumption** — 조립 실적 (PRODUCE/DISASSEMBLE). `reverseOfId` 로 분해 추적, `producedLotId` 로 결과 로트 연결
 
 ### 판매채널
 - **SalesChannel** — 채널 (쿠팡, 네이버, 자사몰, 오프라인 / 수수료율)
 - **ChannelFee** — 채널 추가 수수료
 
-### 비용
-- **IncomingCost** — 입고 비용 (공급상품 기준, PERCENTAGE/FIXED)
-- **SellingCost** — 판매 비용 (판매상품 기준, PERCENTAGE/FIXED)
+### 카드 수수료
+- **CardFeeRate** — 사업자 분류별 카드 수수료율
+- **CardMerchantInfo** — 카드 가맹점 정보
+- **CardCompanyFee** — 카드사별 수수료 오버라이드
 
-### 주요 관계
-- SupplierProduct → ProductMapping → Product (환산비율로 단위 변환)
-- Incoming 확정 → Inventory 증가 + InventoryMovement(INCOMING) + **InventoryLot 생성** (매핑 있으면 productId=mapping.productId, 없으면 오르판 productId=null) + SupplierLedger(CREDIT일 때)
-- Order 확정 → Inventory 감소 + InventoryMovement(OUTGOING/SET_CONSUME) + **FIFO로 로트 소진 + LotConsumption 생성**. 로트 잔량 부족 시 에러로 확정 차단
-- Order 취소/반품 → **LotConsumption 역순 복원 + 삭제** + Inventory 복원
-- SupplierReturn 확정 → **FIFO로 공급상품 로트 잔량 차감** + Inventory 감소 + SupplierLedger(CREDIT이면 REFUND)
-- Stocktake(실사보정) → diff>0 이면 새 ADJUSTMENT 로트 생성 (거래처 선택 필수), diff<0 이면 FIFO로 로트 차감 + Inventory 절대값 설정
-- ProductMapping 생성 → 해당 공급상품의 오르판 로트(productId=null)를 소급 편입 + Inventory 환산 증가
-- 기초등록(`/inventory/initial`) → SupplierProduct 등록 + INITIAL 로트 생성 (1회성 가드). SupplierLedger 영향 없음
-- 기초 미지급금(`/suppliers/initial-balance`) → SupplierLedger(ADJUSTMENT, referenceType=INITIAL_BALANCE) 기록 (1회성 가드). 재고 영향 없음
+### 비용 / 지출
+- **IncomingCost** — 입고 비용 (공급상품 기준, PERCENTAGE/FIXED, isTaxable)
+- **SellingCost** — 판매 비용 (판매상품 기준, PERCENTAGE/FIXED, isTaxable)
+- **Expense** — 일반 지출 (category enum: SHIPPING/RENT/UTILITIES/SALARY/PACKAGING/OFFICE_SUPPLIES/MARKETING/MAINTENANCE/INVENTORY_USAGE/OTHER, supplierId/customerId optional, attachmentUrl)
+
+### 회사 정보 / 랜딩
+- **CompanyInfo** — 자사 정보 싱글턴 (id="singleton") — 상호, 사업자번호, 대표자, 전화, 주소 등. 모든 인쇄물(견적서/명세표/발주서/영수증/시리얼 라벨)이 여기서 읽음
+- **CompanyBankAccount** — 회사 계좌 (인쇄물에 표시)
+- **LandingSettings** — 공개 랜딩(`(landing)/`) 블록 설정
+
+### 주요 관계 / 흐름
+- **SupplierProduct → ProductMapping → Product** (환산비율로 단위 변환). ProductMapping 생성 시 해당 공급상품의 오르판 로트(productId=null)를 소급 편입 + Inventory 환산 증가
+- **Incoming 확정** → Inventory 증가 + InventoryMovement(INCOMING) + **InventoryLot 생성** (매핑 있으면 productId=mapping.productId, 없으면 오르판) + SupplierLedger(CREDIT일 때) + 연결된 PurchaseOrderItem.receivedQty 누적
+- **PurchaseOrder 흐름** — 매입 견적서(`Quotation type=PURCHASE`) → `convert` API 로 PurchaseOrder(DRAFT) 또는 Incoming(직접 입고) 전환. 부분입고는 status PARTIAL → PARTIAL_RESENT/REACCEPTED/COMPLETED 단계 추적
+- **Order 생성** (POS 결제 / B2B 수동 / 외부 채널 import / 견적서 전환) → POS PICKUP 결제는 즉시 `COMPLETED` + 재고 차감, POS DELIVERY/SHIPPING 결제는 `PREPARING` + 재고 차감 (워크보드 진입), B2B 수동·외부 import 는 `PENDING` (재고 미차감)
+- **Order `prepare` 액션** (PENDING→PREPARING) → Inventory 감소 + InventoryMovement(OUTGOING/SET_CONSUME) + **FIFO로 로트 소진 + LotConsumption 생성**. 로트 잔량 부족 시 에러로 차단
+- **Order 취소/반품** → 재고 차감 후(`PREPARING` 이상) 상태에서만 **LotConsumption 역순 복원 + 삭제** + Inventory 복원. PENDING 취소는 상태만 변경
+- **RepairTicket 부속 추가/삭제** → 재고 차감/복원 + InventoryMovement + LotConsumption (`/lib/repair-inventory.ts`)
+- **RepairTicket PICKED_UP** → Order 생성(`repairTicketId` 1:1) + CustomerLedger(SALE) — 결제 처리는 POS 결제 흐름과 동일
+- **Rental 임대 시작** → RentalAsset.status=RENTED + (POS 결제면) Order 생성(`rentalId` 1:1)
+- **SupplierReturn 확정** → **FIFO로 공급상품 로트 잔량 차감** + Inventory 감소 + SupplierLedger(CREDIT이면 REFUND). exchangeIncomingId 있으면 교환 입고 자동 생성
+- **Stocktake(실사보정)** → diff>0 이면 새 ADJUSTMENT 로트 생성 (거래처 선택 필수), diff<0 이면 FIFO로 로트 차감 + Inventory 절대값 설정
+- **Quotation `convert` API** ([api/quotations/[id]/convert/route.ts](src/app/api/quotations/[id]/convert/route.ts)) — `target=statement|order|incoming|purchase_order`. SALES → statement/order, PURCHASE → incoming/purchase_order. 자유 입력 라인(productId/supplierProductId 없음)은 order/incoming/purchase_order 전환 거부. 전환 후 원본 status=CONVERTED 락
+- **기초등록**(`/inventory/initial`) → SupplierProduct 등록 + INITIAL 로트 생성 (1회성 가드)
+- **기초 미지급금**(`/suppliers/initial-balance`) → SupplierLedger(ADJUSTMENT, referenceType=INITIAL_BALANCE) 1회성 가드
 - 삭제는 소프트 삭제 (isActive: false)
 
 ## API 패턴
@@ -478,6 +636,10 @@ export async function GET(
 - 트랜잭션: `prisma.$transaction(async (tx) => { ... })` 패턴
 
 ## UI 컨벤션
+
+> **⚠️ 이 섹션 전체는 ERP 대시보드(`(dashboard)/`) shadcn 기반 한정.**
+> POS/jm 영역은 [src/jm/DESIGN.md](src/jm/DESIGN.md) 의 토큰·컴포넌트·시트 패턴 사용.
+> 두 시스템의 변수·prefix·디렉토리는 격리되어 있으니 한 컴포넌트 안에 섞지 말 것.
 
 ### 테마 색상 (CSS 변수 기반 — 라이트/다크 자동 대응)
 - 배경: `bg-background` (메인), `bg-card` (카드), `bg-muted` (테이블헤더·서브배경), `bg-secondary` (강조 배경)
@@ -681,9 +843,9 @@ import { normalizeDiscountInput, formatDiscountDisplay } from "@/lib/utils";
 - `variant="destructive"` — 경고 (부족, 취소)
 
 ### 로딩 상태
-- 테이블: `<TableCell colSpan={N} className="text-center py-8">로딩 중...</TableCell>`
-- 버튼: `{submitting ? <Loader2 className="animate-spin" /> : <Icon />}`
-- 새로고침: `<RefreshCw className={loading ? "animate-spin" : ""} />`
+> **권위 있는 출처는 위 "필수 코드 패턴 5. 로딩 상태 UI"** — 페이지별 Skeleton 컴포넌트 사용. "로딩 중..." 텍스트 금지.
+- 새로고침 아이콘: `<RefreshCw className={loading ? "animate-spin" : ""} />`
+- 버튼 진행: `{mutation.isPending ? <Loader2 className="animate-spin" /> : <Icon />}`
 
 ### 빈 상태
 - `<TableCell colSpan={N} className="text-center py-8">데이터가 없습니다</TableCell>`
@@ -1009,45 +1171,67 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 - 증상: `Module not found: Can't resolve 'pako/lib/zlib/constants.js'`
 - 해결: `npm install pako@^1.0.11` (버전 2.x 는 서브패스 구조가 바뀌어 호환 안 됨)
 
+## jm 디자인 시스템 (POS / 신규 작업용)
+
+> 전체 가이드: [src/jm/DESIGN.md](src/jm/DESIGN.md). 아래는 빠른 요약.
+
+`src/jm/` 는 **포터블 디자인 시스템** — 이 프로젝트의 POS 와 향후 다른 프로젝트에서 재사용. shadcn 과 격리되어 공존.
+
+### 적용 영역
+- ✅ `src/app/(pos)/**` — POS 모든 페이지·시트·컴포넌트
+- ✅ `src/app/(jm)/**` — 디자인 시스템 showcase
+- ✅ `src/jm/**` — primitive 자체
+- ✅ 새로 만드는 페이지·기능 (ERP 대시보드 외)
+- ❌ `src/app/(dashboard)/**` — 기존 shadcn 유지 (마이그레이션은 점진)
+
+### 핵심 룰
+1. **import 격리** — `@/jm` 또는 `@/jm/...` 만 사용. shadcn `@/components/ui/*` import **금지**
+2. **컴포넌트 prefix** — 모두 `Jm*` (`JmButton`, `JmCard`, `JmTable`, `JmCombobox`, `JmDrawer`, `JmDialog` …)
+3. **토큰만** — 색·radius·shadow·font 모두 `var(--jm-*)`. `zinc-*`, `bg-white`, hex 하드코딩 **금지**
+4. **테마 wrapper** — 페이지/라우트 루트는 `<JmScope theme="light|dark|auto">` 로 감싸야 토큰 cascade
+5. **Portal popup 안전** — base-ui Popover/Dialog Popup 처럼 Portal 로 빠지는 요소는 root element 에 `data-jm-scope` 속성 + `font-[family-name:var(--jm-font-sans)]` 명시. 안 그러면 토큰 cascade 끊김
+6. **새 컴포넌트 추가** — `src/jm/ui/<name>.tsx`, `forwardRef`, `displayName`, `src/jm/ui/index.ts` 에 export, [showcase](src/app/(jm)/jm/page.tsx) 에 데모 섹션. 외부 의존성은 `@base-ui/react`, `lucide-react`, `clsx`, `tailwind-merge`, `cva` 만. 프로젝트 코드(`@/lib/*`, `@/components/ui/*`) import **금지** (포터빌리티 보장)
+
+### 컴포넌트 매핑 (shadcn → jm)
+
+| shadcn | jm | 비고 |
+|---|---|---|
+| `<Button variant="default">` | `<JmButton variant="cta">` | 명명만 |
+| `<Button variant="destructive">` | `<JmButton variant="danger">` | 명명만 |
+| `<Card>` | `<JmCard>` | 동일 |
+| `<Input>` | `<JmInput>` | size prop 추가 |
+| `<Sheet>` | `<JmDrawer>` | side·dragHandle·safe-area 자동 |
+| `<Dialog>` | `<JmDialog>` | 동일 |
+| `<Select>` | `<JmSelect>` | options 배열 props |
+| 검색 select | `<JmCombobox>` (popover) / `<JmComboboxModal>` (풀스크린) / `<JmComboboxDrawer>` (바텀시트, 가상키보드 안 가림) | 컨텍스트별 선택 |
+| `<Tabs>` | `<JmTabs>` | line/pill variant |
+| `<Skeleton>` | `<JmSkeleton>` | 동일 |
+| `<Toaster>` (sonner) | `<JmToaster>` + `jmToast` | jm 토큰 자동 적용 |
+| 가격 입력 (콤마 + onFocus select) | `<JmNumberInput>` | **select-all 안 함**, 캐럿 끝으로, X 버튼 |
+| label + 인풋 grid 패턴 | `<JmFormField>` | label + hint/error 통합 |
+
+### 폰트
+`--jm-font-sans` / `--jm-font-mono` 자동 적용. host 의 `--font-geist-sans`, `--font-pretendard` 사용 (없으면 system-ui 폴백).
+
+### 다크 모드
+`<JmScope theme="dark">` 또는 `theme="auto"` (시스템 따라감). POS 는 [PosThemeWrapper](src/app/(pos)/pos/_components/pos-theme-wrapper.tsx) 가 localStorage 영구 저장 + `usePosTheme()` 훅 제공. 메뉴의 `<JmThemeToggle>` 로 토글.
+
+### Showcase
+모든 컴포넌트의 시각·variant·상태: [http://localhost:3000/jm](http://localhost:3000/jm)
+
+---
+
 ## 후속작업해야할것
 
-견적서·거래명세표 기능(2026-04) 도입 당시 MVP로 제외한 항목. 필요해지면 아래 순서로 처리 가능.
-
-### 1. 견적서 → Order/Incoming 전환
-- **현재**: `POST /api/quotations/[id]/convert`는 `target=statement`만 허용. Order/Incoming 전환 미구현.
-- **필요한 이유**: "수락된 견적서를 자동으로 주문/입고로 승격"하는 플로우가 필요할 때.
+### 외부 채널 API 자동 주문 import (쿠팡·네이버 등)
+- **현재**: 채널 주문은 `/orders` 신규 등록 Sheet 에서 수동 입력만 가능. `Order.channelOrderNo` / `channelId` 필드는 준비됨. 외부 채널 모듈은 아직 없음
+- **필요한 이유**: 외부 마켓 주문이 들어왔을 때 자동으로 ERP 출고 워크보드에 합류시키기 위함
 - **구현 포인트**:
-  - `target=order`: SALES 견적서 → Order 생성. `channelId` 필수라 전환 모달에서 채널 선택 UI 추가 필요. OrderItem은 `productId` 없는 자유입력 행은 생성 불가 → 사전 매핑 강제.
-  - `target=incoming`: PURCHASE 견적서 → Incoming 생성. `supplierProductId` 없는 행은 생성 불가.
-  - 전환 후 원본 견적서 `status=CONVERTED`로 락(읽기 전용)할지 정책 결정.
+  - 채널별 인증·polling/webhook 모듈 (`lib/channels/coupang.ts`, `naver.ts` 등)
+  - import 시 `status=PENDING`, `fulfillmentType=SHIPPING`, `expectedShipDate=주문일+1` 로 생성 → 사용자가 워크보드에서 `prepare`(재고 차감) 후 `ship` → `complete`
+  - 중복 방지: `(channelId, channelOrderNo)` unique 인덱스 추가 권장
+  - 매핑 누락 상품 처리: 채널의 SKU 가 ERP `Product` 와 매핑 안 된 경우 일단 import 만 하고 사용자가 매핑 후 prepare 가능하게 (또는 import 보류 큐로 격리)
+- **선결 조건**: 채널별 SKU ↔ Product 매핑 테이블, OAuth/API 키 보관 위치 결정 (CompanyInfo 확장 또는 환경변수)
 
-### 2. Order 폼의 Customer 엔티티 연동
-- **현재**: `Order.customerId` 컬럼은 DB에 존재. 목록 페이지만 있고 등록/수정 폼이 미완성이라 보류.
-- **필요한 이유**: 채널 주문 외 B2B 고객 주문에서 재방문 추적이 필요할 때.
-- **구현 포인트**: Order 등록 Sheet에 `CustomerCombobox` 추가. 선택 시 `customerName/Phone/shippingAddress` 스냅샷 자동 채움.
+> 참고 — 2026-04 견적서·거래명세표 도입 당시 MVP에서 제외했던 ① 견적서 → Order/Incoming/PurchaseOrder 전환, ② 견적서 → 거래명세표 전환 UI, ③ 회사 정보 DB 이전(`CompanyInfo` 싱글턴) 은 모두 구현 완료. `/api/quotations/[id]/convert` 와 `/quotations` 페이지 전환 다이얼로그, `/api/company-info` 가 그 결과.
 
-### 3. 견적서 → 거래명세표 전환 버튼 UI
-- **현재**: convert API(`target=statement`)는 구현됨. 견적서 목록/상세에 버튼이 없어 호출 수단만 없음.
-- **구현 포인트**: `/quotations` 목록 row 액션 또는 QuotationSheet 편집 모드에 "거래명세표로 전환" 버튼 추가. SALES 타입일 때만 노출.
-
-### 4. 회사 정보(공급자) 환경변수 설정
-- **현재**: 인쇄 페이지(`/quotations/[id]/print`, `/statements/[id]/print`)는 공급자 영역을 `.env`에서 읽음. 미설정이면 "우리 회사"로 출력.
-- **설정 방법**: `.env.local`에 추가:
-  ```
-  COMPANY_NAME=상호명
-  COMPANY_BIZ_NO=000-00-00000
-  COMPANY_CEO=대표자
-  COMPANY_PHONE=02-0000-0000
-  COMPANY_ADDRESS=주소
-  ```
-- **향후 개선**: 환경변수 대신 `settings` 테이블이나 `Company` 모델로 이전해 관리자 UI에서 수정 가능하게.
-
-### 5. 통합 판매내역 페이지 (판매 + 수리 + 임대)
-- **현재**: 매출이 `Order` / `RepairTicket.finalAmount`(PICKED_UP) / `Rental.finalAmount`(RETURNED) 세 소스에 흩어져 있음. `/orders`는 `Order`만 노출, `/pos/repair`·`/pos/rental`은 각 소스 탭별로만 확인 가능. 하루 단위 요약은 `/pos/reports/daily`에 있으나 목록 뷰는 없음.
-- **필요한 이유**: "한 달 매출 전체를 시간순으로 리뷰"하거나 특정 고객의 전체 매출 이력을 한눈에 보고 싶을 때.
-- **구현 포인트**:
-  - ERP 대시보드 쪽 `/sales/history` — 기간·결제수단·타입(판매/수리/임대)·고객·채널 필터, CSV 내보내기
-  - 세 소스를 UNION해서 `{ type, refNo, date, customerName, paymentMethod, amount, status }` 형태로 정규화한 API 신설 (예: `GET /api/sales/history`)
-  - 필요 시 POS에서도 `/pos/history` 간략 뷰 추가 (목록만)
-  - 정렬 키: `Order.orderDate` / `RepairTicket.pickedUpAt` / `Rental.actualReturnedAt` — null이면 `createdAt` 폴백
-- **연관**: 고객 상세 페이지(`/pos/customers/[id]`)의 구매/수리/임대 탭이 이미 이 데이터를 소스별로 가져오고 있으므로 API 일부 재사용 가능.

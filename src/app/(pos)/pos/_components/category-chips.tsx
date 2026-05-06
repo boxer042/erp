@@ -38,8 +38,8 @@ export function CategoryChips({
               key={i}
               className="flex shrink-0 flex-col items-center gap-1.5"
             >
-              <div className="size-14 animate-pulse rounded-2xl bg-zinc-100" />
-              <div className="h-3 w-10 animate-pulse rounded bg-zinc-100" />
+              <div className="size-14 animate-pulse rounded-2xl bg-[var(--jm-surface-muted)]" />
+              <div className="h-3 w-10 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
           ))
         : categories.map((c) => (
@@ -75,8 +75,8 @@ function Chip({
       className="flex w-16 shrink-0 flex-col items-center gap-1.5"
     >
       <div
-        className={`flex size-14 items-center justify-center overflow-hidden rounded-2xl bg-zinc-50 transition-colors ${
-          active ? "ring-[1.5px] ring-zinc-900" : "ring-1 ring-zinc-200"
+        className={`flex size-14 items-center justify-center overflow-hidden rounded-2xl bg-[var(--jm-bg)] transition-colors ${
+          active ? "ring-[1.5px] ring-[var(--jm-action)]" : "ring-1 ring-[var(--jm-border)]"
         }`}
       >
         {isAll ? (
@@ -85,7 +85,7 @@ function Chip({
             height="22"
             viewBox="0 0 20 20"
             fill="none"
-            className={active ? "text-zinc-900" : "text-zinc-400"}
+            className={active ? "text-[var(--jm-text)]" : "text-[var(--jm-text-subtle)]"}
           >
             <rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
             <rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
@@ -103,7 +103,7 @@ function Chip({
         ) : (
           <span
             className={`text-[15px] font-semibold ${
-              active ? "text-zinc-900" : "text-zinc-400"
+              active ? "text-[var(--jm-text)]" : "text-[var(--jm-text-subtle)]"
             }`}
           >
             {label.charAt(0)}
@@ -112,7 +112,7 @@ function Chip({
       </div>
       <span
         className={`line-clamp-1 max-w-full text-[11px] ${
-          active ? "font-semibold text-zinc-900" : "text-zinc-600"
+          active ? "font-semibold text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"
         }`}
       >
         {label}

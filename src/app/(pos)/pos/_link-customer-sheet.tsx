@@ -55,14 +55,14 @@ export function LinkCustomerSheet({
       getKey={(c) => c.id}
       renderItem={(c) => (
         <>
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[16px] font-bold text-zinc-700">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[16px] font-bold text-[var(--jm-text)]">
             {c.name.charAt(0)}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="line-clamp-1 text-[15px] font-semibold text-zinc-900">
+            <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
               {c.name}
             </span>
-            <span className="font-mono text-[12px] text-zinc-500">
+            <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
               {c.phone}
             </span>
           </div>

@@ -48,7 +48,7 @@ function ProductRow({ product }: { product: ProductOption }) {
   const price = parseFloat(product.sellingPrice) || 0;
   return (
     <>
-      <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-400">
+      <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <path
             d="M3 6l7-4 7 4v8l-7 4-7-4V6zM10 2v16M3 6l7 4 7-4"
@@ -60,16 +60,16 @@ function ProductRow({ product }: { product: ProductOption }) {
         </svg>
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+        <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
           {product.name}
         </span>
-        <span className="font-mono text-[11px] text-zinc-400">{product.sku}</span>
+        <span className="font-mono text-[11px] text-[var(--jm-text-subtle)]">{product.sku}</span>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[13px] font-semibold tabular-nums text-zinc-900">
+        <div className="text-[13px] font-semibold tabular-nums text-[var(--jm-text)]">
           ₩{price.toLocaleString("ko-KR")}
         </div>
-        <div className="text-[10px] text-zinc-400">{product.unitOfMeasure}</div>
+        <div className="text-[10px] text-[var(--jm-text-subtle)]">{product.unitOfMeasure}</div>
       </div>
     </>
   );

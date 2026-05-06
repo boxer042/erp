@@ -143,11 +143,11 @@ function Action({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors active:bg-zinc-100 sm:hover:bg-zinc-50"
+      className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors active:bg-[var(--jm-surface-muted)] sm:hover:bg-[var(--jm-bg)]"
     >
       <div
         className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
-          danger ? "bg-rose-50 text-rose-700" : "bg-zinc-100 text-zinc-700"
+          danger ? "bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]" : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
         }`}
       >
         {icon}
@@ -155,13 +155,13 @@ function Action({
       <div className="flex min-w-0 flex-1 flex-col">
         <span
           className={`text-[14px] font-semibold ${
-            danger ? "text-rose-700" : "text-zinc-900"
+            danger ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]"
           }`}
         >
           {label}
         </span>
         {desc && (
-          <span className="line-clamp-1 text-[12px] text-zinc-500">{desc}</span>
+          <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">{desc}</span>
         )}
       </div>
       <svg
@@ -169,7 +169,7 @@ function Action({
         height="14"
         viewBox="0 0 14 14"
         fill="none"
-        className="shrink-0 text-zinc-300"
+        className="shrink-0 text-[var(--jm-text-disabled)]"
       >
         <path
           d="M5 3l4 4-4 4"

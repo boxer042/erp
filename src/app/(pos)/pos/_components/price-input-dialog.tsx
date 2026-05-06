@@ -106,7 +106,7 @@ function Body({
             onSubmit(finalNet);
             onOpenChange(false);
           }}
-          className="h-14 w-full rounded-2xl bg-zinc-900 text-[16px] font-semibold text-white transition-transform active:scale-[0.99]"
+          className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99]"
         >
           저장
         </button>
@@ -121,16 +121,16 @@ function Body({
             value={formatComma(net)}
             onChange={(e) => setNetAndSync(e.target.value)}
             onFocus={(e) => e.currentTarget.select()}
-            className="h-14 w-full rounded-2xl border-2 border-zinc-200 bg-white px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-zinc-900"
+            className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
           />
         </Field>
 
         <Field label="세액 (VAT)" hint="자동 계산" disabled={!taxApplies}>
-          <div className="flex h-14 items-center justify-end rounded-2xl bg-zinc-100 px-4 text-[18px] font-semibold tabular-nums text-zinc-700">
+          <div className="flex h-14 items-center justify-end rounded-2xl bg-[var(--jm-surface-muted)] px-4 text-[18px] font-semibold tabular-nums text-[var(--jm-text)]">
             {taxApplies ? formatComma(String(tax)) : "0"}
           </div>
           {!taxApplies && (
-            <p className="mt-1 text-[11px] text-zinc-500">
+            <p className="mt-1 text-[11px] text-[var(--jm-text-muted)]">
               {taxType === "TAX_FREE" ? "면세 상품" : "영세율 적용"} — 세액 0
             </p>
           )}
@@ -143,7 +143,7 @@ function Body({
             value={formatComma(gross)}
             onChange={(e) => setGrossAndSync(e.target.value)}
             onFocus={(e) => e.currentTarget.select()}
-            className="h-14 w-full rounded-2xl border-2 border-zinc-200 bg-white px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-zinc-900"
+            className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
           />
         </Field>
 
@@ -153,29 +153,29 @@ function Body({
             <div
               className={`flex items-center justify-between rounded-2xl px-4 py-3 ${
                 diff < 0
-                  ? "bg-emerald-50"
+                  ? "bg-[var(--jm-success-bg)]"
                   : diff > 0
-                    ? "bg-rose-50"
-                    : "bg-zinc-50"
+                    ? "bg-[var(--jm-danger-bg)]"
+                    : "bg-[var(--jm-bg)]"
               }`}
             >
               <div className="flex flex-col">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   정가 (세전)
                 </span>
-                <span className="text-[14px] font-semibold tabular-nums text-zinc-700">
+                <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
                   ₩{(originalPrice as number).toLocaleString("ko-KR")}
                 </span>
               </div>
               {diff === 0 ? (
-                <span className="text-[12px] font-medium text-zinc-500">
+                <span className="text-[12px] font-medium text-[var(--jm-text-muted)]">
                   정가와 동일
                 </span>
               ) : (
                 <div className="flex flex-col items-end">
                   <span
                     className={`text-[14px] font-bold tabular-nums ${
-                      diff < 0 ? "text-emerald-700" : "text-rose-700"
+                      diff < 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
                     }`}
                   >
                     {diff < 0 ? "−" : "+"}₩
@@ -183,7 +183,7 @@ function Body({
                   </span>
                   <span
                     className={`text-[11px] font-medium tabular-nums ${
-                      diff < 0 ? "text-emerald-600" : "text-rose-600"
+                      diff < 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
                     }`}
                   >
                     {diff < 0
@@ -198,7 +198,7 @@ function Body({
               <button
                 type="button"
                 onClick={resetToOriginal}
-                className="h-10 rounded-xl bg-zinc-100 text-[12px] font-semibold text-zinc-700 transition-colors active:bg-zinc-200"
+                className="h-10 rounded-xl bg-[var(--jm-surface-muted)] text-[12px] font-semibold text-[var(--jm-text)] transition-colors active:bg-[var(--jm-border)]"
               >
                 정가로 초기화
               </button>
@@ -224,10 +224,10 @@ function Field({
   return (
     <div className={`flex flex-col gap-1.5 ${disabled ? "opacity-70" : ""}`}>
       <div className="flex items-baseline justify-between">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           {label}
         </span>
-        {hint && <span className="text-[10px] text-zinc-400">{hint}</span>}
+        {hint && <span className="text-[10px] text-[var(--jm-text-subtle)]">{hint}</span>}
       </div>
       {children}
     </div>

@@ -59,15 +59,15 @@ export default function RepairV2BoardPage() {
   }, [ticketsQuery.data]);
 
   return (
-    <div className="flex h-full flex-col bg-zinc-50">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       {/* 상단 — 타이틀 + 검색 */}
-      <header className="shrink-0 border-b border-zinc-200 bg-white px-4 py-3 sm:px-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
+      <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 py-3 sm:px-6">
+        <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-[22px] font-bold tracking-tight text-zinc-900">
+            <h1 className="text-[22px] font-bold tracking-tight text-[var(--jm-text)]">
               수리
             </h1>
-            <div className="text-[12px] text-zinc-500">
+            <div className="text-[12px] text-[var(--jm-text-muted)]">
               {ticketsQuery.isFetching ? "동기화 중…" : `${tickets.length}건`}
             </div>
           </div>
@@ -76,7 +76,7 @@ export default function RepairV2BoardPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="수리번호 · 고객 · 전화 · 증상"
-            className="h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-[15px] outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white"
+            className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
           />
           {/* 필터 칩 — 가로 스크롤 */}
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:-mx-6 sm:px-6">
@@ -89,15 +89,15 @@ export default function RepairV2BoardPage() {
                   onClick={() => setFilter(f.value)}
                   className={`flex h-9 shrink-0 items-center gap-2 rounded-full px-4 text-[13px] font-medium transition-colors ${
                     active
-                      ? "bg-zinc-900 text-white"
-                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                      ? "bg-[var(--jm-action)] text-white"
+                      : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-border)]"
                   }`}
                 >
                   {f.label}
                   {c > 0 && (
                     <span
                       className={`text-[11px] tabular-nums ${
-                        active ? "text-white/70" : "text-zinc-500"
+                        active ? "text-white/70" : "text-[var(--jm-text-muted)]"
                       }`}
                     >
                       {c}
@@ -112,7 +112,7 @@ export default function RepairV2BoardPage() {
 
       {/* 본문 — 카드 리스트 */}
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
+        <div className="px-4 py-4 sm:px-6">
           {ticketsQuery.isPending ? (
             <SkeletonGrid />
           ) : tickets.length === 0 ? (
@@ -142,7 +142,7 @@ export default function RepairV2BoardPage() {
       <button
         type="button"
         onClick={() => setNewOpen(true)}
-        className="fixed bottom-6 right-6 z-30 flex h-14 items-center gap-2 rounded-full bg-zinc-900 px-5 text-white shadow-lg shadow-zinc-900/25 transition-transform active:scale-95 sm:bottom-8 sm:right-8"
+        className="fixed bottom-6 right-6 z-30 flex h-14 items-center gap-2 rounded-full bg-[var(--jm-action)] px-5 text-white shadow-lg shadow-[var(--jm-shadow-lg)] transition-transform active:scale-95 sm:bottom-8 sm:right-8"
         aria-label="새 수리 시작"
       >
         <svg
@@ -192,7 +192,7 @@ function TicketCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-left transition-all active:scale-[0.99] sm:hover:border-zinc-300 sm:hover:shadow-sm"
+      className="group flex flex-col gap-3 rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4 text-left transition-all active:scale-[0.99] sm:hover:border-[var(--jm-border-strong)] sm:hover:shadow-sm"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
@@ -202,64 +202,64 @@ function TicketCard({
               {meta.label}
             </span>
             {ticket.type === "ON_SITE" && (
-              <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+              <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                 즉시
               </span>
             )}
           </div>
-          <span className="font-mono text-[12px] text-zinc-400">
+          <span className="font-mono text-[12px] text-[var(--jm-text-subtle)]">
             {ticket.ticketNo}
           </span>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[11px] text-zinc-400">
+          <div className="text-[11px] text-[var(--jm-text-subtle)]">
             {formatDistanceToNow(new Date(ticket.receivedAt), {
               addSuffix: true,
               locale: ko,
             })}
           </div>
-          <div className="text-[10px] text-zinc-300">
+          <div className="text-[10px] text-[var(--jm-text-disabled)]">
             {format(new Date(ticket.receivedAt), "MM/dd HH:mm")}
           </div>
         </div>
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <div className="text-[15px] font-semibold text-zinc-900">
+        <div className="text-[15px] font-semibold text-[var(--jm-text)]">
           {ticket.customer?.name ?? "(미등록 고객)"}
         </div>
         {ticket.customer?.phone && (
-          <div className="font-mono text-[12px] text-zinc-500">
+          <div className="font-mono text-[12px] text-[var(--jm-text-muted)]">
             {ticket.customer.phone}
           </div>
         )}
       </div>
 
       {(device || ticket.symptom) && (
-        <div className="flex flex-col gap-0.5 border-t border-zinc-100 pt-3">
+        <div className="flex flex-col gap-0.5 border-t border-[var(--jm-border)] pt-3">
           {device && (
-            <div className="line-clamp-1 text-[13px] font-medium text-zinc-700">
+            <div className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
               {device}
             </div>
           )}
           {ticket.symptom && (
-            <div className="line-clamp-2 text-[13px] text-zinc-500">
+            <div className="line-clamp-2 text-[13px] text-[var(--jm-text-muted)]">
               {ticket.symptom}
             </div>
           )}
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t border-zinc-100 pt-2">
-        <div className="flex gap-3 text-[11px] text-zinc-400">
+      <div className="flex items-center justify-between border-t border-[var(--jm-border)] pt-2">
+        <div className="flex gap-3 text-[11px] text-[var(--jm-text-subtle)]">
           {ticket._count.parts > 0 && <span>부속 {ticket._count.parts}</span>}
           {ticket._count.labors > 0 && <span>공임 {ticket._count.labors}</span>}
           {ticket._count.parts === 0 && ticket._count.labors === 0 && (
-            <span className="text-zinc-300">—</span>
+            <span className="text-[var(--jm-text-disabled)]">—</span>
           )}
         </div>
         {ticket.assignedTo?.name && (
-          <span className="text-[11px] text-zinc-500">
+          <span className="text-[11px] text-[var(--jm-text-muted)]">
             담당 {ticket.assignedTo.name}
           </span>
         )}
@@ -274,11 +274,11 @@ function SkeletonGrid() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4"
+          className="flex flex-col gap-3 rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4"
         >
-          <div className="h-4 w-1/3 animate-pulse rounded bg-zinc-100" />
-          <div className="h-5 w-2/3 animate-pulse rounded bg-zinc-100" />
-          <div className="h-4 w-full animate-pulse rounded bg-zinc-100" />
+          <div className="h-4 w-1/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="h-5 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="h-4 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
         </div>
       ))}
     </div>
@@ -294,7 +294,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-      <div className="flex size-16 items-center justify-center rounded-2xl bg-zinc-100">
+      <div className="flex size-16 items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)]">
         <svg
           width="28"
           height="28"
@@ -312,17 +312,17 @@ function EmptyState({
         </svg>
       </div>
       <div className="flex flex-col gap-1">
-        <div className="text-[15px] font-semibold text-zinc-900">
+        <div className="text-[15px] font-semibold text-[var(--jm-text)]">
           {filterLabel} 수리가 없습니다
         </div>
-        <div className="text-[13px] text-zinc-500">
+        <div className="text-[13px] text-[var(--jm-text-muted)]">
           우하단 + 버튼으로 새 수리를 시작하세요
         </div>
       </div>
       <button
         type="button"
         onClick={onNew}
-        className="mt-2 h-10 rounded-full bg-zinc-900 px-5 text-[13px] font-semibold text-white"
+        className="mt-2 h-10 rounded-full bg-[var(--jm-action)] px-5 text-[13px] font-semibold text-white"
       >
         새 수리 시작
       </button>

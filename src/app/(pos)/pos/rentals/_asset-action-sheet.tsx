@@ -75,24 +75,24 @@ function Body({
       <BottomSheet open onOpenChange={(v) => !v && onClose()} title={asset.name}>
         <div className="flex flex-col gap-3 pb-2">
           {/* 자산 요약 */}
-          <div className="flex items-center justify-between rounded-2xl bg-zinc-50 px-4 py-3">
+          <div className="flex items-center justify-between rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
             <div className="flex flex-col">
-              <span className="font-mono text-[11px] text-zinc-500">
+              <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                 {asset.assetNo}
               </span>
-              <span className="text-[13px] text-zinc-700">
+              <span className="text-[13px] text-[var(--jm-text)]">
                 일일가{" "}
-                <span className="font-semibold tabular-nums text-zinc-900">
+                <span className="font-semibold tabular-nums text-[var(--jm-text)]">
                   {fmtKRW(dailyRate)}
                 </span>
               </span>
             </div>
             {inUse ? (
-              <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+              <span className="rounded-full bg-[var(--jm-danger-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-danger-fg)]">
                 사용중
               </span>
             ) : (
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+              <span className="rounded-full bg-[var(--jm-success-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-success-fg)]">
                 임대 가능
               </span>
             )}
@@ -147,10 +147,10 @@ function Body({
       {sub === "manage" && (
         <BottomSheet open onOpenChange={() => setSub(null)} title="관리">
           <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
-            <span className="text-[14px] font-semibold text-zinc-700">
+            <span className="text-[14px] font-semibold text-[var(--jm-text)]">
               자산 점검·정비 이력 — 준비 중
             </span>
-            <span className="text-[12px] text-zinc-500">
+            <span className="text-[12px] text-[var(--jm-text-muted)]">
               수리 티켓과 연동해 자산별 정비 이력을 여기서 추적할 예정입니다.
             </span>
           </div>
@@ -175,16 +175,16 @@ function ActionItem({
 }) {
   const ring =
     accent === "emerald"
-      ? "ring-emerald-200 bg-emerald-50"
+      ? "ring-[var(--jm-success-bg)] bg-[var(--jm-success-bg)]"
       : accent === "amber"
-        ? "ring-amber-200 bg-amber-50"
-        : "ring-zinc-200 bg-zinc-50";
+        ? "ring-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)]"
+        : "ring-[var(--jm-border)] bg-[var(--jm-bg)]";
   const dot =
     accent === "emerald"
-      ? "bg-emerald-500"
+      ? "bg-[var(--jm-success-bg)]0"
       : accent === "amber"
-        ? "bg-amber-500"
-        : "bg-zinc-400";
+        ? "bg-[var(--jm-warning-bg)]0"
+        : "bg-[var(--jm-text-subtle)]";
   return (
     <button
       type="button"
@@ -198,15 +198,15 @@ function ActionItem({
     >
       <span className={`size-2.5 shrink-0 rounded-full ${dot}`} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-semibold text-zinc-900">{label}</span>
-        <span className="line-clamp-1 text-[12px] text-zinc-600">{desc}</span>
+        <span className="text-[15px] font-semibold text-[var(--jm-text)]">{label}</span>
+        <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">{desc}</span>
       </div>
       <svg
         width="14"
         height="14"
         viewBox="0 0 14 14"
         fill="none"
-        className="shrink-0 text-zinc-400"
+        className="shrink-0 text-[var(--jm-text-subtle)]"
         aria-hidden
       >
         <path
@@ -352,7 +352,7 @@ function RentalCreateSheet({
             type="button"
             onClick={() => createMutation.mutate()}
             disabled={!canSubmit}
-            className="flex h-14 w-full items-center justify-between rounded-2xl bg-zinc-900 px-5 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-[var(--jm-action)] px-5 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
           >
             <span className="flex items-center gap-2">
               {createMutation.isPending && (
@@ -366,14 +366,14 @@ function RentalCreateSheet({
       >
         <div className="flex flex-col gap-4 pt-2">
           {/* 자산 — 고정 (상위 시트에서 이미 선택됨) */}
-          <div className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               자산
             </span>
-            <span className="text-[14px] font-semibold text-zinc-900">
+            <span className="text-[14px] font-semibold text-[var(--jm-text)]">
               {asset.name}
             </span>
-            <span className="font-mono text-[11px] text-zinc-500">
+            <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
               {asset.assetNo}
             </span>
           </div>
@@ -384,17 +384,17 @@ function RentalCreateSheet({
             value={
               customer ? (
                 <span className="flex flex-col">
-                  <span className="text-[14px] font-semibold text-zinc-900">
+                  <span className="text-[14px] font-semibold text-[var(--jm-text)]">
                     {customer.name}
                   </span>
                   {customer.phone && (
-                    <span className="font-mono text-[11px] text-zinc-500">
+                    <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                       {customer.phone}
                     </span>
                   )}
                 </span>
               ) : (
-                <span className="text-[14px] text-zinc-400">고객 선택</span>
+                <span className="text-[14px] text-[var(--jm-text-subtle)]">고객 선택</span>
               )
             }
             onClick={() => setCustomerPickerOpen(true)}
@@ -402,20 +402,20 @@ function RentalCreateSheet({
 
           {/* 기간 — Calendar 에서 점유된 날짜 자체가 선택 불가능. min 제약(과거/미래만 등)도 함께 적용 */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               기간
             </span>
 
             {/* 점유 안내 — 사용자가 시작일을 정하기 전에 어느 날짜가 막힌지 한눈에 파악 */}
             {!occupancyLoading && occupiedRanges.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-zinc-50 px-3 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-[var(--jm-bg)] px-3 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   이미 예약됨
                 </span>
                 {occupiedRanges.map((r, i) => (
                   <span
                     key={i}
-                    className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700"
+                    className="rounded-full bg-[var(--jm-danger-bg)] px-2 py-0.5 text-[11px] font-semibold text-[var(--jm-danger-fg)]"
                   >
                     {format(r.start, "M/d")} ~ {format(r.end, "M/d")}
                   </span>
@@ -466,22 +466,22 @@ function RentalCreateSheet({
             </div>
 
             {startTooEarly ? (
-              <span className="text-[11px] text-rose-600">
+              <span className="text-[11px] text-[var(--jm-danger-fg)]">
                 사용중 자산은 내일 이후만 예약 가능합니다
               </span>
             ) : overlap ? (
-              <span className="text-[11px] text-rose-600">
+              <span className="text-[11px] text-[var(--jm-danger-fg)]">
                 선택한 기간이 기존 예약({format(overlap.start, "M/d")} ~{" "}
                 {format(overlap.end, "M/d")})과 겹칩니다
               </span>
             ) : (
-              <span className="text-[11px] text-zinc-400">{days}일 임대</span>
+              <span className="text-[11px] text-[var(--jm-text-subtle)]">{days}일 임대</span>
             )}
           </div>
 
           {/* 메모 */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               메모
             </span>
             <textarea
@@ -489,38 +489,38 @@ function RentalCreateSheet({
               onChange={(e) => setMemo(e.target.value)}
               rows={2}
               placeholder="(선택)"
-              className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[14px] outline-none focus:border-zinc-400 focus:bg-white"
+              className="rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-3 py-2 text-[14px] outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
             />
           </div>
 
           {/* 가격 요약 */}
-          <div className="flex flex-col gap-2 rounded-2xl bg-zinc-50 p-4">
+          <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-bg)] p-4">
             <div className="flex items-baseline justify-between">
-              <span className="text-[13px] text-zinc-600">일일가</span>
-              <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+              <span className="text-[13px] text-[var(--jm-text-muted)]">일일가</span>
+              <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
                 {fmtKRW(dailyRate)}
-                <span className="ml-1 text-[11px] font-normal text-zinc-500">
+                <span className="ml-1 text-[11px] font-normal text-[var(--jm-text-muted)]">
                   ×{days}
                 </span>
               </span>
             </div>
             {deposit > 0 && (
               <div className="flex items-baseline justify-between">
-                <span className="text-[13px] text-zinc-600">보증금</span>
-                <span className="text-[14px] font-semibold tabular-nums text-zinc-900">
+                <span className="text-[13px] text-[var(--jm-text-muted)]">보증금</span>
+                <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
                   {fmtKRW(deposit)}
-                  <span className="ml-1 text-[11px] font-normal text-zinc-500">
+                  <span className="ml-1 text-[11px] font-normal text-[var(--jm-text-muted)]">
                     반환
                   </span>
                 </span>
               </div>
             )}
-            <div className="my-1 h-px bg-zinc-200" />
+            <div className="my-1 h-px bg-[var(--jm-border)]" />
             <div className="flex items-baseline justify-between">
-              <span className="text-[14px] font-semibold text-zinc-900">
+              <span className="text-[14px] font-semibold text-[var(--jm-text)]">
                 임대료
               </span>
-              <span className="text-[18px] font-bold tabular-nums text-zinc-900">
+              <span className="text-[18px] font-bold tabular-nums text-[var(--jm-text)]">
                 {fmtKRW(total)}
               </span>
             </div>
@@ -553,9 +553,9 @@ function FieldButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-1.5 rounded-2xl bg-zinc-50 px-4 py-3 text-left transition-colors active:bg-zinc-100 sm:hover:bg-zinc-100"
+      className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3 text-left transition-colors active:bg-[var(--jm-surface-muted)] sm:hover:bg-[var(--jm-surface-muted)]"
     >
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {label}
       </span>
       <div className="flex items-center justify-between gap-2">
@@ -565,7 +565,7 @@ function FieldButton({
           height="14"
           viewBox="0 0 14 14"
           fill="none"
-          className="shrink-0 text-zinc-400"
+          className="shrink-0 text-[var(--jm-text-subtle)]"
           aria-hidden
         >
           <path
@@ -615,15 +615,15 @@ function DatePopoverField({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
           {label}
         </span>
         <PopoverTrigger
-          className="flex h-12 items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-[14px] tabular-nums text-zinc-900 outline-none transition-colors hover:bg-white focus:border-zinc-400 focus:bg-white"
+          className="flex h-12 items-center justify-between gap-2 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-3 text-[14px] tabular-nums text-[var(--jm-text)] outline-none transition-colors hover:bg-[var(--jm-surface)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
           aria-label={`${label} 날짜 선택`}
         >
           <span>{selected ? format(selected, "yyyy-MM-dd") : "날짜 선택"}</span>
-          <CalendarDays className="size-4 text-zinc-400" aria-hidden />
+          <CalendarDays className="size-4 text-[var(--jm-text-subtle)]" aria-hidden />
         </PopoverTrigger>
       </div>
       <PopoverContent className="w-auto p-0" align="start">

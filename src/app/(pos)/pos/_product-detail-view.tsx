@@ -74,7 +74,7 @@ export function ProductDetailView({ productId }: Props) {
         <button
           type="button"
           onClick={() => landingQuery.refetch()}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-zinc-900 px-4 text-[13px] font-semibold text-white"
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--jm-action)] px-4 text-[13px] font-semibold text-white"
         >
           <Loader2 className="h-3.5 w-3.5" />
           다시 시도

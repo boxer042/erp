@@ -43,7 +43,7 @@ export function BottomTabBar<T extends string>({
   const cellCount =
     tabs.length + (prefixAction ? 1 : 0) + (suffixAction ? 1 : 0);
   return (
-    <nav className="shrink-0 border-t border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+    <nav className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--jm-surface)]/85">
       <div
         className="grid"
         style={{
@@ -57,15 +57,15 @@ export function BottomTabBar<T extends string>({
             onClick={prefixAction.onClick}
             className="relative flex flex-col items-center gap-1 pb-2 pt-3"
           >
-            <div className="relative text-zinc-700">
+            <div className="relative text-[var(--jm-text)]">
               {prefixAction.icon}
               {prefixAction.badge != null && prefixAction.badge > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold tabular-nums text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-bg)]0 px-1 text-[10px] font-bold tabular-nums text-white">
                   {prefixAction.badge}
                 </span>
               )}
             </div>
-            <span className="text-[11px] font-medium text-zinc-700">
+            <span className="text-[11px] font-medium text-[var(--jm-text)]">
               {prefixAction.label}
             </span>
           </button>
@@ -82,24 +82,24 @@ export function BottomTabBar<T extends string>({
               {/* 상단 indicator */}
               <span
                 className={`absolute left-1/2 top-0 h-1 w-10 -translate-x-1/2 rounded-b-full transition-colors ${
-                  isActive ? "bg-zinc-900" : "bg-transparent"
+                  isActive ? "bg-[var(--jm-action)]" : "bg-transparent"
                 }`}
               />
               <div
                 className={`relative ${
-                  isActive ? "text-zinc-900" : "text-zinc-400"
+                  isActive ? "text-[var(--jm-text)]" : "text-[var(--jm-text-subtle)]"
                 }`}
               >
                 {t.icon}
                 {t.badge != null && t.badge > 0 && (
-                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold tabular-nums text-white">
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-bg)]0 px-1 text-[10px] font-bold tabular-nums text-white">
                     {t.badge}
                   </span>
                 )}
               </div>
               <span
                 className={`text-[11px] font-medium ${
-                  isActive ? "text-zinc-900" : "text-zinc-500"
+                  isActive ? "text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"
                 }`}
               >
                 {t.label}
@@ -113,15 +113,15 @@ export function BottomTabBar<T extends string>({
             onClick={suffixAction.onClick}
             className="relative flex flex-col items-center gap-1 pb-2 pt-3"
           >
-            <div className="relative text-zinc-700">
+            <div className="relative text-[var(--jm-text)]">
               {suffixAction.icon}
               {suffixAction.badge != null && suffixAction.badge > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold tabular-nums text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-bg)]0 px-1 text-[10px] font-bold tabular-nums text-white">
                   {suffixAction.badge}
                 </span>
               )}
             </div>
-            <span className="text-[11px] font-medium text-zinc-700">
+            <span className="text-[11px] font-medium text-[var(--jm-text)]">
               {suffixAction.label}
             </span>
           </button>
