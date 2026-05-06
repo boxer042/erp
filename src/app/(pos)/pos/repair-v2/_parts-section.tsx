@@ -218,6 +218,7 @@ function PartRow({
       quantity?: number;
       unitPrice?: number;
       status?: "USED" | "LOST";
+      billLost?: boolean;
     }) =>
       apiMutate(
         `/api/repair-tickets/${ticketId}/parts/${part.id}`,
@@ -252,30 +253,51 @@ function PartRow({
         isLost ? "opacity-60" : ""
       }`}
     >
-      {/* 1행: 이름/SKU + USED/LOST(상품명 영역 우측 끝) + 삭제 — 토글은 상품명 영역 안, 휴지통은 별도 우측 */}
+      {/* 1행: 이름/SKU + USED/LOST + (LOST 면) 청구 토글 + 삭제 */}
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <span
               className={`line-clamp-1 text-[14px] font-semibold text-zinc-900 ${
-                isLost ? "line-through" : ""
+                isLost && !part.billLost ? "line-through" : ""
               }`}
             >
               {part.product.name}
             </span>
-            {!readonly && (
-              <button
-                type="button"
-                onClick={() => update.mutate({ status: isLost ? "USED" : "LOST" })}
-                className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
-                  isLost
-                    ? "bg-rose-100 text-rose-700"
-                    : "bg-emerald-100 text-emerald-700"
-                }`}
-              >
-                {isLost ? "LOST" : "USED"}
-              </button>
-            )}
+            <div className="flex shrink-0 items-center gap-1">
+              {/* LOST 일 때만 — 청구 토글 (회사 손실 vs 손님 청구) */}
+              {!readonly && isLost && (
+                <button
+                  type="button"
+                  onClick={() => update.mutate({ billLost: !part.billLost })}
+                  className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
+                    part.billLost
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-zinc-100 text-zinc-500"
+                  }`}
+                  title={
+                    part.billLost
+                      ? "손님 청구 — 합계 포함 (해제 시 회사 손실)"
+                      : "회사 손실 — 합계 미포함 (클릭 시 청구)"
+                  }
+                >
+                  {part.billLost ? "청구" : "손실"}
+                </button>
+              )}
+              {!readonly && (
+                <button
+                  type="button"
+                  onClick={() => update.mutate({ status: isLost ? "USED" : "LOST" })}
+                  className={`h-5 shrink-0 rounded-full px-2 text-[10px] font-bold ${
+                    isLost
+                      ? "bg-rose-100 text-rose-700"
+                      : "bg-emerald-100 text-emerald-700"
+                  }`}
+                >
+                  {isLost ? "LOST" : "USED"}
+                </button>
+              )}
+            </div>
           </div>
           <span className="font-mono text-[11px] text-zinc-400">
             {part.product.sku}

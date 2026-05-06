@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
+        type: true,
         ledger: {
           select: {
             type: true,
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
     return {
       customerId: c.id,
       customerName: c.name,
+      customerType: c.type,
       currentBalance,
       openingBalance,
       totalSale,

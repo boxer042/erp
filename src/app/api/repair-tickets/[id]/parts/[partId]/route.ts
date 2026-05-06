@@ -84,6 +84,7 @@ export async function PATCH(
           totalPrice: new Prisma.Decimal(newQty).times(newPrice),
           ...(data.discount !== undefined ? { discount: data.discount } : {}),
           ...(data.status !== undefined ? { status: data.status } : {}),
+          ...(data.billLost !== undefined ? { billLost: data.billLost } : {}),
         },
         include: { product: { select: { id: true, name: true, sku: true } } },
       });

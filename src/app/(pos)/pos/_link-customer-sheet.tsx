@@ -9,6 +9,8 @@ interface Customer {
   id: string;
   name: string;
   phone: string;
+  type?: "INDIVIDUAL" | "BUSINESS";
+  businessNumber?: string | null;
 }
 
 interface Props {

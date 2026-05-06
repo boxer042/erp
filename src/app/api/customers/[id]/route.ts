@@ -25,16 +25,50 @@ export async function PUT(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const data = parsed.data;
+  const isBusiness = data.type === "BUSINESS";
+
+  // 사업자번호 중복 체크 — 자신 제외
+  if (isBusiness && data.businessNumber) {
+    const normalizedBN = data.businessNumber.replace(/[^\d]/g, "");
+    if (normalizedBN.length === 10) {
+      const conflict = await prisma.customer.findFirst({
+        where: {
+          isActive: true,
+          businessNumber: { contains: normalizedBN },
+          id: { not: id },
+        },
+        select: { id: true, name: true },
+      });
+      if (conflict) {
+        return NextResponse.json(
+          {
+            error: `같은 사업자번호로 이미 등록된 다른 고객이 있습니다 — ${conflict.name}`,
+            existing: conflict,
+          },
+          { status: 409 },
+        );
+      }
+    }
+  }
+
   const customer = await prisma.customer.update({
     where: { id },
     data: {
+      type: data.type,
       name: data.name,
       phone: data.phone,
-      businessNumber: data.businessNumber ?? null,
-      ceo: data.ceo ?? null,
       email: data.email ?? null,
-      address: data.address ?? null,
       memo: data.memo ?? null,
+      businessNumber: isBusiness ? data.businessNumber ?? null : null,
+      ceo: isBusiness ? data.ceo ?? null : null,
+      fax: isBusiness ? data.fax ?? null : null,
+      businessType: isBusiness ? data.businessType ?? null : null,
+      businessItem: isBusiness ? data.businessItem ?? null : null,
+      address: data.address ?? null,
+      shippingAddress: data.shippingAddress ?? null,
+      contactName: isBusiness ? data.contactName ?? null : null,
+      contactPhone: isBusiness ? data.contactPhone ?? null : null,
+      contactPosition: isBusiness ? data.contactPosition ?? null : null,
     },
   });
   return NextResponse.json(customer);

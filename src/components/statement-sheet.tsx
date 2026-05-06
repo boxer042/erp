@@ -104,7 +104,7 @@ interface StatementSheetProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   editData?: StatementFormData | null;
-  onSaved: (id: string) => void;
+  onSaved: (id: string, statementNo?: string) => void;
 }
 
 export function StatementSheet({ open, onOpenChange, editData, onSaved }: StatementSheetProps) {
@@ -217,9 +217,10 @@ export function StatementSheet({ open, onOpenChange, editData, onSaved }: Statem
       }
       const saved = await res.json().catch(() => null);
       const savedId = isEdit ? editData!.id! : saved?.id;
+      const savedNo: string | undefined = saved?.statementNo;
       toast.success(isEdit ? "거래명세표가 수정되었습니다" : "거래명세표가 등록되었습니다");
       onOpenChange(false);
-      onSaved(savedId);
+      onSaved(savedId, savedNo);
     } catch {
       toast.error("오류가 발생했습니다");
     } finally {

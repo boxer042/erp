@@ -73,8 +73,12 @@ export default function PosV2CustomerPage({
     customerId: string,
     name: string,
     phone: string | undefined,
+    extras?: {
+      type?: "INDIVIDUAL" | "BUSINESS";
+      businessNumber?: string | null;
+    },
   ) => {
-    setCustomer(customerId, name, phone, sid);
+    setCustomer(customerId, name, phone, sid, extras);
     try {
       await apiMutate(`/api/pos/sessions/${sid}/link-customer`, "POST", {
         customerId,
@@ -105,6 +109,9 @@ export default function PosV2CustomerPage({
   const [customerActionOpen, setCustomerActionOpen] = useState(false);
   const [quickRegister, setQuickRegister] = useState<{ defaultText: string } | null>(null);
   const [labelCodes, setLabelCodes] = useState<string[] | null>(null);
+  // 라벨 모달 닫을 때 손님 그리드(/pos) 로 이동할지 — 결제 직후 발번 케이스만 true.
+  // 카트에서 미리 출력하는 케이스는 false (세션 유지, 손님 페이지 머물러야 함).
+  const [labelRedirectAfter, setLabelRedirectAfter] = useState(false);
   const [detail, setDetail] = useState<Detail>(null);
   // 카트 시트 외부 트리거 — BottomTabBar 의 장바구니 탭 클릭 시 increment → ProductsMode 가 useEffect 로 cartOpen
   const [cartOpenSignal, setCartOpenSignal] = useState(0);
@@ -186,18 +193,44 @@ export default function PosV2CustomerPage({
               >
                 {isRegistered ? (
                   <>
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
-                      {(session.customerName ?? "?").charAt(0)}
-                    </div>
-                    <div className="flex min-w-0 max-w-[120px] flex-col">
-                      <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
-                        {session.customerName}
-                      </span>
-                      {session.customerPhone && (
+                    {session.customerType === "BUSINESS" ? (
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
+                        {(session.customerName ?? "?").charAt(0)}
+                      </div>
+                    )}
+                    <div className="flex min-w-0 max-w-[140px] flex-col">
+                      <div className="flex items-center gap-1">
+                        {session.customerType === "BUSINESS" && (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                            기업
+                          </span>
+                        )}
+                        <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                          {session.customerName}
+                        </span>
+                      </div>
+                      {session.customerType === "BUSINESS" &&
+                      session.customerBusinessNumber ? (
+                        <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                          {session.customerBusinessNumber}
+                        </span>
+                      ) : session.customerPhone ? (
                         <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
                           {session.customerPhone}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </>
                 ) : (
@@ -255,18 +288,44 @@ export default function PosV2CustomerPage({
               >
                 {isRegistered ? (
                   <>
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
-                      {(session.customerName ?? "?").charAt(0)}
-                    </div>
-                    <div className="flex min-w-0 max-w-[120px] flex-col">
-                      <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
-                        {session.customerName}
-                      </span>
-                      {session.customerPhone && (
+                    {session.customerType === "BUSINESS" ? (
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
+                        {(session.customerName ?? "?").charAt(0)}
+                      </div>
+                    )}
+                    <div className="flex min-w-0 max-w-[140px] flex-col">
+                      <div className="flex items-center gap-1">
+                        {session.customerType === "BUSINESS" && (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                            기업
+                          </span>
+                        )}
+                        <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                          {session.customerName}
+                        </span>
+                      </div>
+                      {session.customerType === "BUSINESS" &&
+                      session.customerBusinessNumber ? (
+                        <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                          {session.customerBusinessNumber}
+                        </span>
+                      ) : session.customerPhone ? (
                         <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
                           {session.customerPhone}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </>
                 ) : (
@@ -317,6 +376,7 @@ export default function PosV2CustomerPage({
         onOpenChange={setCustomerActionOpen}
         session={session}
         onLinkCustomer={() => setLinkOpen(true)}
+        onCreateCustomer={() => setQuickRegister({ defaultText: "" })}
       />
 
       {/* 미등록 → 기존 고객 매핑 시트 */}
@@ -324,7 +384,10 @@ export default function PosV2CustomerPage({
         open={linkOpen}
         onOpenChange={setLinkOpen}
         onSelect={(c) => {
-          void linkCustomerToSession(c.id, c.name, c.phone);
+          void linkCustomerToSession(c.id, c.name, c.phone, {
+            type: c.type,
+            businessNumber: c.businessNumber ?? null,
+          });
           setLinkOpen(false);
         }}
         onCreate={(query) => {
@@ -338,7 +401,10 @@ export default function PosV2CustomerPage({
         onOpenChange={(o) => !o && setQuickRegister(null)}
         defaultText={quickRegister?.defaultText ?? ""}
         onCreated={(c) => {
-          void linkCustomerToSession(c.id, c.name, c.phone);
+          void linkCustomerToSession(c.id, c.name, c.phone, {
+            type: c.type,
+            businessNumber: c.businessNumber ?? null,
+          });
           setQuickRegister(null);
         }}
       />
@@ -386,7 +452,10 @@ export default function PosV2CustomerPage({
         ) : mode === "product" ? (
           <ProductsMode
             session={session}
-            onPrintLabels={(codes) => setLabelCodes(codes)}
+            onPrintLabels={(codes, options) => {
+              setLabelCodes(codes);
+              setLabelRedirectAfter(!!options?.afterPayment);
+            }}
             onProductDetail={(id) => setDetail({ type: "product", id })}
             openCartTrigger={cartOpenSignal}
             searchOpen={productSearchOpen}
@@ -406,14 +475,17 @@ export default function PosV2CustomerPage({
         )}
       </main>
 
-      {/* 라벨 인쇄 모달 — 결제 직후 자동 표시 */}
+      {/* 라벨 인쇄 모달 — 결제 직후 자동 표시 또는 카트의 시리얼출력 */}
       {labelCodes && labelCodes.length > 0 && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/40 backdrop-blur-sm">
           <button
             type="button"
             onClick={() => {
               setLabelCodes(null);
-              router.push("/pos");
+              if (labelRedirectAfter) {
+                setLabelRedirectAfter(false);
+                router.push("/pos");
+              }
             }}
             className="m-4 self-end rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-zinc-900 shadow"
           >

@@ -18,6 +18,8 @@ interface SearchCustomer {
   id: string;
   name: string;
   phone: string;
+  type?: "INDIVIDUAL" | "BUSINESS";
+  businessNumber?: string | null;
 }
 interface SearchRepair {
   id: string;
@@ -218,7 +220,10 @@ function Body({
                       } else {
                         const sid = addSession();
                         if (sid) {
-                          setCustomer(c.id, c.name, c.phone, sid);
+                          setCustomer(c.id, c.name, c.phone, sid, {
+                            type: c.type,
+                            businessNumber: c.businessNumber ?? null,
+                          });
                           router.push(`/pos/customer/${sid}`);
                         }
                       }

@@ -22,8 +22,12 @@ interface CategoryRoot {
 
 interface Props {
   session: CartSession;
-  /** 결제 후 라벨 인쇄 모달 트리거 — 부모(customer 페이지)가 처리 */
-  onPrintLabels: (codes: string[]) => void;
+  /**
+   * 라벨 인쇄 모달 트리거 — 부모(customer 페이지)가 처리.
+   * options.afterPayment=true 면 결제 직후 발번 (모달 닫을 때 손님 그리드로 이동).
+   * 미지정/false 면 카트에서 미리 발번 — 닫아도 손님 페이지에 머무름.
+   */
+  onPrintLabels: (codes: string[], options?: { afterPayment?: boolean }) => void;
   /** 상품 카드 우상단 i 클릭 — 부모(customer page) 가 detail 진입 처리 */
   onProductDetail?: (productId: string) => void;
   /** BottomTabBar 의 장바구니 탭 클릭 등 외부에서 카트 시트 강제 오픈 — 값이 변할 때마다 카트 열림 */
@@ -102,6 +106,10 @@ export function ProductsMode({
   const otherCount = cartCount - productItems.length;
 
   const addToCart = (p: ProductLite, unitPrice: number) => {
+    // 비교 기준선 — listPrice 우선, 없으면 sellingPrice 사용 (= 카트 추가 시점에 보이던 판매가)
+    const list = p.listPrice ? parseFloat(p.listPrice) : 0;
+    const selling = parseFloat(p.sellingPrice) || 0;
+    const baseline = list > 0 ? list : selling;
     add(
       {
         productId: p.id,
@@ -110,6 +118,7 @@ export function ProductsMode({
         sku: p.sku,
         imageUrl: p.imageUrl,
         unitPrice,
+        listPrice: baseline > 0 ? baseline : undefined,
         taxType: p.taxType === "TAX_FREE" ? "TAX_FREE" : "TAXABLE",
         zeroRateEligible: p.zeroRateEligible,
         isBulk: p.isBulk,
@@ -122,8 +131,8 @@ export function ProductsMode({
   };
 
   const handleProductTap = (p: ProductLite) => {
-    // autoMapped + 0원 → 가격 다이얼로그 강제
-    if (p.autoMapped && Number(p.sellingPrice) === 0) {
+    // 가격이 0원인 모든 상품은 가격 입력 강제 (0원 결제 사고 방지)
+    if (Number(p.sellingPrice) === 0) {
       setPriceProduct(p);
       return;
     }
@@ -253,6 +262,7 @@ export function ProductsMode({
             brand: null,
             spec: null,
             sellingPrice: p.sellingPrice,
+            listPrice: p.listPrice,
             imageUrl: null,
             taxType: p.taxType ?? "TAXABLE",
             zeroRateEligible: p.zeroRateEligible,
@@ -270,6 +280,7 @@ export function ProductsMode({
         onOpenChange={setCartOpen}
         session={session}
         onCheckout={() => setPaymentOpen(true)}
+        onPrintLabels={onPrintLabels}
       />
 
       <PaymentSheet
@@ -292,6 +303,15 @@ export function ProductsMode({
           initialNet={parseFloat(priceProduct.sellingPrice) || 0}
           taxType={priceProduct.taxType === "TAX_FREE" ? "TAX_FREE" : "TAXABLE"}
           isZeroRate={false}
+          originalPrice={(() => {
+            // listPrice 우선, 없으면 sellingPrice 를 비교 기준선으로
+            const list = priceProduct.listPrice
+              ? parseFloat(priceProduct.listPrice)
+              : 0;
+            const selling = parseFloat(priceProduct.sellingPrice) || 0;
+            const baseline = list > 0 ? list : selling;
+            return baseline > 0 ? baseline : undefined;
+          })()}
           onSubmit={(net) => {
             addToCart(priceProduct, net);
             setPriceProduct(null);

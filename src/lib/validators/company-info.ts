@@ -21,6 +21,12 @@ export const companyInfoSchema = z.object({
     .min(0)
     .nullable()
     .optional(),
+  defaultDiagnosisFee: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .nullable()
+    .optional(),
 });
 
 export type CompanyInfoInput = z.infer<typeof companyInfoSchema>;

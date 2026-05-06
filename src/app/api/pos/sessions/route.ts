@@ -46,13 +46,22 @@ export async function GET() {
 
   const rows = await prisma.posSession.findMany({
     where: { userId: user.id, deletedAt: null },
+    include: {
+      customer: {
+        select: { type: true, businessNumber: true },
+      },
+    },
     orderBy: { updatedAt: "desc" },
   });
   const shaped = await toClientShapes(rows);
   return NextResponse.json({ sessions: shaped, rejectedIds: [] });
 }
 
-type SessionRow = Awaited<ReturnType<typeof prisma.posSession.findFirst>>;
+type SessionRow = Awaited<
+  ReturnType<typeof prisma.posSession.findFirst<{
+    include: { customer: { select: { type: true; businessNumber: true } } };
+  }>>
+>;
 
 function toClientShape(r: NonNullable<SessionRow>) {
   return {
@@ -60,6 +69,8 @@ function toClientShape(r: NonNullable<SessionRow>) {
     customerId: r.customerId,
     customerName: r.customerName,
     customerPhone: r.customerPhone,
+    customerType: r.customer?.type ?? null,
+    customerBusinessNumber: r.customer?.businessNumber ?? null,
     label: r.label,
     totalDiscount: r.totalDiscount,
     shippingCost: r.shippingCost,
@@ -228,6 +239,9 @@ export async function POST(request: NextRequest) {
   // 3) 응답 — 현재 user 의 활성 세션 + rejected ID 들
   const fresh = await prisma.posSession.findMany({
     where: { userId: user.id, deletedAt: null },
+    include: {
+      customer: { select: { type: true, businessNumber: true } },
+    },
     orderBy: { updatedAt: "desc" },
   });
   const shaped = await toClientShapes(fresh);

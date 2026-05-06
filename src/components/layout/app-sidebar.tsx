@@ -20,6 +20,10 @@ import {
   Receipt,
   BookOpen,
   TrendingUp,
+  History,
+  AlertTriangle,
+  ShieldAlert,
+  FileSpreadsheet,
   WalletMinimal,
   Settings,
   Menu,
@@ -94,10 +98,13 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { id: "orders", label: "주문", href: "/orders", icon: ShoppingCart },
+      { id: "sales-history", label: "통합 판매내역", href: "/sales/history", icon: History },
+      { id: "tax-invoices-pending", label: "세금계산서 대기", href: "/tax-invoices/pending", icon: FileSpreadsheet },
       { id: "quotations", label: "견적서", href: "/quotations", icon: FileText },
       { id: "statements", label: "거래명세표", href: "/statements", icon: Receipt },
       { id: "serial-items", label: "시리얼 라벨", href: "/serial-items", icon: QrCode },
       { id: "repairs", label: "수리", href: "/repairs", icon: Wrench },
+      { id: "repairs-warranty", label: "수리 보증 만료", href: "/repairs/warranty", icon: ShieldAlert },
       { id: "customers", label: "고객", href: "/customers", icon: Users },
       { id: "customer-ledger", label: "고객 원장", href: "/customers/ledger", icon: BookOpen },
       { id: "channels", label: "판매 채널", href: "/channels", icon: Store },
@@ -125,6 +132,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { id: "lots", label: "로트 현황", href: "/inventory/lots", icon: Boxes },
+      { id: "low-stock", label: "재고 부족", href: "/inventory/low-stock", icon: AlertTriangle },
       { id: "assembly", label: "조립 실적", href: "/inventory/assembly", icon: Factory },
       { id: "stocktake", label: "실사 보정", href: "/inventory/stocktake", icon: ClipboardCheck },
       { id: "initial-inventory", label: "초기 등록", href: "/inventory/initial", icon: ClipboardList },

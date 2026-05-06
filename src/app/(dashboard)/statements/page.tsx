@@ -11,15 +11,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Pencil, Trash2, FileText } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { StatementSheet, type StatementFormData } from "@/components/statement-sheet";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
-import { Printer, FileDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DocumentPrintDialog } from "@/components/document-print-dialog";
 
 function StatementsSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
@@ -71,7 +67,7 @@ export default function StatementsPage() {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editData, setEditData] = useState<StatementFormData | null>(null);
-  const [printDialogId, setPrintDialogId] = useState<string | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{ id: string; statementNo: string } | null>(null);
 
   const statementsQuery = useQuery({
     queryKey: queryKeys.statements.list({ search: appliedSearch }),
@@ -210,9 +206,14 @@ export default function StatementsPage() {
                     <TableCell className="text-right font-medium">₩{Math.round(parseFloat(s.totalAmount)).toLocaleString("ko-KR")}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Link href={`/statements/${s.id}/print`} target="_blank">
-                          <Button variant="ghost" size="icon"><FileText className="h-4 w-4" /></Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setPreviewTarget({ id: s.id, statementNo: s.statementNo })}
+                          title="거래명세표 보기"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -233,40 +234,18 @@ export default function StatementsPage() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         editData={editData}
-        onSaved={(id) => {
+        onSaved={(id, no) => {
           refresh();
-          if (id) setPrintDialogId(id);
+          if (id) setPreviewTarget({ id, statementNo: no ?? "" });
         }}
       />
 
-      <Dialog open={!!printDialogId} onOpenChange={(v) => { if (!v) setPrintDialogId(null); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>저장되었습니다</DialogTitle>
-            <DialogDescription>작성한 거래명세표를 바로 출력할까요?</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => setPrintDialogId(null)}>닫기</Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                if (printDialogId) window.open(`/statements/${printDialogId}/print?auto=1`, "_blank");
-                setPrintDialogId(null);
-              }}
-            >
-              <FileDown className="h-4 w-4 mr-1.5" /> PDF 다운로드
-            </Button>
-            <Button
-              onClick={() => {
-                if (printDialogId) window.open(`/statements/${printDialogId}/print?auto=1`, "_blank");
-                setPrintDialogId(null);
-              }}
-            >
-              <Printer className="h-4 w-4 mr-1.5" /> 인쇄
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DocumentPrintDialog
+        open={!!previewTarget}
+        onOpenChange={(v) => { if (!v) setPreviewTarget(null); }}
+        printPath={previewTarget ? `/statements/${previewTarget.id}/print` : null}
+        title={previewTarget ? `거래명세표 — ${previewTarget.statementNo}` : "거래명세표"}
+      />
     </>
   );
 }

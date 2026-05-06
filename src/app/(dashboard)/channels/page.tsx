@@ -82,7 +82,8 @@ export default function ChannelsPage() {
 
   const channelsQuery = useQuery({
     queryKey: queryKeys.channels.list(),
-    queryFn: () => apiGet<SalesChannel[]>("/api/channels"),
+    // 관리 페이지는 비활성 채널도 표시 (재활성화/삭제 가능하게)
+    queryFn: () => apiGet<SalesChannel[]>("/api/channels?includeInactive=1"),
   });
   const channels = channelsQuery.data ?? [];
   const loading = channelsQuery.isPending;

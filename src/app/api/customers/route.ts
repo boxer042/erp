@@ -40,15 +40,68 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parsed.data;
+
+  // 전화번호 중복 체크 — 같은 phone 으로 활성 고객이 이미 있으면 409 + 기존 정보 반환.
+  // 클라이언트가 "기존 고객으로 사용" / "그래도 새로 등록" 선택할 수 있도록 details 제공.
+  const normalizedPhone = data.phone.replace(/[^\d]/g, "");
+  if (normalizedPhone.length > 0 && !data.allowDuplicatePhone) {
+    const existing = await prisma.customer.findFirst({
+      where: { isActive: true, phone: { contains: normalizedPhone } },
+      select: { id: true, name: true, phone: true, businessNumber: true, type: true },
+    });
+    if (existing) {
+      return NextResponse.json(
+        {
+          error: "같은 전화번호로 이미 등록된 고객이 있습니다",
+          existing,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
+  // 사업자번호 중복 체크 — BUSINESS 일 때만. 사업자번호는 고유식별자성이 강해 우회 옵션 없이 막음.
+  if (data.type === "BUSINESS" && data.businessNumber) {
+    const normalizedBN = data.businessNumber.replace(/[^\d]/g, "");
+    if (normalizedBN.length === 10) {
+      const existing = await prisma.customer.findFirst({
+        where: {
+          isActive: true,
+          businessNumber: { contains: normalizedBN },
+        },
+        select: { id: true, name: true, phone: true, businessNumber: true, type: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          {
+            error: `같은 사업자번호로 이미 등록된 고객이 있습니다 — ${existing.name}`,
+            existing,
+          },
+          { status: 409 },
+        );
+      }
+    }
+  }
+
+  // 개인이면 기업 전용 fields 강제 null 처리 (UI 에서 잔재 들어와도 정리)
+  const isBusiness = data.type === "BUSINESS";
   const customer = await prisma.customer.create({
     data: {
+      type: data.type,
       name: data.name,
       phone: data.phone,
-      businessNumber: data.businessNumber || null,
-      ceo: data.ceo || null,
       email: data.email || null,
-      address: data.address || null,
       memo: data.memo || null,
+      businessNumber: isBusiness ? data.businessNumber || null : null,
+      ceo: isBusiness ? data.ceo || null : null,
+      fax: isBusiness ? data.fax || null : null,
+      businessType: isBusiness ? data.businessType || null : null,
+      businessItem: isBusiness ? data.businessItem || null : null,
+      address: data.address || null,
+      shippingAddress: data.shippingAddress || null,
+      contactName: isBusiness ? data.contactName || null : null,
+      contactPhone: isBusiness ? data.contactPhone || null : null,
+      contactPosition: isBusiness ? data.contactPosition || null : null,
     },
   });
 

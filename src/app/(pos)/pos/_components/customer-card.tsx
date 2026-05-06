@@ -37,11 +37,25 @@ export function CustomerCard({ session, onClick, onClose }: Props) {
         className="group flex w-full flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-left transition-all active:scale-[0.99] sm:hover:border-zinc-300 sm:hover:shadow-sm"
       >
         <div className="flex items-start gap-3">
-          {/* 아바타 */}
+          {/* 아바타 — 기업이면 빌딩 아이콘, 개인이면 이름 첫글자, 미등록이면 컬러 코드 */}
           {isRegistered ? (
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-bold text-zinc-700">
-              {(session.customerName ?? "?").charAt(0)}
-            </div>
+            session.customerType === "BUSINESS" ? (
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+            ) : (
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[18px] font-bold text-zinc-700">
+                {(session.customerName ?? "?").charAt(0)}
+              </div>
+            )
           ) : (
             <div
               className={`flex size-12 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
@@ -56,14 +70,26 @@ export function CustomerCard({ session, onClick, onClose }: Props) {
           <div className="flex min-w-0 flex-1 flex-col">
             {isRegistered ? (
               <>
-                <span className="line-clamp-1 text-[16px] font-semibold text-zinc-900">
-                  {session.customerName}
-                </span>
-                {session.customerPhone && (
+                <div className="flex items-center gap-1.5">
+                  {session.customerType === "BUSINESS" && (
+                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                      기업
+                    </span>
+                  )}
+                  <span className="line-clamp-1 text-[16px] font-semibold text-zinc-900">
+                    {session.customerName}
+                  </span>
+                </div>
+                {session.customerType === "BUSINESS" &&
+                session.customerBusinessNumber ? (
+                  <span className="font-mono text-[12px] text-zinc-500">
+                    {session.customerBusinessNumber}
+                  </span>
+                ) : session.customerPhone ? (
                   <span className="font-mono text-[12px] text-zinc-500">
                     {session.customerPhone}
                   </span>
-                )}
+                ) : null}
               </>
             ) : (
               <>

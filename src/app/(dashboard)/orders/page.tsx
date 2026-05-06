@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { formatComma, parseComma } from "@/lib/utils";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
+import { CustomerCombobox } from "@/components/customer-combobox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -63,6 +64,16 @@ interface Channel {
   commissionRate: string;
 }
 
+interface CustomerOption {
+  id: string;
+  name: string;
+  phone: string;
+  type: "INDIVIDUAL" | "BUSINESS";
+  businessNumber: string | null;
+  shippingAddress: string | null;
+  address: string | null;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -90,7 +101,7 @@ interface Order {
   subtotalAmount: string;
   totalAmount: string;
   commissionAmount: string;
-  channel: { name: string; code: string };
+  channel: { name: string; code: string } | null;
   createdBy: { name: string };
   repairTicket: { id: string; ticketNo: string; status: string } | null;
   _count: { items: number };
@@ -112,7 +123,7 @@ interface OrderDetail {
   totalAmount: string;
   commissionAmount: string;
   memo: string | null;
-  channel: { name: string; code: string; commissionRate: string };
+  channel: { name: string; code: string; commissionRate: string } | null;
   createdBy: { name: string };
   items: Array<{
     id: string;
@@ -196,10 +207,13 @@ export default function OrdersPage() {
   // 등록 다이얼로그
   const [createOpen, setCreateOpen] = useState(false);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState("");
   const [orderDate, setOrderDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [channelOrderNo, setChannelOrderNo] = useState("");
+  /** 등록 고객 ID — 비어있으면 미등록 (텍스트 입력 fallback) */
+  const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
@@ -236,15 +250,18 @@ export default function OrdersPage() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
 
   const openCreateDialog = async () => {
-    const [chs, prs] = await Promise.all([
+    const [chs, prs, cus] = await Promise.all([
       apiGet<Channel[]>("/api/channels"),
       apiGet<Product[]>("/api/products?isBulk=all"),
+      apiGet<CustomerOption[]>("/api/customers"),
     ]);
     setChannels(chs);
     setProducts(prs);
+    setCustomers(cus);
     setSelectedChannelId("");
     setOrderDate(new Date().toISOString().split("T")[0]);
     setChannelOrderNo("");
+    setCustomerId("");
     setCustomerName("");
     setCustomerPhone("");
     setShippingAddress("");
@@ -326,6 +343,7 @@ export default function OrdersPage() {
       apiMutate("/api/orders", "POST", {
         channelId: selectedChannelId,
         channelOrderNo,
+        customerId: customerId || null,
         customerName,
         customerPhone,
         shippingAddress,
@@ -459,17 +477,27 @@ export default function OrdersPage() {
         addLabel="주문 등록"
         loading={loading}
         filters={
-          <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v === "ALL" ? "" : (v ?? "")); }}>
-            <SelectTrigger className="h-[30px] w-[120px] text-[13px] bg-card border-border">
-              <SelectValue placeholder="전체 상태" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">전체</SelectItem>
-              {Object.entries(statusLabels).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v === "ALL" ? "" : (v ?? "")); }}>
+              <SelectTrigger className="h-[30px] w-[120px] text-[13px] bg-card border-border">
+                <SelectValue placeholder="전체 상태" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">전체</SelectItem>
+                {Object.entries(statusLabels).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-[30px] text-[13px]"
+              onClick={() => router.push("/orders/stats")}
+            >
+              매출 통계
+            </Button>
+          </div>
         }
       />
       <ScrollArea className="flex-1 min-h-0">
@@ -512,7 +540,15 @@ export default function OrdersPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell><Badge variant="outline">{order.channel.name}</Badge></TableCell>
+                  <TableCell>
+                    {order.channel ? (
+                      <Badge variant="outline">{order.channel.name}</Badge>
+                    ) : order.repairTicket ? (
+                      <Badge variant="secondary">수리</Badge>
+                    ) : (
+                      <Badge variant="secondary">POS</Badge>
+                    )}
+                  </TableCell>
                   <TableCell>{order.customerName || "-"}</TableCell>
                   <TableCell>{new Date(order.orderDate).toLocaleDateString("ko-KR")}</TableCell>
                   <TableCell>
@@ -579,20 +615,56 @@ export default function OrdersPage() {
                 <Input value={channelOrderNo} onChange={(e) => setChannelOrderNo(e.target.value)} placeholder="외부 채널 주문번호" />
               </div>
               <div className="space-y-2">
-                <Label>고객명</Label>
-                <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                <Label>고객 (선택)</Label>
+                <CustomerCombobox
+                  customers={customers}
+                  value={customerId}
+                  onChange={(id, c) => {
+                    setCustomerId(id);
+                    if (id) {
+                      setCustomerName(c.name);
+                      // 전화는 활성 고객에서 가져옴 (덮어쓰기 방지: 기존 이름이 있을 때만)
+                      const full = customers.find((x) => x.id === id);
+                      if (full) {
+                        setCustomerPhone(full.phone || "");
+                        // 배송지는 customer.shippingAddress 우선, 없으면 address
+                        setShippingAddress(
+                          full.shippingAddress || full.address || "",
+                        );
+                      }
+                    }
+                  }}
+                  onCreateNew={() => {
+                    /* 주문 폼에서 신규 등록은 별도 흐름 — /customers 에서 등록 후 재선택 */
+                  }}
+                  placeholder="등록 고객 선택 (또는 비워두기)"
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>연락처</Label>
-                <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                <Label>고객명 {customerId ? "(연결됨)" : "(미등록)"}</Label>
+                <Input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="홍길동 / (주)대한기계"
+                />
               </div>
               <div className="space-y-2">
-                <Label>배송지</Label>
-                <Input value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} />
+                <Label>연락처</Label>
+                <Input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>배송지</Label>
+              <Input
+                value={shippingAddress}
+                onChange={(e) => setShippingAddress(e.target.value)}
+              />
             </div>
 
             {/* 상품 추가 */}
@@ -753,7 +825,9 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">채널</span>
-                    <p className="font-medium">{detail.channel.name}</p>
+                    <p className="font-medium">
+                      {detail.channel?.name ?? "POS"}
+                    </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">주문일</span>
@@ -854,10 +928,14 @@ export default function OrdersPage() {
                         <span>총액</span>
                         <span>₩{formatPrice(detail.totalAmount)}</span>
                       </div>
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>수수료 ({(Number(detail.channel.commissionRate) * 100).toFixed(1)}%)</span>
-                        <span>₩{formatPrice(detail.commissionAmount)}</span>
-                      </div>
+                      {detail.channel && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>
+                            수수료 ({(Number(detail.channel.commissionRate) * 100).toFixed(1)}%)
+                          </span>
+                          <span>₩{formatPrice(detail.commissionAmount)}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

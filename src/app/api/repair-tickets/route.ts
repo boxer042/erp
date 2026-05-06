@@ -69,14 +69,24 @@ export async function POST(request: NextRequest) {
   }
   const data = parsed.data;
 
-  // 보증기간 기본값: CompanyInfo.defaultRepairWarrantyMonths
+  // 보증기간 + 진단비 기본값 — CompanyInfo 한 번 조회로 두 값 같이 가져옴
   let warrantyMonths = data.repairWarrantyMonths;
-  if (warrantyMonths == null) {
+  let diagnosisFee = data.diagnosisFee;
+  if (warrantyMonths == null || diagnosisFee == null || diagnosisFee === 0) {
     const company = await prisma.companyInfo.findUnique({
       where: { id: "singleton" },
-      select: { defaultRepairWarrantyMonths: true },
+      select: {
+        defaultRepairWarrantyMonths: true,
+        defaultDiagnosisFee: true,
+      },
     });
-    warrantyMonths = company?.defaultRepairWarrantyMonths ?? null;
+    if (warrantyMonths == null) {
+      warrantyMonths = company?.defaultRepairWarrantyMonths ?? null;
+    }
+    // 사용자가 명시적으로 0 / 미입력 보냈는데 회사 기본값 있으면 채움 — 사용자가 진단비 0 원하면 그대로 보내짐
+    if ((diagnosisFee == null || diagnosisFee === 0) && company?.defaultDiagnosisFee) {
+      diagnosisFee = Number(company.defaultDiagnosisFee);
+    }
   }
 
   const ticket = await prisma.repairTicket.create({
@@ -90,7 +100,7 @@ export async function POST(request: NextRequest) {
       receivedAt: new Date(),
       symptom: data.symptom?.trim() || null,
       diagnosis: data.diagnosis?.trim() || null,
-      diagnosisFee: data.diagnosisFee,
+      diagnosisFee: diagnosisFee ?? data.diagnosisFee,
       repairWarrantyMonths: warrantyMonths,
       parentRepairTicketId: data.parentRepairTicketId || null,
       // 담당자 기본값 — 명시 미지정 시 현재 user 가 기본 담당자

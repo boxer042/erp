@@ -483,13 +483,24 @@ export function QuickSupplierProductSheet({
 
 export interface CustomerFormData {
   id?: string;
+  type?: "INDIVIDUAL" | "BUSINESS";
   name: string;
   phone: string;
+  email: string;
+  memo: string;
+  // 기업
   businessNumber: string;
   ceo: string;
-  email: string;
+  fax?: string;
+  businessType?: string;
+  businessItem?: string;
+  // 주소
   address: string;
-  memo: string;
+  shippingAddress?: string;
+  // 담당자 (기업)
+  contactName?: string;
+  contactPhone?: string;
+  contactPosition?: string;
 }
 
 interface QuickCustomerSheetProps {
@@ -505,31 +516,57 @@ export function QuickCustomerSheet({
   open, onOpenChange, defaultName = "", editData, onCreated, onUpdated,
 }: QuickCustomerSheetProps) {
   const isEdit = !!editData?.id;
+  const [type, setType] = useState<"INDIVIDUAL" | "BUSINESS">("INDIVIDUAL");
   const [name, setName] = useState(defaultName);
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [memo, setMemo] = useState("");
+  // 기업 전용
   const [businessNumber, setBusinessNumber] = useState("");
   const [ceo, setCeo] = useState("");
-  const [email, setEmail] = useState("");
+  const [fax, setFax] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [businessItem, setBusinessItem] = useState("");
+  // 주소
   const [address, setAddress] = useState("");
-  const [memo, setMemo] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
+  const [shippingDiffers, setShippingDiffers] = useState(false);
+  // 담당자 (기업)
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactPosition, setContactPosition] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       if (editData) {
+        setType(editData.type ?? "INDIVIDUAL");
         setName(editData.name);
         setPhone(editData.phone);
+        setEmail(editData.email);
+        setMemo(editData.memo);
         setBusinessNumber(editData.businessNumber);
         setCeo(editData.ceo);
-        setEmail(editData.email);
+        setFax(editData.fax ?? "");
+        setBusinessType(editData.businessType ?? "");
+        setBusinessItem(editData.businessItem ?? "");
         setAddress(editData.address);
-        setMemo(editData.memo);
+        setShippingAddress(editData.shippingAddress ?? "");
+        setShippingDiffers(!!editData.shippingAddress);
+        setContactName(editData.contactName ?? "");
+        setContactPhone(editData.contactPhone ?? "");
+        setContactPosition(editData.contactPosition ?? "");
       } else {
-        setName(defaultName); setPhone(""); setBusinessNumber(""); setCeo("");
-        setEmail(""); setAddress(""); setMemo("");
+        setType("INDIVIDUAL");
+        setName(defaultName); setPhone(""); setEmail(""); setMemo("");
+        setBusinessNumber(""); setCeo(""); setFax(""); setBusinessType(""); setBusinessItem("");
+        setAddress(""); setShippingAddress(""); setShippingDiffers(false);
+        setContactName(""); setContactPhone(""); setContactPosition("");
       }
     }
   }, [open, defaultName, editData]);
+
+  const isBusiness = type === "BUSINESS";
 
   const handleSubmit = async () => {
     if (!name.trim() || !phone.trim()) return;
@@ -541,24 +578,116 @@ export function QuickCustomerSheet({
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          type,
           name: name.trim(),
           phone: phone.trim(),
-          businessNumber: digitsOnly(businessNumber) || undefined,
-          ceo: ceo.trim() || undefined,
           email: email.trim() || undefined,
-          address: address.trim() || undefined,
           memo: memo.trim() || undefined,
+          ...(isBusiness && {
+            businessNumber: digitsOnly(businessNumber) || undefined,
+            ceo: ceo.trim() || undefined,
+            fax: digitsOnly(fax) || undefined,
+            businessType: businessType.trim() || undefined,
+            businessItem: businessItem.trim() || undefined,
+            contactName: contactName.trim() || undefined,
+            contactPhone: digitsOnly(contactPhone) || undefined,
+            contactPosition: contactPosition.trim() || undefined,
+          }),
+          address: address.trim() || undefined,
+          shippingAddress: shippingDiffers
+            ? shippingAddress.trim() || undefined
+            : undefined,
         }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
+        // phone 중복 (409) — existing 고객 정보 보여주고 사용자가 선택
+        if (res.status === 409 && err?.existing && !isEdit) {
+          const existing = err.existing as {
+            id: string;
+            name: string;
+            phone: string;
+            type?: "INDIVIDUAL" | "BUSINESS";
+          };
+          const typeLabel = existing.type === "BUSINESS" ? " (기업)" : " (개인)";
+          const useExisting = window.confirm(
+            `같은 전화번호로 이미 등록된 고객이 있습니다:\n\n  ${existing.name}${typeLabel} — ${formatPhone(existing.phone)}\n\n[확인] 기존 고객 사용 (권장)\n[취소] 동명이인으로 새로 등록`,
+          );
+          if (useExisting) {
+            // 기존 고객으로 진행 — onCreated 콜백에 기존 고객 전달
+            toast.success(`기존 고객 "${existing.name}" 사용`);
+            onOpenChange(false);
+            onCreated({
+              id: existing.id,
+              name: existing.name,
+              phone: existing.phone,
+            });
+            return;
+          }
+          // "그래도 등록" — allowDuplicatePhone 으로 재시도
+          const retry = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...JSON.parse(
+                JSON.stringify({
+                  type,
+                  name: name.trim(),
+                  phone: phone.trim(),
+                  email: email.trim() || undefined,
+                  memo: memo.trim() || undefined,
+                  ...(isBusiness && {
+                    businessNumber: digitsOnly(businessNumber) || undefined,
+                    ceo: ceo.trim() || undefined,
+                    fax: digitsOnly(fax) || undefined,
+                    businessType: businessType.trim() || undefined,
+                    businessItem: businessItem.trim() || undefined,
+                    contactName: contactName.trim() || undefined,
+                    contactPhone: digitsOnly(contactPhone) || undefined,
+                    contactPosition: contactPosition.trim() || undefined,
+                  }),
+                  address: address.trim() || undefined,
+                  shippingAddress: shippingDiffers
+                    ? shippingAddress.trim() || undefined
+                    : undefined,
+                }),
+              ),
+              allowDuplicatePhone: true,
+            }),
+          });
+          if (!retry.ok) {
+            const e = await retry.json().catch(() => null);
+            toast.error(typeof e?.error === "string" ? e.error : "고객 등록 실패");
+            return;
+          }
+          const saved2 = await retry.json();
+          const typeLbl = isBusiness ? " (기업)" : " (개인)";
+          toast.success(`고객 "${name.trim()}"${typeLbl} 등록 완료`);
+          onOpenChange(false);
+          onCreated({ id: saved2.id, name: saved2.name, phone: saved2.phone });
+          return;
+        }
         const fieldErr = err?.error?.fieldErrors;
-        const msg = fieldErr?.name?.[0] || fieldErr?.phone?.[0] || fieldErr?.email?.[0] || (typeof err?.error === "string" ? err.error : isEdit ? "고객 수정 실패" : "고객 등록 실패");
+        const msg =
+          fieldErr?.name?.[0] ||
+          fieldErr?.phone?.[0] ||
+          fieldErr?.email?.[0] ||
+          fieldErr?.businessNumber?.[0] ||
+          (typeof err?.error === "string"
+            ? err.error
+            : isEdit
+              ? "고객 수정 실패"
+              : "고객 등록 실패");
         toast.error(msg);
         return;
       }
       const saved = await res.json();
-      toast.success(isEdit ? `고객 "${name.trim()}" 수정 완료` : `고객 "${name.trim()}" 등록 완료`);
+      const typeLabel = isBusiness ? " (기업)" : " (개인)";
+      toast.success(
+        isEdit
+          ? `고객 "${name.trim()}"${typeLabel} 수정 완료`
+          : `고객 "${name.trim()}"${typeLabel} 등록 완료`,
+      );
       onOpenChange(false);
       if (isEdit) {
         onUpdated?.();
@@ -577,32 +706,164 @@ export function QuickCustomerSheet({
         </SheetHeader>
         <ScrollArea className="flex-1 min-h-0">
           <div className="px-5 py-5 space-y-3">
-            <FieldRow label="고객명" required>
-              <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+            {/* 타입 토글 */}
+            <FieldRow label="구분" required>
+              <div className="grid grid-cols-2 gap-1.5 rounded-md border border-border bg-muted/40 p-1">
+                {(["INDIVIDUAL", "BUSINESS"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setType(t)}
+                    className={`h-9 rounded text-[13px] font-semibold transition-colors ${
+                      type === t
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {t === "INDIVIDUAL" ? "개인" : "기업/사업자"}
+                  </button>
+                ))}
+              </div>
             </FieldRow>
-            <FieldRow label="연락처" required>
+
+            <FieldRow label={isBusiness ? "상호" : "이름"} required>
+              <Input
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={isBusiness ? "(주)회사명" : "홍길동"}
+              />
+            </FieldRow>
+            <FieldRow label={isBusiness ? "대표 전화" : "연락처"} required>
               <Input
                 value={formatPhone(phone)}
                 onChange={(e) => setPhone(digitsOnly(e.target.value))}
                 placeholder="010-0000-0000"
               />
             </FieldRow>
-            <FieldRow label="사업자번호">
-              <Input
-                value={formatBusinessNumber(businessNumber)}
-                onChange={(e) => setBusinessNumber(digitsOnly(e.target.value))}
-                placeholder="000-00-00000"
-              />
-            </FieldRow>
-            <FieldRow label="대표자">
-              <Input value={ceo} onChange={(e) => setCeo(e.target.value)} />
-            </FieldRow>
             <FieldRow label="이메일">
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </FieldRow>
-            <FieldRow label="주소">
+
+            {/* 기업 전용 섹션 */}
+            {isBusiness && (
+              <>
+                <div className="pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  사업자 정보
+                </div>
+                <FieldRow label="사업자번호">
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      value={formatBusinessNumber(businessNumber)}
+                      onChange={(e) => setBusinessNumber(digitsOnly(e.target.value))}
+                      placeholder="000-00-00000"
+                      className={
+                        businessNumber.length > 0 && businessNumber.length !== 10
+                          ? "border-amber-300 focus-visible:border-amber-500"
+                          : ""
+                      }
+                    />
+                    {businessNumber.length > 0 && businessNumber.length < 10 && (
+                      <p className="text-[11px] text-amber-700">
+                        {10 - businessNumber.length}자리 더 입력 (10자리 필요)
+                      </p>
+                    )}
+                    {businessNumber.length === 10 && (
+                      <p className="text-[11px] text-emerald-600">
+                        형식 OK ({formatBusinessNumber(businessNumber)})
+                      </p>
+                    )}
+                    {businessNumber.length > 10 && (
+                      <p className="text-[11px] text-rose-600">
+                        10자리 초과 — 앞 10자리만 사용됩니다
+                      </p>
+                    )}
+                  </div>
+                </FieldRow>
+                <FieldRow label="대표자">
+                  <Input value={ceo} onChange={(e) => setCeo(e.target.value)} />
+                </FieldRow>
+                <FieldRow label="팩스">
+                  <Input
+                    value={formatPhone(fax)}
+                    onChange={(e) => setFax(digitsOnly(e.target.value))}
+                    placeholder="02-0000-0000"
+                  />
+                </FieldRow>
+                <FieldRow label="업태">
+                  <Input
+                    value={businessType}
+                    onChange={(e) => setBusinessType(e.target.value)}
+                    placeholder="제조업, 도매업 등"
+                  />
+                </FieldRow>
+                <FieldRow label="종목">
+                  <Input
+                    value={businessItem}
+                    onChange={(e) => setBusinessItem(e.target.value)}
+                    placeholder="농기계, 부품 등"
+                  />
+                </FieldRow>
+
+                <div className="pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  실무 담당자 (대표 외)
+                </div>
+                <FieldRow label="담당자명">
+                  <Input value={contactName} onChange={(e) => setContactName(e.target.value)} />
+                </FieldRow>
+                <FieldRow label="담당자 전화">
+                  <Input
+                    value={formatPhone(contactPhone)}
+                    onChange={(e) => setContactPhone(digitsOnly(e.target.value))}
+                  />
+                </FieldRow>
+                <FieldRow label="직책">
+                  <Input
+                    value={contactPosition}
+                    onChange={(e) => setContactPosition(e.target.value)}
+                    placeholder="과장, 대리 등"
+                  />
+                </FieldRow>
+              </>
+            )}
+
+            {/* 주소 섹션 */}
+            <div className="pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {isBusiness ? "주소" : "주소"}
+            </div>
+            <FieldRow label={isBusiness ? "사업장 주소" : "주소"}>
               <Input value={address} onChange={(e) => setAddress(e.target.value)} />
             </FieldRow>
+            <FieldRow label="배송지 다름">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShippingDiffers((v) => !v)}
+                  className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors ${
+                    shippingDiffers ? "bg-emerald-500" : "bg-zinc-300"
+                  }`}
+                >
+                  <span
+                    className={`size-5 rounded-full bg-white shadow transition-transform ${
+                      shippingDiffers ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+                <span className="text-[12px] text-muted-foreground">
+                  배송지가 {isBusiness ? "사업장" : "주소"}와 다름
+                </span>
+              </div>
+            </FieldRow>
+            {shippingDiffers && (
+              <FieldRow label="배송지 주소">
+                <Input
+                  value={shippingAddress}
+                  onChange={(e) => setShippingAddress(e.target.value)}
+                  placeholder="물건을 받을 주소"
+                />
+              </FieldRow>
+            )}
+
             <FieldRow label="메모">
               <Input value={memo} onChange={(e) => setMemo(e.target.value)} />
             </FieldRow>

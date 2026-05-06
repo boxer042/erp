@@ -55,6 +55,7 @@ export const repairPartUpdateSchema = z.object({
   unitPrice: z.coerce.number().min(0).optional(),
   discount: z.string().optional(),
   status: z.enum(["USED", "LOST"]).optional(),
+  billLost: z.boolean().optional(),
 });
 
 export type RepairPartUpdateInput = z.infer<typeof repairPartUpdateSchema>;

@@ -12,6 +12,7 @@ import {
   Download,
   Clock,
   Printer,
+  PackageX,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { format, startOfMonth, startOfWeek, startOfYear, subDays } from "date-fns";
@@ -83,6 +84,18 @@ interface ProductStat {
   count: number;
   failures: number;
   failureRate: number;
+  /** 회사 손실 LOST 부속 합계 (billLost=false 분만) */
+  lostCost: number;
+  /** 평균 처리 기간 (PICKED_UP, receivedAt → pickedUpAt) */
+  avgDays: number | null;
+}
+
+interface CategoryStat {
+  categoryId: string | null;
+  categoryName: string;
+  count: number;
+  avgDays: number | null;
+  completedCount: number;
 }
 
 interface AssigneeStat {
@@ -99,12 +112,23 @@ interface Stats {
   cancelled: number;
   byStatus: { status: string; count: number }[];
   byCancelReason: { reason: string | null; count: number }[];
-  byCategory: { categoryId: string | null; categoryName: string; count: number }[];
+  byCategory: CategoryStat[];
   byProduct: ProductStat[];
   avgRepairDays: { avgDays: number | null; completedCount: number };
   revenueByMonth: { month: string; revenue: string; count: number }[];
   byAssignee: AssigneeStat[];
   soldAsProductByMonth: { month: string; count: number }[];
+  lostParts: {
+    /** 회사 부담 LOST 합계 (billLost=false). 청구된 LOST 는 매출이라 별개 */
+    totalCost: number;
+    count: number;
+    byMonth: { month: string; cost: number; count: number }[];
+  };
+  byCustomerType: {
+    type: string;
+    count: number;
+    revenue: number;
+  }[];
 }
 
 type RangePreset = "ALL" | "THIS_WEEK" | "THIS_MONTH" | "THIS_YEAR" | "LAST_30D" | "CUSTOM";
@@ -377,6 +401,13 @@ export default function RepairStatsPage() {
                 }
                 hint={`완료 ${stats.avgRepairDays.completedCount.toLocaleString("ko-KR")}건`}
               />
+              <KpiCard
+                icon={<PackageX className="size-4" />}
+                label="LOST 회사 부담"
+                value={`₩${stats.lostParts.totalCost.toLocaleString("ko-KR")}`}
+                hint={`${stats.lostParts.count.toLocaleString("ko-KR")}개 부속`}
+                tone="danger"
+              />
             </div>
 
             {/* 차트 — 카테고리 막대 + 취소사유 파이 (2열) */}
@@ -458,6 +489,130 @@ export default function RepairStatsPage() {
                       />
                     </LineChart>
                   </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 고객 type 별 수리 분포 + 매출 */}
+            {stats.byCustomerType && stats.byCustomerType.length > 0 && (
+              <Card className="stats-print-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">고객 분류별 수리</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {stats.byCustomerType.map((g) => {
+                      const label =
+                        g.type === "BUSINESS"
+                          ? "기업"
+                          : g.type === "INDIVIDUAL"
+                            ? "개인"
+                            : "미등록";
+                      const tone =
+                        g.type === "BUSINESS"
+                          ? "bg-amber-50 text-amber-900 border-amber-200"
+                          : g.type === "INDIVIDUAL"
+                            ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                            : "bg-zinc-50 text-zinc-700 border-zinc-200";
+                      const totalCount = stats.byCustomerType.reduce(
+                        (s, x) => s + x.count,
+                        0,
+                      );
+                      const pct =
+                        totalCount > 0 ? (g.count / totalCount) * 100 : 0;
+                      return (
+                        <div
+                          key={g.type}
+                          className={`flex flex-col gap-1 rounded-xl border p-3 ${tone}`}
+                        >
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-[12px] font-semibold">
+                              {label}
+                            </span>
+                            <span className="text-[11px] tabular-nums opacity-70">
+                              {pct.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="text-[18px] font-bold tabular-nums">
+                            {g.count.toLocaleString("ko-KR")}건
+                          </div>
+                          {g.revenue > 0 && (
+                            <div className="text-[11px] tabular-nums opacity-70">
+                              매출 ₩{g.revenue.toLocaleString("ko-KR")}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 카테고리별 평균 처리 기간 + 건수 ranking */}
+            <Card className="stats-print-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  카테고리별 평균 처리 기간 — 어떤 카테고리가 빠르게/느리게 끝나는지
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.byCategory.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    데이터 없음
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>카테고리</TableHead>
+                        <TableHead className="text-right">전체 건수</TableHead>
+                        <TableHead className="text-right">완료 건수</TableHead>
+                        <TableHead className="text-right">평균 처리 기간</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.byCategory
+                        .slice()
+                        .sort((a, b) => {
+                          // avgDays 있는 것 먼저, 그 안에서 desc (느린 것이 위로)
+                          if (a.avgDays == null && b.avgDays == null) return 0;
+                          if (a.avgDays == null) return 1;
+                          if (b.avgDays == null) return -1;
+                          return b.avgDays - a.avgDays;
+                        })
+                        .map((c) => (
+                          <TableRow key={c.categoryId ?? "none"}>
+                            <TableCell className="font-medium">
+                              {c.categoryName}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {c.count.toLocaleString("ko-KR")}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                              {c.completedCount.toLocaleString("ko-KR")}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {c.avgDays != null ? (
+                                <span
+                                  className={
+                                    c.avgDays >= 7
+                                      ? "font-semibold text-amber-600"
+                                      : c.avgDays >= 3
+                                        ? "text-foreground"
+                                        : "text-emerald-700"
+                                  }
+                                >
+                                  {c.avgDays.toFixed(1)}일
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>
@@ -579,6 +734,8 @@ export default function RepairStatsPage() {
                         <TableHead className="text-right">수리 건수</TableHead>
                         <TableHead className="text-right">실패</TableHead>
                         <TableHead className="text-right">실패율</TableHead>
+                        <TableHead className="text-right">LOST 회사 부담</TableHead>
+                        <TableHead className="text-right">평균 기간</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -611,6 +768,30 @@ export default function RepairStatsPage() {
                             >
                               {p.failureRate.toFixed(1)}%
                             </span>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {p.lostCost > 0 ? (
+                              <span className="text-rose-600">
+                                ₩{p.lostCost.toLocaleString("ko-KR")}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {p.avgDays != null ? (
+                              <span
+                                className={
+                                  p.avgDays >= 7
+                                    ? "font-semibold text-amber-600"
+                                    : "text-muted-foreground"
+                                }
+                              >
+                                {p.avgDays.toFixed(1)}일
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

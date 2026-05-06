@@ -28,6 +28,55 @@ export default function PosV2HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickRegister, setQuickRegister] = useState<{ defaultText: string } | null>(null);
+  const [gridFilter, setGridFilter] = useState("");
+  const [gridTypeFilter, setGridTypeFilter] = useState<
+    "ALL" | "INDIVIDUAL" | "BUSINESS" | "UNREGISTERED"
+  >("ALL");
+  const [gridSort, setGridSort] = useState<"recent" | "name" | "active">(
+    "recent",
+  );
+
+  // 손님 세션 필터 — 검색어 + type
+  const filteredSessions = sessions
+    .filter((s) => {
+      if (gridTypeFilter === "BUSINESS" && s.customerType !== "BUSINESS") return false;
+      if (gridTypeFilter === "INDIVIDUAL" && s.customerType !== "INDIVIDUAL") return false;
+      if (gridTypeFilter === "UNREGISTERED" && s.customerId) return false;
+      if (gridFilter.trim()) {
+        const q = gridFilter.trim().toLowerCase();
+        const hay = [
+          s.customerName ?? "",
+          s.customerPhone ?? "",
+          s.customerBusinessNumber ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    })
+    .slice() // sort 불변성 위해 복사
+    .sort((a, b) => {
+      if (gridSort === "name") {
+        const an = (a.customerName ?? "").toLowerCase();
+        const bn = (b.customerName ?? "").toLowerCase();
+        // 미등록은 뒤로
+        if (!a.customerId && b.customerId) return 1;
+        if (a.customerId && !b.customerId) return -1;
+        return an.localeCompare(bn, "ko");
+      }
+      if (gridSort === "active") {
+        const ac =
+          (a.openRepairCount ?? 0) +
+          a.items.length;
+        const bc =
+          (b.openRepairCount ?? 0) +
+          b.items.length;
+        return bc - ac;
+      }
+      // recent (default) — server 응답 순서 (updatedAt desc) 유지
+      return 0;
+    });
 
   const goToCustomer = (sessionId: string) => {
     router.push(`/pos/customer/${sessionId}`);
@@ -85,26 +134,123 @@ export default function PosV2HomePage() {
               onSearch={startWithCustomerLink}
             />
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {sessions.map((s) => (
-                <CustomerCard
-                  key={s.id}
-                  session={s}
-                  onClick={() => goToCustomer(s.id)}
-                  onClose={
-                    // 진행중이 없을 때만 닫기 가능
-                    s.items.length === 0 && (s.openRepairCount ?? 0) === 0
-                      ? () => {
-                          if (sessions.length === 1) {
-                            // 마지막 세션은 닫기 대신 미등록으로 초기화 — 일단 단순히 삭제 허용
-                          }
-                          removeSession(s.id);
-                        }
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
+            <>
+              {/* 검색 + type 필터 — 세션 8개 이상일 때만 노출 */}
+              {sessions.length >= 8 && (
+                <div className="mb-3 flex flex-col gap-2">
+                  <div className="relative">
+                    <svg
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                    >
+                      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.6" />
+                      <path d="M14 14l3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                    <input
+                      type="search"
+                      value={gridFilter}
+                      onChange={(e) => setGridFilter(e.target.value)}
+                      placeholder="이름·전화·사업자번호"
+                      className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 text-[14px] outline-none focus:border-zinc-400"
+                    />
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto">
+                    {(
+                      [
+                        { v: "ALL", label: "전체" },
+                        { v: "BUSINESS", label: "기업" },
+                        { v: "INDIVIDUAL", label: "개인" },
+                        { v: "UNREGISTERED", label: "미등록" },
+                      ] as const
+                    ).map((opt) => {
+                      const active = gridTypeFilter === opt.v;
+                      return (
+                        <button
+                          key={opt.v}
+                          type="button"
+                          onClick={() => setGridTypeFilter(opt.v)}
+                          className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                            active
+                              ? "bg-zinc-900 text-white"
+                              : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                    <div className="ml-1 flex shrink-0 gap-1 rounded-full bg-zinc-100 p-0.5">
+                      {(
+                        [
+                          { v: "recent", label: "최근" },
+                          { v: "active", label: "진행중" },
+                          { v: "name", label: "이름순" },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.v}
+                          type="button"
+                          onClick={() => setGridSort(opt.v)}
+                          className={`rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
+                            gridSort === opt.v
+                              ? "bg-white text-zinc-900 shadow-sm"
+                              : "text-zinc-500 hover:text-zinc-900"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    {(gridFilter ||
+                      gridTypeFilter !== "ALL" ||
+                      gridSort !== "recent") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGridFilter("");
+                          setGridTypeFilter("ALL");
+                          setGridSort("recent");
+                        }}
+                        className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium text-zinc-500 hover:text-zinc-900"
+                      >
+                        초기화
+                      </button>
+                    )}
+                  </div>
+                  {filteredSessions.length !== sessions.length && (
+                    <p className="text-[11px] text-zinc-500">
+                      {filteredSessions.length} / {sessions.length} 표시
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {filteredSessions.length === 0 ? (
+                <div className="py-12 text-center text-[13px] text-zinc-500">
+                  조건에 맞는 손님이 없습니다
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {filteredSessions.map((s) => (
+                    <CustomerCard
+                      key={s.id}
+                      session={s}
+                      onClick={() => goToCustomer(s.id)}
+                      onClose={
+                        s.items.length === 0 && (s.openRepairCount ?? 0) === 0
+                          ? () => {
+                              removeSession(s.id);
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <div className="h-28" />
         </div>
@@ -177,7 +323,10 @@ export default function PosV2HomePage() {
           }
           const sid = addSession();
           if (!sid) return;
-          setCustomer(c.id, c.name, c.phone, sid);
+          setCustomer(c.id, c.name, c.phone, sid, {
+            type: c.type,
+            businessNumber: c.businessNumber ?? null,
+          });
           setLinkOpen(false);
           goToCustomer(sid);
         }}
@@ -196,7 +345,10 @@ export default function PosV2HomePage() {
           // 등록 후 즉시 새 세션 + 고객 연결 + 손님 페이지 이동
           const sid = addSession();
           if (!sid) return;
-          setCustomer(c.id, c.name, c.phone, sid);
+          setCustomer(c.id, c.name, c.phone, sid, {
+            type: c.type,
+            businessNumber: c.businessNumber ?? null,
+          });
           setQuickRegister(null);
           goToCustomer(sid);
         }}

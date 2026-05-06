@@ -10,6 +10,8 @@ export interface ProductLite {
   brand: string | null;
   spec: string | null;
   sellingPrice: string;
+  /** 공식 판매 정가(세전) — 가격 다이얼로그에서 입력가와 비교해 할인/인상 표시 */
+  listPrice?: string;
   imageUrl: string | null;
   taxType: string;
   zeroRateEligible?: boolean;

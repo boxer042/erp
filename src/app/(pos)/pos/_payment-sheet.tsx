@@ -15,6 +15,7 @@ import {
   deriveTempColor,
 } from "@/components/pos/temp-customer";
 import { BottomSheet } from "./_components/bottom-sheet";
+import { issueStatement, openPrintTab } from "./_issue-document";
 
 type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
 const METHODS: { value: PaymentMethod; label: string; sub?: string }[] = [
@@ -28,8 +29,8 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   session: CartSession;
-  /** 결제 후 라벨 인쇄 모달 띄움 — 부모가 받아서 처리 */
-  onPrintLabels: (codes: string[]) => void;
+  /** 결제 후 라벨 인쇄 모달 띄움 — 부모가 받아서 처리. afterPayment=true 로 호출 (닫으면 손님 그리드 이동). */
+  onPrintLabels: (codes: string[], options?: { afterPayment?: boolean }) => void;
   /** 손님 썸네일 카드 클릭 — 부모가 CustomerActionSheet 띄우도록 (재사용) */
   onCustomerClick?: () => void;
   /** 좌상단 뒤로가기 — 부모가 카트 시트로 복귀시킴 */
@@ -61,9 +62,23 @@ function CustomerCard({
       </span>
       <div className="flex min-w-0 items-center gap-2.5">
         {isRegistered ? (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
-            {(session.customerName ?? "?").charAt(0)}
-          </div>
+          session.customerType === "BUSINESS" ? (
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+          ) : (
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[15px] font-bold text-zinc-700">
+              {(session.customerName ?? "?").charAt(0)}
+            </div>
+          )
         ) : (
           <div
             className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
@@ -76,14 +91,26 @@ function CustomerCard({
         <div className="flex min-w-0 flex-1 flex-col">
           {isRegistered ? (
             <>
-              <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
-                {session.customerName}
-              </span>
-              {session.customerPhone && (
+              <div className="flex items-center gap-1">
+                {session.customerType === "BUSINESS" && (
+                  <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                    기업
+                  </span>
+                )}
+                <span className="line-clamp-1 text-[14px] font-semibold text-zinc-900">
+                  {session.customerName}
+                </span>
+              </div>
+              {session.customerType === "BUSINESS" &&
+              session.customerBusinessNumber ? (
+                <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
+                  {session.customerBusinessNumber}
+                </span>
+              ) : session.customerPhone ? (
                 <span className="line-clamp-1 font-mono text-[11px] text-zinc-500">
                   {session.customerPhone}
                 </span>
-              )}
+              ) : null}
             </>
           ) : (
             <>
@@ -214,6 +241,8 @@ function Body({
   const [method, setMethod] = useState<PaymentMethod>("CARD");
   // 손님 등록 우회 — "이 손님은 등록 없이 진행" 클릭 시 true. 통계 데이터 안 쌓이는 단점 있음.
   const [skipCustomerLink, setSkipCustomerLink] = useState(false);
+  // 세금계산서 발행 요청 — Order.taxInvoiceRequested 로 저장 (사장님이 추후 발행)
+  const [taxInvoiceRequested, setTaxInvoiceRequested] = useState(false);
   // 결제시간 — 시트가 열린 순간 고정. Body 가 마운트될 때마다 새로 계산.
   const [paymentAt] = useState(() => new Date());
 
@@ -231,6 +260,11 @@ function Body({
   const requiresCustomer = hasRentalOrRepair && needsCustomer;
   const requiresCustomerForUnpaid =
     method === "UNPAID" && !session.customerId && !skipCustomerLink;
+  // 변형 미확정 라인 — canonical 그대로 결제 불가 (사용자 정책)
+  const unresolvedVariants = session.items.filter(
+    (i) => i.isCanonical && i.productId,
+  );
+  const hasUnresolvedVariant = unresolvedVariants.length > 0;
 
   const checkoutMutation = useMutation<
     { id: string; no: string; labelCodes: string[] },
@@ -242,6 +276,11 @@ function Body({
       }
       if (method === "UNPAID" && !session.customerId && !skipCustomerLink) {
         throw new Error("외상은 고객 연결이 필요합니다");
+      }
+      if (hasUnresolvedVariant) {
+        throw new Error(
+          `변형 미확정 라인 ${unresolvedVariants.length}건 — 카트에서 먼저 변형을 선택하세요`,
+        );
       }
 
       // 1) 라벨 자동 발번 (trackable 상품에 한해)
@@ -277,10 +316,11 @@ function Body({
       const result = await submitCheckout(sessionForCheckout, {
         action: "order",
         paymentMethod: method,
+        taxInvoiceRequested,
       });
       return { ...result, labelCodes };
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       // 외상 결제는 미수금 자동 등록됐다는 명시적 안내
       if (method === "UNPAID") {
         toast.success(`외상 등록 — ${data.no}`, {
@@ -298,9 +338,19 @@ function Body({
       } catch {
         /* 팝업 차단 — silent */
       }
-      // 라벨 있으면 인쇄 모달 띄움 (영수증과 별도)
+      // 거래명세표 자동 발행 — 등록 고객일 때만 (사업자/B2B 증빙용)
+      // 미등록 손님은 영수증으로 충분하므로 발행 생략 (스팸 방지)
+      if (session.customerId) {
+        try {
+          const stmt = await issueStatement({ ...session, items: allItems });
+          openPrintTab("statements", stmt.id);
+        } catch {
+          /* 거래명세표 실패해도 결제는 완료됨 — silent */
+        }
+      }
+      // 라벨 있으면 인쇄 모달 띄움 (영수증과 별도) — 결제 직후 → afterPayment=true
       if (data.labelCodes.length > 0) {
-        onPrintLabels(data.labelCodes);
+        onPrintLabels(data.labelCodes, { afterPayment: true });
       }
       // 카트 클리어 + 손님 그리드로 이동
       clear(session.id);
@@ -329,7 +379,8 @@ function Body({
             checkoutMutation.isPending ||
             allItems.length === 0 ||
             requiresCustomer ||
-            requiresCustomerForUnpaid
+            requiresCustomerForUnpaid ||
+            hasUnresolvedVariant
           }
           className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
         >
@@ -444,6 +495,46 @@ function Body({
                 고객 등록 시 구매 이력·통계가 자동 누적됩니다
               </p>
             )}
+
+          {/* 변형 미확정 — 결제 차단 안내 */}
+          {hasUnresolvedVariant && (
+            <div className="rounded-xl bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
+              ⚠ 변형 미확정 <strong>{unresolvedVariants.length}건</strong> — 카트로 돌아가 변형을 선택해주세요
+            </div>
+          )}
+
+          {/* 세금계산서 요청 토글 — 등록 고객일 때만 (사업자번호 등 기록 필요) */}
+          {session.customerId && (
+            <button
+              type="button"
+              onClick={() => setTaxInvoiceRequested((v) => !v)}
+              className={`flex items-center justify-between rounded-xl px-4 py-3 text-left transition-colors ${
+                taxInvoiceRequested
+                  ? "bg-emerald-50 ring-1 ring-emerald-300"
+                  : "bg-zinc-50 hover:bg-zinc-100"
+              }`}
+            >
+              <div className="flex flex-col">
+                <span className="text-[13px] font-semibold text-zinc-900">
+                  세금계산서 발행 요청
+                </span>
+                <span className="text-[11px] text-zinc-500">
+                  결제 후 사장님이 별도 발행
+                </span>
+              </div>
+              <span
+                className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors ${
+                  taxInvoiceRequested ? "bg-emerald-500" : "bg-zinc-300"
+                }`}
+              >
+                <span
+                  className={`size-5 rounded-full bg-white shadow transition-transform ${
+                    taxInvoiceRequested ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </span>
+            </button>
+          )}
         </div>
 
         {method === "UNPAID" && session.customerId && (

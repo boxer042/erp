@@ -135,7 +135,7 @@ interface QuotationSheetProps {
   onOpenChange: (v: boolean) => void;
   type: QuotationType;
   editData?: QuotationFormData | null;
-  onSaved: (id: string) => void;
+  onSaved: (id: string, quotationNo?: string) => void;
 }
 
 export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: QuotationSheetProps) {
@@ -266,9 +266,10 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
       }
       const saved = await res.json().catch(() => null);
       const savedId = isEdit ? editData!.id! : saved?.id;
+      const savedNo: string | undefined = saved?.quotationNo;
       toast.success(isEdit ? "견적서가 수정되었습니다" : "견적서가 등록되었습니다");
       onOpenChange(false);
-      onSaved(savedId);
+      onSaved(savedId, savedNo);
     } catch {
       toast.error("오류가 발생했습니다");
     } finally {

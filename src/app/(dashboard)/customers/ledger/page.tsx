@@ -55,6 +55,7 @@ interface LedgerEntry {
 interface CustomerSummary {
   customerId: string;
   customerName: string;
+  customerType?: "INDIVIDUAL" | "BUSINESS";
   currentBalance: number;
   openingBalance: number;
   totalSale: number;
@@ -394,9 +395,16 @@ export default function CustomerLedgerPage() {
                     onClick={() => setSelectedCustomerId(c.customerId)}
                     className={cn("px-3 py-2.5 border-b border-border cursor-pointer transition-colors", selectedCustomerId === c.customerId ? "bg-muted" : "hover:bg-muted/50")}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm truncate">{c.customerName}</span>
-                      <span className={cn("text-xs tabular-nums", balColor)}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {c.customerType === "BUSINESS" && (
+                          <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                            기업
+                          </span>
+                        )}
+                        <span className="text-sm truncate">{c.customerName}</span>
+                      </div>
+                      <span className={cn("text-xs tabular-nums shrink-0", balColor)}>
                         ₩{formatAmount(bal)}
                       </span>
                     </div>

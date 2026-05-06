@@ -22,6 +22,7 @@ function CustomersSkeletonRows({ rows = 8 }: { rows?: number }) {
     <>
       {Array.from({ length: rows }).map((_, i) => (
         <TableRow key={i}>
+          <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-4 w-32" /></TableCell>
           <TableCell><Skeleton className="h-4 w-28" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -37,12 +38,20 @@ function CustomersSkeletonRows({ rows = 8 }: { rows?: number }) {
 
 interface Customer {
   id: string;
+  type: "INDIVIDUAL" | "BUSINESS";
   name: string;
   phone: string;
   businessNumber: string | null;
   ceo: string | null;
+  fax: string | null;
+  businessType: string | null;
+  businessItem: string | null;
   email: string | null;
   address: string | null;
+  shippingAddress: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactPosition: string | null;
   memo: string | null;
   isActive: boolean;
 }
@@ -79,12 +88,20 @@ export default function CustomersPage() {
   const openEdit = (c: Customer) => {
     setEditData({
       id: c.id,
+      type: c.type,
       name: c.name,
       phone: c.phone,
       businessNumber: c.businessNumber || "",
       ceo: c.ceo || "",
+      fax: c.fax || "",
+      businessType: c.businessType || "",
+      businessItem: c.businessItem || "",
       email: c.email || "",
       address: c.address || "",
+      shippingAddress: c.shippingAddress || "",
+      contactName: c.contactName || "",
+      contactPhone: c.contactPhone || "",
+      contactPosition: c.contactPosition || "",
       memo: c.memo || "",
     });
     setSheetOpen(true);
@@ -116,7 +133,8 @@ export default function CustomersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>고객명</TableHead>
+                <TableHead className="w-[80px]">구분</TableHead>
+                <TableHead>고객명/상호</TableHead>
                 <TableHead>연락처</TableHead>
                 <TableHead>사업자번호</TableHead>
                 <TableHead>대표자</TableHead>
@@ -130,11 +148,18 @@ export default function CustomersPage() {
                 <CustomersSkeletonRows />
               ) : customers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">등록된 고객이 없습니다</TableCell>
+                  <TableCell colSpan={8} className="text-center py-8">등록된 고객이 없습니다</TableCell>
                 </TableRow>
               ) : (
                 customers.map((c) => (
                   <TableRow key={c.id}>
+                    <TableCell>
+                      <Badge
+                        variant={c.type === "BUSINESS" ? "default" : "secondary"}
+                      >
+                        {c.type === "BUSINESS" ? "기업" : "개인"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell>{formatPhone(c.phone)}</TableCell>
                     <TableCell>{c.businessNumber ? formatBusinessNumber(c.businessNumber) : "-"}</TableCell>

@@ -167,6 +167,45 @@ export async function POST(request: NextRequest) {
   });
   const productMap = new Map(products.map((p) => [p.id, p]));
 
+  // 중복 픽업/반납 idempotency — 같은 RepairTicket / Rental 에 이미 non-CANCELLED Order 가 있으면 차단.
+  // schema 가 unique 가 아니라서 race condition 으로 두 번째 결제 요청이 통과될 수 있음 → 명시적 가드.
+  if (body.repairTicketId) {
+    const existingOrder = await prisma.order.findFirst({
+      where: {
+        repairTicketId: body.repairTicketId,
+        status: { not: "CANCELLED" },
+      },
+      select: { id: true, orderNo: true },
+    });
+    if (existingOrder) {
+      return NextResponse.json(
+        {
+          error: `이 수리는 이미 결제됐습니다 (${existingOrder.orderNo})`,
+          existing: existingOrder,
+        },
+        { status: 409 },
+      );
+    }
+  }
+  if (body.rentalId) {
+    const existingOrder = await prisma.order.findFirst({
+      where: {
+        rentalId: body.rentalId,
+        status: { not: "CANCELLED" },
+      },
+      select: { id: true, orderNo: true },
+    });
+    if (existingOrder) {
+      return NextResponse.json(
+        {
+          error: `이 임대는 이미 결제됐습니다 (${existingOrder.orderNo})`,
+          existing: existingOrder,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.create({

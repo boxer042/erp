@@ -17,6 +17,11 @@ interface Props {
   /** 영세율 적용 여부 (taxType=TAXABLE 일 때만 의미) */
   isZeroRate?: boolean;
   title?: string;
+  /**
+   * 정가(세전 공급가액) — 입력값과 비교하여 할인/인상 차이를 표시한다.
+   * 미지정 시 비교 영역은 렌더링하지 않음. 0 이하도 무시.
+   */
+  originalPrice?: number;
   /** 저장 시 호출 — 항상 공급가액(세전) 으로 반환 */
   onSubmit: (net: number) => void;
 }
@@ -41,6 +46,7 @@ function Body({
   taxType,
   isZeroRate,
   title = "가격 입력",
+  originalPrice,
   onSubmit,
 }: Props) {
   const taxApplies = taxType === "TAXABLE" && !isZeroRate;
@@ -72,6 +78,21 @@ function Body({
   };
 
   const finalNet = parseInt(net.replace(/,/g, ""), 10) || 0;
+
+  // 정가 비교 — originalPrice(listPrice) 가 있을 때만. 없으면 비교 영역 안 보여줌.
+  const hasOriginal = !!originalPrice && originalPrice > 0;
+  const diff = hasOriginal ? finalNet - (originalPrice as number) : 0;
+  const diffPercent = hasOriginal && originalPrice
+    ? Math.round((diff / originalPrice) * 1000) / 10
+    : 0;
+  const canResetToOriginal = hasOriginal && finalNet !== originalPrice;
+
+  const resetToOriginal = () => {
+    if (!hasOriginal) return;
+    const orig = originalPrice as number;
+    setNet(String(orig));
+    setGross(String(taxApplies ? Math.round(orig * (1 + TAX_RATE)) : orig));
+  };
 
   return (
     <BottomSheet
@@ -125,6 +146,65 @@ function Body({
             className="h-14 w-full rounded-2xl border-2 border-zinc-200 bg-white px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-zinc-900"
           />
         </Field>
+
+        {/* 정가 비교 — 할인/인상 표시 + 정가복원 버튼 */}
+        {hasOriginal && (
+          <div className="flex flex-col gap-2">
+            <div
+              className={`flex items-center justify-between rounded-2xl px-4 py-3 ${
+                diff < 0
+                  ? "bg-emerald-50"
+                  : diff > 0
+                    ? "bg-rose-50"
+                    : "bg-zinc-50"
+              }`}
+            >
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  정가 (세전)
+                </span>
+                <span className="text-[14px] font-semibold tabular-nums text-zinc-700">
+                  ₩{(originalPrice as number).toLocaleString("ko-KR")}
+                </span>
+              </div>
+              {diff === 0 ? (
+                <span className="text-[12px] font-medium text-zinc-500">
+                  정가와 동일
+                </span>
+              ) : (
+                <div className="flex flex-col items-end">
+                  <span
+                    className={`text-[14px] font-bold tabular-nums ${
+                      diff < 0 ? "text-emerald-700" : "text-rose-700"
+                    }`}
+                  >
+                    {diff < 0 ? "−" : "+"}₩
+                    {Math.abs(diff).toLocaleString("ko-KR")}
+                  </span>
+                  <span
+                    className={`text-[11px] font-medium tabular-nums ${
+                      diff < 0 ? "text-emerald-600" : "text-rose-600"
+                    }`}
+                  >
+                    {diff < 0
+                      ? `${Math.abs(diffPercent).toFixed(1)}% 할인`
+                      : `${diffPercent.toFixed(1)}% 인상`}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {canResetToOriginal && (
+              <button
+                type="button"
+                onClick={resetToOriginal}
+                className="h-10 rounded-xl bg-zinc-100 text-[12px] font-semibold text-zinc-700 transition-colors active:bg-zinc-200"
+              >
+                정가로 초기화
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </BottomSheet>
   );

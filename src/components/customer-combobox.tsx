@@ -7,6 +7,7 @@ interface Customer {
   name: string;
   phone?: string | null;
   businessNumber?: string | null;
+  type?: "INDIVIDUAL" | "BUSINESS";
 }
 
 interface CustomerComboboxProps {
@@ -51,10 +52,17 @@ export function CustomerCombobox({
       onClear={() => onChange("", EMPTY_CUSTOMER)}
       renderItem={(c) => (
         <>
-          <span>{c.name}</span>
-          {c.phone && (
-            <span className="ml-auto text-xs text-muted-foreground">{c.phone}</span>
+          {c.type === "BUSINESS" && (
+            <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+              기업
+            </span>
           )}
+          <span>{c.name}</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {c.type === "BUSINESS" && c.businessNumber
+              ? c.businessNumber
+              : c.phone}
+          </span>
         </>
       )}
     />

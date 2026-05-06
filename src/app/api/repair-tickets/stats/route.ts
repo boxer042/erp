@@ -55,6 +55,12 @@ export async function GET(request: NextRequest) {
     revenueByMonth,
     byAssignee,
     soldAsProductByMonth,
+    lostPartsCostTotal,
+    lostPartsCostByMonth,
+    lostPartsCostByProduct,
+    avgDaysByCategory,
+    avgDaysByProduct,
+    byCustomerType,
   ] = await Promise.all([
     prisma.repairTicket.count({ where: dateFilter }),
     prisma.repairTicket.groupBy({
@@ -130,7 +136,100 @@ export async function GET(request: NextRequest) {
       ORDER BY 1 DESC
       LIMIT 12
     `,
+    // LOST 부속 — 회사 손실(billLost=false) 만 합산. 청구된(billLost=true) 분은 매출이라 제외.
+    prisma.$queryRaw<{ total_cost: string | null; count: bigint }[]>`
+      SELECT
+        SUM(rp.total_price)::text AS total_cost,
+        COUNT(*)::bigint AS count
+      FROM repair_parts rp
+      JOIN repair_tickets rt ON rt.id = rp.repair_ticket_id
+      WHERE rp.status = 'LOST' AND rp.bill_lost = false
+      ${fromSql}
+      ${toSql}
+    `,
+    // LOST 회사 손실 월별 — 추세 시각화용
+    prisma.$queryRaw<{ month: string; cost: string | null; count: bigint }[]>`
+      SELECT TO_CHAR(DATE_TRUNC('month', rt.received_at), 'YYYY-MM') AS month,
+             SUM(rp.total_price)::text AS cost,
+             COUNT(*)::bigint AS count
+      FROM repair_parts rp
+      JOIN repair_tickets rt ON rt.id = rp.repair_ticket_id
+      WHERE rp.status = 'LOST' AND rp.bill_lost = false
+      ${fromSql}
+      ${toSql}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `,
+    // 상품별 LOST 회사 손실 — billLost=false 분만
+    prisma.$queryRaw<{ repair_product_id: string | null; lost_cost: string | null }[]>`
+      SELECT rt.repair_product_id,
+             SUM(rp.total_price)::text AS lost_cost
+      FROM repair_parts rp
+      JOIN repair_tickets rt ON rt.id = rp.repair_ticket_id
+      WHERE rp.status = 'LOST' AND rp.bill_lost = false AND rt.repair_product_id IS NOT NULL
+      ${fromSql}
+      ${toSql}
+      GROUP BY 1
+    `,
+    // 카테고리별 평균 처리 기간 + 완료 건수 — 어떤 카테고리가 빠르게/느리게 처리되는지
+    prisma.$queryRaw<{ repair_category_id: string | null; avg_days: number | null; count: bigint }[]>`
+      SELECT rt.repair_category_id,
+             AVG(EXTRACT(EPOCH FROM (rt.picked_up_at - rt.received_at)) / 86400) AS avg_days,
+             COUNT(*)::bigint AS count
+      FROM repair_tickets rt
+      WHERE rt.status = 'PICKED_UP' AND rt.picked_up_at IS NOT NULL
+      ${fromSql}
+      ${toSql}
+      GROUP BY 1
+    `,
+    // 상품별 평균 처리 기간 — byProduct 와 join 용
+    prisma.$queryRaw<{ repair_product_id: string | null; avg_days: number | null }[]>`
+      SELECT rt.repair_product_id,
+             AVG(EXTRACT(EPOCH FROM (rt.picked_up_at - rt.received_at)) / 86400) AS avg_days
+      FROM repair_tickets rt
+      WHERE rt.status = 'PICKED_UP' AND rt.picked_up_at IS NOT NULL AND rt.repair_product_id IS NOT NULL
+      ${fromSql}
+      ${toSql}
+      GROUP BY 1
+    `,
+    // 고객 type 별 수리 분포 — INDIVIDUAL / BUSINESS / UNREGISTERED
+    prisma.$queryRaw<{ type: string; count: bigint; revenue: string | null }[]>`
+      SELECT
+        COALESCE(c.type::text, 'UNREGISTERED') AS type,
+        COUNT(*)::bigint AS count,
+        SUM(CASE WHEN rt.status = 'PICKED_UP' THEN rt.final_amount ELSE 0 END)::text AS revenue
+      FROM repair_tickets rt
+      LEFT JOIN customers c ON c.id = rt.customer_id
+      WHERE 1=1 ${fromSql} ${toSql}
+      GROUP BY 1
+      ORDER BY COUNT(*) DESC
+    `,
   ]);
+
+  // 상품별 LOST 손실 lookup
+  const lostCostByProductId = new Map<string, number>();
+  for (const r of lostPartsCostByProduct) {
+    if (r.repair_product_id) {
+      lostCostByProductId.set(
+        r.repair_product_id,
+        Number(r.lost_cost ?? 0),
+      );
+    }
+  }
+  // 카테고리/상품별 평균 처리 기간 lookup
+  const avgDaysByCategoryId = new Map<string | null, { avgDays: number | null; count: number }>();
+  for (const r of avgDaysByCategory) {
+    avgDaysByCategoryId.set(r.repair_category_id, {
+      avgDays: r.avg_days != null ? Number(r.avg_days) : null,
+      count: Number(r.count),
+    });
+  }
+  const avgDaysByProductId = new Map<string, number>();
+  for (const r of avgDaysByProduct) {
+    if (r.repair_product_id && r.avg_days != null) {
+      avgDaysByProductId.set(r.repair_product_id, Number(r.avg_days));
+    }
+  }
 
   // 담당자 이름 lookup
   const assigneeIds = byAssignee
@@ -202,19 +301,30 @@ export async function GET(request: NextRequest) {
       reason: g.cancelReason,
       count: g._count,
     })),
-    byCategory: byCategory.map((g) => ({
-      categoryId: g.repairCategoryId,
-      categoryName: g.repairCategoryId
-        ? (categoryName.get(g.repairCategoryId) ?? "삭제된 카테고리")
-        : "기타",
-      count: g._count,
-    })),
+    byCategory: byCategory.map((g) => {
+      const avg = avgDaysByCategoryId.get(g.repairCategoryId);
+      return {
+        categoryId: g.repairCategoryId,
+        categoryName: g.repairCategoryId
+          ? (categoryName.get(g.repairCategoryId) ?? "삭제된 카테고리")
+          : "기타",
+        count: g._count,
+        avgDays: avg?.avgDays ?? null,
+        completedCount: avg?.count ?? 0,
+      };
+    }),
     byProduct: byProduct
       .map((g) => {
         const p = g.repairProductId ? productLookup.get(g.repairProductId) : null;
         const failures = g.repairProductId
           ? (failureCount.get(g.repairProductId) ?? 0)
           : 0;
+        const lostCost = g.repairProductId
+          ? (lostCostByProductId.get(g.repairProductId) ?? 0)
+          : 0;
+        const avgDays = g.repairProductId
+          ? (avgDaysByProductId.get(g.repairProductId) ?? null)
+          : null;
         return {
           productId: g.repairProductId,
           productName: p?.name ?? "(상품 정보 없음)",
@@ -222,6 +332,8 @@ export async function GET(request: NextRequest) {
           count: g._count,
           failures,
           failureRate: g._count > 0 ? (failures / g._count) * 100 : 0,
+          lostCost,
+          avgDays,
         };
       })
       .filter((p) => !!p.productId),
@@ -249,6 +361,21 @@ export async function GET(request: NextRequest) {
     soldAsProductByMonth: soldAsProductByMonth.map((r) => ({
       month: r.month,
       count: Number(r.count),
+    })),
+    // LOST 부속 손실 — 수리 실패로 매장이 부담한 부속 비용
+    lostParts: {
+      totalCost: Number(lostPartsCostTotal[0]?.total_cost ?? 0),
+      count: Number(lostPartsCostTotal[0]?.count ?? 0),
+      byMonth: lostPartsCostByMonth.map((r) => ({
+        month: r.month,
+        cost: Number(r.cost ?? 0),
+        count: Number(r.count),
+      })),
+    },
+    byCustomerType: byCustomerType.map((r) => ({
+      type: r.type,
+      count: Number(r.count),
+      revenue: Number(r.revenue ?? 0),
     })),
   });
 }

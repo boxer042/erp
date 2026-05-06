@@ -59,6 +59,7 @@ interface CompanyInfoData {
   businessType: string | null;
   businessItem: string | null;
   defaultRepairWarrantyMonths: number | null;
+  defaultDiagnosisFee: string | number | null;
   bankAccounts: BankAccount[];
 }
 
@@ -72,6 +73,7 @@ const emptyCompanyForm = {
   businessType: "",
   businessItem: "",
   defaultRepairWarrantyMonths: "",
+  defaultDiagnosisFee: "",
 };
 
 const emptyBankForm = {
@@ -109,6 +111,10 @@ export default function SettingsPage() {
           companyQuery.data.defaultRepairWarrantyMonths != null
             ? String(companyQuery.data.defaultRepairWarrantyMonths)
             : "",
+        defaultDiagnosisFee:
+          companyQuery.data.defaultDiagnosisFee != null
+            ? String(companyQuery.data.defaultDiagnosisFee)
+            : "",
       });
     }
   }, [companyQuery.data, companyDirty]);
@@ -119,6 +125,12 @@ export default function SettingsPage() {
         ...companyForm,
         defaultRepairWarrantyMonths: companyForm.defaultRepairWarrantyMonths
           ? parseInt(companyForm.defaultRepairWarrantyMonths, 10)
+          : null,
+        defaultDiagnosisFee: companyForm.defaultDiagnosisFee
+          ? parseInt(
+              companyForm.defaultDiagnosisFee.replace(/[^\d]/g, ""),
+              10,
+            )
           : null,
       }),
     onSuccess: () => {
@@ -336,6 +348,18 @@ export default function SettingsPage() {
                 setCompanyField("defaultRepairWarrantyMonths", v.replace(/\D/g, ""))
               }
               placeholder="예: 1"
+            />
+            <CompanyField
+              label="진단비 기본값 (₩)"
+              value={
+                companyForm.defaultDiagnosisFee
+                  ? Number(companyForm.defaultDiagnosisFee).toLocaleString("ko-KR")
+                  : ""
+              }
+              onChange={(v) =>
+                setCompanyField("defaultDiagnosisFee", v.replace(/\D/g, ""))
+              }
+              placeholder="예: 10,000"
             />
             <div className="md:col-span-2">
               <CompanyField label="주소" value={companyForm.address} onChange={(v) => setCompanyField("address", v)} />

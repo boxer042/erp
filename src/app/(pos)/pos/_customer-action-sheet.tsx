@@ -8,7 +8,10 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   session: CartSession;
+  /** "기존 고객 연결" / "다른 고객으로 변경" — 검색 시트를 연다 */
   onLinkCustomer: () => void;
+  /** "새 고객 등록" — 검색 건너뛰고 등록 시트 바로. 미지정 시 onLinkCustomer 폴백. */
+  onCreateCustomer?: () => void;
 }
 
 /**
@@ -24,6 +27,7 @@ export function CustomerActionSheet({
   onOpenChange,
   session,
   onLinkCustomer,
+  onCreateCustomer,
 }: Props) {
   if (!open) return null;
   return (
@@ -31,6 +35,7 @@ export function CustomerActionSheet({
       onOpenChange={onOpenChange}
       session={session}
       onLinkCustomer={onLinkCustomer}
+      onCreateCustomer={onCreateCustomer}
     />
   );
 }
@@ -39,6 +44,7 @@ function Body({
   onOpenChange,
   session,
   onLinkCustomer,
+  onCreateCustomer,
 }: Omit<Props, "open">) {
   const router = useRouter();
   const isRegistered = !!session.customerId;
@@ -65,9 +71,8 @@ function Body({
               desc={`${session.customerName} — 구매·수리·임대 이력`}
               onClick={() => {
                 close();
-                // 고객 상세 페이지는 v2 가 아직 미구현 — dashboard 고객 목록으로 fallback
                 if (session.customerId) {
-                  router.push(`/customers`);
+                  router.push(`/pos/customer-profile/${session.customerId}`);
                 }
               }}
             />
@@ -111,7 +116,7 @@ function Body({
               desc="이름·전화 입력 후 즉시 매핑"
               onClick={() => {
                 close();
-                onLinkCustomer();
+                (onCreateCustomer ?? onLinkCustomer)();
               }}
             />
           </>

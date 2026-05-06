@@ -8,6 +8,8 @@ export interface ProductOption {
   name: string;
   sku: string;
   sellingPrice: string;
+  /** 공식 판매 정가(세전) — 카트 라인 정가 비교에 사용 */
+  listPrice?: string;
   unitCost: string | null;
   /** 분해 — 공급단가 (환산 후, 세전) */
   supplierUnitPrice?: string | number;

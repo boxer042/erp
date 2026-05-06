@@ -29,6 +29,8 @@ export interface CartItem {
   sku?: string;
   imageUrl: string | null;
   unitPrice: number;
+  /** 정가(세전) — 가격 다이얼로그에서 입력가와 비교용. 미지정 시 비교 영역 안 보여줌. */
+  listPrice?: number;
   quantity: number;
   discount: string; // "1000" 또는 "10%"
   taxType?: "TAXABLE" | "TAX_FREE";
@@ -47,6 +49,10 @@ export interface CartSession {
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
+  /** 고객 타입 — 기업이면 상호 강조 등 UI 분기용. 미설정 시 INDIVIDUAL 로 취급. */
+  customerType?: "INDIVIDUAL" | "BUSINESS";
+  /** 기업 고객일 때 사업자번호 — 카트 헤더/결제시트 등 표시용 */
+  customerBusinessNumber?: string | null;
   items: CartItem[];
   totalDiscount: string; // "1000" 또는 "10%" — 세션 전체 할인
   shippingCost: string;  // 세전 공급가액 기준, 정수 문자열
@@ -84,7 +90,13 @@ interface SessionsContextValue {
   updateRentalDates: (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number, sessionId?: string) => void;
   assignVariant: (cartItemId: string, variant: { productId: string; name: string; sku?: string; unitPrice: number }, sessionId?: string) => void;
   toggleZeroRate: (cartItemId: string, sessionId?: string) => void;
-  setCustomer: (id: string, name: string, phone?: string, sessionId?: string) => void;
+  setCustomer: (
+    id: string,
+    name: string,
+    phone?: string,
+    sessionId?: string,
+    extras?: { type?: "INDIVIDUAL" | "BUSINESS"; businessNumber?: string | null },
+  ) => void;
   clearCustomer: (sessionId?: string) => void;
   setSessionDiscount: (discount: string, sessionId?: string) => void;
   setSessionShipping: (amount: string, sessionId?: string) => void;
@@ -334,7 +346,12 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
                 ...s,
                 items: s.items.map((p) =>
                   p.productId === it.productId
-                    ? { ...p, quantity: p.quantity + (it.quantity ?? 1) }
+                    ? {
+                        ...p,
+                        quantity: p.quantity + (it.quantity ?? 1),
+                        // backfill — 구버전 라인은 listPrice 가 없을 수 있음. 새 데이터 들어오면 채움.
+                        listPrice: p.listPrice ?? it.listPrice,
+                      }
                     : p
                 ),
               };
@@ -352,6 +369,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
                 sku: it.sku,
                 imageUrl: it.imageUrl,
                 unitPrice: it.unitPrice,
+                listPrice: it.listPrice,
                 quantity: it.quantity ?? 1,
                 discount: "0",
                 taxType: it.taxType,
@@ -495,7 +513,13 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setCustomer = useCallback(
-    (id: string, name: string, phone?: string, sessionId?: string) => {
+    (
+      id: string,
+      name: string,
+      phone?: string,
+      sessionId?: string,
+      extras?: { type?: "INDIVIDUAL" | "BUSINESS"; businessNumber?: string | null },
+    ) => {
       const targetId = sessionId ?? activeId;
       let ticketIdsToUpgrade: string[] = [];
       mutateSessions((prev) =>
@@ -507,6 +531,8 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
             customerId: id,
             customerName: name,
             customerPhone: phone,
+            customerType: extras?.type,
+            customerBusinessNumber: extras?.businessNumber ?? null,
           };
         })
       );
