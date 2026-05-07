@@ -10,9 +10,12 @@ import {
   CheckCircle2,
   MapPin,
   Package,
+  PackageCheck,
+  PackageOpen,
   Pencil,
   Phone,
   Printer,
+  Search,
   StickyNote,
   ThumbsDown,
   Truck,
@@ -89,7 +92,8 @@ function isEditable(status: OrderStatus) {
 }
 
 /**
- * 반품 액션 — 손님 요청 → 매장 결정(수락/반려) → 회수 후 종결(환불 또는 교환).
+ * 반품/교환 액션 — 5단계 흐름:
+ *   요청 → 매장 결정(수락/반려) → 회수 → 검수 → 종결(환불/교환)
  * 즉시 반품(COMPLETED→RETURNED)은 매장 즉석 처리용 단축 경로.
  */
 type ReturnAction =
@@ -97,7 +101,10 @@ type ReturnAction =
   | "accept_return"
   | "reject_return"
   | "cancel_return_request"
+  | "collect_return"
+  | "inspect_return"
   | "return"
+  | "refund"
   | "exchange";
 
 interface OrderDetail {
@@ -379,21 +386,26 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     mutationFn: (
       action:
         | "prepare"
+        | "pack"
         | "complete"
         | "cancel"
         | ReturnAction,
     ) => apiMutate(`/api/orders/${orderId}`, "PUT", { action }),
     onSuccess: (_data, action) => {
       const labels: Record<string, string> = {
-        prepare: "준비 시작 — 재고가 차감되었습니다",
-        complete: "주문이 완료되었습니다",
-        cancel: "주문이 취소되었습니다 (재고·환불 복원)",
-        request_return: "반품 요청 접수 — 매장 결정 대기",
-        accept_return: "반품 수락됨 — 회수 대기 상태입니다",
-        reject_return: "반품 요청을 반려했습니다",
-        cancel_return_request: "반품 요청을 취소했습니다",
-        return: "반품 처리 완료 — 재고 복원·환불되었습니다",
-        exchange: "교환 처리 완료 — 재고 복원, 차액은 새 주문에서 정산하세요",
+        prepare: "출고대기 — 재고 차감",
+        pack: "출고확정 — 송장 발급 후 발송 처리",
+        complete: "배송완료",
+        cancel: "주문 취소 — 재고·결제 복원",
+        request_return: "요청 접수 — 매장 결정 대기",
+        accept_return: "수락 — 회수 대기",
+        reject_return: "요청 반려",
+        cancel_return_request: "요청 취소",
+        collect_return: "회수완료 — 검수 진행",
+        inspect_return: "검수완료 — 환불/교환 종결 대기",
+        return: "반품완료 — 재고 복원·환불",
+        refund: "반품완료 — 재고 복원·환불",
+        exchange: "교환완료 — 새 주문 자동 생성",
       };
       toast.success(labels[action]);
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
@@ -481,6 +493,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
   const handleTransition = (
     action:
       | "prepare"
+      | "pack"
       | "ship"
       | "complete"
       | "cancel"
@@ -492,7 +505,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       setShipDialogOpen(true);
       return;
     }
-    // 반품 요청 — Dialog 로 claimType + reason 입력 받기
+    // 반품/교환 요청 — Dialog 로 claimType + reason 입력 받기
     if (action === "request_return") {
       setClaimType("REFUND");
       setClaimReason("");
@@ -509,15 +522,27 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       setExchangeDialogOpen(true);
       return;
     }
+    const isUnpaidReturn =
+      (action === "refund" || action === "return" || action === "cancel") &&
+      detailQuery.data?.paymentStatus === "UNPAID";
+    const cancelRefundLine = isUnpaidReturn
+      ? "외상 주문이라 매출 취소(SALES_CANCELLED) 처리됩니다."
+      : "재고·결제건이 환불 처리됩니다.";
     const confirms: Partial<Record<typeof action, string>> = {
-      cancel: "주문을 취소하시겠습니까?\n재고가 복원되고 결제건은 환불 처리됩니다.",
+      cancel: `주문을 취소하시겠습니까?\n${cancelRefundLine}`,
+      pack:
+        "출고확정 단계로 전환합니다.\n포장·송장 발급 완료 후 발송 가능. 이 시점부터 취소 불가 (반품 흐름으로 처리).",
       accept_return:
-        "반품 요청을 수락합니다.\n회수 대기 상태로 전환됩니다 (재고 미복원).",
+        "요청을 수락합니다.\n회수 대기 상태로 전환됩니다 (재고 미복원).",
       reject_return:
-        "반품 요청을 반려하시겠습니까?\n주문은 완료 상태로 되돌아갑니다.",
-      cancel_return_request: "반품 요청을 취소하고 완료 상태로 되돌리시겠습니까?",
-      return:
-        "회수 완료 — 환불 처리합니다.\n재고가 복원되고 결제건은 환불 처리됩니다.",
+        "요청을 반려하시겠습니까?\n주문은 배송완료 상태로 복귀합니다.",
+      cancel_return_request:
+        "요청을 취소하고 배송완료 상태로 되돌리시겠습니까?",
+      collect_return: "회수가 완료되었습니까? 검수 단계로 진입합니다.",
+      inspect_return:
+        "검수가 완료되었습니까?\n결제건 paymentStatus 가 환불진행(REFUND_PENDING)으로 표시됩니다.",
+      refund: `반품완료로 처리합니다.\n재고가 복원되고 ${cancelRefundLine}`,
+      return: `반품완료로 처리합니다.\n재고가 복원되고 ${cancelRefundLine}`,
     };
     const msg = confirms[action];
     if (msg && !confirm(msg)) return;
@@ -539,7 +564,14 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
             </JmDrawerTitle>
             {data && (
               <>
-                <StatusBadge status={data.status} />
+                <StatusBadge
+                  status={data.status}
+                  channelId={data.channel ? "ext" : null}
+                  claimType={data.claimType}
+                  isExchangeReplacement={
+                    (data.exchangedFromOrders?.length ?? 0) > 0
+                  }
+                />
                 <PaymentStatusBadge status={data.paymentStatus} showPaid />
                 <JmBadge variant="outline" size="sm" shape="square">
                   <FulfillmentIcon type={data.fulfillmentType} />
@@ -675,6 +707,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
         ) : data ? (
           <ActionFooter
             status={data.status}
+            claimType={data.claimType}
             onTransition={handleTransition}
             pending={transitionPending}
           />
@@ -1477,25 +1510,31 @@ function ItemsEditView({
 /* ------------------------------ FOOTER ------------------------------ */
 
 /**
- * 상태별 액션 footer.
+ * 상태별 액션 footer — 5단계 출고 + 5단계 반품/교환 흐름.
  *
- * PENDING            → [취소] [준비 시작]
- * PREPARING          → [취소] [발송]
- * SHIPPED            → [완료]
- * COMPLETED          → [즉시 반품] [반품 요청]                         (1단계 또는 손님이 사후 요청)
- * RETURN_REQUESTED   → [요청 취소] [반려] [수락]                       (매장이 손님 요청에 응답)
- * RETURN_ACCEPTED    → [환불 처리] [교환 처리]                          (회수 후 종결 분기)
+ * PENDING            → [취소] [출고대기]
+ * PREPARING          → [취소] [출고확정]
+ * PREPARING_PACKED   → [발송]                                             (취소 불가, 송장 발급됨)
+ * SHIPPED            → [배송완료]
+ * COMPLETED          → [즉시 반품] [반품/교환 요청]                       (Dialog 에서 type 결정)
+ * RETURN_REQUESTED   → [요청 취소] [반려] [수락]
+ * RETURN_ACCEPTED    → [회수완료]
+ * RETURN_COLLECTED   → [검수완료]
+ * RETURN_INSPECTED   → [반품완료] / [교환완료]                            (claimType 따라)
  * 그 외(CANCELLED/RETURNED/EXCHANGED) → 종결 메시지
  */
 function ActionFooter({
   status,
+  claimType,
   onTransition,
   pending,
 }: {
   status: OrderStatus;
+  claimType: OrderClaimType | null;
   onTransition: (
     action:
       | "prepare"
+      | "pack"
       | "ship"
       | "complete"
       | "cancel"
@@ -1504,13 +1543,22 @@ function ActionFooter({
   pending: boolean;
 }) {
   type Btn = {
-    action: "prepare" | "ship" | "complete" | "cancel" | ReturnAction;
+    action:
+      | "prepare"
+      | "pack"
+      | "ship"
+      | "complete"
+      | "cancel"
+      | ReturnAction;
     label: string;
     icon: React.ReactNode;
     /** 시각 — primary(채워짐) / outline / ghost(빨강) / ghost(회색) */
     tone: "primary" | "outline" | "danger-ghost" | "ghost";
   };
   const buttons: Btn[] = [];
+
+  const isExchangeClaim =
+    claimType === "EXCHANGE_SAME" || claimType === "EXCHANGE_DIFFERENT";
 
   switch (status) {
     case "PENDING":
@@ -1522,7 +1570,7 @@ function ActionFooter({
       });
       buttons.push({
         action: "prepare",
-        label: "준비 시작",
+        label: "출고대기",
         icon: <Package className="size-4" />,
         tone: "primary",
       });
@@ -1535,6 +1583,14 @@ function ActionFooter({
         tone: "danger-ghost",
       });
       buttons.push({
+        action: "pack",
+        label: "출고확정",
+        icon: <PackageCheck className="size-4" />,
+        tone: "primary",
+      });
+      break;
+    case "PREPARING_PACKED":
+      buttons.push({
         action: "ship",
         label: "발송",
         icon: <Truck className="size-4" />,
@@ -1544,7 +1600,7 @@ function ActionFooter({
     case "SHIPPED":
       buttons.push({
         action: "complete",
-        label: "완료",
+        label: "배송완료",
         icon: <CheckCircle2 className="size-4" />,
         tone: "primary",
       });
@@ -1558,7 +1614,7 @@ function ActionFooter({
       });
       buttons.push({
         action: "request_return",
-        label: "반품 요청",
+        label: "반품/교환 요청",
         icon: <RotateCcw className="size-4" />,
         tone: "outline",
       });
@@ -1585,17 +1641,49 @@ function ActionFooter({
       break;
     case "RETURN_ACCEPTED":
       buttons.push({
-        action: "exchange",
-        label: "교환 처리",
-        icon: <ArrowLeftRight className="size-4" />,
-        tone: "outline",
-      });
-      buttons.push({
-        action: "return",
-        label: "환불 처리",
-        icon: <RotateCcw className="size-4" />,
+        action: "collect_return",
+        label: "회수완료",
+        icon: <PackageOpen className="size-4" />,
         tone: "primary",
       });
+      break;
+    case "RETURN_COLLECTED":
+      buttons.push({
+        action: "inspect_return",
+        label: "검수완료",
+        icon: <Search className="size-4" />,
+        tone: "primary",
+      });
+      break;
+    case "RETURN_INSPECTED":
+      // claimType 따라 강조 분기 — 다른 옵션은 outline 으로 변경 가능
+      if (isExchangeClaim) {
+        buttons.push({
+          action: "refund",
+          label: "반품완료(환불)",
+          icon: <RotateCcw className="size-4" />,
+          tone: "outline",
+        });
+        buttons.push({
+          action: "exchange",
+          label: "교환완료",
+          icon: <ArrowLeftRight className="size-4" />,
+          tone: "primary",
+        });
+      } else {
+        buttons.push({
+          action: "exchange",
+          label: "교환완료",
+          icon: <ArrowLeftRight className="size-4" />,
+          tone: "outline",
+        });
+        buttons.push({
+          action: "refund",
+          label: "반품완료",
+          icon: <RotateCcw className="size-4" />,
+          tone: "primary",
+        });
+      }
       break;
   }
 

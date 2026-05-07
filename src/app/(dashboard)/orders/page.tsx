@@ -110,20 +110,30 @@ export default function OrdersBoardPage() {
       id: string;
       action:
         | "prepare"
+        | "pack"
         | "ship"
         | "complete"
         | "cancel"
         | "return"
-        | "accept_return";
+        | "refund"
+        | "exchange"
+        | "accept_return"
+        | "collect_return"
+        | "inspect_return";
     }) => apiMutate(`/api/orders/${id}`, "PUT", { action }),
     onSuccess: (_data, vars) => {
       const labels: Record<string, string> = {
-        prepare: "준비 시작 — 재고가 차감되었습니다",
-        ship: "발송 처리되었습니다",
-        complete: "주문이 완료되었습니다",
-        cancel: "주문이 취소되었습니다",
-        return: "반품 처리되었습니다 — 재고 복원·환불",
-        accept_return: "반품 요청 수락 — 회수 대기",
+        prepare: "출고대기 — 재고 차감",
+        pack: "출고확정 — 송장 발급 후 발송",
+        ship: "배송 시작",
+        complete: "배송 완료",
+        cancel: "주문 취소 — 재고·결제 복원",
+        return: "반품 종결",
+        refund: "반품완료 — 환불 처리",
+        exchange: "교환완료 — 새 주문 생성",
+        accept_return: "수락 — 회수 대기",
+        collect_return: "회수완료 — 검수 진행",
+        inspect_return: "검수완료 — 환불/교환 종결 대기",
       };
       toast.success(labels[vars.action]);
       invalidate();
@@ -377,7 +387,10 @@ export default function OrdersBoardPage() {
                 ) : (
                   rows.map((order) => {
                     const days = daysUntilShip(order.expectedShipDate, today);
-                    const next = nextActionFor(order.status);
+                    const next = nextActionFor(order.status, order.claimType);
+                    const isExchangeReplacement =
+                      (order.exchangedFromOrders?.length ?? 0) > 0 ||
+                      order.orderNo.endsWith("-EX");
                     const rowPending =
                       transitionMutation.isPending &&
                       transitionMutation.variables?.id === order.id;
@@ -403,7 +416,12 @@ export default function OrdersBoardPage() {
                           )}
                         </JmTableCell>
                         <JmTableCell>
-                          <StatusBadge status={order.status} />
+                          <StatusBadge
+                            status={order.status}
+                            channelId={order.channel ? "ext" : null}
+                            claimType={order.claimType}
+                            isExchangeReplacement={isExchangeReplacement}
+                          />
                         </JmTableCell>
                         <JmTableCell>
                           <FulfillmentBadge type={order.fulfillmentType} />

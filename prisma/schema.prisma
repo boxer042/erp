@@ -863,29 +863,36 @@ model PurchaseOrderItem {
 // ============================================================
 
 enum OrderStatus {
-  PENDING          // 접수 — 외부 채널 import / B2B 미확정 (재고 미차감)
-  PREPARING        // 준비 — 피킹/포장 (재고 차감됨)
-  SHIPPED          // 발송 — 택배 인계 / 배달 출발
-  COMPLETED        // 완료 — 인도/픽업 종결
-  RETURN_REQUESTED // 반품 요청 — 매장 확인 대기 (수락/반려 결정 전)
-  RETURN_ACCEPTED  // 반품 수락 — 회수 대기 (재고 복원 X, 환불 X). 회수 완료 시 환불 또는 교환으로 분기
+  PENDING           // 주문/접수 — channelId 있으면 "주문"(외부), 없으면 "접수"(매장). 재고 미차감
+  PREPARING         // 출고대기 — 재고 차감됨, 포장·송장 발급 전. 취소 가능 마지막 단계
+  PREPARING_PACKED  // 출고확정 — 포장·송장 입력 완료, 발송 직전. 취소 불가 (반품 흐름으로)
+  SHIPPED           // 배송중 — 택배 인계 / 배달 출발
+  COMPLETED         // 배송완료 — 인도 종결
+  RETURN_REQUESTED  // 클레임 요청 — claimType 으로 반품/교환 분기. 매장 수락/반려 결정 전
+  RETURN_ACCEPTED   // 클레임 수락 — 회수대기
+  RETURN_COLLECTED  // 회수완료 — 물품 도착, 검수 전
+  RETURN_INSPECTED  // 검수완료 — 다음에 환불(반품) 또는 교환출고로 분기
+  RETURNED          // 반품완료 — 재고 복원 + 환불(또는 매출 취소) 종결
+  EXCHANGED         // 교환완료 — 재고 복원 + 새 주문(-EX) 자동 생성. 차액 정산은 새 주문에서
   CANCELLED
-  RETURNED         // 반품 종결 (환불) — 재고 복원 + 환불 처리
-  EXCHANGED        // 교환 종결 — 재고 복원 + 새 주문(exchangeOrderId) 생성. 차액 정산은 새 주문에서.
 }
 
 /**
  * 결제 축 — 출고 상태(OrderStatus) 와 별개의 재무 상태.
  *  - UNPAID: 미수 (외상). UNPAID 인 채로 출고는 가능하지만 customer ledger 에 잔액 누적
  *  - PAID: 결제 완료
+ *  - REFUND_PENDING: 환불 진행 중 (검수 후 PG/은행 처리 대기)
  *  - PARTIAL_REFUND: 일부 환불 (부분 반품 시)
- *  - REFUNDED: 전액 환불 (전체 반품·취소 후 환불)
+ *  - REFUNDED: 전액 환불 완료
+ *  - SALES_CANCELLED: 매출 취소 — 외상(UNPAID) 주문 반품. 환불 없이 customer ledger 잔액 차감
  */
 enum OrderPaymentStatus {
   UNPAID
   PAID
+  REFUND_PENDING
   PARTIAL_REFUND
   REFUNDED
+  SALES_CANCELLED
 }
 
 /**

@@ -21,6 +21,8 @@ const badgeVariants = cva(
           "bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]",
         info:
           "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)]",
+        accent:
+          "bg-[var(--jm-accent-bg)] text-[var(--jm-accent-fg)]",
       },
       size: {
         sm: "h-5 rounded-full px-1.5 text-jm-3xs",

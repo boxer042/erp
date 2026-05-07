@@ -613,8 +613,8 @@ ERP `(dashboard)/` 안에서 jm 으로 만든 페이지는 **리스트 / 상세 
 주문 도메인은 **출고·결제·반품(클레임) 3축**으로 분리되어 있음. 한 축의 상태를 다른 축의 의미로 오인하지 않도록 주의.
 
 - **Order** — 주문 (ORD[YYMMDD]-[4자리]). 교환 새 주문은 원본번호 + `-EX` 접미사
-  - **출고 축** `status`: `PENDING`(접수, 재고 미차감) → `PREPARING`(준비, 재고 차감) → `SHIPPED`(발송) → `COMPLETED` + `CANCELLED` / `RETURN_REQUESTED` / `RETURN_ACCEPTED` / `RETURNED` / `EXCHANGED`
-  - **결제 축** `paymentStatus`: `UNPAID`/`PAID`/`PARTIAL_REFUND`/`REFUNDED` — 출고 축과 직교. 외상(UNPAID 출고), 환불 표현용
+  - **출고 축** `status` (5단계 + 반품 5단계): `PENDING`(주문/접수, 재고 미차감) → `PREPARING`(출고대기, 재고 차감) → `PREPARING_PACKED`(출고확정, 송장) → `SHIPPED`(배송중) → `COMPLETED`(배송완료) · 반품/교환: `RETURN_REQUESTED` → `RETURN_ACCEPTED` → `RETURN_COLLECTED` → `RETURN_INSPECTED` → `RETURNED`/`EXCHANGED` · 종결: `CANCELLED`. 라벨은 channelId/claimType 으로 동적 분기 ("주문/접수", "반품요청/교환요청")
+  - **결제 축** `paymentStatus`: `UNPAID`/`PAID`/`REFUND_PENDING`/`PARTIAL_REFUND`/`REFUNDED`/`SALES_CANCELLED` — 외상은 매출 취소(SALES_CANCELLED), 검수 후 환불진행(REFUND_PENDING)
   - **클레임 축** `claimType`(`REFUND`/`EXCHANGE_SAME`/`EXCHANGE_DIFFERENT`) + `claimReason`(`DEFECTIVE`/`DAMAGED_IN_TRANSIT`/`WRONG_ITEM`/`CHANGE_MIND`/`SIZE_COLOR`/`OTHER`) — 손님 의도 + 책임 소재
   - `fulfillmentType`: `PICKUP`(매장 수령, POS 즉시 종결) / `DELIVERY`(자체 배달) / `SHIPPING`(택배). PICKUP 은 워크보드 미노출
   - `expectedShipDate`: 출고 예정일 (DELIVERY/SHIPPING 만). 워크보드의 지연/오늘/이번주 분류

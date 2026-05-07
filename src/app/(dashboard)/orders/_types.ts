@@ -1,10 +1,13 @@
 export type OrderStatus =
   | "PENDING"
   | "PREPARING"
+  | "PREPARING_PACKED"
   | "SHIPPED"
   | "COMPLETED"
   | "RETURN_REQUESTED"
   | "RETURN_ACCEPTED"
+  | "RETURN_COLLECTED"
+  | "RETURN_INSPECTED"
   | "CANCELLED"
   | "RETURNED"
   | "EXCHANGED";
@@ -13,8 +16,10 @@ export type OrderStatus =
 export type OrderPaymentStatus =
   | "UNPAID"
   | "PAID"
+  | "REFUND_PENDING"
   | "PARTIAL_REFUND"
-  | "REFUNDED";
+  | "REFUNDED"
+  | "SALES_CANCELLED";
 
 /** 클레임 분기 — 손님이 원하는 결과 */
 export type OrderClaimType =
@@ -58,6 +63,9 @@ export interface OrderListItem {
   commissionAmount: string;
   paymentMethod: string | null;
   paymentStatus: OrderPaymentStatus;
+  claimType: OrderClaimType | null;
+  /** 이 주문이 다른 주문의 교환 새 주문인지 식별 (-EX 색·배지 분기용) */
+  exchangedFromOrders?: Array<{ id: string }>;
   channel: { name: string; code: string } | null;
   createdBy: { name: string };
   repairTicket: { id: string; ticketNo: string; status: string } | null;
@@ -85,23 +93,65 @@ export interface BoardResponse {
 /** 채널 필터 — 오프라인(channelId=null) / 외부 채널(<id>) / 전체 */
 export type ChannelFilter = "all" | "offline" | string;
 
-export const STATUS_LABELS: Record<OrderStatus, string> = {
-  PENDING: "접수",
-  PREPARING: "준비",
-  SHIPPED: "발송",
-  COMPLETED: "완료",
-  RETURN_REQUESTED: "반품 요청",
-  RETURN_ACCEPTED: "회수 대기",
+/**
+ * 상태 라벨 — 정적 매핑.
+ * 단계별 라벨이지만 일부는 컨텍스트(channelId, claimType) 에 따라 동적으로 다른 라벨이 적용됨.
+ *  - PENDING: channelId 있으면 "주문" (외부), 없으면 "접수" (매장) — `statusLabel()` 사용
+ *  - RETURN_*: claimType 이 EXCHANGE_* 이면 "교환 ..." (예: 교환요청), REFUND 면 "반품 ..." — `statusLabel()` 사용
+ */
+const STATUS_LABEL_DEFAULTS: Record<OrderStatus, string> = {
+  PENDING: "주문",
+  PREPARING: "출고대기",
+  PREPARING_PACKED: "출고확정",
+  SHIPPED: "배송중",
+  COMPLETED: "배송완료",
+  RETURN_REQUESTED: "반품요청",
+  RETURN_ACCEPTED: "반품 회수대기",
+  RETURN_COLLECTED: "회수완료",
+  RETURN_INSPECTED: "검수완료",
   CANCELLED: "취소",
-  RETURNED: "반품",
-  EXCHANGED: "교환",
+  RETURNED: "반품완료",
+  EXCHANGED: "교환완료",
 };
+
+/** 출고 정적 호환성용 — 단순 매핑이 필요한 곳 (이전 import 호환) */
+export const STATUS_LABELS = STATUS_LABEL_DEFAULTS;
+
+/**
+ * 컨텍스트 인지 라벨.
+ *  - PENDING: channelId 있으면 "주문", 없으면 "접수"
+ *  - RETURN_REQUESTED + EXCHANGE_*: "교환요청"
+ *  - RETURN_ACCEPTED + EXCHANGE_*: "교환 회수대기"
+ *  - 그 외 RETURN_*: 기본 라벨 ("반품...")
+ */
+export function statusLabel(
+  status: OrderStatus,
+  ctx: {
+    channelId?: string | null;
+    claimType?: OrderClaimType | null;
+  } = {},
+): string {
+  if (status === "PENDING") {
+    return ctx.channelId ? "주문" : "접수";
+  }
+  const isExchangeClaim =
+    ctx.claimType === "EXCHANGE_SAME" || ctx.claimType === "EXCHANGE_DIFFERENT";
+  if (isExchangeClaim) {
+    if (status === "RETURN_REQUESTED") return "교환요청";
+    if (status === "RETURN_ACCEPTED") return "교환 회수대기";
+    if (status === "RETURN_COLLECTED") return "교환 회수완료";
+    if (status === "RETURN_INSPECTED") return "교환 검수완료";
+  }
+  return STATUS_LABEL_DEFAULTS[status];
+}
 
 export const PAYMENT_STATUS_LABELS: Record<OrderPaymentStatus, string> = {
   UNPAID: "외상",
   PAID: "결제완료",
+  REFUND_PENDING: "환불진행",
   PARTIAL_REFUND: "부분환불",
   REFUNDED: "환불완료",
+  SALES_CANCELLED: "매출취소",
 };
 
 export const CLAIM_TYPE_LABELS: Record<OrderClaimType, string> = {
@@ -169,23 +219,47 @@ export const BOARD_SECTION_TITLES: Record<BoardGroupKey, string> = {
 };
 
 /** 카드에 보일 다음 액션 — null 이면 액션 버튼 없음.
- * 출고 흐름 + 반품 처리 흐름의 가장 흔한 다음 단계만 노출.
- * 분기(반품 반려, 즉시반품 등)는 상세 시트에서. */
-export function nextActionFor(status: OrderStatus): {
-  action: "prepare" | "ship" | "complete" | "accept_return" | "return";
-  label: string;
-} | null {
+ * 출고/반품/교환 흐름의 가장 흔한 다음 단계만 노출.
+ * 분기(반려, 즉시반품 등)는 상세 시트에서. */
+export type WorkboardAction =
+  | "prepare"
+  | "pack"
+  | "ship"
+  | "complete"
+  | "accept_return"
+  | "collect_return"
+  | "inspect_return"
+  | "refund"
+  | "exchange";
+
+export function nextActionFor(
+  status: OrderStatus,
+  claimType?: OrderClaimType | null,
+): { action: WorkboardAction; label: string } | null {
   switch (status) {
     case "PENDING":
-      return { action: "prepare", label: "준비 시작" };
+      return { action: "prepare", label: "출고대기" };
     case "PREPARING":
+      return { action: "pack", label: "출고확정" };
+    case "PREPARING_PACKED":
       return { action: "ship", label: "발송" };
     case "SHIPPED":
-      return { action: "complete", label: "완료" };
+      return { action: "complete", label: "배송완료" };
     case "RETURN_REQUESTED":
       return { action: "accept_return", label: "수락" };
     case "RETURN_ACCEPTED":
-      return { action: "return", label: "회수·환불" };
+      return { action: "collect_return", label: "회수완료" };
+    case "RETURN_COLLECTED":
+      return { action: "inspect_return", label: "검수완료" };
+    case "RETURN_INSPECTED":
+      // 검수 후 — claimType 으로 환불/교환 분기. 워크보드 행은 가장 흔한 환불 노출.
+      if (
+        claimType === "EXCHANGE_SAME" ||
+        claimType === "EXCHANGE_DIFFERENT"
+      ) {
+        return { action: "exchange", label: "교환완료" };
+      }
+      return { action: "refund", label: "반품완료" };
     default:
       return null;
   }
@@ -216,39 +290,51 @@ export const STATUS_FLOW: Record<
   { meaning: string; nextHint: string | null }
 > = {
   PENDING: {
-    meaning: "접수만 된 상태 — 재고는 아직 차감되지 않음",
-    nextHint: "준비를 시작하면 재고가 차감됩니다",
+    meaning: "주문/접수 — 재고는 아직 차감되지 않음",
+    nextHint: "출고대기로 진입하면 재고가 차감됩니다",
   },
   PREPARING: {
-    meaning: "재고가 차감되어 출고 준비 중",
-    nextHint: "송장 정보를 입력하고 발송하세요",
+    meaning: "출고대기 — 재고 차감됨, 포장·송장 발급 대기",
+    nextHint: "포장·송장 입력 완료 후 출고확정",
+  },
+  PREPARING_PACKED: {
+    meaning: "출고확정 — 포장·송장 완료, 발송 직전 (취소 불가)",
+    nextHint: "택배 인계 시 발송 처리",
   },
   SHIPPED: {
-    meaning: "택배사에 인도되어 배송 중",
-    nextHint: "고객 인도 확인 후 완료 처리",
+    meaning: "배송중 — 택배사 인계, 손님 인도 대기",
+    nextHint: "손님 인도 확인 후 배송완료",
   },
   COMPLETED: {
-    meaning: "고객에게 인도되어 종결됨",
-    nextHint: "필요 시 반품 요청으로 회수 절차 시작",
+    meaning: "배송완료 — 인도 종결",
+    nextHint: "필요 시 반품/교환 요청으로 클레임 절차 시작",
   },
   RETURN_REQUESTED: {
-    meaning: "반품 요청 접수 — 매장의 수락/반려 결정 대기",
+    meaning: "클레임 요청 — 매장 수락/반려 결정 대기 (claimType 으로 반품/교환 분기)",
     nextHint: "사유 확인 후 수락 또는 반려",
   },
   RETURN_ACCEPTED: {
-    meaning: "반품 수락됨 — 회수 대기 (재고·환불 미진행)",
-    nextHint: "회수 완료 후 환불 또는 교환으로 종결",
+    meaning: "수락됨 — 회수 대기 (재고·환불 미진행)",
+    nextHint: "물품 도착 시 회수완료 처리",
+  },
+  RETURN_COLLECTED: {
+    meaning: "회수완료 — 검수 대기",
+    nextHint: "검수 후 검수완료 처리 (불량 시 반려 가능)",
+  },
+  RETURN_INSPECTED: {
+    meaning: "검수완료 — 환불 또는 교환 종결로 진행",
+    nextHint: "claimType 따라 환불(REFUND) 또는 교환(EXCHANGE_*) 처리",
   },
   CANCELLED: {
-    meaning: "주문이 취소됨 — 재고 복원, 결제건은 환불 완료",
+    meaning: "주문 취소 — 재고 복원, 결제건은 환불(SALES_CANCELLED 가능)",
     nextHint: null,
   },
   RETURNED: {
-    meaning: "반품 종결 (환불) — 재고 복원, 환불 완료",
+    meaning: "반품완료 — 재고 복원, 환불 완료",
     nextHint: null,
   },
   EXCHANGED: {
-    meaning: "교환 종결 — 재고 복원, 차액은 새 주문에서 정산",
+    meaning: "교환완료 — 재고 복원, 새 주문(-EX) 자동 생성",
     nextHint: null,
   },
 };

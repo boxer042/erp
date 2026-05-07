@@ -10,6 +10,7 @@ import {
   PackageCheck,
   PackageOpen,
   RotateCcw,
+  Search,
   Store,
   Truck,
   XCircle,
@@ -17,57 +18,110 @@ import {
 import {
   FULFILLMENT_LABELS,
   PAYMENT_STATUS_LABELS,
-  STATUS_LABELS,
+  statusLabel,
   type FulfillmentType,
+  type OrderClaimType,
   type OrderPaymentStatus,
   type OrderStatus,
 } from "./_types";
 
 /**
- * 시각 위계 정책 (배지 구분 명확성):
- *   1순위 출고 상태  — 색 채워진 배지(filled). dot 추가로 의미 강조. size md.
- *   2순위 결제 상태  — outline + 색 dot. 텍스트 muted. size sm.
- *   3순위 출고 방식  — outline + 아이콘 only(라벨 자동 hidden 가능). 회색 톤. size sm.
- *   3순위 채널       — 오프라인=default(muted), 외부=info(파랑) + 아이콘. size sm.
+ * 시각 위계 + 흐름별 색 통일 정책:
+ *   - 출고 흐름  → info (파랑)         · 종결(COMPLETED) → success (초록)
+ *   - 반품 흐름  → warning (노랑)       · 종결(RETURNED) → outline
+ *   - 교환 흐름  → accent (보라)        · 종결(EXCHANGED) → outline
+ *   - 교환 새 주문 (-EX) → 출고 단계지만 accent (보라) 로 분리 — 일반 출고와 식별
+ *   - 취소(CANCELLED)  → outline (회색)
  *
- * 한 줄 동시 노출 시 색 충돌 방지:
- *   - 출고 상태 SHIPPED 만 solid 검정/브랜드 색 — 다른 줄의 어떤 배지와도 충돌 X
- *   - 결제 UNPAID 의 dot 은 danger(빨강), 출고 상태에는 빨강이 CANCELLED 뿐 → 워크보드엔 CANCELLED 안 나옴
- *   - 채널 외부=info(파랑), 출고 SHIPPED=solid(검정) — 색 분리됨
+ * 흐름 내 단계는 같은 색. 단계 차이는 텍스트 + 아이콘으로 구분.
  */
 
-/**
- * 출고 상태별 시각 매핑 — 색 + 의미 아이콘.
- * 진행 중 상태는 색 채워짐(filled), 종결 상태(CANCELLED/RETURNED/EXCHANGED)는 outline 으로 통일.
- */
-const STATUS_VISUAL: Record<
-  OrderStatus,
-  {
-    variant: "default" | "outline" | "solid" | "success" | "warning" | "danger" | "info";
-    icon: React.ComponentType<{ className?: string }> | null;
-  }
-> = {
-  PENDING: { variant: "warning", icon: Clock },
+type BadgeVariant =
+  | "default"
+  | "outline"
+  | "solid"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "accent";
+
+interface StatusVisual {
+  variant: BadgeVariant;
+  icon: React.ComponentType<{ className?: string }> | null;
+}
+
+/** 정적 매핑 — claimType / 새 주문 여부 미고려한 기본값. resolveStatusVisual() 로 동적 분기. */
+const STATUS_VISUAL_DEFAULT: Record<OrderStatus, StatusVisual> = {
+  PENDING: { variant: "info", icon: Clock },
   PREPARING: { variant: "info", icon: Package },
-  SHIPPED: { variant: "solid", icon: Truck },
+  PREPARING_PACKED: { variant: "info", icon: PackageCheck },
+  SHIPPED: { variant: "info", icon: Truck },
   COMPLETED: { variant: "success", icon: PackageCheck },
   RETURN_REQUESTED: { variant: "warning", icon: RotateCcw },
-  RETURN_ACCEPTED: { variant: "info", icon: PackageOpen },
+  RETURN_ACCEPTED: { variant: "warning", icon: PackageOpen },
+  RETURN_COLLECTED: { variant: "warning", icon: PackageOpen },
+  RETURN_INSPECTED: { variant: "warning", icon: Search },
   CANCELLED: { variant: "outline", icon: XCircle },
   RETURNED: { variant: "outline", icon: RotateCcw },
   EXCHANGED: { variant: "outline", icon: ArrowLeftRight },
 };
 
 /**
- * 출고 상태 배지 — 가장 두드러지게.
- * 색 채워진 배지 + 의미 아이콘. size md.
+ * 동적 시각 매핑 — claimType / 교환 새 주문 여부에 따라 색 분기.
+ *  - 교환 흐름 (claimType=EXCHANGE_*): 반품 단계의 warning → accent 로 변환
+ *  - 교환 새 주문 (-EX): 출고 단계의 info → accent
  */
-export function StatusBadge({ status }: { status: OrderStatus }) {
-  const { variant, icon: Icon } = STATUS_VISUAL[status];
+export function resolveStatusVisual(
+  status: OrderStatus,
+  ctx: {
+    claimType?: OrderClaimType | null;
+    isExchangeReplacement?: boolean;
+  } = {},
+): StatusVisual {
+  const base = STATUS_VISUAL_DEFAULT[status];
+
+  // 교환 새 주문 (-EX): 일반 출고 단계지만 accent 색으로 분리
+  if (ctx.isExchangeReplacement && base.variant === "info") {
+    return { ...base, variant: "accent" };
+  }
+  if (ctx.isExchangeReplacement && status === "COMPLETED") {
+    return { ...base, variant: "outline" }; // 교환 새 주문의 종결도 outline
+  }
+
+  // 반품/교환 단계 — claimType 으로 색 분기
+  const isExchangeClaim =
+    ctx.claimType === "EXCHANGE_SAME" || ctx.claimType === "EXCHANGE_DIFFERENT";
+  if (isExchangeClaim && base.variant === "warning") {
+    return { ...base, variant: "accent" };
+  }
+
+  return base;
+}
+
+/**
+ * 출고 상태 배지 — 동적 색·라벨.
+ * 행에 ChannelId, ClaimType, 교환 여부 컨텍스트 받아 색·라벨 분기.
+ */
+export function StatusBadge({
+  status,
+  channelId,
+  claimType,
+  isExchangeReplacement,
+}: {
+  status: OrderStatus;
+  channelId?: string | null;
+  claimType?: OrderClaimType | null;
+  isExchangeReplacement?: boolean;
+}) {
+  const { variant, icon: Icon } = resolveStatusVisual(status, {
+    claimType,
+    isExchangeReplacement,
+  });
   return (
     <JmBadge variant={variant} size="md" shape="square">
       {Icon && <Icon className="size-3" />}
-      {STATUS_LABELS[status]}
+      {statusLabel(status, { channelId, claimType })}
     </JmBadge>
   );
 }
@@ -79,8 +133,10 @@ export function StatusBadge({ status }: { status: OrderStatus }) {
 const PAYMENT_DOT: Record<OrderPaymentStatus, string> = {
   UNPAID: "bg-[var(--jm-danger-fg)]",
   PAID: "bg-[var(--jm-success-fg)]",
+  REFUND_PENDING: "bg-[var(--jm-warning-fg)]",
   PARTIAL_REFUND: "bg-[var(--jm-text-subtle)]",
   REFUNDED: "bg-[var(--jm-text-subtle)]",
+  SALES_CANCELLED: "bg-[var(--jm-text-subtle)]",
 };
 
 export function PaymentStatusBadge({
@@ -156,17 +212,27 @@ export function ShipDateCell({
   expectedShipDate: string | null;
   daysUntil: number | null;
 }) {
-  // 반품 처리 중인 주문 — 출고예정일은 의미 없음. 반품 단계 표시.
+  // 반품 처리 중인 주문 — 출고예정일은 의미 없음. 단계 텍스트 표시.
   if (status === "RETURN_REQUESTED") {
     return (
       <span className="text-[12px] text-[var(--jm-warning-fg)]">
-        매장 결정 대기
+        결정 대기
       </span>
     );
   }
   if (status === "RETURN_ACCEPTED") {
     return (
-      <span className="text-[12px] text-[var(--jm-info-fg)]">회수 대기</span>
+      <span className="text-[12px] text-[var(--jm-warning-fg)]">회수 대기</span>
+    );
+  }
+  if (status === "RETURN_COLLECTED") {
+    return (
+      <span className="text-[12px] text-[var(--jm-warning-fg)]">검수 대기</span>
+    );
+  }
+  if (status === "RETURN_INSPECTED") {
+    return (
+      <span className="text-[12px] text-[var(--jm-warning-fg)]">종결 대기</span>
     );
   }
   if (!expectedShipDate) {
@@ -211,38 +277,43 @@ export function ShipDateCell({
 }
 
 /**
- * 상태 흐름 가이드 — 출고/반품(환불)/교환 3축을 줄로 시각화.
- * StatusBadge 와 동일 시각 매핑 사용 — 행 배지와 가이드의 시각 일관성 보장.
+ * 상태 흐름 가이드 — 출고/반품/교환 3축을 줄로 시각화.
+ * 흐름별 색 통일: 출고=info(파랑), 반품=warning(노랑), 교환=accent(보라).
  */
 export function StatusFlowGuide() {
-  const flowSteps: Array<{ status: OrderStatus; hint: string }> = [
-    { status: "PENDING", hint: "접수" },
-    { status: "PREPARING", hint: "재고 차감" },
-    { status: "SHIPPED", hint: "송장 입력" },
-    { status: "COMPLETED", hint: "종결" },
+  const flowSteps: Array<{ status: OrderStatus; hint?: string }> = [
+    { status: "PENDING" },
+    { status: "PREPARING" },
+    { status: "PREPARING_PACKED" },
+    { status: "SHIPPED" },
+    { status: "COMPLETED" },
   ];
-  const refundSteps: Array<{ status: OrderStatus; hint: string }> = [
-    { status: "COMPLETED", hint: "" },
-    { status: "RETURN_REQUESTED", hint: "매장 수락/반려" },
-    { status: "RETURN_ACCEPTED", hint: "회수" },
-    { status: "RETURNED", hint: "재고 복원·환불" },
-  ];
-  const exchangeSteps: Array<{ status: OrderStatus; hint: string }> = [
-    { status: "RETURN_ACCEPTED", hint: "회수" },
-    { status: "EXCHANGED", hint: "재고 복원 + 새 주문(-EX) 자동" },
+  const refundSteps: Array<{ status: OrderStatus; hint?: string }> = [
+    { status: "RETURN_REQUESTED" },
+    { status: "RETURN_ACCEPTED" },
+    { status: "RETURN_COLLECTED" },
+    { status: "RETURN_INSPECTED" },
+    { status: "RETURNED" },
   ];
   return (
     <div className="flex flex-col gap-2 px-4 py-3 text-[11px] text-[var(--jm-text-muted)]">
-      <FlowRow label="출고" steps={flowSteps} />
+      <FlowRow
+        label="출고"
+        steps={flowSteps}
+        suffix="· 출고대기까지 취소 가능"
+      />
       <FlowRow
         label="반품"
         steps={refundSteps}
-        suffix="· 즉시 반품(1단계 단축) 가능"
+        claimType="REFUND"
+        suffix="· 외상은 매출취소(SALES_CANCELLED)"
       />
       <FlowRow
         label="교환"
-        steps={exchangeSteps}
-        suffix="· EXCHANGE_SAME(항목 복제) / EXCHANGE_DIFFERENT(빈 항목 + 차액 정산)"
+        steps={refundSteps}
+        claimType="EXCHANGE_SAME"
+        suffix="· 검수 후 교환완료 + 새 주문(-EX) 자동 생성"
+        terminalStatus="EXCHANGED"
       />
     </div>
   );
@@ -251,22 +322,31 @@ export function StatusFlowGuide() {
 function FlowRow({
   label,
   steps,
+  claimType,
   suffix,
+  terminalStatus,
 }: {
   label: string;
-  steps: Array<{ status: OrderStatus; hint: string }>;
+  steps: Array<{ status: OrderStatus; hint?: string }>;
+  claimType?: OrderClaimType;
   suffix?: string;
+  /** 기본 종결 status 와 다른 종결 (교환은 EXCHANGED) */
+  terminalStatus?: OrderStatus;
 }) {
+  // 마지막 단계만 terminalStatus 로 치환 (교환 흐름의 종결)
+  const effectiveSteps = terminalStatus
+    ? [...steps.slice(0, -1), { status: terminalStatus }]
+    : steps;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
       <span className="w-14 font-medium text-[var(--jm-text-subtle)]">
         {label}
       </span>
-      {steps.map((s, i) => (
-        <span key={s.status} className="inline-flex items-center gap-1.5">
-          <StatusBadge status={s.status} />
+      {effectiveSteps.map((s, i) => (
+        <span key={`${s.status}-${i}`} className="inline-flex items-center gap-1.5">
+          <StatusBadge status={s.status} claimType={claimType} />
           {s.hint && <span>{s.hint}</span>}
-          {i < steps.length - 1 && (
+          {i < effectiveSteps.length - 1 && (
             <ChevronRight className="size-3 text-[var(--jm-text-subtle)]" />
           )}
         </span>

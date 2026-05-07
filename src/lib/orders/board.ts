@@ -10,10 +10,13 @@
 export type OrderStatusForBoard =
   | "PENDING"
   | "PREPARING"
+  | "PREPARING_PACKED"
   | "SHIPPED"
   | "COMPLETED"
   | "RETURN_REQUESTED"
   | "RETURN_ACCEPTED"
+  | "RETURN_COLLECTED"
+  | "RETURN_INSPECTED"
   | "CANCELLED"
   | "RETURNED"
   | "EXCHANGED";
@@ -56,12 +59,12 @@ export function utcDayDiff(a: Date, b: Date): number {
 
 /**
  * 워크보드 섹션 분류:
- *  - SHIPPED: shipped
- *  - RETURN_REQUESTED / RETURN_ACCEPTED: returnPending (매장 결정 또는 회수 대기 — 처리 필요)
- *  - PENDING/PREPARING + expectedShipDate=null: unscheduled (예정일 미정 — 사용자가 채워야 함)
- *  - PENDING/PREPARING + 날짜 있음: 일수 차이로
+ *  - SHIPPED: shipped (배송중)
+ *  - RETURN_*: returnPending (반품/교환 처리 흐름 모두 — 매장 결정·회수·검수·종결 대기)
+ *  - PENDING/PREPARING/PREPARING_PACKED + expectedShipDate=null: unscheduled
+ *  - PENDING/PREPARING/PREPARING_PACKED + 날짜 있음: 일수 차이로
  *      < 0 → overdue, = 0 → today, ≤ 7 → thisWeek, > 7 → future
- *  - 그 외 (COMPLETED/CANCELLED/RETURNED/EXCHANGED): null (종결 — 워크보드 미노출)
+ *  - 그 외 (COMPLETED/CANCELLED/RETURNED/EXCHANGED): null (종결)
  */
 export function classifyBoardGroup(
   status: OrderStatusForBoard,
@@ -69,9 +72,19 @@ export function classifyBoardGroup(
   today: Date,
 ): BoardGroupKey | null {
   if (status === "SHIPPED") return "shipped";
-  if (status === "RETURN_REQUESTED" || status === "RETURN_ACCEPTED")
+  if (
+    status === "RETURN_REQUESTED" ||
+    status === "RETURN_ACCEPTED" ||
+    status === "RETURN_COLLECTED" ||
+    status === "RETURN_INSPECTED"
+  ) {
     return "returnPending";
-  if (status !== "PREPARING" && status !== "PENDING") return null;
+  }
+  const isPrepFlow =
+    status === "PENDING" ||
+    status === "PREPARING" ||
+    status === "PREPARING_PACKED";
+  if (!isPrepFlow) return null;
   if (!expectedShipDate) return "unscheduled";
   const diffDays = utcDayDiff(expectedShipDate, today);
   if (diffDays < 0) return "overdue";

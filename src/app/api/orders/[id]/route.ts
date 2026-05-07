@@ -133,42 +133,74 @@ export async function PUT(
   }
 
   /**
-   * 출고 흐름: PENDING → PREPARING → SHIPPED → COMPLETED.
+   * 출고 흐름 (5단계):
+   *   PENDING(주문/접수) →(prepare)→ PREPARING(출고대기) →(pack)→ PREPARING_PACKED(출고확정)
+   *     →(ship)→ SHIPPED(배송중) →(complete)→ COMPLETED(배송완료)
    *
-   * 반품 흐름 (3단계 — 손님 요청 / 매장 결정 / 회수·종결):
-   *   COMPLETED →(request_return)→ RETURN_REQUESTED  (손님 요청, 매장 미확인)
-   *   RETURN_REQUESTED →(accept_return)→ RETURN_ACCEPTED  (회수 대기)
+   * 반품/교환 흐름 (5단계):
+   *   COMPLETED →(request_return)→ RETURN_REQUESTED  (손님 요청)
+   *   RETURN_REQUESTED →(accept_return)→ RETURN_ACCEPTED  (수락)
    *   RETURN_REQUESTED →(reject_return)→ COMPLETED  (반려)
-   *   RETURN_REQUESTED →(cancel_return_request)→ COMPLETED  (손님이 요청 취소)
-   *   RETURN_ACCEPTED →(return)→ RETURNED  (회수 완료 + 재고 복원 + 환불)
-   *   RETURN_ACCEPTED →(exchange)→ EXCHANGED  (회수 완료 + 재고 복원, 차액은 새 주문)
+   *   RETURN_REQUESTED →(cancel_return_request)→ COMPLETED  (자진 취소)
+   *   RETURN_ACCEPTED →(collect_return)→ RETURN_COLLECTED  (회수완료)
+   *   RETURN_COLLECTED →(inspect_return)→ RETURN_INSPECTED  (검수완료)
+   *   RETURN_INSPECTED →(refund)→ RETURNED  (반품완료 + 재고 복원 + 환불/매출취소)
+   *   RETURN_INSPECTED →(exchange)→ EXCHANGED  (교환완료 + 재고 복원 + 새 주문 자동 생성)
    *
-   * 즉시 반품 (1단계, 매장에서 손님이 즉석 처리):
-   *   COMPLETED →(return)→ RETURNED
+   * 단축 경로 (매장 즉석 처리):
+   *   COMPLETED →(return)→ RETURNED  (1단계 즉시 반품)
    *
-   * 취소: PENDING/PREPARING →(cancel)→ CANCELLED
+   * 취소: PENDING/PREPARING →(cancel)→ CANCELLED  (PREPARING_PACKED 후 불가, 송장 발급 후라 반품으로)
    *
    * 부수효과:
-   *   - 재고 복원: cancel(PREPARING이상)/return/exchange 에서 (PENDING은 미차감이라 X)
-   *   - paymentStatus: cancel/return 시 PAID였으면 REFUNDED. exchange 는 새 주문에서 정산하므로 PAID 유지.
+   *   - 재고 차감: prepare 시점 (출고대기 진입 시 FIFO 차감 + LotConsumption)
+   *   - 재고 복원: cancel(PREPARING)/refund/exchange (PENDING 취소·CANCELLED 는 차감 X)
+   *   - paymentStatus 전이:
+   *     · cancel: PAID → REFUNDED, UNPAID → SALES_CANCELLED
+   *     · refund: PAID → REFUNDED, UNPAID → SALES_CANCELLED
+   *     · exchange: 그대로 유지 (차액은 새 주문에서 정산)
+   *     · inspect_return: PAID → REFUND_PENDING (환불 절차 진행 중 표시)
    */
   const statusTransitions: Record<
     string,
     { from: string | string[]; to: string }
   > = {
     prepare: { from: "PENDING", to: "PREPARING" },
-    ship: { from: "PREPARING", to: "SHIPPED" },
+    pack: { from: "PREPARING", to: "PREPARING_PACKED" },
+    ship: { from: "PREPARING_PACKED", to: "SHIPPED" },
     complete: { from: "SHIPPED", to: "COMPLETED" },
     cancel: { from: ["PENDING", "PREPARING"], to: "CANCELLED" },
     request_return: { from: "COMPLETED", to: "RETURN_REQUESTED" },
     accept_return: { from: "RETURN_REQUESTED", to: "RETURN_ACCEPTED" },
     reject_return: { from: "RETURN_REQUESTED", to: "COMPLETED" },
     cancel_return_request: { from: "RETURN_REQUESTED", to: "COMPLETED" },
-    return: {
-      from: ["COMPLETED", "RETURN_REQUESTED", "RETURN_ACCEPTED"],
+    collect_return: {
+      from: "RETURN_ACCEPTED",
+      to: "RETURN_COLLECTED",
+    },
+    inspect_return: {
+      from: "RETURN_COLLECTED",
+      to: "RETURN_INSPECTED",
+    },
+    refund: {
+      from: ["RETURN_INSPECTED", "RETURN_COLLECTED", "RETURN_ACCEPTED"],
       to: "RETURNED",
     },
-    exchange: { from: "RETURN_ACCEPTED", to: "EXCHANGED" },
+    return: {
+      // 하위 호환 + 단축 경로 — COMPLETED 에서 즉시 반품
+      from: [
+        "COMPLETED",
+        "RETURN_REQUESTED",
+        "RETURN_ACCEPTED",
+        "RETURN_COLLECTED",
+        "RETURN_INSPECTED",
+      ],
+      to: "RETURNED",
+    },
+    exchange: {
+      from: ["RETURN_ACCEPTED", "RETURN_COLLECTED", "RETURN_INSPECTED"],
+      to: "EXCHANGED",
+    },
   };
 
   const transition = statusTransitions[action];
@@ -388,6 +420,58 @@ export async function PUT(
     return NextResponse.json(updated);
   }
 
+  // === 단순 단계 전이 (재고·결제 변동 없음, 상태만) ===
+  // pack:           PREPARING → PREPARING_PACKED. 송장 입력은 ship 액션에서.
+  // collect_return: RETURN_ACCEPTED → RETURN_COLLECTED. 물품 도착.
+  // inspect_return: RETURN_COLLECTED → RETURN_INSPECTED. 검수 통과 + paymentStatus PAID→REFUND_PENDING (환불 절차 시작 표시)
+  if (
+    action === "pack" ||
+    action === "collect_return" ||
+    action === "inspect_return"
+  ) {
+    const auditUser = await getCurrentUser();
+    const targetStatus = transition.to as
+      | "PREPARING_PACKED"
+      | "RETURN_COLLECTED"
+      | "RETURN_INSPECTED";
+    const trackingPatch =
+      action === "pack"
+        ? {
+            ...(typeof body.trackingCarrier === "string"
+              ? { trackingCarrier: body.trackingCarrier || null }
+              : {}),
+            ...(typeof body.trackingNumber === "string"
+              ? { trackingNumber: body.trackingNumber || null }
+              : {}),
+          }
+        : {};
+    // 검수완료 시 결제 축 표시 갱신 — PAID 였다면 REFUND_PENDING (환불 절차 진행 중)
+    const paymentPatch =
+      action === "inspect_return" && order.paymentStatus === "PAID"
+        ? { paymentStatus: "REFUND_PENDING" as const }
+        : {};
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.order.update({
+        where: { id },
+        data: { status: targetStatus, ...trackingPatch, ...paymentPatch },
+      });
+      await recordAudit(tx, {
+        userId: auditUser?.id ?? null,
+        entity: "Order",
+        entityId: id,
+        action: "STATUS_CHANGE",
+        meta: {
+          from: order.status,
+          to: targetStatus,
+          action,
+          orderNo: order.orderNo,
+        },
+      });
+      return u;
+    });
+    return NextResponse.json(updated);
+  }
+
   // === 반품 흐름 단계 전이 (재고·결제 변동 없음, 상태 + timestamp + claim 정보만) ===
   // request_return: 손님 요청 접수 + claimType (필수, default REFUND) + claimReason (선택)
   // accept_return:  매장 수락 (returnAcceptedAt). 매장이 claimType 변경 가능 (수락 시 결정 변경)
@@ -504,13 +588,24 @@ export async function PUT(
     return NextResponse.json(updated);
   }
 
-  // === 취소/반품/교환 시 재고 복원 + 결제 상태 전이 ===
+  // === 취소/반품/환불/교환 시 재고 복원 + 결제 상태 전이 ===
   // PENDING 은 재고 차감 안 된 상태이므로 그냥 상태만 변경.
   // PREPARING 이상은 차감됐으므로 LotConsumption 복원 + Inventory 복원.
   // exchange: 재고 복원 + paymentStatus 유지 + 새 주문 자동 생성 (교환 발송용).
-  if (action === "cancel" || action === "return" || action === "exchange") {
+  // 결제 분기:
+  //   - PAID/REFUND_PENDING → REFUNDED (환불 완료)
+  //   - UNPAID → SALES_CANCELLED (외상은 환불 없이 매출 취소)
+  if (
+    action === "cancel" ||
+    action === "return" ||
+    action === "refund" ||
+    action === "exchange"
+  ) {
     const wasStockDeducted = order.status !== "PENDING";
-    const wasPaid = order.paymentStatus === "PAID";
+    const wasUnpaid = order.paymentStatus === "UNPAID";
+    const wasPaidOrPending =
+      order.paymentStatus === "PAID" ||
+      order.paymentStatus === "REFUND_PENDING";
     const isExchange = action === "exchange";
     // exchange 액션은 body 의 claimType 을 우선 (UI Dialog 에서 SAME/DIFFERENT 직접 선택).
     // body 미전달 시 order.claimType 폴백. 둘 다 EXCHANGE_* 가 아니면 기본 EXCHANGE_SAME.
@@ -589,14 +684,20 @@ export async function PUT(
         exchangeNewOrderId = newOrder.id;
       }
 
+      // 결제 축 전이:
+      //   - exchange: 그대로 유지 (차액은 새 주문)
+      //   - cancel/return/refund + PAID/REFUND_PENDING → REFUNDED
+      //   - cancel/return/refund + UNPAID → SALES_CANCELLED (외상 매출 취소)
+      let paymentPatch: { paymentStatus?: "REFUNDED" | "SALES_CANCELLED" } = {};
+      if (!isExchange) {
+        if (wasPaidOrPending) paymentPatch = { paymentStatus: "REFUNDED" };
+        else if (wasUnpaid) paymentPatch = { paymentStatus: "SALES_CANCELLED" };
+      }
       await tx.order.update({
         where: { id },
         data: {
           status: targetStatus,
-          // 환불 처리: cancel/return 만. exchange 는 새 주문에서 정산하므로 paymentStatus 유지.
-          ...(!isExchange && wasPaid
-            ? { paymentStatus: "REFUNDED" as const }
-            : {}),
+          ...paymentPatch,
           ...(isExchange
             ? {
                 exchangedAt: new Date(),
@@ -618,7 +719,7 @@ export async function PUT(
           orderNo: order.orderNo,
           totalAmount: Number(order.totalAmount),
           stockRestored: wasStockDeducted,
-          refunded: !isExchange && wasPaid,
+          paymentTransition: paymentPatch.paymentStatus ?? null,
           isExchange,
           claimType: isExchange ? order.claimType ?? null : undefined,
           exchangeNewOrderId: exchangeNewOrderId ?? undefined,
@@ -767,14 +868,19 @@ export async function PATCH(
   if (!order) {
     return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 });
   }
-  if (
-    order.status === "COMPLETED" ||
-    order.status === "RETURN_REQUESTED" ||
-    order.status === "RETURN_ACCEPTED" ||
-    order.status === "CANCELLED" ||
-    order.status === "RETURNED" ||
-    order.status === "EXCHANGED"
-  ) {
+  // PATCH 가능한 상태: PENDING / PREPARING / PREPARING_PACKED / SHIPPED 만 (출고 흐름 진행 중).
+  // 그 외는 잠금 — 항목·송장·출고예정 모두 수정 불가.
+  const lockedStatuses = [
+    "COMPLETED",
+    "RETURN_REQUESTED",
+    "RETURN_ACCEPTED",
+    "RETURN_COLLECTED",
+    "RETURN_INSPECTED",
+    "CANCELLED",
+    "RETURNED",
+    "EXCHANGED",
+  ];
+  if (lockedStatuses.includes(order.status)) {
     return NextResponse.json(
       { error: `${order.status} 상태에서는 수정할 수 없습니다` },
       { status: 400 },
