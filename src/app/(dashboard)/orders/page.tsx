@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertCircle,
+  BookOpen,
   CalendarClock,
   CalendarRange,
   ChevronRight,
@@ -36,6 +37,7 @@ import {
   JmTableToolbar,
   JmTableToolbarActions,
   JmTableToolbarFilters,
+  JmTableToolbarMore,
   JmTableToolbarSearch,
 } from "@/jm";
 
@@ -303,15 +305,34 @@ export default function OrdersBoardPage() {
                   )}
                 </JmPill>
               ))}
-              <JmSelect
-                size="sm"
-                value={channelFilter}
-                onChange={(v) => setChannelFilter(v as ChannelFilter)}
-                options={channelOptions}
-                className="w-[180px]"
-              />
+              <JmTableToolbarMore
+                count={
+                  (groupFilter !== "all" ? 1 : 0) +
+                  (channelFilter !== "all" ? 1 : 0)
+                }
+                onReset={() => {
+                  setGroupFilter("all");
+                  setChannelFilter("all");
+                }}
+              >
+                <JmSelect
+                  size="sm"
+                  value={channelFilter}
+                  onChange={(v) => setChannelFilter(v as ChannelFilter)}
+                  options={channelOptions}
+                  className="w-[180px]"
+                />
+              </JmTableToolbarMore>
             </JmTableToolbarFilters>
             <JmTableToolbarActions>
+              <JmButton
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/orders/help")}
+              >
+                <BookOpen className="size-4" />
+                도움말
+              </JmButton>
               <JmIconButton
                 variant="ghost"
                 size="sm"
@@ -401,19 +422,22 @@ export default function OrdersBoardPage() {
                         onClick={() => openDetail(order.id)}
                       >
                         <JmTableCell>
-                          <span className="font-mono text-[13px] font-medium text-[var(--jm-text)]">
-                            {order.orderNo}
-                          </span>
-                          {order.orderNo.endsWith("-EX") && (
-                            <span className="ml-1.5 inline-flex items-center rounded bg-[var(--jm-info-bg)] px-1 py-0.5 text-[10px] text-[var(--jm-info-fg)]">
-                              교환 발송
+                          <div className="flex flex-col gap-0">
+                            <span
+                              className="block truncate font-mono text-[13px] font-medium text-[var(--jm-text)]"
+                              title={order.orderNo}
+                            >
+                              {order.orderNo}
                             </span>
-                          )}
-                          {order.channelOrderNo && (
-                            <span className="block font-mono text-[10px] text-[var(--jm-text-subtle)]">
-                              {order.channelOrderNo}
-                            </span>
-                          )}
+                            {order.channelOrderNo && (
+                              <span
+                                className="block truncate font-mono text-[10px] text-[var(--jm-text-subtle)]"
+                                title={order.channelOrderNo}
+                              >
+                                {order.channelOrderNo}
+                              </span>
+                            )}
+                          </div>
                         </JmTableCell>
                         <JmTableCell>
                           <StatusBadge
