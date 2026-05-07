@@ -8,11 +8,15 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  AlertCircle,
+  CheckCircle2,
   Download,
+  Inbox,
   Loader2,
   Package,
   Plus,
   RefreshCw,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 
@@ -72,6 +76,7 @@ interface MappingRow {
 
 interface PendingRow {
   id: string;
+  channelId: string;
   channelOrderNo: string;
   status:
     | "UNMAPPED_SKU"
@@ -83,11 +88,34 @@ interface PendingRow {
   rawPayload: {
     channelOrderNo?: string;
     buyer?: { name?: string };
-    items?: Array<{ channelSku: string; quantity: number }>;
+    items?: Array<{
+      channelSku: string;
+      channelProductName?: string;
+      quantity: number;
+    }>;
   };
   createdAt: string;
   channel: { id: string; name: string; code: string };
   resolvedOrderId: string | null;
+}
+
+interface MappingSuggestion {
+  productId: string;
+  productName: string;
+  productSku: string;
+  score: number;
+  reason: string;
+}
+
+interface ImportStats {
+  pendingByStatus: Record<string, number>;
+  last7Days: { imported: number; pending: number; resolved: number };
+  missingSkuTop: Array<{
+    channelSku: string;
+    channelId: string;
+    channelName: string;
+    count: number;
+  }>;
 }
 
 const PENDING_STATUS_LABEL: Record<PendingRow["status"], string> = {
@@ -132,6 +160,8 @@ export default function ChannelImportsPage() {
           1 — Mock 어댑터로 dev 검증 가능, 실 채널은 가입 후 어댑터 추가)
         </p>
       </div>
+
+      <StatsBar />
 
       <Tabs defaultValue="trigger" className="flex flex-1 flex-col">
         <div className="border-b border-border px-5 py-2">
@@ -263,6 +293,9 @@ function PendingSection({ channels }: { channels: Channel[] }) {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<"" | PendingRow["status"]>("");
   const [channelFilter, setChannelFilter] = useState<string>("");
+  const [suggestionTarget, setSuggestionTarget] = useState<PendingRow | null>(
+    null,
+  );
 
   const pendingQuery = useQuery({
     queryKey: queryKeys.channels.pending({
@@ -427,6 +460,17 @@ function PendingSection({ channels }: { channels: Channel[] }) {
                   <TableCell>
                     {isOpen ? (
                       <div className="flex justify-end gap-1">
+                        {p.status === "UNMAPPED_SKU" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[12px]"
+                            onClick={() => setSuggestionTarget(p)}
+                          >
+                            <Sparkles className="mr-0.5 h-3 w-3" />
+                            추천
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -468,9 +512,273 @@ function PendingSection({ channels }: { channels: Channel[] }) {
       </Table>
 
       <p className="text-[11px] text-muted-foreground">
-        매핑 누락 항목은 SKU 매핑 탭에서 매핑을 등록한 뒤 [변환] 클릭. 매핑이
-        여전히 누락이면 reason 만 갱신되고 보류 유지.
+        매핑 누락 항목은 [추천] 으로 ERP 상품 매칭 후 매핑 → [변환] 클릭. 또는
+        SKU 매핑 탭에서 직접 매핑 후 [변환].
       </p>
+
+      <SuggestionDialog
+        target={suggestionTarget}
+        onClose={() => setSuggestionTarget(null)}
+      />
+    </div>
+  );
+}
+
+// ─────────── 매핑 추천 Dialog (보류 큐의 UNMAPPED_SKU 항목 1클릭 매핑)
+
+function SuggestionDialog({
+  target,
+  onClose,
+}: {
+  target: PendingRow | null;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const open = !!target;
+  const items = target?.rawPayload.items ?? [];
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            매핑 추천 {target ? `· ${target.channelOrderNo}` : ""}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[60vh] space-y-3 overflow-auto px-1">
+          {items.map((it, idx) => (
+            <SkuSuggestionRow
+              key={`${it.channelSku}-${idx}`}
+              channelId={target!.channelId}
+              channelSku={it.channelSku}
+              channelProductName={it.channelProductName}
+              quantity={it.quantity}
+              onMapped={() => {
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.channels.pending(),
+                });
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.channels.mappings(target!.channelId),
+                });
+              }}
+            />
+          ))}
+        </div>
+        <DialogFooter>
+          <p className="mr-auto text-[11px] text-muted-foreground">
+            매핑 등록 후 닫고 [변환] 버튼으로 정식 주문 승격
+          </p>
+          <Button variant="outline" onClick={onClose}>
+            닫기
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SkuSuggestionRow({
+  channelId,
+  channelSku,
+  channelProductName,
+  quantity,
+  onMapped,
+}: {
+  channelId: string;
+  channelSku: string;
+  channelProductName?: string;
+  quantity: number;
+  onMapped: () => void;
+}) {
+  const [mapped, setMapped] = useState(false);
+  const suggestionsQuery = useQuery({
+    queryKey: ["channel-suggest", channelId, channelSku],
+    queryFn: () => {
+      const params = new URLSearchParams({ sku: channelSku });
+      if (channelProductName) params.set("name", channelProductName);
+      return apiGet<MappingSuggestion[]>(
+        `/api/channels/${channelId}/suggest?${params.toString()}`,
+      );
+    },
+  });
+
+  const mapMutation = useMutation({
+    mutationFn: (productId: string) =>
+      apiMutate(`/api/channels/${channelId}/mappings`, "POST", {
+        channelSku,
+        channelName: channelProductName,
+        productId,
+      }),
+    onSuccess: () => {
+      toast.success(`${channelSku} 매핑 등록됨`);
+      setMapped(true);
+      onMapped();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "매핑 실패"),
+  });
+
+  return (
+    <div className="rounded-md border border-border p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="font-mono text-[13px] font-medium">{channelSku}</span>
+          {channelProductName && (
+            <span className="text-[11px] text-muted-foreground">
+              채널명: {channelProductName} · 수량 {quantity}
+            </span>
+          )}
+        </div>
+        {mapped && (
+          <Badge variant="default">
+            <CheckCircle2 className="mr-0.5 h-3 w-3" />
+            매핑됨
+          </Badge>
+        )}
+      </div>
+      {!mapped && (
+        <div className="mt-2 space-y-1">
+          {suggestionsQuery.isPending ? (
+            <Skeleton className="h-12 w-full" />
+          ) : (suggestionsQuery.data ?? []).length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">
+              자동 추천 결과 없음 — SKU 매핑 탭에서 직접 등록하세요
+            </p>
+          ) : (
+            (suggestionsQuery.data ?? []).map((s) => {
+              const isThisPending =
+                mapMutation.isPending && mapMutation.variables === s.productId;
+              return (
+                <div
+                  key={s.productId}
+                  className="flex items-center justify-between gap-2 rounded border border-border-subtle p-2 text-[12px]"
+                >
+                  <div className="flex flex-1 flex-col">
+                    <span className="text-foreground">{s.productName}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {s.productSku} · {s.reason}
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="shrink-0">
+                    {s.score}점
+                  </Badge>
+                  <Button
+                    size="sm"
+                    className="h-7 shrink-0 text-[12px]"
+                    onClick={() => mapMutation.mutate(s.productId)}
+                    disabled={mapMutation.isPending}
+                  >
+                    {isThisPending ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : null}
+                    매핑
+                  </Button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────── 통계 바 (페이지 헤더 다음, 항상 노출)
+
+function StatsBar() {
+  const statsQuery = useQuery({
+    queryKey: ["channels", "stats"],
+    queryFn: () => apiGet<ImportStats>("/api/channels/stats"),
+  });
+  const data = statsQuery.data;
+
+  return (
+    <div className="border-b border-border bg-muted/30 px-5 py-2.5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard
+          icon={<AlertCircle className="h-3.5 w-3.5" />}
+          label="매핑 누락 보류"
+          value={data?.pendingByStatus.UNMAPPED_SKU ?? 0}
+          loading={statsQuery.isPending}
+          tone={
+            (data?.pendingByStatus.UNMAPPED_SKU ?? 0) > 0
+              ? "warning"
+              : "default"
+          }
+        />
+        <StatCard
+          icon={<Inbox className="h-3.5 w-3.5" />}
+          label="최근 7일 import"
+          value={data?.last7Days.imported ?? 0}
+          loading={statsQuery.isPending}
+        />
+        <StatCard
+          icon={<Sparkles className="h-3.5 w-3.5" />}
+          label="최근 7일 변환됨"
+          value={data?.last7Days.resolved ?? 0}
+          loading={statsQuery.isPending}
+        />
+        <StatCard
+          icon={<Package className="h-3.5 w-3.5" />}
+          label="전체 보류"
+          value={
+            (data?.pendingByStatus.UNMAPPED_SKU ?? 0) +
+            (data?.pendingByStatus.VALIDATION_FAILED ?? 0)
+          }
+          loading={statsQuery.isPending}
+        />
+      </div>
+      {data && data.missingSkuTop.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+          <span className="text-muted-foreground">자주 누락 SKU:</span>
+          {data.missingSkuTop.slice(0, 5).map((s) => (
+            <Badge
+              key={`${s.channelId}-${s.channelSku}`}
+              variant="outline"
+              className="font-mono"
+            >
+              {s.channelSku}
+              <span className="ml-1 text-muted-foreground">×{s.count}</span>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  loading,
+  tone = "default",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  loading: boolean;
+  tone?: "default" | "warning";
+}) {
+  return (
+    <div
+      className={`rounded-md border bg-card p-2.5 ${
+        tone === "warning"
+          ? "border-[var(--jm-warning-bg, #fef3c7)]"
+          : "border-border"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div
+        className={`mt-1 text-[18px] font-semibold tabular-nums ${
+          tone === "warning" ? "text-amber-600 dark:text-amber-500" : ""
+        }`}
+      >
+        {loading ? <Skeleton className="h-5 w-12" /> : value.toLocaleString("ko-KR")}
+      </div>
     </div>
   );
 }

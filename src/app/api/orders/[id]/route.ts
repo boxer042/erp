@@ -5,6 +5,11 @@ import { fifoConsume, ensureBulkStock } from "@/lib/inventory/fifo";
 import { orderUpdateSchema } from "@/lib/validators/order";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  dispatchAcceptReturn,
+  dispatchPushTracking,
+  dispatchRejectReturn,
+} from "@/lib/channels/outbound";
 
 /**
  * 교환 새 주문번호 — 원본 주문번호 뒤에 -EX 접미사. 사용자가 한눈에 교환 새 주문임을 인지.
@@ -472,6 +477,30 @@ export async function PUT(
       });
       return u;
     });
+
+    // Outbound — 매장 결정을 채널에 자동 통보 (best-effort)
+    if (
+      (action === "accept_return" || action === "reject_return") &&
+      order.channelId &&
+      order.channelOrderNo
+    ) {
+      const ctx = {
+        orderId: id,
+        channelId: order.channelId,
+        channelOrderNo: order.channelOrderNo,
+      };
+      if (action === "accept_return") {
+        await dispatchAcceptReturn(prisma, ctx, auditUser?.id ?? null);
+      } else {
+        await dispatchRejectReturn(
+          prisma,
+          ctx,
+          reasonInput ?? "",
+          auditUser?.id ?? null,
+        );
+      }
+    }
+
     return NextResponse.json(updated);
   }
 
@@ -683,6 +712,26 @@ export async function PUT(
     });
     return u;
   });
+
+  // Outbound — ship 액션 시 채널에 송장 자동 push (best-effort, 실패해도 ERP 액션 영향 X)
+  if (action === "ship" && updated.channelId && updated.channelOrderNo) {
+    const carrier = updated.trackingCarrier ?? "";
+    const trackingNo = updated.trackingNumber ?? "";
+    if (carrier || trackingNo) {
+      // 트랜잭션 외부 — 채널 API 호출이 길거나 실패해도 ERP 트랜잭션은 이미 commit
+      await dispatchPushTracking(
+        prisma,
+        {
+          orderId: id,
+          channelId: updated.channelId,
+          channelOrderNo: updated.channelOrderNo,
+        },
+        carrier,
+        trackingNo,
+        auditUserShip?.id ?? null,
+      );
+    }
+  }
 
   return NextResponse.json(updated);
 }
