@@ -94,8 +94,70 @@ model SalesChannel {
   orders                  Order[]
   sellingCosts            SellingCost[]
   channelCategoryMappings ChannelCategoryMapping[]
+  productMappings         ChannelProductMapping[]
+  pendingOrders           PendingChannelOrder[]
 
   @@map("sales_channels")
+}
+
+/**
+ * 채널 SKU ↔ ERP Product 매핑.
+ * 외부 채널(쿠팡·네이버 등) 의 상품 코드를 ERP Product 와 연결.
+ * import 시 raw order 의 channelSku 로 lookup → 매칭 안 되면 보류 큐로 격리.
+ *
+ * unique: 한 채널 내에서 channelSku 는 한 ERP product 에만 매핑.
+ */
+model ChannelProductMapping {
+  id          String       @id @default(uuid())
+  channelId   String       @map("channel_id")
+  channel     SalesChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channelSku  String       @map("channel_sku")
+  /** 채널이 보내주는 상품명 — 매핑 UI 에서 hint 로 표시 */
+  channelName String?      @map("channel_name")
+  productId   String       @map("product_id")
+  product     Product      @relation(fields: [productId], references: [id])
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([channelId, channelSku])
+  @@index([productId])
+  @@map("channel_product_mappings")
+}
+
+/**
+ * 외부 채널 import 보류 큐.
+ * SKU 매핑 누락 등으로 즉시 Order 로 변환 못한 raw order 를 격리 보관.
+ * 사용자가 매핑 후 resolve 하면 정식 Order 로 승격.
+ */
+model PendingChannelOrder {
+  id              String                    @id @default(uuid())
+  channelId       String                    @map("channel_id")
+  channel         SalesChannel              @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  /** 채널 측 주문번호 — 동일 채널 내 unique. 중복 import 방지 */
+  channelOrderNo  String                    @map("channel_order_no")
+  /** 어댑터가 받아온 원본 payload 전체. JSON 으로 보존해 추후 디버깅·재변환 가능 */
+  rawPayload      Json                      @map("raw_payload")
+  /** 보류 사유 — UNMAPPED_SKU(매핑 누락), VALIDATION_FAILED(필드 부족), DUPLICATE(중복), OTHER */
+  status          PendingChannelOrderStatus @default(UNMAPPED_SKU)
+  /** 사람이 읽을 사유 메모 — 어떤 SKU 가 누락됐는지 등 */
+  reason          String?
+  /** resolved 되어 정식 Order 로 변환된 경우 그 Order 의 id */
+  resolvedOrderId String?                   @unique @map("resolved_order_id")
+  resolvedAt      DateTime?                 @map("resolved_at")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+
+  @@unique([channelId, channelOrderNo])
+  @@index([status])
+  @@map("pending_channel_orders")
+}
+
+enum PendingChannelOrderStatus {
+  UNMAPPED_SKU       // 매핑 안 된 SKU 가 있어 보류
+  VALIDATION_FAILED  // 필수 필드 누락 등
+  DUPLICATE          // 이미 Order 로 import 된 채널주문번호
+  RESOLVED           // 매핑 후 정식 Order 로 승격됨
+  DISCARDED          // 사용자가 import 거부 (스팸·테스트 주문 등)
 }
 
 model ChannelFee {
@@ -288,6 +350,7 @@ model Product {
   setComponents      SetComponent[]      @relation("SetParent")
   partOfSets         SetComponent[]      @relation("SetChild")
   productMappings    ProductMapping[]
+  channelMappings    ChannelProductMapping[]
   channelPricings    ChannelPricing[]
   repairPackageParts RepairPackagePart[]
   inventory          Inventory?
@@ -800,12 +863,59 @@ model PurchaseOrderItem {
 // ============================================================
 
 enum OrderStatus {
-  PENDING       // 접수 — 외부 채널 import / B2B 미확정 (재고 미차감)
-  PREPARING     // 준비 — 피킹/포장 (재고 차감됨)
-  SHIPPED       // 발송 — 택배 인계 / 배달 출발
-  COMPLETED     // 완료 — 인도/픽업 종결
+  PENDING          // 접수 — 외부 채널 import / B2B 미확정 (재고 미차감)
+  PREPARING        // 준비 — 피킹/포장 (재고 차감됨)
+  SHIPPED          // 발송 — 택배 인계 / 배달 출발
+  COMPLETED        // 완료 — 인도/픽업 종결
+  RETURN_REQUESTED // 반품 요청 — 매장 확인 대기 (수락/반려 결정 전)
+  RETURN_ACCEPTED  // 반품 수락 — 회수 대기 (재고 복원 X, 환불 X). 회수 완료 시 환불 또는 교환으로 분기
   CANCELLED
-  RETURNED
+  RETURNED         // 반품 종결 (환불) — 재고 복원 + 환불 처리
+  EXCHANGED        // 교환 종결 — 재고 복원 + 새 주문(exchangeOrderId) 생성. 차액 정산은 새 주문에서.
+}
+
+/**
+ * 결제 축 — 출고 상태(OrderStatus) 와 별개의 재무 상태.
+ *  - UNPAID: 미수 (외상). UNPAID 인 채로 출고는 가능하지만 customer ledger 에 잔액 누적
+ *  - PAID: 결제 완료
+ *  - PARTIAL_REFUND: 일부 환불 (부분 반품 시)
+ *  - REFUNDED: 전액 환불 (전체 반품·취소 후 환불)
+ */
+enum OrderPaymentStatus {
+  UNPAID
+  PAID
+  PARTIAL_REFUND
+  REFUNDED
+}
+
+/**
+ * 클레임 종류 — 손님이 어떤 결과를 원하는지. 회수 후 처리 분기.
+ *  - REFUND:             환불 종결 (RETURNED)
+ *  - EXCHANGE_SAME:      같은 상품 재발송. 새 주문 자동 생성 (항목 복제, totalAmount=0)
+ *  - EXCHANGE_DIFFERENT: 다른 상품으로 교체. 새 주문 자동 생성 (빈 항목, 사용자 편집 + 차액 정산)
+ */
+enum OrderClaimType {
+  REFUND
+  EXCHANGE_SAME
+  EXCHANGE_DIFFERENT
+}
+
+/**
+ * 클레임 사유 — 책임 소재 구분. 통계·정책(운임 부담 등)에 활용.
+ *  - DEFECTIVE:          불량/하자 — 매장 책임
+ *  - DAMAGED_IN_TRANSIT: 배송 중 파손 — 매장/택배사 책임
+ *  - WRONG_ITEM:         오배송 — 매장 책임
+ *  - CHANGE_MIND:        단순 변심 — 손님 책임
+ *  - SIZE_COLOR:         사이즈/색상 변경 — 부분 손님 책임
+ *  - OTHER:              기타
+ */
+enum OrderClaimReason {
+  DEFECTIVE
+  DAMAGED_IN_TRANSIT
+  WRONG_ITEM
+  CHANGE_MIND
+  SIZE_COLOR
+  OTHER
 }
 
 enum FulfillmentType {
@@ -846,6 +956,22 @@ model Order {
   totalAmount         Decimal             @default(0) @map("total_amount") @db.Decimal(15, 2)
   commissionAmount    Decimal             @default(0) @map("commission_amount") @db.Decimal(15, 2)
   paymentMethod       OrderPaymentMethod? @map("payment_method")
+  /** 결제 축 — 출고 상태와 별개. 외상/환불 표현용 */
+  paymentStatus       OrderPaymentStatus  @default(UNPAID) @map("payment_status")
+  /** 반품 흐름 timestamp — 운영 로그 + 단계 추적 */
+  returnRequestedAt   DateTime?           @map("return_requested_at")
+  returnAcceptedAt    DateTime?           @map("return_accepted_at")
+  returnRejectedAt    DateTime?           @map("return_rejected_at")
+  /** 클레임 분기 — 환불/같은상품교환/다른상품교환. RETURN_REQUESTED 시 결정. */
+  claimType           OrderClaimType?     @map("claim_type")
+  claimReason         OrderClaimReason?   @map("claim_reason")
+  /** 교환 종결 시 새 주문 link — 차액 정산은 새 주문에서 */
+  exchangeOrderId     String?             @unique @map("exchange_order_id")
+  exchangeOrder       Order?              @relation("OrderExchange", fields: [exchangeOrderId], references: [id])
+  exchangedFromOrders Order[]             @relation("OrderExchange")
+  exchangedAt         DateTime?           @map("exchanged_at")
+  /** 클레임 메모 — 손님 자유 사유 + 매장 처리 메모 (claimReason enum 외 보충) */
+  returnReason        String?             @map("return_reason")
   taxInvoiceRequested Boolean             @default(false) @map("tax_invoice_requested")
   taxInvoicedAt       DateTime?           @map("tax_invoiced_at")
   memo                String?
@@ -866,6 +992,9 @@ model Order {
   @@index([channelId, orderDate])
   @@index([status])
   @@index([status, expectedShipDate])
+  // 채널 import 중복 방지 — 동일 채널 내 channelOrderNo 는 한 번만 import.
+  // PostgreSQL 의 unique 는 NULL 을 unique 로 보지 않으므로 오프라인(channelId=null) 주문은 영향 X.
+  @@unique([channelId, channelOrderNo])
   // repairTicketId / rentalId 는 @unique 가 자동으로 unique index 생성 — 별도 @@index 불필요
   @@map("orders")
 }
@@ -1972,6 +2101,9 @@ model PosSession {
   // soft delete — 다른 기기가 옛 sessionStorage 데이터로 sync 해서 부활하는 것을 막기 위함.
   // null = active. 값 있으면 GET 응답에서 제외 + POST 시 그 id 로 들어온 upsert 거부.
   deletedAt            DateTime? @map("deleted_at")
+  // 장바구니 저장 — null = 그리드 활성, 값 있으면 그리드에서 숨기되 "저장된 상담" 페이지에서 부활 가능.
+  // 라인의 productId 만 의미있고 가격은 부활 시점에 현재 sellingPrice 로 다시 계산.
+  parkedAt             DateTime? @map("parked_at")
 
   // 역참조 — 이 세션에서 만든 미등록 손님의 수리 티켓들 (등록 손님은 customer.repairs 로)
   repairTickets RepairTicket[]
@@ -1980,5 +2112,6 @@ model PosSession {
   @@index([userId, updatedAt])
   @@index([customerId])
   @@index([deletedAt])
+  @@index([userId, parkedAt])
   @@map("pos_sessions")
 }

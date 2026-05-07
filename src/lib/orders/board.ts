@@ -12,8 +12,11 @@ export type OrderStatusForBoard =
   | "PREPARING"
   | "SHIPPED"
   | "COMPLETED"
+  | "RETURN_REQUESTED"
+  | "RETURN_ACCEPTED"
   | "CANCELLED"
-  | "RETURNED";
+  | "RETURNED"
+  | "EXCHANGED";
 
 export type BoardGroupKey =
   | "overdue"
@@ -56,7 +59,9 @@ export function utcDayDiff(a: Date, b: Date): number {
  *  - PENDING/PREPARING + expectedShipDate=null: unscheduled (예정일 미정 — 사용자가 채워야 함)
  *  - PENDING/PREPARING + 날짜 있음: 일수 차이로
  *      < 0 → overdue, = 0 → today, ≤ 7 → thisWeek, > 7 → future
- *  - 그 외(COMPLETED/CANCELLED/RETURNED): null (워크보드 미노출)
+ *  - 그 외 (COMPLETED/RETURN_REQUESTED/RETURN_ACCEPTED/CANCELLED/RETURNED/EXCHANGED): null
+ *    └ 반품 흐름(RETURN_REQUESTED/RETURN_ACCEPTED) 은 별도 "반품 처리" 뷰에서 관리 예정.
+ *      워크보드는 출고 흐름 전용으로 단순화 유지.
  */
 export function classifyBoardGroup(
   status: OrderStatusForBoard,

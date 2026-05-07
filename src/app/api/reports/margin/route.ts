@@ -99,6 +99,10 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       status: { in: [...ACTIVE_STATUSES] },
       orderDate: { gte: from, lt: to },
       ...(channelId ? { channelId } : {}),
+      // 교환 발송용 새 주문은 매출 중복 인식 방지를 위해 제외.
+      // exchangedFromOrders = 이 주문이 다른 주문의 교환 새 주문(reverse relation).
+      // 비어있으면 정상 매출 주문, 비어있지 않으면 교환 발송용.
+      exchangedFromOrders: { none: {} },
     },
     include: {
       channel: { select: { id: true, name: true, code: true } },

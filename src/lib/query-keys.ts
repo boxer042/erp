@@ -44,6 +44,8 @@ export const queryKeys = {
   channels: {
     all: ["channels"] as const,
     list: () => ["channels", "list"] as const,
+    mappings: (channelId: string) => ["channels", "mappings", channelId] as const,
+    pending: (params?: Record<string, unknown>) => ["channels", "pending", params ?? {}] as const,
   },
   categories: {
     all: ["categories"] as const,

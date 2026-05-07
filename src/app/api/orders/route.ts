@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
   const fulfillmentType = searchParams.get("fulfillmentType");
   const view = searchParams.get("view"); // "board" | (default: list)
   const search = searchParams.get("search") || "";
+  // 채널 필터 — "all"(또는 미지정)·"offline"(channelId=null)·<channelId>
+  const channelFilter = searchParams.get("channelFilter");
 
   const where: Prisma.OrderWhereInput = {
     ...(status ? { status: status as OrderStatus } : {}),
@@ -44,6 +46,11 @@ export async function GET(request: NextRequest) {
   if (view === "board") {
     where.status = { in: ["PENDING", "PREPARING", "SHIPPED"] };
     where.fulfillmentType = { in: ["DELIVERY", "SHIPPING"] };
+    if (channelFilter === "offline") {
+      where.channelId = null;
+    } else if (channelFilter && channelFilter !== "all") {
+      where.channelId = channelFilter;
+    }
   }
 
   const orders = await prisma.order.findMany({
@@ -92,7 +99,17 @@ export async function GET(request: NextRequest) {
     if (!group) continue;
     grouped[group].push(o);
   }
-  return NextResponse.json({ groups: grouped, today: today.toISOString() });
+  // 채널 필터 옵션 — 활성 채널 전체 (필터 selection 과 무관하게 항상 동일한 옵션 노출)
+  const channels = await prisma.salesChannel.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, code: true },
+    orderBy: { name: "asc" },
+  });
+  return NextResponse.json({
+    groups: grouped,
+    today: today.toISOString(),
+    channels,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -158,6 +175,10 @@ export async function POST(request: NextRequest) {
 
   // ERP 수동 등록은 PENDING 으로 시작 (재고 미차감 — prepare 액션에서 차감)
   const isPickup = data.fulfillmentType === "PICKUP";
+  // paymentStatus 산출 — paymentMethod=UNPAID 또는 미입력은 외상, 그 외는 결제 완료.
+  // 결제 상태는 출고 상태와 별개의 축. 추후 부분환불/환불 액션에서 갱신.
+  const paymentStatus =
+    !data.paymentMethod || data.paymentMethod === "UNPAID" ? "UNPAID" : "PAID";
   const order = await prisma.order.create({
     data: {
       orderNo: generateOrderNo(),
@@ -176,6 +197,7 @@ export async function POST(request: NextRequest) {
           ? null
           : new Date(data.expectedShipDate),
       paymentMethod: data.paymentMethod ?? null,
+      paymentStatus,
       subtotalAmount,
       discountAmount,
       shippingFee,

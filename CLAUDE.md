@@ -135,9 +135,14 @@ src/
 │   │   ├── expenses/           # 지출
 │   │   ├── audit-logs/         # 감사 로그
 │   │   ├── reports/margin/     # 마진 리포트
-│   │   ├── channels/           # 판매채널
+│   │   ├── channels/           # 판매채널 (+ /channels/imports — 외부 채널 import 통합 페이지)
 │   │   └── settings/           # 회사정보 · 랜딩 · 미디어
-│   ├── (pos)/              # POS (모바일/태블릿 우선, repair-v2 / rentals / customer profile 통합)
+│   ├── (pos)/              # POS (모바일/태블릿 우선) — 자세한 운영 흐름은 [docs/POS.md](docs/POS.md)
+│   │       /pos                 손님 그리드
+│   │       /pos/customer/[sid]  손님 작업 페이지 (상품/수리/임대)
+│   │       /pos/repairs         수리관리 (6섹션)
+│   │       /pos/rentals         임대관리 (3섹션)
+│   │       /pos/parked          저장된 상담 (장바구니 저장된 PosSession)
 │   ├── (print)/            # 인쇄용 — 견적서, 거래명세표, 발주서, 영수증, 시리얼 라벨, 거래처 원장, 수리 영수증
 │   ├── repair/approve/     # 손님용 수리 승인 페이지 (토큰 기반, 비인증)
 │   ├── api/                # REST API 라우트
@@ -177,6 +182,7 @@ src/
 │   ├── audit.ts                               # 감사 로그 기록
 │   ├── inventory/fifo.ts                      # FIFO 로트 소진/복원 공용 헬퍼
 │   ├── orders/board.ts                        # 주문 워크보드 분류 로직
+│   ├── channels/                              # 외부 채널 import — types.ts/import.ts/mock.ts/registry.ts
 │   ├── repair.ts, repair-inventory.ts         # 수리 합계 계산 / 부속 재고 차감·복원
 │   ├── purchase-order.ts                      # 발주 상태 전이 헬퍼
 │   ├── customer-ledger.ts, supplier-ledger.ts # 원장 잔액 재계산
@@ -489,6 +495,63 @@ const open = async (id) => {
 - ❌ "로딩 중..." 텍스트 출력 — 모두 Skeleton으로 대체
 - ❌ mutation 진행 중 버튼 비활성화 누락 — 다중 클릭/중복 요청 가능
 
+### 6. 페이지 레이아웃 패딩 — 리스트와 상세는 다르게
+
+> **⚠️ jm 디자인 시스템 적용 ERP 페이지(`(dashboard)/orders`, `(dashboard)/purchase-orders`, `(dashboard)/customers` 등) 한정.**
+> shadcn 잔존 페이지(suppliers, products 등)는 자체 패턴 유지.
+
+ERP `(dashboard)/` 안에서 jm 으로 만든 페이지는 **리스트 / 상세 두 가지 표준 컨테이너 패턴 중 하나**를 따른다. 새 페이지·상세 페이지를 만들 때마다 임의 값(`p-4`, `max-w-[1280px]` 등)을 새로 적기 금지.
+
+#### 리스트 페이지 (KPI + 테이블 형태) — `(dashboard)/orders`, `purchase-orders`, `customers` 리스트
+```tsx
+<div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+  <div className="flex w-full flex-col gap-6 p-4">
+    {/* KPI grid */}
+    {/* JmCard with toolbar + table */}
+  </div>
+</div>
+```
+- 외곽: `flex min-h-full flex-col bg-[var(--jm-bg)]`
+- 내부: `flex w-full flex-col gap-6 p-4` — **풀폭 + p-4 (16px)**
+- 폭 제한 없음 — 테이블이 와이드 모니터에서 자연스럽게 넓어지도록
+
+#### 상세 페이지 (단건 상세 + 액션) — `(dashboard)/purchase-orders/[id]`, `customers/[id]`
+```tsx
+<div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+  {/* 스티키 헤더 — 페이지 폭 제한 없이 가로 꽉 채움 (액션 버튼 다 보이게) */}
+  <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+    <JmIconButton aria-label="뒤로" onClick={...}><ArrowLeft /></JmIconButton>
+    <span className="text-jm-base font-semibold">{title}</span>
+    <div className="ml-auto flex items-center gap-1.5">{/* 액션들 */}</div>
+  </div>
+
+  <JmContainer width="default" padded={false} className="space-y-6 p-6">
+    {/* 본문 — KPI / 탭 / 카드들 */}
+  </JmContainer>
+</div>
+```
+- 헤더: 페이지 폭 제한 없이 sticky, **`px-6 py-3` (좌우 24px / 상하 12px)**
+- 본문: `<JmContainer width="default" padded={false} className="space-y-6 p-6">`
+  - `width="default"` = max-w 1280px + 가운데 정렬
+  - `padded={false}` 로 컨테이너 기본 padding 끄고 명시적 `p-6` 사용 (24px)
+- 폭 제한 1280px — 와이드 모니터에서 시선 이동 부담 줄임
+
+**금지 패턴**:
+```tsx
+// ❌ 상세 페이지에 리스트용 p-4 사용
+<div className="flex w-full max-w-[1280px] flex-col gap-6 self-center p-4">
+
+// ❌ JmContainer 안 쓰고 max-w-[NNNNpx] 직접 박기
+<div className="mx-auto max-w-[1280px] p-6">
+
+// ❌ 헤더에 폭 제한 (액션 버튼 가려질 수 있음)
+<JmContainer><header>...</header></JmContainer>
+```
+
+**판단 기준**:
+- KPI + 테이블 위주 (목록·보드) → **리스트 패턴 (`p-4`, 풀폭)**
+- 단건 + 헤더 액션 + 탭/카드 (상세·편집·리포트) → **상세 패턴 (스티키 헤더 `px-6 py-3` + `JmContainer p-6`)**
+
 ---
 
 ## 데이터베이스 스키마
@@ -545,14 +608,21 @@ const open = async (id) => {
 - **QuotationItem** — 견적 품목 (productId/supplierProductId optional, listPrice/discountAmount/unitPrice/totalPrice)
 - **Statement / StatementItem** — 거래명세표 (STA 번호, 발행일). 견적서·주문에서 전환
 
-### 주문
-- **Order** — 주문 (ORD[YYMMDD]-[4자리])
-  - `status`: `PENDING`(접수, 재고 미차감) → `PREPARING`(준비, 재고 차감) → `SHIPPED`(발송) → `COMPLETED` + `CANCELLED` / `RETURNED`
+### 주문 ⚠️ 3축 모델 — 자세한 설계는 [docs/ORDERS_SYSTEM.md](docs/ORDERS_SYSTEM.md) 참고
+
+주문 도메인은 **출고·결제·반품(클레임) 3축**으로 분리되어 있음. 한 축의 상태를 다른 축의 의미로 오인하지 않도록 주의.
+
+- **Order** — 주문 (ORD[YYMMDD]-[4자리]). 교환 새 주문은 원본번호 + `-EX` 접미사
+  - **출고 축** `status`: `PENDING`(접수, 재고 미차감) → `PREPARING`(준비, 재고 차감) → `SHIPPED`(발송) → `COMPLETED` + `CANCELLED` / `RETURN_REQUESTED` / `RETURN_ACCEPTED` / `RETURNED` / `EXCHANGED`
+  - **결제 축** `paymentStatus`: `UNPAID`/`PAID`/`PARTIAL_REFUND`/`REFUNDED` — 출고 축과 직교. 외상(UNPAID 출고), 환불 표현용
+  - **클레임 축** `claimType`(`REFUND`/`EXCHANGE_SAME`/`EXCHANGE_DIFFERENT`) + `claimReason`(`DEFECTIVE`/`DAMAGED_IN_TRANSIT`/`WRONG_ITEM`/`CHANGE_MIND`/`SIZE_COLOR`/`OTHER`) — 손님 의도 + 책임 소재
   - `fulfillmentType`: `PICKUP`(매장 수령, POS 즉시 종결) / `DELIVERY`(자체 배달) / `SHIPPING`(택배). PICKUP 은 워크보드 미노출
   - `expectedShipDate`: 출고 예정일 (DELIVERY/SHIPPING 만). 워크보드의 지연/오늘/이번주 분류
   - `repairTicketId` / `rentalId` (각각 `@unique`) — 수리·임대 결제 1:1 연결
   - `quotationId` — 판매 견적서 전환 시 연결
+  - `exchangeOrderId` (`@unique`, self-relation `OrderExchange`) — 교환 발송용 새 주문 link. reverse navigable via `exchangedFromOrders`
   - `recipientName/Phone/shippingAddress`, `trackingCarrier/Number` (택배)
+  - 반품 흐름 timestamp: `returnRequestedAt`/`returnAcceptedAt`/`returnRejectedAt`/`exchangedAt` + 자유 메모 `returnReason`
 - **OrderItem** — `serviceName`(서비스 라인), `unitCostSnapshot`, `channelCommissionRateSnapshot`, `cardFeeRateSnapshot`, `sellingCostSnapshot`
 
 ### POS
@@ -605,9 +675,15 @@ const open = async (id) => {
 - **SupplierProduct → ProductMapping → Product** (환산비율로 단위 변환). ProductMapping 생성 시 해당 공급상품의 오르판 로트(productId=null)를 소급 편입 + Inventory 환산 증가
 - **Incoming 확정** → Inventory 증가 + InventoryMovement(INCOMING) + **InventoryLot 생성** (매핑 있으면 productId=mapping.productId, 없으면 오르판) + SupplierLedger(CREDIT일 때) + 연결된 PurchaseOrderItem.receivedQty 누적
 - **PurchaseOrder 흐름** — 매입 견적서(`Quotation type=PURCHASE`) → `convert` API 로 PurchaseOrder(DRAFT) 또는 Incoming(직접 입고) 전환. 부분입고는 status PARTIAL → PARTIAL_RESENT/REACCEPTED/COMPLETED 단계 추적
-- **Order 생성** (POS 결제 / B2B 수동 / 외부 채널 import / 견적서 전환) → POS PICKUP 결제는 즉시 `COMPLETED` + 재고 차감, POS DELIVERY/SHIPPING 결제는 `PREPARING` + 재고 차감 (워크보드 진입), B2B 수동·외부 import 는 `PENDING` (재고 미차감)
+- **Order 생성** (POS 결제 / B2B 수동 / 외부 채널 import / 견적서 전환) → POS PICKUP 결제는 즉시 `COMPLETED` + 재고 차감, POS DELIVERY/SHIPPING 결제는 `PREPARING` + 재고 차감 (워크보드 진입), B2B 수동·외부 import 는 `PENDING` (재고 미차감). 생성 시 `paymentStatus` 자동 산출: `paymentMethod=UNPAID` 또는 미입력은 `UNPAID`, 그 외 `PAID`
 - **Order `prepare` 액션** (PENDING→PREPARING) → Inventory 감소 + InventoryMovement(OUTGOING/SET_CONSUME) + **FIFO로 로트 소진 + LotConsumption 생성**. 로트 잔량 부족 시 에러로 차단
-- **Order 취소/반품** → 재고 차감 후(`PREPARING` 이상) 상태에서만 **LotConsumption 역순 복원 + 삭제** + Inventory 복원. PENDING 취소는 상태만 변경
+- **Order 취소** (`cancel` 액션, PENDING/PREPARING 한정) → CANCELLED. PREPARING이었으면 LotConsumption 역순 복원 + 삭제 + Inventory 복원. `paymentStatus=PAID`였다면 `REFUNDED` 자동 전이
+- **Order 반품 흐름** — 3단계 또는 1단계:
+  - 3단계 (택배 회수): COMPLETED →`request_return`(claimType+claimReason 입력)→ RETURN_REQUESTED →`accept_return`/`reject_return`/`cancel_return_request`→ RETURN_ACCEPTED →`return`/`exchange`→ RETURNED/EXCHANGED
+  - 1단계 (매장 즉석): COMPLETED →`return`→ RETURNED (claimType=REFUND 자동)
+  - `return` 시 LotConsumption 역순 복원 + Inventory 복원 + paymentStatus PAID→REFUNDED
+  - `exchange` 시 LotConsumption 복원 + Inventory 복원 + **새 주문 자동 생성** (원본번호+`-EX`, claimType=`EXCHANGE_SAME`이면 항목 복제 + paymentStatus=PAID + totalAmount=원본, `EXCHANGE_DIFFERENT`이면 빈 항목 + paymentStatus=UNPAID + totalAmount=0). 양방향 link via `exchangeOrderId`
+  - 교환 새 주문은 마진 리포트에서 자동 제외 (`exchangedFromOrders: { none: {} }` 필터) — 매출 중복 방지
 - **RepairTicket 부속 추가/삭제** → 재고 차감/복원 + InventoryMovement + LotConsumption (`/lib/repair-inventory.ts`)
 - **RepairTicket PICKED_UP** → Order 생성(`repairTicketId` 1:1) + CustomerLedger(SALE) — 결제 처리는 POS 결제 흐름과 동일
 - **Rental 임대 시작** → RentalAsset.status=RENTED + (POS 결제면) Order 생성(`rentalId` 1:1)
@@ -1223,15 +1299,38 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 
 ## 후속작업해야할것
 
-### 외부 채널 API 자동 주문 import (쿠팡·네이버 등)
-- **현재**: 채널 주문은 `/orders` 신규 등록 Sheet 에서 수동 입력만 가능. `Order.channelOrderNo` / `channelId` 필드는 준비됨. 외부 채널 모듈은 아직 없음
-- **필요한 이유**: 외부 마켓 주문이 들어왔을 때 자동으로 ERP 출고 워크보드에 합류시키기 위함
-- **구현 포인트**:
-  - 채널별 인증·polling/webhook 모듈 (`lib/channels/coupang.ts`, `naver.ts` 등)
-  - import 시 `status=PENDING`, `fulfillmentType=SHIPPING`, `expectedShipDate=주문일+1` 로 생성 → 사용자가 워크보드에서 `prepare`(재고 차감) 후 `ship` → `complete`
-  - 중복 방지: `(channelId, channelOrderNo)` unique 인덱스 추가 권장
-  - 매핑 누락 상품 처리: 채널의 SKU 가 ERP `Product` 와 매핑 안 된 경우 일단 import 만 하고 사용자가 매핑 후 prepare 가능하게 (또는 import 보류 큐로 격리)
-- **선결 조건**: 채널별 SKU ↔ Product 매핑 테이블, OAuth/API 키 보관 위치 결정 (CompanyInfo 확장 또는 환경변수)
+### POS 도메인 (자세한 운영 흐름·의도는 [docs/POS.md](docs/POS.md) §9 참고)
+
+**우선순위 높음**:
+- **견적서 → POS 카트 로드** — 발행된 Quotation 을 새 PosSession 으로 부활 (CONVERTED 락 + 가격은 견적서 스냅샷 그대로). 메뉴/검색에 "견적서 검색" 진입점 추가
+- **수리관리 [결제로 이동] 완성** — 현재 손님 카드 부활까지만. RepairPart/RepairLabor 합계로 카트 라인 자동 생성 필요
+
+**우선순위 중간**:
+- **자동 만료 / 노쇼 처리** — 지난 RESERVED 임대 일괄 EXPIRED, 진단 대기 N일 알림. 매장 정책 페이지로 임계값 설정
+- **저장된 상담 검색·정렬** — `/pos/parked` 양 늘어나면 손님명/저장일 검색 필요
+- **손님 카드 X undo 토스트** — 그리드 X "그냥 닫기" 5초 안에 되돌리기 (soft delete 라 server-side 복구 가능)
+
+**우선순위 낮음**:
+- **저장된 상담 → 견적서 일괄 변환** — 1~2달 뒤 가져올 때 한 번에 견적서 발행 옵션
+- **POS_V1_V2_COMPARISON.md archive** — v1 폐기 완료, [docs/POS.md](docs/POS.md) 가 단일 출처가 됨
+
+### 주문 도메인 (자세한 한계는 [docs/ORDERS_SYSTEM.md §8](docs/ORDERS_SYSTEM.md#8-한계와-후속-작업) 참고)
+
+**우선순위 높음** (도메인 정합성 직결):
+- **차액 결제 자동 청구·환불** — EXCHANGE_DIFFERENT 차액은 표시만 (warning). 실제 결제 안내·환불은 매장 수동. 알림 시스템 도입 시 자동화
+- **외부 채널 자동 import — Phase 2 (실 채널 어댑터)** — Phase 1(어댑터 인터페이스 + Mock + import 변환 + 매핑 + 보류 큐 + UI) 완료. 쿠팡·네이버 가입·API 키 후 `lib/channels/coupang.ts` 등 실 어댑터 구현 → `lib/channels/registry.ts` 등록만 추가하면 자동 활성화. webhook signature 검증, OAuth, polling cron 등록 필요
+
+**우선순위 중간**:
+- **부분 출고 / 부분 취소 / 부분 반품** — `OrderItem.shippedQty`/`returnedQty` 필드 + 액션 단위 처리. PARTIAL_REFUND 실사용 가능
+- **반품 회수 단계 세분화** — RETURN_ACCEPTED 가 "회수 대기/회수 중/회수 완료"를 모두 포함. 택배 회수 라벨 발급 흐름 도입 시 분리 검토
+- **운임 자동 청구 라인** — `CLAIM_REASON_LIABILITY` 매핑은 안내만. 매장 정책 설정 페이지 + 자동 운임 라인 생성
+
+**우선순위 낮음**:
+- **알림(SMS/이메일) 훅** — 주문 상태 변경 시 고객 통지 (출고·반품 결정·차액 안내). Solapi/Twilio 등 외부 SaaS 연동
+- **송장 사전 등록** — PREPARING 단계에서 송장 미리 발급 (배송 라벨 일괄 출력)
+- **반품 처리 전용 뷰** — 워크보드 외 RETURN_REQUESTED/RETURN_ACCEPTED 만 모은 클레임 처리 batch 페이지
 
 > 참고 — 2026-04 견적서·거래명세표 도입 당시 MVP에서 제외했던 ① 견적서 → Order/Incoming/PurchaseOrder 전환, ② 견적서 → 거래명세표 전환 UI, ③ 회사 정보 DB 이전(`CompanyInfo` 싱글턴) 은 모두 구현 완료. `/api/quotations/[id]/convert` 와 `/quotations` 페이지 전환 다이얼로그, `/api/company-info` 가 그 결과.
+
+> 참고 — 2026-05-07 주문 시스템 3축 분리(출고·결제·클레임), 반품 흐름 세분화(RETURN_REQUESTED/RETURN_ACCEPTED), 교환 자동화(EXCHANGE_SAME/DIFFERENT + 새 주문 자동 생성 + 양방향 link), 마진 리포트 정합성 (교환 발송 자동 제외), OrderItem 편집 UI(PENDING 한정), customerPayment FIFO 자동 매칭(외상→입금 시 paymentStatus 자동 PAID), 외부 채널 자동화 Phase 1 (`ChannelAdapter`/`MockChannelAdapter`/`ChannelProductMapping`/`PendingChannelOrder` + `/channels/imports` 페이지) 도입 완료. 자세한 설계와 시각 위계는 [docs/ORDERS_SYSTEM.md](docs/ORDERS_SYSTEM.md).
 

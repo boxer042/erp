@@ -96,15 +96,51 @@ export async function POST(request: NextRequest) {
 
     await rebalanceCustomerLedger(tx, data.customerId);
 
+    // FIFO 자동 매칭 — UNPAID 주문(외상)을 orderDate 오름차순으로 입금액만큼 PAID 처리.
+    // 단순화: 주문 단위 fully paid 만 (각 주문의 totalAmount 보다 입금액이 크거나 같아야 PAID).
+    // 부분 매칭은 customer 잔액에 반영되어 있으니 다음 입금에서 처리됨.
+    const unpaidOrders = await tx.order.findMany({
+      where: {
+        customerId: data.customerId,
+        paymentStatus: "UNPAID",
+        // 종결되지 않은 활성 주문만 (취소·반품된 외상은 환불 대상 아님)
+        status: {
+          notIn: ["CANCELLED", "RETURNED", "EXCHANGED"],
+        },
+      },
+      select: { id: true, orderNo: true, totalAmount: true },
+      orderBy: { orderDate: "asc" },
+    });
+    let remaining = amount;
+    const paidOrderIds: string[] = [];
+    for (const o of unpaidOrders) {
+      const orderAmount = Number(o.totalAmount);
+      if (remaining + 0.01 < orderAmount) break; // 잔액 부족 — 다음 주문 처리 안 함
+      remaining -= orderAmount;
+      paidOrderIds.push(o.id);
+    }
+    if (paidOrderIds.length > 0) {
+      await tx.order.updateMany({
+        where: { id: { in: paidOrderIds } },
+        data: { paymentStatus: "PAID" },
+      });
+    }
+
     await recordAudit(tx, {
       userId: user.id,
       entity: "CustomerPayment",
       entityId: payment.id,
       action: "CREATE",
-      meta: { customerId: data.customerId, amount, method: data.method, paymentDate: data.paymentDate },
+      meta: {
+        customerId: data.customerId,
+        amount,
+        method: data.method,
+        paymentDate: data.paymentDate,
+        autoMatchedOrderIds: paidOrderIds,
+      },
     });
 
-    return { payment, newBalance };
+    return { payment, newBalance, autoMatchedOrders: paidOrderIds.length };
   });
 
   return NextResponse.json(result, { status: 201 });

@@ -39,8 +39,11 @@ export type FulfillmentType = z.infer<typeof fulfillmentTypeSchema>;
 
 /**
  * 주문 수정 — 상세 Sheet 의 편집 모드에서 사용. 모든 필드 optional.
- * 종결 상태(COMPLETED/CANCELLED/RETURNED) 의 주문은 API 에서 차단.
- * 항목·금액 편집은 재고 차감 영향이 있어 별도 흐름으로 분리(현재 미지원).
+ * 종결 상태(COMPLETED/CANCELLED/RETURNED/EXCHANGED) 의 주문은 API 에서 차단.
+ *
+ * 항목 편집(`items`) 은 PENDING 한정. 재고 차감 전이라 안전.
+ * PATCH 시 items 배열 전달하면 기존 OrderItem 모두 삭제 후 재생성 (replace).
+ * subtotalAmount/taxAmount/totalAmount/commissionAmount 자동 재계산.
  */
 export const orderUpdateSchema = z.object({
   fulfillmentType: fulfillmentTypeSchema.optional(),
@@ -53,6 +56,10 @@ export const orderUpdateSchema = z.object({
   memo: z.string().optional(),
   trackingCarrier: z.string().optional(),
   trackingNumber: z.string().optional(),
+  /** 항목 replace — PENDING 한정. min(1) 보장은 API 측에서 (자유 입력 라인 허용). */
+  items: z.array(orderItemSchema).optional(),
+  discountAmount: z.string().optional(),
+  shippingFee: z.string().optional(),
 });
 
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;

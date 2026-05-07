@@ -128,6 +128,8 @@ export async function POST(
           orderNo: generateDocumentNo("ORD"),
           channelId: channel.id,
           status: "PENDING",
+          // 견적서 전환 주문은 결제 미진행 상태로 시작 (외상). 입금 후 paymentStatus=PAID 갱신.
+          paymentStatus: "UNPAID",
           customerId: quotation.customerId,
           customerName: quotation.customer?.name || null,
           customerPhone: quotation.customer?.phone || null,

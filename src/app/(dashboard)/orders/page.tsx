@@ -23,6 +23,7 @@ import {
   JmIconButton,
   JmPill,
   JmSearchInput,
+  JmSelect,
   JmSpinner,
   JmStat,
   JmTable,
@@ -40,18 +41,23 @@ import {
 import { OrderCreateSheet } from "./_create-sheet";
 import { OrderDetailSheet } from "./_detail-sheet";
 import {
+  AmountCell,
+  ChannelBadge,
   FulfillmentBadge,
+  PaymentStatusBadge,
   ShipDateCell,
   StatusBadge,
+  StatusFlowGuide,
   TableRowSkeleton,
 } from "./_parts";
 import {
   type BoardGroupKey,
   type BoardResponse,
+  type ChannelFilter,
   type OrderListItem,
   nextActionFor,
 } from "./_types";
-import { daysUntilShip, formatCurrency, summarizeItems } from "./_helpers";
+import { daysUntilShip, summarizeItems } from "./_helpers";
 
 /** 그룹 필터 — KPI 카드 클릭 / pill 토글 */
 type GroupFilter = "all" | BoardGroupKey;
@@ -74,14 +80,19 @@ export default function OrdersBoardPage() {
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const detailId = searchParams.get("id");
 
   const boardQuery = useQuery({
-    queryKey: queryKeys.orders.board({ search: appliedSearch }),
+    queryKey: queryKeys.orders.board({
+      search: appliedSearch,
+      channelFilter,
+    }),
     queryFn: () => {
       const params = new URLSearchParams({ view: "board" });
       if (appliedSearch) params.set("search", appliedSearch);
+      if (channelFilter !== "all") params.set("channelFilter", channelFilter);
       return apiGet<BoardResponse>(`/api/orders?${params}`);
     },
   });
@@ -178,9 +189,21 @@ export default function OrdersBoardPage() {
   const isPending = boardQuery.isPending;
   const isError = boardQuery.isError;
 
+  /** 채널 필터 옵션 — "전체 / 오프라인 / 활성 채널들" */
+  const channelOptions = useMemo(() => {
+    const base: { value: ChannelFilter; label: string }[] = [
+      { value: "all", label: "전체 채널" },
+      { value: "offline", label: "오프라인 (POS·수동)" },
+    ];
+    for (const c of boardQuery.data?.channels ?? []) {
+      base.push({ value: c.id, label: c.name });
+    }
+    return base;
+  }, [boardQuery.data?.channels]);
+
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-[var(--jm-bg)]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex w-full flex-col gap-6 p-4">
         {/* KPI */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <JmStat
@@ -249,6 +272,13 @@ export default function OrdersBoardPage() {
                   )}
                 </JmPill>
               ))}
+              <JmSelect
+                size="sm"
+                value={channelFilter}
+                onChange={(v) => setChannelFilter(v as ChannelFilter)}
+                options={channelOptions}
+                className="w-[180px]"
+              />
             </JmTableToolbarFilters>
             <JmTableToolbarActions>
               <JmIconButton
@@ -271,28 +301,35 @@ export default function OrdersBoardPage() {
             </JmTableToolbarActions>
           </JmTableToolbar>
 
+          {/* 상태 흐름 안내 — 각 상태가 무엇을 의미하고 다음에 무엇을 유도하는지 */}
+          <div className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)]">
+            <StatusFlowGuide />
+          </div>
+
           <div className="overflow-x-auto">
-            <JmTable className="min-w-[960px]">
+            <JmTable className="min-w-[1200px]">
               <JmTableHeader>
                 <JmTableRow>
                   <JmTableHead className="w-[140px]">주문번호</JmTableHead>
-                  <JmTableHead className="w-[80px]">상태</JmTableHead>
+                  <JmTableHead className="w-[100px]">상태</JmTableHead>
                   <JmTableHead className="w-[110px]">출고</JmTableHead>
+                  <JmTableHead className="w-[140px]">채널</JmTableHead>
                   <JmTableHead>고객 / 항목</JmTableHead>
                   <JmTableHead className="w-[110px]">출고예정</JmTableHead>
-                  <JmTableHead className="w-[110px] text-right">합계</JmTableHead>
+                  <JmTableHead className="w-[100px] text-right">합계</JmTableHead>
+                  <JmTableHead className="w-[100px]">결제</JmTableHead>
                   <JmTableHead className="w-[120px]" />
                 </JmTableRow>
               </JmTableHeader>
               <JmTableBody>
                 {isPending ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <TableRowSkeleton key={i} cols={7} />
+                    <TableRowSkeleton key={i} cols={9} />
                   ))
                 ) : isError ? (
                   <JmTableRow>
                     <JmTableCell
-                      colSpan={7}
+                      colSpan={9}
                       className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
                     >
                       주문 목록을 불러오지 못했습니다
@@ -300,7 +337,7 @@ export default function OrdersBoardPage() {
                   </JmTableRow>
                 ) : rows.length === 0 ? (
                   <JmTableRow className="hover:bg-transparent">
-                    <JmTableCell colSpan={7} className="py-12">
+                    <JmTableCell colSpan={9} className="py-12">
                       <JmEmpty
                         icon={<Truck className="size-8" />}
                         title={
@@ -320,7 +357,7 @@ export default function OrdersBoardPage() {
                   rows.map((order) => {
                     const days = daysUntilShip(order.expectedShipDate, today);
                     const next = nextActionFor(order.status);
-                    const pending =
+                    const rowPending =
                       transitionMutation.isPending &&
                       transitionMutation.variables?.id === order.id;
                     return (
@@ -333,6 +370,11 @@ export default function OrdersBoardPage() {
                           <span className="font-mono text-[13px] font-medium text-[var(--jm-text)]">
                             {order.orderNo}
                           </span>
+                          {order.channelOrderNo && (
+                            <span className="block font-mono text-[10px] text-[var(--jm-text-subtle)]">
+                              {order.channelOrderNo}
+                            </span>
+                          )}
                         </JmTableCell>
                         <JmTableCell>
                           <StatusBadge status={order.status} />
@@ -341,14 +383,12 @@ export default function OrdersBoardPage() {
                           <FulfillmentBadge type={order.fulfillmentType} />
                         </JmTableCell>
                         <JmTableCell>
+                          <ChannelBadge channel={order.channel} />
+                        </JmTableCell>
+                        <JmTableCell>
                           <div className="flex flex-col">
                             <span className="text-[13px] text-[var(--jm-text)]">
                               {order.customerName ?? "—"}
-                              {order.channel && (
-                                <span className="ml-2 text-[11px] text-[var(--jm-text-muted)]">
-                                  {order.channel.name}
-                                </span>
-                              )}
                             </span>
                             <span className="line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">
                               {summarizeItems(order)}
@@ -361,8 +401,17 @@ export default function OrdersBoardPage() {
                             daysUntil={days}
                           />
                         </JmTableCell>
-                        <JmTableCell className="text-right tabular-nums font-semibold">
-                          {formatCurrency(order.totalAmount)}
+                        <JmTableCell className="text-right">
+                          <AmountCell
+                            totalAmount={order.totalAmount}
+                            paymentStatus={order.paymentStatus}
+                          />
+                        </JmTableCell>
+                        <JmTableCell>
+                          <PaymentStatusBadge
+                            status={order.paymentStatus}
+                            showPaid
+                          />
                         </JmTableCell>
                         <JmTableCell>
                           <div className="flex items-center justify-end gap-1">
@@ -376,9 +425,9 @@ export default function OrdersBoardPage() {
                                     action: next.action,
                                   });
                                 }}
-                                disabled={pending}
+                                disabled={rowPending}
                               >
-                                {pending ? (
+                                {rowPending ? (
                                   <JmSpinner size="xs" tone="inverted" />
                                 ) : null}
                                 {next.label}

@@ -270,6 +270,11 @@ export async function POST(request: NextRequest) {
           totalAmount,
           commissionAmount: 0,
           paymentMethod: body.paymentMethod ?? null,
+          // 결제 축 — UNPAID(외상) 또는 미입력은 미수, 그 외는 결제 완료
+          paymentStatus:
+            !body.paymentMethod || body.paymentMethod === "UNPAID"
+              ? "UNPAID"
+              : "PAID",
           taxInvoiceRequested: !!body.taxInvoiceRequested,
           memo: body.memo || null,
           repairTicketId: body.repairTicketId || null,

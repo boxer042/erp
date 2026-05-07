@@ -1,44 +1,143 @@
 "use client";
 
 import { JmBadge, JmSkeleton } from "@/jm";
-import { Truck, Package, Store } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChevronRight,
+  Clock,
+  Globe,
+  Package,
+  PackageCheck,
+  PackageOpen,
+  RotateCcw,
+  Store,
+  Truck,
+  XCircle,
+} from "lucide-react";
 import {
   FULFILLMENT_LABELS,
+  PAYMENT_STATUS_LABELS,
   STATUS_LABELS,
-  STATUS_VARIANTS,
   type FulfillmentType,
+  type OrderPaymentStatus,
   type OrderStatus,
 } from "./_types";
 
-/** STATUS_VARIANTS (shadcn 톤) → JmBadge variant 매핑 */
-export function statusBadgeVariant(
-  status: OrderStatus,
-): "default" | "outline" | "solid" | "success" | "warning" | "danger" | "info" {
-  const v = STATUS_VARIANTS[status];
-  if (v === "warning") return "warning";
-  if (v === "destructive") return "danger";
-  if (v === "success") return "success";
-  if (v === "secondary") return "default";
-  if (v === "outline") return "outline";
-  return "info";
-}
+/**
+ * 시각 위계 정책 (배지 구분 명확성):
+ *   1순위 출고 상태  — 색 채워진 배지(filled). dot 추가로 의미 강조. size md.
+ *   2순위 결제 상태  — outline + 색 dot. 텍스트 muted. size sm.
+ *   3순위 출고 방식  — outline + 아이콘 only(라벨 자동 hidden 가능). 회색 톤. size sm.
+ *   3순위 채널       — 오프라인=default(muted), 외부=info(파랑) + 아이콘. size sm.
+ *
+ * 한 줄 동시 노출 시 색 충돌 방지:
+ *   - 출고 상태 SHIPPED 만 solid 검정/브랜드 색 — 다른 줄의 어떤 배지와도 충돌 X
+ *   - 결제 UNPAID 의 dot 은 danger(빨강), 출고 상태에는 빨강이 CANCELLED 뿐 → 워크보드엔 CANCELLED 안 나옴
+ *   - 채널 외부=info(파랑), 출고 SHIPPED=solid(검정) — 색 분리됨
+ */
 
-/** 상태 배지 — 테이블 셀에서 사용 */
+/**
+ * 출고 상태별 시각 매핑 — 색 + 의미 아이콘.
+ * 진행 중 상태는 색 채워짐(filled), 종결 상태(CANCELLED/RETURNED/EXCHANGED)는 outline 으로 통일.
+ */
+const STATUS_VISUAL: Record<
+  OrderStatus,
+  {
+    variant: "default" | "outline" | "solid" | "success" | "warning" | "danger" | "info";
+    icon: React.ComponentType<{ className?: string }> | null;
+  }
+> = {
+  PENDING: { variant: "warning", icon: Clock },
+  PREPARING: { variant: "info", icon: Package },
+  SHIPPED: { variant: "solid", icon: Truck },
+  COMPLETED: { variant: "success", icon: PackageCheck },
+  RETURN_REQUESTED: { variant: "warning", icon: RotateCcw },
+  RETURN_ACCEPTED: { variant: "info", icon: PackageOpen },
+  CANCELLED: { variant: "outline", icon: XCircle },
+  RETURNED: { variant: "outline", icon: RotateCcw },
+  EXCHANGED: { variant: "outline", icon: ArrowLeftRight },
+};
+
+/**
+ * 출고 상태 배지 — 가장 두드러지게.
+ * 색 채워진 배지 + 의미 아이콘. size md.
+ */
 export function StatusBadge({ status }: { status: OrderStatus }) {
+  const { variant, icon: Icon } = STATUS_VISUAL[status];
   return (
-    <JmBadge variant={statusBadgeVariant(status)} size="sm" shape="square">
+    <JmBadge variant={variant} size="md" shape="square">
+      {Icon && <Icon className="size-3" />}
       {STATUS_LABELS[status]}
     </JmBadge>
   );
 }
 
-/** 출고 방식 + 아이콘 */
+/**
+ * 결제 상태 배지 — outline + 색 dot. 출고 상태와 시각 무게 분리.
+ * 같은 줄에 출고 상태와 함께 노출되어도 outline 이라 가벼움.
+ */
+const PAYMENT_DOT: Record<OrderPaymentStatus, string> = {
+  UNPAID: "bg-[var(--jm-danger-fg)]",
+  PAID: "bg-[var(--jm-success-fg)]",
+  PARTIAL_REFUND: "bg-[var(--jm-text-subtle)]",
+  REFUNDED: "bg-[var(--jm-text-subtle)]",
+};
+
+export function PaymentStatusBadge({
+  status,
+  showPaid = false,
+}: {
+  status: OrderPaymentStatus;
+  /** PAID 도 명시적으로 보일지 (상세 시트). 기본 false (리스트 노이즈 방지) */
+  showPaid?: boolean;
+}) {
+  if (status === "PAID" && !showPaid) return null;
+  return (
+    <JmBadge variant="outline" size="sm" shape="square">
+      <span
+        aria-hidden
+        className={`size-1.5 rounded-full ${PAYMENT_DOT[status]}`}
+      />
+      {PAYMENT_STATUS_LABELS[status]}
+    </JmBadge>
+  );
+}
+
+/**
+ * 출고 방식 — 정보 전달용. default(muted gray) + 아이콘.
+ * 출고 상태가 색을 가져가니 여기선 색 빠짐.
+ */
 export function FulfillmentBadge({ type }: { type: FulfillmentType }) {
   const Icon = type === "DELIVERY" ? Truck : type === "SHIPPING" ? Package : Store;
   return (
-    <JmBadge variant="outline" size="sm" shape="square">
+    <JmBadge variant="default" size="sm" shape="square">
       <Icon className="size-3" />
       {FULFILLMENT_LABELS[type]}
+    </JmBadge>
+  );
+}
+
+/**
+ * 채널 — 오프라인은 default(muted), 외부 채널은 info(파랑).
+ * 외부 채널이 시각적으로 도드라져 워크보드 한 눈에 origin 분류.
+ */
+export function ChannelBadge({
+  channel,
+}: {
+  channel: { name: string; code: string } | null;
+}) {
+  if (!channel) {
+    return (
+      <JmBadge variant="default" size="sm" shape="square">
+        <Store className="size-3" />
+        오프라인
+      </JmBadge>
+    );
+  }
+  return (
+    <JmBadge variant="info" size="sm" shape="square">
+      <Globe className="size-3" />
+      {channel.name}
     </JmBadge>
   );
 }
@@ -88,6 +187,87 @@ export function ShipDateCell({
     <span className="flex flex-col text-[12px] tabular-nums">
       <span className="text-[var(--jm-text)]">{dateStr}</span>
       <span className="text-[11px] text-[var(--jm-text-muted)]">D+{daysUntil}</span>
+    </span>
+  );
+}
+
+/**
+ * 상태 흐름 가이드 — 출고 축 + 반품 축을 두 줄로 시각화.
+ * StatusBadge 와 동일 시각 매핑 사용 — 행 배지와 가이드의 시각 일관성 보장.
+ */
+export function StatusFlowGuide() {
+  const flowSteps: Array<{ status: OrderStatus; hint: string }> = [
+    { status: "PENDING", hint: "접수" },
+    { status: "PREPARING", hint: "재고 차감" },
+    { status: "SHIPPED", hint: "송장 입력" },
+    { status: "COMPLETED", hint: "종결" },
+  ];
+  const returnSteps: Array<{ status: OrderStatus; hint: string }> = [
+    { status: "COMPLETED", hint: "" },
+    { status: "RETURN_REQUESTED", hint: "매장 결정" },
+    { status: "RETURN_ACCEPTED", hint: "회수 대기" },
+    { status: "RETURNED", hint: "환불 / 교환" },
+  ];
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3 text-[11px] text-[var(--jm-text-muted)]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <span className="w-14 font-medium text-[var(--jm-text-subtle)]">
+          출고
+        </span>
+        {flowSteps.map((s, i) => (
+          <span key={s.status} className="inline-flex items-center gap-1.5">
+            <StatusBadge status={s.status} />
+            <span>{s.hint}</span>
+            {i < flowSteps.length - 1 && (
+              <ChevronRight className="size-3 text-[var(--jm-text-subtle)]" />
+            )}
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <span className="w-14 font-medium text-[var(--jm-text-subtle)]">
+          반품
+        </span>
+        {returnSteps.map((s, i) => (
+          <span key={s.status} className="inline-flex items-center gap-1.5">
+            <StatusBadge status={s.status} />
+            {s.hint && <span>{s.hint}</span>}
+            {i < returnSteps.length - 1 && (
+              <ChevronRight className="size-3 text-[var(--jm-text-subtle)]" />
+            )}
+          </span>
+        ))}
+        <span className="ml-1 text-[var(--jm-text-subtle)]">
+          · 즉시 반품(1단계) 또는 교환 분기 가능
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 합계 셀 — 결제 상태가 별도 컬럼으로 분리되었으므로 여기선 금액만 단순 표시.
+ * REFUNDED 만 line-through 로 "이미 환불된 돈" 신호 (정렬 시 한눈에 구분).
+ */
+export function AmountCell({
+  totalAmount,
+  paymentStatus,
+}: {
+  totalAmount: string;
+  paymentStatus: OrderPaymentStatus;
+}) {
+  const amount = `₩${Number(totalAmount).toLocaleString("ko-KR")}`;
+  const isRefunded =
+    paymentStatus === "REFUNDED" || paymentStatus === "PARTIAL_REFUND";
+  return (
+    <span
+      className={`tabular-nums font-semibold ${
+        isRefunded
+          ? "text-[var(--jm-text-muted)] line-through"
+          : "text-[var(--jm-text)]"
+      }`}
+    >
+      {amount}
     </span>
   );
 }

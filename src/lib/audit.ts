@@ -47,7 +47,8 @@ export type AuditAction =
   | "DELETE"
   | "CONFIRM"
   | "CANCEL"
-  | "STATUS_CHANGE";
+  | "STATUS_CHANGE"
+  | "IMPORT";
 
 export const AUDIT_ENTITIES = [
   "Order",
