@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Plus,
   RefreshCw,
+  RotateCcw,
   Truck,
 } from "lucide-react";
 
@@ -70,6 +71,7 @@ const GROUP_LABELS: Record<GroupFilter, string> = {
   shipped: "발송 중",
   thisWeek: "이번 주",
   future: "이후",
+  returnPending: "반품 처리",
 };
 
 export default function OrdersBoardPage() {
@@ -106,7 +108,13 @@ export default function OrdersBoardPage() {
       action,
     }: {
       id: string;
-      action: "prepare" | "ship" | "complete" | "cancel" | "return";
+      action:
+        | "prepare"
+        | "ship"
+        | "complete"
+        | "cancel"
+        | "return"
+        | "accept_return";
     }) => apiMutate(`/api/orders/${id}`, "PUT", { action }),
     onSuccess: (_data, vars) => {
       const labels: Record<string, string> = {
@@ -114,7 +122,8 @@ export default function OrdersBoardPage() {
         ship: "발송 처리되었습니다",
         complete: "주문이 완료되었습니다",
         cancel: "주문이 취소되었습니다",
-        return: "반품 처리되었습니다",
+        return: "반품 처리되었습니다 — 재고 복원·환불",
+        accept_return: "반품 요청 수락 — 회수 대기",
       };
       toast.success(labels[vars.action]);
       invalidate();
@@ -148,6 +157,7 @@ export default function OrdersBoardPage() {
       shipped: [],
       thisWeek: [],
       future: [],
+      returnPending: [],
     };
     const groups = boardQuery.data?.groups ?? empty;
     const counts: Record<GroupFilter, number> = {
@@ -158,6 +168,7 @@ export default function OrdersBoardPage() {
       shipped: groups.shipped.length,
       thisWeek: groups.thisWeek.length,
       future: groups.future.length,
+      returnPending: groups.returnPending.length,
     };
     counts.all =
       counts.overdue +
@@ -165,10 +176,12 @@ export default function OrdersBoardPage() {
       counts.unscheduled +
       counts.shipped +
       counts.thisWeek +
-      counts.future;
+      counts.future +
+      counts.returnPending;
 
-    // 그룹 필터 적용 — 정렬 우선순위는 지연 → 오늘 → 미정 → 발송 중 → 이번 주 → 이후
+    // 그룹 필터 적용 — 정렬 우선순위: 반품 처리 → 지연 → 오늘 → 미정 → 발송 중 → 이번 주 → 이후
     const order: BoardGroupKey[] = [
+      "returnPending",
       "overdue",
       "today",
       "unscheduled",
@@ -205,7 +218,7 @@ export default function OrdersBoardPage() {
     <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
       <div className="flex w-full flex-col gap-6 p-4">
         {/* KPI */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <JmStat
             label="지연"
             value={isPending ? "—" : counts.overdue}
@@ -233,6 +246,14 @@ export default function OrdersBoardPage() {
             value={isPending ? "—" : counts.unscheduled}
             icon={<CalendarRange className="size-4" />}
             hint={isPending ? "" : "예정일 채워주세요"}
+            positiveIsGood={false}
+            size="sm"
+          />
+          <JmStat
+            label="반품 처리"
+            value={isPending ? "—" : counts.returnPending}
+            icon={<RotateCcw className="size-4" />}
+            hint={isPending ? "" : "수락·회수 대기"}
             positiveIsGood={false}
             size="sm"
           />
@@ -370,6 +391,11 @@ export default function OrdersBoardPage() {
                           <span className="font-mono text-[13px] font-medium text-[var(--jm-text)]">
                             {order.orderNo}
                           </span>
+                          {order.orderNo.endsWith("-EX") && (
+                            <span className="ml-1.5 inline-flex items-center rounded bg-[var(--jm-info-bg)] px-1 py-0.5 text-[10px] text-[var(--jm-info-fg)]">
+                              교환 발송
+                            </span>
+                          )}
                           {order.channelOrderNo && (
                             <span className="block font-mono text-[10px] text-[var(--jm-text-subtle)]">
                               {order.channelOrderNo}
@@ -397,6 +423,7 @@ export default function OrdersBoardPage() {
                         </JmTableCell>
                         <JmTableCell>
                           <ShipDateCell
+                            status={order.status}
                             expectedShipDate={order.expectedShipDate}
                             daysUntil={days}
                           />

@@ -42,9 +42,18 @@ export async function GET(request: NextRequest) {
       : {}),
   };
 
-  // 워크보드 뷰: 출고 대상(PENDING/PREPARING/SHIPPED) 중 PICKUP 제외
+  // 워크보드 뷰: 출고 대상 + 반품 처리 대상. PICKUP 제외.
+  // RETURN_REQUESTED/RETURN_ACCEPTED 는 반품 처리 대기 — 매장이 결정·회수해야 하므로 워크보드에 노출.
   if (view === "board") {
-    where.status = { in: ["PENDING", "PREPARING", "SHIPPED"] };
+    where.status = {
+      in: [
+        "PENDING",
+        "PREPARING",
+        "SHIPPED",
+        "RETURN_REQUESTED",
+        "RETURN_ACCEPTED",
+      ],
+    };
     where.fulfillmentType = { in: ["DELIVERY", "SHIPPING"] };
     if (channelFilter === "offline") {
       where.channelId = null;
@@ -93,6 +102,7 @@ export async function GET(request: NextRequest) {
     shipped: [] as typeof orders,
     thisWeek: [] as typeof orders,
     future: [] as typeof orders,
+    returnPending: [] as typeof orders,
   };
   for (const o of orders) {
     const group = classifyBoardGroup(o.status, o.expectedShipDate, today);

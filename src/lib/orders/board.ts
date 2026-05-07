@@ -24,7 +24,8 @@ export type BoardGroupKey =
   | "unscheduled"
   | "shipped"
   | "thisWeek"
-  | "future";
+  | "future"
+  | "returnPending";
 
 /** "Asia/Seoul" 기준 오늘 날짜의 UTC 자정 Date 객체. KR 사용자 시간대 기준 분류용. */
 export function getKrToday(now: Date = new Date()): Date {
@@ -56,12 +57,11 @@ export function utcDayDiff(a: Date, b: Date): number {
 /**
  * 워크보드 섹션 분류:
  *  - SHIPPED: shipped
+ *  - RETURN_REQUESTED / RETURN_ACCEPTED: returnPending (매장 결정 또는 회수 대기 — 처리 필요)
  *  - PENDING/PREPARING + expectedShipDate=null: unscheduled (예정일 미정 — 사용자가 채워야 함)
  *  - PENDING/PREPARING + 날짜 있음: 일수 차이로
  *      < 0 → overdue, = 0 → today, ≤ 7 → thisWeek, > 7 → future
- *  - 그 외 (COMPLETED/RETURN_REQUESTED/RETURN_ACCEPTED/CANCELLED/RETURNED/EXCHANGED): null
- *    └ 반품 흐름(RETURN_REQUESTED/RETURN_ACCEPTED) 은 별도 "반품 처리" 뷰에서 관리 예정.
- *      워크보드는 출고 흐름 전용으로 단순화 유지.
+ *  - 그 외 (COMPLETED/CANCELLED/RETURNED/EXCHANGED): null (종결 — 워크보드 미노출)
  */
 export function classifyBoardGroup(
   status: OrderStatusForBoard,
@@ -69,6 +69,8 @@ export function classifyBoardGroup(
   today: Date,
 ): BoardGroupKey | null {
   if (status === "SHIPPED") return "shipped";
+  if (status === "RETURN_REQUESTED" || status === "RETURN_ACCEPTED")
+    return "returnPending";
   if (status !== "PREPARING" && status !== "PENDING") return null;
   if (!expectedShipDate) return "unscheduled";
   const diffDays = utcDayDiff(expectedShipDate, today);

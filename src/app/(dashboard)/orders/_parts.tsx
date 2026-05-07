@@ -142,14 +142,33 @@ export function ChannelBadge({
   );
 }
 
-/** 출고예정일 — D+N / 오늘 / 지연 / 미정 */
+/**
+ * 출고예정일 셀.
+ *  - 출고 흐름 (PENDING/PREPARING/SHIPPED): D+N / 오늘 / 지연 / 미정
+ *  - 반품 처리 (RETURN_REQUESTED/RETURN_ACCEPTED): 반품 단계 텍스트로 대체
+ */
 export function ShipDateCell({
+  status,
   expectedShipDate,
   daysUntil,
 }: {
+  status: OrderStatus;
   expectedShipDate: string | null;
   daysUntil: number | null;
 }) {
+  // 반품 처리 중인 주문 — 출고예정일은 의미 없음. 반품 단계 표시.
+  if (status === "RETURN_REQUESTED") {
+    return (
+      <span className="text-[12px] text-[var(--jm-warning-fg)]">
+        매장 결정 대기
+      </span>
+    );
+  }
+  if (status === "RETURN_ACCEPTED") {
+    return (
+      <span className="text-[12px] text-[var(--jm-info-fg)]">회수 대기</span>
+    );
+  }
   if (!expectedShipDate) {
     return (
       <span className="text-[12px] text-[var(--jm-warning-fg)]">예정일 미정</span>
@@ -192,7 +211,7 @@ export function ShipDateCell({
 }
 
 /**
- * 상태 흐름 가이드 — 출고 축 + 반품 축을 두 줄로 시각화.
+ * 상태 흐름 가이드 — 출고/반품(환불)/교환 3축을 줄로 시각화.
  * StatusBadge 와 동일 시각 매핑 사용 — 행 배지와 가이드의 시각 일관성 보장.
  */
 export function StatusFlowGuide() {
@@ -202,45 +221,59 @@ export function StatusFlowGuide() {
     { status: "SHIPPED", hint: "송장 입력" },
     { status: "COMPLETED", hint: "종결" },
   ];
-  const returnSteps: Array<{ status: OrderStatus; hint: string }> = [
+  const refundSteps: Array<{ status: OrderStatus; hint: string }> = [
     { status: "COMPLETED", hint: "" },
-    { status: "RETURN_REQUESTED", hint: "매장 결정" },
-    { status: "RETURN_ACCEPTED", hint: "회수 대기" },
-    { status: "RETURNED", hint: "환불 / 교환" },
+    { status: "RETURN_REQUESTED", hint: "매장 수락/반려" },
+    { status: "RETURN_ACCEPTED", hint: "회수" },
+    { status: "RETURNED", hint: "재고 복원·환불" },
+  ];
+  const exchangeSteps: Array<{ status: OrderStatus; hint: string }> = [
+    { status: "RETURN_ACCEPTED", hint: "회수" },
+    { status: "EXCHANGED", hint: "재고 복원 + 새 주문(-EX) 자동" },
   ];
   return (
     <div className="flex flex-col gap-2 px-4 py-3 text-[11px] text-[var(--jm-text-muted)]">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <span className="w-14 font-medium text-[var(--jm-text-subtle)]">
-          출고
+      <FlowRow label="출고" steps={flowSteps} />
+      <FlowRow
+        label="반품"
+        steps={refundSteps}
+        suffix="· 즉시 반품(1단계 단축) 가능"
+      />
+      <FlowRow
+        label="교환"
+        steps={exchangeSteps}
+        suffix="· EXCHANGE_SAME(항목 복제) / EXCHANGE_DIFFERENT(빈 항목 + 차액 정산)"
+      />
+    </div>
+  );
+}
+
+function FlowRow({
+  label,
+  steps,
+  suffix,
+}: {
+  label: string;
+  steps: Array<{ status: OrderStatus; hint: string }>;
+  suffix?: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <span className="w-14 font-medium text-[var(--jm-text-subtle)]">
+        {label}
+      </span>
+      {steps.map((s, i) => (
+        <span key={s.status} className="inline-flex items-center gap-1.5">
+          <StatusBadge status={s.status} />
+          {s.hint && <span>{s.hint}</span>}
+          {i < steps.length - 1 && (
+            <ChevronRight className="size-3 text-[var(--jm-text-subtle)]" />
+          )}
         </span>
-        {flowSteps.map((s, i) => (
-          <span key={s.status} className="inline-flex items-center gap-1.5">
-            <StatusBadge status={s.status} />
-            <span>{s.hint}</span>
-            {i < flowSteps.length - 1 && (
-              <ChevronRight className="size-3 text-[var(--jm-text-subtle)]" />
-            )}
-          </span>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <span className="w-14 font-medium text-[var(--jm-text-subtle)]">
-          반품
-        </span>
-        {returnSteps.map((s, i) => (
-          <span key={s.status} className="inline-flex items-center gap-1.5">
-            <StatusBadge status={s.status} />
-            {s.hint && <span>{s.hint}</span>}
-            {i < returnSteps.length - 1 && (
-              <ChevronRight className="size-3 text-[var(--jm-text-subtle)]" />
-            )}
-          </span>
-        ))}
-        <span className="ml-1 text-[var(--jm-text-subtle)]">
-          · 즉시 반품(1단계) 또는 교환 분기 가능
-        </span>
-      </div>
+      ))}
+      {suffix && (
+        <span className="ml-1 text-[var(--jm-text-subtle)]">{suffix}</span>
+      )}
     </div>
   );
 }

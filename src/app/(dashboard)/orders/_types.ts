@@ -39,7 +39,8 @@ export type BoardGroupKey =
   | "unscheduled"
   | "shipped"
   | "thisWeek"
-  | "future";
+  | "future"
+  | "returnPending";
 
 export interface OrderListItem {
   id: string;
@@ -164,12 +165,14 @@ export const BOARD_SECTION_TITLES: Record<BoardGroupKey, string> = {
   shipped: "발송 중",
   thisWeek: "이번 주",
   future: "이후",
+  returnPending: "반품 처리",
 };
 
 /** 카드에 보일 다음 액션 — null 이면 액션 버튼 없음.
- * 워크보드 행에는 "출고 흐름 다음 단계" 만 노출. 반품·취소는 상세 시트에서. */
+ * 출고 흐름 + 반품 처리 흐름의 가장 흔한 다음 단계만 노출.
+ * 분기(반품 반려, 즉시반품 등)는 상세 시트에서. */
 export function nextActionFor(status: OrderStatus): {
-  action: "prepare" | "ship" | "complete";
+  action: "prepare" | "ship" | "complete" | "accept_return" | "return";
   label: string;
 } | null {
   switch (status) {
@@ -179,6 +182,10 @@ export function nextActionFor(status: OrderStatus): {
       return { action: "ship", label: "발송" };
     case "SHIPPED":
       return { action: "complete", label: "완료" };
+    case "RETURN_REQUESTED":
+      return { action: "accept_return", label: "수락" };
+    case "RETURN_ACCEPTED":
+      return { action: "return", label: "회수·환불" };
     default:
       return null;
   }
