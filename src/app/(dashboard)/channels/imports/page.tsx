@@ -16,6 +16,7 @@ import {
   Package,
   Plus,
   RefreshCw,
+  Settings,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -210,6 +211,7 @@ function ImportTriggerSection({
   loading: boolean;
   onSuccess: () => void;
 }) {
+  const [configChannelId, setConfigChannelId] = useState<string | null>(null);
   const importMutation = useMutation({
     mutationFn: (channelId: string) =>
       apiMutate<{
@@ -267,23 +269,224 @@ function ImportTriggerSection({
                   {c.code}
                 </span>
               </div>
-              <Button
-                size="sm"
-                onClick={() => importMutation.mutate(c.id)}
-                disabled={isPending}
-              >
-                {isPending ? (
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                ) : (
-                  <Download className="mr-1 h-3 w-3" />
-                )}
-                Import 실행
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setConfigChannelId(c.id)}
+                  title="설정"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => importMutation.mutate(c.id)}
+                  disabled={isPending}
+                >
+                  {isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="mr-1 h-3 w-3" />
+                  )}
+                  Import 실행
+                </Button>
+              </div>
             </div>
           );
         })}
       </div>
+
+      <ChannelConfigDialog
+        channelId={configChannelId}
+        onClose={() => setConfigChannelId(null)}
+      />
     </div>
+  );
+}
+
+// ─────────── 채널 설정 Dialog
+
+interface ChannelConfig {
+  pollingMinutes?: number;
+  shipDateOffsetDays?: number;
+  autoStockSync?: boolean;
+  autoTrackingPush?: boolean;
+  pendingThreshold?: number;
+}
+
+function ChannelConfigDialog({
+  channelId,
+  onClose,
+}: {
+  channelId: string | null;
+  onClose: () => void;
+}) {
+  const open = !!channelId;
+  const queryClient = useQueryClient();
+  const configQuery = useQuery({
+    queryKey: ["channel-config", channelId],
+    queryFn: () =>
+      apiGet<{ id: string; name: string; code: string; config: ChannelConfig | null }>(
+        `/api/channels/${channelId}/config`,
+      ),
+    enabled: open,
+  });
+
+  const [form, setForm] = useState<ChannelConfig>({});
+  const [initialized, setInitialized] = useState(false);
+
+  // 데이터 도착 후 form 초기화
+  if (configQuery.data && !initialized && open) {
+    setForm(configQuery.data.config ?? {});
+    setInitialized(true);
+  }
+  if (!open && initialized) {
+    setForm({});
+    setInitialized(false);
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiMutate(`/api/channels/${channelId}/config`, "PATCH", form),
+    onSuccess: () => {
+      toast.success("채널 설정이 저장되었습니다");
+      queryClient.invalidateQueries({ queryKey: ["channel-config", channelId] });
+      onClose();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            채널 설정 {configQuery.data ? `· ${configQuery.data.name}` : ""}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 px-1 py-2">
+          <p className="text-[12px] text-muted-foreground">
+            운영 정책 (credentials 는 보안상 환경변수에서 관리)
+          </p>
+
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">Polling 간격 (분)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={1440}
+              value={form.pollingMinutes ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  pollingMinutes: e.target.value
+                    ? parseInt(e.target.value, 10)
+                    : undefined,
+                })
+              }
+              placeholder="기본 10분"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              cron 라우트 호출 간격. 채널 rate limit 고려해 설정
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">출고 예정일 offset (일)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={30}
+              value={form.shipDateOffsetDays ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  shipDateOffsetDays: e.target.value
+                    ? parseInt(e.target.value, 10)
+                    : undefined,
+                })
+              }
+              placeholder="기본 1일 (D+1)"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              채널 정책상 주문일 기준 출고 시한
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">보류 큐 알림 임계값</Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.pendingThreshold ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  pendingThreshold: e.target.value
+                    ? parseInt(e.target.value, 10)
+                    : undefined,
+                })
+              }
+              placeholder="예: 10"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              매핑 누락 보류가 이 수 초과 시 매장에 알림
+            </p>
+          </div>
+
+          <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5">
+            <label className="flex cursor-pointer items-center justify-between gap-2">
+              <div className="flex flex-col">
+                <span className="text-[13px] font-medium">자동 송장 push</span>
+                <span className="text-[11px] text-muted-foreground">
+                  ERP [발송] 시 채널에 송장 자동 통보
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.autoTrackingPush ?? true}
+                onChange={(e) =>
+                  setForm({ ...form, autoTrackingPush: e.target.checked })
+                }
+                className="size-4"
+              />
+            </label>
+            <label className="flex cursor-pointer items-center justify-between gap-2 border-t border-border pt-2">
+              <div className="flex flex-col">
+                <span className="text-[13px] font-medium">자동 재고 sync</span>
+                <span className="text-[11px] text-muted-foreground">
+                  Inventory 변동 시 채널에 가용 재고 push (Phase 2 필요)
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.autoStockSync ?? false}
+                onChange={(e) =>
+                  setForm({ ...form, autoStockSync: e.target.checked })
+                }
+                className="size-4"
+              />
+            </label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            취소
+          </Button>
+          <Button
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+          >
+            {saveMutation.isPending && (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            )}
+            저장
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

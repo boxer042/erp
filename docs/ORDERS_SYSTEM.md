@@ -313,16 +313,17 @@ model Order {
 
 #### 1. 차액 결제 자동 청구·환불
 - EXCHANGE_DIFFERENT 차액은 표시만. 실제 결제·환불은 매장 수동
-- 알림(SMS/이메일) 시스템 도입 시 자동화
+- 알림 시스템 인터페이스 도입됨 → Phase 2 후 실 SaaS 어댑터 등록 시 차액 안내 자동화 가능
 
-#### 2. 부분 처리 (부분 출고/반품/환불)
+#### 2. 부분 처리 (부분 출고/반품/환불) — 후속 PR
 - OrderItem 단위 status·shippedQty·returnedQty·refundedAmount 필요
 - PARTIAL_REFUND 실사용 가능
 - 외부 채널·B2B 에서 자주 발생
+- 큰 작업: schema 변경 + LotConsumption 부분 복원 알고리즘 + UI 모두 재설계
 
-#### 3. 검수 반려 처리
-- 현재는 검수완료 후 반품완료/교환완료만. 검수 결과 불량(포장 손상 등)이면 반려 가능해야 함
-- RETURN_COLLECTED → COMPLETED (반려) 액션 추가 필요
+#### 3. 다중·variant 매핑 — 후속 PR
+- 한 채널 SKU 가 ERP 세트 상품 또는 variant 여러 개로 매핑
+- 큰 작업: ChannelProductMapping 1:1 → 1:N + import.ts 풀어내기 알고리즘 + UI
 
 ### 우선순위 중간 (확장 기능)
 
@@ -370,6 +371,7 @@ RETURN_* 만 모은 클레임 처리 batch 페이지.
 
 ## 9. 변경 이력
 
+- **2026-05-07 (7차)**: 검수 반려 분기(reject_inspection — RETURN_COLLECTED → COMPLETED, 재고 복원 X) + 외상 반품 → customer ledger 자동 ADJUSTMENT (SALES_CANCELLED 시 잔액 차감) + Inventory 변동 시 채널에 가용 재고 자동 push (`dispatchPushStock`, autoStockSync config 토글) + 채널 설정 Dialog (polling 빈도/D+1 offset/자동 push toggle/임계값) + 알림 시스템 인터페이스 (`lib/notifications/` Mock 어댑터 + dispatch helper) + 임계값 알림(보류 큐 N건 초과 시 ADMIN 알림) + 배송완료/반품 수락·반려 시 고객 SMS 알림. 부분 처리·다중 매핑은 모델 변경 큰 작업이라 후속 PR 로 분리.
 - **2026-05-07 (6차)**: 출고 5단계화 (PENDING/PREPARING/PREPARING_PACKED/SHIPPED/COMPLETED — 출고확정 분리, 취소는 출고대기까지) + 반품/교환 5단계화 (REQUESTED/ACCEPTED/COLLECTED/INSPECTED/COMPLETED — 회수·검수 분리) + paymentStatus 확장 (REFUND_PENDING + SALES_CANCELLED) + claimType 별 라벨 동적 분기 (반품/교환) + jm `accent` 보라 토큰 + 흐름별 색 통일 (출고=파랑, 반품=노랑, 교환=보라).
 - **2026-05-07 (5차)**: 외부 채널 자동화 Phase 2-비의존 후속 — SKU 자동 매핑 추천, Outbound hook, Cron 라우트, 운영 대시보드 위젯.
 - **2026-05-07 (4차)**: 외부 채널 자동화 Phase 1 — `ChannelAdapter` 인터페이스, `MockChannelAdapter`, import 변환 로직, SKU 매핑/보류 큐 모델 + UI.

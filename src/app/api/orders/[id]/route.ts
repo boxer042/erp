@@ -7,10 +7,12 @@ import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
 import {
   dispatchAcceptReturn,
+  dispatchPushStock,
   dispatchPushTracking,
   dispatchRejectReturn,
 } from "@/lib/channels/outbound";
 import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
+import { notify } from "@/lib/notifications/dispatch";
 
 /**
  * 교환 새 주문번호 — 원본 주문번호 뒤에 -EX 접미사. 사용자가 한눈에 교환 새 주문임을 인지.
@@ -425,6 +427,22 @@ export async function PUT(
     }
 
     const updated = await prisma.order.findUnique({ where: { id } });
+
+    // Inventory 변동 — 매핑된 채널에 가용 재고 push (best-effort, 트랜잭션 외부)
+    const productIdsToPush = Array.from(
+      new Set(
+        order.items
+          .flatMap((i) => [
+            i.product?.id,
+            ...(i.product?.setComponents?.map((sc) => sc.componentId) ?? []),
+          ])
+          .filter((p): p is string => !!p),
+      ),
+    );
+    if (productIdsToPush.length > 0) {
+      await dispatchPushStock(prisma, productIdsToPush);
+    }
+
     return NextResponse.json(updated);
   }
 
@@ -612,6 +630,25 @@ export async function PUT(
           ctx,
           reasonInput ?? "",
           auditUser?.id ?? null,
+        );
+      }
+    }
+
+    // 알림 — 손님에게 수락/반려 통지 (best-effort)
+    if (action === "accept_return" || action === "reject_return") {
+      const phone = order.customerPhone;
+      if (phone) {
+        const isAccept = action === "accept_return";
+        await notify(
+          { phone, name: order.customerName ?? undefined },
+          {
+            kind: isAccept ? "RETURN_ACCEPTED" : "RETURN_REJECTED",
+            subject: `[${isAccept ? "반품 수락" : "반품 반려"}] ${order.orderNo}`,
+            body: isAccept
+              ? `주문 ${order.orderNo} 반품 요청이 수락되었습니다. 회수 안내를 곧 보내드리겠습니다.`
+              : `주문 ${order.orderNo} 반품 요청이 반려되었습니다.${reasonInput ? ` 사유: ${reasonInput}` : ""}`,
+          },
+          "sms",
         );
       }
     }
@@ -834,6 +871,24 @@ export async function PUT(
     });
 
     const updated = await prisma.order.findUnique({ where: { id } });
+
+    // Inventory 복원 — 매핑된 채널에 가용 재고 push (best-effort, 트랜잭션 외부)
+    if (wasStockDeducted) {
+      const productIdsToPush = Array.from(
+        new Set(
+          order.items
+            .flatMap((i) => [
+              i.product?.id,
+              ...(i.product?.setComponents?.map((sc) => sc.componentId) ?? []),
+            ])
+            .filter((p): p is string => !!p),
+        ),
+      );
+      if (productIdsToPush.length > 0) {
+        await dispatchPushStock(prisma, productIdsToPush);
+      }
+    }
+
     return NextResponse.json(updated);
   }
 
@@ -887,6 +942,22 @@ export async function PUT(
         carrier,
         trackingNo,
         auditUserShip?.id ?? null,
+      );
+    }
+  }
+
+  // 알림 — 배송완료 시 고객에게 통지 (best-effort)
+  if (action === "complete") {
+    const phone = updated.recipientPhone || updated.customerPhone;
+    if (phone) {
+      await notify(
+        { phone, name: updated.recipientName ?? updated.customerName ?? undefined },
+        {
+          kind: "ORDER_DELIVERED",
+          subject: `[배송완료] ${updated.orderNo}`,
+          body: `주문 ${updated.orderNo} 배송이 완료되었습니다. 이용해주셔서 감사합니다.`,
+        },
+        "sms",
       );
     }
   }

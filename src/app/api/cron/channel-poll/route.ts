@@ -21,6 +21,7 @@ import { prisma } from "@/lib/prisma";
 import { getChannelAdapter } from "@/lib/channels/registry";
 import { importChannelOrders } from "@/lib/channels/import";
 import { recordAudit } from "@/lib/audit";
+import { notify } from "@/lib/notifications/dispatch";
 
 export async function GET(request: NextRequest) {
   // 인증
@@ -112,5 +113,53 @@ export async function GET(request: NextRequest) {
     meta: { trigger: "cron", since: since.toISOString(), summary },
   });
 
+  // 보류 큐 임계값 알림 — 채널별 config.pendingThreshold 초과 시 매장에 알림
+  await checkPendingThresholdAlerts(systemUser.id);
+
   return NextResponse.json({ ok: true, since: since.toISOString(), summary });
+}
+
+/**
+ * 활성 채널마다 보류 큐 누적이 config.pendingThreshold 초과인지 검사.
+ * 초과 채널은 ADMIN 사용자에게 알림 (best-effort).
+ */
+async function checkPendingThresholdAlerts(triggerUserId: string) {
+  const channels = await prisma.salesChannel.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, code: true, config: true },
+  });
+  const overThreshold: Array<{ name: string; count: number; threshold: number }> = [];
+  for (const c of channels) {
+    const cfg = (c.config as Record<string, unknown> | null) ?? {};
+    const threshold = typeof cfg.pendingThreshold === "number" ? cfg.pendingThreshold : null;
+    if (threshold === null || threshold <= 0) continue;
+    const count = await prisma.pendingChannelOrder.count({
+      where: { channelId: c.id, status: "UNMAPPED_SKU" },
+    });
+    if (count >= threshold) {
+      overThreshold.push({ name: c.name, count, threshold });
+    }
+  }
+  if (overThreshold.length === 0) return;
+
+  // 알림 받을 ADMIN 들 — 일단 트리거 사용자만. 향후 알림 대상자 설정 페이지 추가 시 확장.
+  const admin = await prisma.user.findUnique({
+    where: { id: triggerUserId },
+    select: { id: true, name: true, email: true },
+  });
+  if (!admin) return;
+
+  const body = overThreshold
+    .map((c) => `${c.name}: 보류 ${c.count}건 (임계값 ${c.threshold})`)
+    .join("\n");
+  await notify(
+    { id: admin.id, email: admin.email, name: admin.name },
+    {
+      kind: "PENDING_QUEUE_THRESHOLD",
+      subject: "[ERP 알림] 채널 보류 큐 임계값 초과",
+      body: `다음 채널의 SKU 매핑 누락 보류가 임계값을 초과했습니다.\n\n${body}\n\n매핑 페이지에서 정리해주세요.`,
+      meta: { channels: overThreshold },
+    },
+    "email",
+  );
 }

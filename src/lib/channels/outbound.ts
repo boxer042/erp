@@ -22,7 +22,7 @@ interface OutboundContext {
 }
 
 /**
- * 송장 정보를 채널에 push. 채널 없는 주문(오프라인)·어댑터 미등록 채널은 no-op.
+ * 송장 정보를 채널에 push. 채널 없는 주문(오프라인)·어댑터 미등록·config.autoTrackingPush=false 면 no-op.
  */
 export async function dispatchPushTracking(
   prisma: Tx,
@@ -35,6 +35,15 @@ export async function dispatchPushTracking(
   if (!adapter) return;
   if (!adapter.pushTrackingNumber) return;
   if (!ctx.channelOrderNo) return;
+  // config.autoTrackingPush 가 명시적 false 면 skip (default: true)
+  if (ctx.channelId) {
+    const channel = await prisma.salesChannel.findUnique({
+      where: { id: ctx.channelId },
+      select: { config: true },
+    });
+    const cfg = (channel?.config as Record<string, unknown> | null) ?? {};
+    if (cfg.autoTrackingPush === false) return;
+  }
   try {
     await adapter.pushTrackingNumber(ctx.channelOrderNo, carrier, trackingNumber);
     await recordAudit(prisma, {
@@ -151,4 +160,85 @@ async function resolveAdapter(prisma: Tx, ctx: OutboundContext) {
   });
   if (!channel) return null;
   return getChannelAdapter(channel.code);
+}
+
+/**
+ * 재고 sync — productId 들의 가용 재고를 매핑된 모든 채널에 push.
+ *
+ * 호출 위치: Inventory 변동이 있는 모든 곳.
+ *  - 주문 prepare/cancel/return/exchange (Order)
+ *  - 입고 확정 (Incoming)
+ *  - 실사보정 (Stocktake)
+ *  - 조립/분해 (Assembly)
+ *
+ * 정책:
+ *  - 비동기·best-effort. 실패해도 ERP 트랜잭션 영향 X
+ *  - 매핑된 (channelId, channelSku) 만 push. 비매핑 SKU 는 채널이 모르니 무시
+ *  - 채널 어댑터가 pushStock 미구현이면 skip
+ *
+ * Phase 1: Mock 어댑터는 no-op. Phase 2 후 실 채널에서 작동.
+ */
+export async function dispatchPushStock(
+  prisma: PrismaClient,
+  productIds: string[],
+): Promise<void> {
+  if (productIds.length === 0) return;
+  try {
+    const mappings = await prisma.channelProductMapping.findMany({
+      where: { productId: { in: productIds } },
+      select: {
+        channelSku: true,
+        productId: true,
+        channel: { select: { id: true, code: true, isActive: true, config: true } },
+        product: {
+          select: {
+            inventory: { select: { quantity: true } },
+          },
+        },
+      },
+    });
+    // 채널별로 그룹핑
+    const byChannel = new Map<
+      string,
+      { code: string; items: Array<{ channelSku: string; availableQty: number }> }
+    >();
+    for (const m of mappings) {
+      if (!m.channel.isActive) continue;
+      const adapter = getChannelAdapter(m.channel.code);
+      if (!adapter || !adapter.pushStock) continue;
+      // config.autoStockSync 가 명시적 true 가 아니면 skip (default: false)
+      const cfg = (m.channel.config as Record<string, unknown> | null) ?? {};
+      if (cfg.autoStockSync !== true) continue;
+      const qty = m.product.inventory
+        ? Number(m.product.inventory.quantity)
+        : 0;
+      const entry = byChannel.get(m.channel.code) ?? {
+        code: m.channel.code,
+        items: [],
+      };
+      entry.items.push({ channelSku: m.channelSku, availableQty: qty });
+      byChannel.set(m.channel.code, entry);
+    }
+    // 채널별 push (병렬)
+    await Promise.all(
+      Array.from(byChannel.values()).map(async ({ code, items }) => {
+        const adapter = getChannelAdapter(code);
+        if (!adapter?.pushStock) return;
+        try {
+          await adapter.pushStock(items);
+        } catch (e) {
+          console.error(
+            `[outbound/push-stock] ${code} push 실패`,
+            e instanceof Error ? e.message : e,
+          );
+        }
+      }),
+    );
+  } catch (e) {
+    // 메인 흐름 영향 X — 로그만
+    console.error(
+      "[outbound/push-stock] 전체 실패",
+      e instanceof Error ? e.message : e,
+    );
+  }
 }

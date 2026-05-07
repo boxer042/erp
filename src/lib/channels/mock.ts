@@ -87,4 +87,8 @@ export class MockChannelAdapter implements ChannelAdapter {
   async rejectReturn(): Promise<void> {
     // Mock — no-op.
   }
+
+  async pushStock(): Promise<void> {
+    // Mock — no-op. Phase 2 의 실 어댑터가 채널 재고 API 호출.
+  }
 }

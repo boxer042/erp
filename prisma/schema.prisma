@@ -86,6 +86,17 @@ model SalesChannel {
   memo           String?
   logoUrl        String?  @map("logo_url")
   logoPath       String?  @map("logo_path")
+  /**
+   * 채널 운영 정책·credentials 보관 JSON.
+   * 구조 (선택 필드):
+   *  - pollingMinutes: number   — cron 호출 간격 (default 10)
+   *  - shipDateOffsetDays: number — 출고 예정일 offset (쿠팡=1, 네이버=정책별)
+   *  - autoStockSync: boolean   — Inventory 변동 시 채널에 push 여부 (default false)
+   *  - autoTrackingPush: boolean — ERP [발송] 시 송장 자동 push 여부 (default true)
+   *  - credentials: { ... }     — OAuth/API 키 (Phase 2 — 가입 후 입력)
+   *  - pendingThreshold: number — 보류 큐 임계값 (이 수 초과 시 알림)
+   */
+  config         Json?    @map("config")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

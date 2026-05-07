@@ -78,6 +78,17 @@ export interface ChannelAdapter {
    * 반품 반려 알림.
    */
   rejectReturn?(channelOrderNo: string, reason: string): Promise<void>;
+
+  /**
+   * 가용 재고를 채널에 push.
+   * Phase 6 — Inventory 변동(prepare/cancel/return/입고/조정) 시 자동 호출.
+   * Phase 1: Mock 어댑터는 no-op. Phase 2 의 실 어댑터에서만 실 효과.
+   *
+   * @param items channelSku 별 가용 수량. 매핑 안 된 SKU 는 호출자가 이미 필터.
+   */
+  pushStock?(
+    items: Array<{ channelSku: string; availableQty: number }>,
+  ): Promise<void>;
 }
 
 /** Import 결과 요약 */
