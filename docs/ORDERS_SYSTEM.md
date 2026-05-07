@@ -301,9 +301,41 @@ model Order {
 
 ### 우선순위 중간 (확장 기능)
 
-#### 4. 외부 채널 자동 import — Phase 2 (실 채널 어댑터)
-- **Phase 1 완료** (2026-05-07): 어댑터 인터페이스, import 변환 로직, SKU 매핑 모델·UI, 보류 큐, Mock 어댑터, `(channelId, channelOrderNo)` unique 인덱스. `/channels/imports` 페이지에서 dev 검증 가능.
-- **Phase 2 (가입·API 키 후)**: `lib/channels/coupang.ts`, `naver.ts` 등 실제 어댑터 구현. webhook signature 검증, OAuth, polling cron 등록. `lib/channels/registry.ts` 에 어댑터 등록만 추가하면 자동 활성화.
+#### 4. 외부 채널 자동화 — 단계별 로드맵
+
+**Phase 1 — 도메인 layer (완료, 2026-05-07)**
+- 어댑터 인터페이스 (`ChannelAdapter`), import 변환 로직, SKU 매핑 모델·UI, 보류 큐, Mock 어댑터
+- `(channelId, channelOrderNo)` unique 인덱스로 중복 방지
+- `/channels/imports` 페이지 (Import 트리거·보류 큐·SKU 매핑)
+
+**Phase 2 — 실 채널 어댑터 (가입·API 키 후)**
+- `lib/channels/coupang.ts`, `naver.ts` 등 채널별 어댑터 구현
+- OAuth 인증·토큰 갱신
+- 채널 API 응답 → `RawChannelOrder` 매핑 (실제 응답 schema 와 normalize)
+- `lib/channels/registry.ts` 에 등록만 추가하면 즉시 활성화 (UI·도메인 변경 X)
+- rate limit 대응
+
+**Phase 3 — 자동 트리거 (사용자가 버튼 안 눌러도 자동)**
+- **Polling cron** — `/api/cron/channel-poll` 라우트 + Vercel cron 또는 Supabase pg_cron 등록. 5~15분 간격으로 활성 어댑터의 fetchNewOrders 자동 호출
+- **Webhook 진입** — `/api/webhooks/channel/[provider]` 라우트. signature 검증 (각 채널 별 방식). polling 과 동시 운영 가능 (같은 import 변환 거치니 중복 자동 처리)
+- 실패 시 retry 큐 (PendingChannelOrder.status = VALIDATION_FAILED 활용)
+
+**Phase 4 — Outbound 동기화 (ERP → 채널 자동 통보)**
+- ERP `[발송]` 액션 후 `adapter.pushTrackingNumber()` 자동 호출 → 채널에 송장 등록 (사용자가 채널 콘솔 별도 입력 불필요)
+- ERP `[수락]/[반려]` 후 `adapter.acceptReturn()/rejectReturn()` 자동 호출
+- 실패 시 retry — 큐 모델 신설 또는 audit log 기반 재시도
+
+**Phase 5 — 채널 → ERP 역방향 자동화 (Inbound)**
+- 채널에서 반품 요청 들어오면 webhook 수신 → ERP `Order.status = RETURN_REQUESTED` 자동 전이 + claimType/Reason 채널 데이터에서 매핑
+- 채널 정산 데이터 받으면 paymentStatus 자동 PAID 전이 + 채널 수수료 정산 (customerPayment FIFO 매칭과 별개 — 채널 정산용 별도 테이블 도입 가능)
+- 채널 취소 요청 자동 import → ERP CANCELLED 전이
+
+**Phase 6+ — 운영 효율화**
+- **재고 sync** — Inventory 변동 시 채널에 가용 재고 push (품절 표시 자동). 채널별 단가도 sync
+- **SKU 자동 매핑 추천** — 보류 큐 항목에 동일 SKU 코드·상품명 유사도 기반 추천 매핑 표시 → 1클릭 매핑
+- **다중·variant 매핑** — 한 채널 SKU 가 ERP 세트 상품 또는 variant 로 매핑 (현재는 1:1만)
+- **운영 대시보드** — import 실패/보류 누적/매핑 누락 SKU 통계. 임계값 초과 시 매장 알림
+- **채널 설정 페이지** — credentials, 정책(D+1, 운임), polling 빈도 등 매장이 직접 관리
 
 #### 5. 부분 출고 / 부분 취소 / 부분 반품
 - 현재 OrderItem 단위 차감/복원 미지원 (전체 또는 취소만)

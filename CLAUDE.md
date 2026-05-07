@@ -1318,7 +1318,12 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 
 **우선순위 높음** (도메인 정합성 직결):
 - **차액 결제 자동 청구·환불** — EXCHANGE_DIFFERENT 차액은 표시만 (warning). 실제 결제 안내·환불은 매장 수동. 알림 시스템 도입 시 자동화
-- **외부 채널 자동 import — Phase 2 (실 채널 어댑터)** — Phase 1(어댑터 인터페이스 + Mock + import 변환 + 매핑 + 보류 큐 + UI) 완료. 쿠팡·네이버 가입·API 키 후 `lib/channels/coupang.ts` 등 실 어댑터 구현 → `lib/channels/registry.ts` 등록만 추가하면 자동 활성화. webhook signature 검증, OAuth, polling cron 등록 필요
+- **외부 채널 자동화** — Phase 1(어댑터 인터페이스 + Mock + import 변환 + 매핑 + 보류 큐 + UI) 완료. 단계별 로드맵 ([docs/ORDERS_SYSTEM.md §8.4](docs/ORDERS_SYSTEM.md#4-외부-채널-자동화--단계별-로드맵)):
+  - **Phase 2**: 실 채널 어댑터 구현 (쿠팡·네이버 등 가입 후 OAuth + API 매핑)
+  - **Phase 3**: 자동 polling cron + webhook 진입 — 사용자 트리거 없이 자동
+  - **Phase 4**: Outbound 동기화 — ERP `[발송]/[수락]/[반려]` 후 채널에 자동 통보
+  - **Phase 5**: Inbound 역방향 — 채널의 반품 요청·정산 자동 ERP 전이
+  - **Phase 6+**: 재고 sync, SKU 자동 매핑 추천, 다중 매핑, 운영 대시보드
 
 **우선순위 중간**:
 - **부분 출고 / 부분 취소 / 부분 반품** — `OrderItem.shippedQty`/`returnedQty` 필드 + 액션 단위 처리. PARTIAL_REFUND 실사용 가능
