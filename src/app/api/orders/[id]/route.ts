@@ -10,6 +10,7 @@ import {
   dispatchPushTracking,
   dispatchRejectReturn,
 } from "@/lib/channels/outbound";
+import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 
 /**
  * 교환 새 주문번호 — 원본 주문번호 뒤에 -EX 접미사. 사용자가 한눈에 교환 새 주문임을 인지.
@@ -181,6 +182,13 @@ export async function PUT(
     inspect_return: {
       from: "RETURN_COLLECTED",
       to: "RETURN_INSPECTED",
+    },
+    /** 검수 반려 — 회수했지만 검수 결과 불량(포장 손상·사용 흔적 등)
+     *  손님에게 반송, COMPLETED 복귀. 재고 복원 X (물품 다시 손님에게).
+     *  paymentStatus 도 그대로 유지. */
+    reject_inspection: {
+      from: "RETURN_COLLECTED",
+      to: "COMPLETED",
     },
     refund: {
       from: ["RETURN_INSPECTED", "RETURN_COLLECTED", "RETURN_ACCEPTED"],
@@ -421,19 +429,22 @@ export async function PUT(
   }
 
   // === 단순 단계 전이 (재고·결제 변동 없음, 상태만) ===
-  // pack:           PREPARING → PREPARING_PACKED. 송장 입력은 ship 액션에서.
-  // collect_return: RETURN_ACCEPTED → RETURN_COLLECTED. 물품 도착.
-  // inspect_return: RETURN_COLLECTED → RETURN_INSPECTED. 검수 통과 + paymentStatus PAID→REFUND_PENDING (환불 절차 시작 표시)
+  // pack:              PREPARING → PREPARING_PACKED. 송장 입력은 ship 액션에서.
+  // collect_return:    RETURN_ACCEPTED → RETURN_COLLECTED. 물품 도착.
+  // inspect_return:    RETURN_COLLECTED → RETURN_INSPECTED. 검수 통과 + paymentStatus PAID→REFUND_PENDING.
+  // reject_inspection: RETURN_COLLECTED → COMPLETED. 검수 반려 — 손님 반송, returnRejectedAt 기록.
   if (
     action === "pack" ||
     action === "collect_return" ||
-    action === "inspect_return"
+    action === "inspect_return" ||
+    action === "reject_inspection"
   ) {
     const auditUser = await getCurrentUser();
     const targetStatus = transition.to as
       | "PREPARING_PACKED"
       | "RETURN_COLLECTED"
-      | "RETURN_INSPECTED";
+      | "RETURN_INSPECTED"
+      | "COMPLETED";
     const trackingPatch =
       action === "pack"
         ? {
@@ -450,10 +461,27 @@ export async function PUT(
       action === "inspect_return" && order.paymentStatus === "PAID"
         ? { paymentStatus: "REFUND_PENDING" as const }
         : {};
+    // 검수 반려 — returnRejectedAt 기록 + reason 보강. 재고·결제 변동 없음.
+    const reasonInputForReject =
+      typeof body.returnReason === "string" ? body.returnReason : undefined;
+    const rejectPatch =
+      action === "reject_inspection"
+        ? {
+            returnRejectedAt: new Date(),
+            ...(reasonInputForReject
+              ? { returnReason: reasonInputForReject }
+              : {}),
+          }
+        : {};
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.order.update({
         where: { id },
-        data: { status: targetStatus, ...trackingPatch, ...paymentPatch },
+        data: {
+          status: targetStatus,
+          ...trackingPatch,
+          ...paymentPatch,
+          ...rejectPatch,
+        },
       });
       await recordAudit(tx, {
         userId: auditUser?.id ?? null,
@@ -465,6 +493,9 @@ export async function PUT(
           to: targetStatus,
           action,
           orderNo: order.orderNo,
+          ...(reasonInputForReject
+            ? { rejectReason: reasonInputForReject }
+            : {}),
         },
       });
       return u;
@@ -708,6 +739,32 @@ export async function PUT(
             : {}),
         },
       });
+
+      // === SALES_CANCELLED — 외상 주문 매출 취소 시 customer ledger 자동 조정 ===
+      // 주문 생성 시 외상이면 SALE 잔액이 누적되어 있음 → 매출 취소 시 ADJUSTMENT (credit) 로 차감.
+      // 등록 고객(customerId) 있는 외상에만 적용. 비등록 외상은 ledger 자체가 없음.
+      if (paymentPatch.paymentStatus === "SALES_CANCELLED" && order.customerId) {
+        const lastLedger = await tx.customerLedger.findFirst({
+          where: { customerId: order.customerId },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        });
+        const prevBalance = lastLedger ? Number(lastLedger.balance) : 0;
+        const orderAmount = Number(order.totalAmount);
+        await tx.customerLedger.create({
+          data: {
+            customerId: order.customerId,
+            type: "ADJUSTMENT",
+            description: `매출취소 — 주문 ${order.orderNo}`,
+            debitAmount: 0,
+            creditAmount: orderAmount,
+            balance: prevBalance - orderAmount,
+            referenceId: order.id,
+            referenceType: "ORDER_SALES_CANCELLED",
+          },
+        });
+        // 후속 ledger 항목들의 balance 재계산 (시간순 정렬 보장)
+        await rebalanceCustomerLedger(tx, order.customerId);
+      }
       await recordAudit(tx, {
         userId: auditUser?.id ?? null,
         entity: "Order",

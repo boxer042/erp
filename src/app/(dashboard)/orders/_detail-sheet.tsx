@@ -103,6 +103,7 @@ type ReturnAction =
   | "cancel_return_request"
   | "collect_return"
   | "inspect_return"
+  | "reject_inspection"
   | "return"
   | "refund"
   | "exchange";
@@ -403,6 +404,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
         cancel_return_request: "요청 취소",
         collect_return: "회수완료 — 검수 진행",
         inspect_return: "검수완료 — 환불/교환 종결 대기",
+        reject_inspection: "검수 반려 — 손님 반송, 배송완료로 복귀",
         return: "반품완료 — 재고 복원·환불",
         refund: "반품완료 — 재고 복원·환불",
         exchange: "교환완료 — 새 주문 자동 생성",
@@ -541,6 +543,8 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       collect_return: "회수가 완료되었습니까? 검수 단계로 진입합니다.",
       inspect_return:
         "검수가 완료되었습니까?\n결제건 paymentStatus 가 환불진행(REFUND_PENDING)으로 표시됩니다.",
+      reject_inspection:
+        "검수 반려 — 손님에게 반송하고 배송완료로 복귀합니다.\n재고는 복원되지 않으며 결제건도 그대로 유지됩니다 (손님이 다시 받음).",
       refund: `반품완료로 처리합니다.\n재고가 복원되고 ${cancelRefundLine}`,
       return: `반품완료로 처리합니다.\n재고가 복원되고 ${cancelRefundLine}`,
     };
@@ -1648,6 +1652,12 @@ function ActionFooter({
       });
       break;
     case "RETURN_COLLECTED":
+      buttons.push({
+        action: "reject_inspection",
+        label: "검수 반려",
+        icon: <ThumbsDown className="size-4" />,
+        tone: "danger-ghost",
+      });
       buttons.push({
         action: "inspect_return",
         label: "검수완료",

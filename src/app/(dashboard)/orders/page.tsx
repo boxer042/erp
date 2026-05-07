@@ -121,7 +121,8 @@ export default function OrdersBoardPage() {
         | "exchange"
         | "accept_return"
         | "collect_return"
-        | "inspect_return";
+        | "inspect_return"
+        | "reject_inspection";
     }) => apiMutate(`/api/orders/${id}`, "PUT", { action }),
     onSuccess: (_data, vars) => {
       const labels: Record<string, string> = {
@@ -136,6 +137,7 @@ export default function OrdersBoardPage() {
         accept_return: "수락 — 회수 대기",
         collect_return: "회수완료 — 검수 진행",
         inspect_return: "검수완료 — 환불/교환 종결 대기",
+        reject_inspection: "검수 반려 — 손님 반송, 배송완료로 복귀",
       };
       toast.success(labels[vars.action]);
       invalidate();

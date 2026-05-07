@@ -886,18 +886,42 @@ import { normalizeDiscountInput, formatDiscountDisplay } from "@/lib/utils";
 
 ### 페이지 레이아웃
 
-모든 대시보드 페이지의 공통 구조:
+대시보드 페이지는 두 가지 패턴 중 하나로 작성. **마진 누락 절대 금지** — 콘텐츠가 화면 가장자리에 붙어 답답해 보이지 않게.
+
+**패턴 A — 기본 테이블 페이지** (suppliers, customers, products 등 shadcn 기반):
 ```tsx
 <div className="flex h-full flex-col">
-  <DataTableToolbar ... />              {/* 상단 고정 */}
-  <div className="flex-1 overflow-auto"> {/* 스크롤 영역 */}
+  <DataTableToolbar ... />              {/* 상단 고정, px-5 py-2.5 */}
+  <div className="flex-1 overflow-auto"> {/* 스크롤 영역, padding 없음 — 테이블이 컨테이너 채움 */}
     <Table>...</Table>
   </div>
 </div>
 ```
+
+**패턴 B — 카드 기반 워크보드 페이지** (orders, purchase-orders 등 jm 기반):
+```tsx
+<div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+  <div className="flex w-full flex-col gap-6 p-4">  {/* ⚠️ p-4 마진 필수, gap-6 으로 카드 간격 */}
+    {/* KPI grid, 메인 카드, ... */}
+  </div>
+</div>
+```
+
+⚠️ **신규 페이지 만들 때 자주 누락되는 부분**:
+- **외곽 마진 (`p-4` 또는 `p-5`)** — 이게 없으면 페이지 콘텐츠가 가장자리에 붙어 답답함. 주문(`p-4`)·발주·도움말 페이지 모두 이 마진 사용.
+- **루트 배경 (`bg-[var(--jm-bg)]`)** — jm 페이지면 필수. 다크 모드 대응.
+- **카드 간격 (`gap-6`)** — 여러 카드 세로 배치 시.
+- **콘텐츠 폭 제한 (`max-w-4xl mx-auto` 등)** — 도움말·설정 같은 long-form 페이지는 폭 제한해 가독성 확보.
+
+체크리스트 (신규 페이지 만들기 전 확인):
+1. 루트 `flex min-h-full flex-col bg-[var(--jm-bg)]` (jm) 또는 `flex h-full flex-col` (shadcn) 적용했나?
+2. 콘텐츠 wrapper 에 `p-4` 또는 `p-5` 마진 줬나?
+3. 여러 섹션 있으면 `gap-6` 또는 `space-y-6` 으로 간격 줬나?
+4. 폼·문서형 페이지면 `max-w-3xl` ~ `max-w-5xl` + `mx-auto` 로 폭 제한했나?
+
 - 루트: `flex h-full flex-col` (브라우저 높이 사용)
 - 콘텐츠: `flex-1 overflow-auto` (남은 공간 채움 + 스크롤)
-- Table 부모에 padding 없음
+- Table 부모에 padding 없음 (테이블 자체가 컨테이너 꽉 채움)
 
 ### DataTableToolbar
 - Props: `search`, `onRefresh`, `onAdd`, `addLabel`, `filters`, `loading`
