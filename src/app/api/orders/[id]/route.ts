@@ -656,6 +656,221 @@ export async function PUT(
     return NextResponse.json(updated);
   }
 
+  // === 부분 반품 (refund + body.partialItems) — 일부 OrderItem 만 환불 ===
+  // 흐름: RETURN_INSPECTED 까지 정상 진행 → refund 시점에 partialItems 로 일부 지정.
+  // 종결 status: 모든 OrderItem 이 returnedQty == quantity 면 RETURNED, 아니면 COMPLETED 복귀.
+  // paymentStatus: 결제 → PARTIAL_REFUND(부분) / REFUNDED(전체), 외상 → SALES_CANCELLED + ledger 부분 차감.
+  if (
+    action === "refund" &&
+    Array.isArray(body.partialItems) &&
+    body.partialItems.length > 0
+  ) {
+    type PartialItem = { orderItemId: string; returnQty: number };
+    const partials: PartialItem[] = (
+      body.partialItems as Array<{ orderItemId?: string; returnQty?: number }>
+    )
+      .filter(
+        (p): p is PartialItem =>
+          typeof p.orderItemId === "string" &&
+          typeof p.returnQty === "number" &&
+          p.returnQty > 0,
+      )
+      .map((p) => ({ orderItemId: p.orderItemId, returnQty: p.returnQty }));
+
+    if (partials.length === 0) {
+      return NextResponse.json(
+        { error: "유효한 partialItems 가 없습니다" },
+        { status: 400 },
+      );
+    }
+
+    // 검증 — 모든 orderItemId 가 이 주문에 속하고, returnedQty + returnQty <= quantity
+    const itemMap = new Map(order.items.map((i) => [i.id, i]));
+    for (const p of partials) {
+      const it = itemMap.get(p.orderItemId);
+      if (!it) {
+        return NextResponse.json(
+          { error: `OrderItem ${p.orderItemId} 가 이 주문에 없습니다` },
+          { status: 400 },
+        );
+      }
+      const already = Number(it.returnedQty);
+      const newTotal = already + p.returnQty;
+      if (newTotal > Number(it.quantity) + 0.0001) {
+        return NextResponse.json(
+          {
+            error: `${it.product?.name ?? it.id}: 반품 누적 ${newTotal} > 주문 수량 ${it.quantity}`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    const wasUnpaid = order.paymentStatus === "UNPAID";
+    const wasPaidOrPending =
+      order.paymentStatus === "PAID" ||
+      order.paymentStatus === "REFUND_PENDING" ||
+      order.paymentStatus === "PARTIAL_REFUND";
+    const auditUser = await getCurrentUser();
+
+    let totalRefundAmount = 0;
+    let allFullyReturnedAfter = true;
+
+    await prisma.$transaction(async (tx) => {
+      for (const p of partials) {
+        const it = itemMap.get(p.orderItemId)!;
+        const productId = it.product?.id;
+        if (!productId) continue; // 서비스 라인 — 재고 무관
+
+        // LotConsumption 부분 복원 — createdAt DESC (가장 최근 소진 lot 부터 복원)
+        const consumptions = await tx.lotConsumption.findMany({
+          where: { orderItemId: it.id },
+          orderBy: { createdAt: "desc" },
+          include: { lot: { select: { id: true } } },
+        });
+        let restoreLeft = p.returnQty;
+        for (const c of consumptions) {
+          if (restoreLeft <= 0) break;
+          const cQty = Number(c.quantity);
+          const take = Math.min(restoreLeft, cQty);
+          await tx.inventoryLot.update({
+            where: { id: c.lotId },
+            data: { remainingQty: { increment: take } },
+          });
+          if (take >= cQty - 0.0001) {
+            await tx.lotConsumption.delete({ where: { id: c.id } });
+          } else {
+            await tx.lotConsumption.update({
+              where: { id: c.id },
+              data: { quantity: cQty - take },
+            });
+          }
+          restoreLeft -= take;
+        }
+        // Inventory 복원 + movement
+        const inventory = await tx.inventory.update({
+          where: { productId },
+          data: { quantity: { increment: p.returnQty } },
+        });
+        await tx.inventoryMovement.create({
+          data: {
+            inventoryId: inventory.id,
+            type: "RETURN",
+            quantity: p.returnQty,
+            balanceAfter: inventory.quantity,
+            referenceId: order.id,
+            referenceType: "ORDER",
+            memo: `주문 ${order.orderNo} 부분 반품 복원 (item ${it.id})`,
+          },
+        });
+
+        // OrderItem 누적 갱신
+        const newReturnedQty = Number(it.returnedQty) + p.returnQty;
+        const itemRefund = p.returnQty * Number(it.unitPrice);
+        const newRefunded = Number(it.refundedAmount) + itemRefund;
+        await tx.orderItem.update({
+          where: { id: it.id },
+          data: {
+            returnedQty: newReturnedQty,
+            refundedAmount: newRefunded,
+          },
+        });
+
+        totalRefundAmount += itemRefund;
+        if (newReturnedQty < Number(it.quantity) - 0.0001) {
+          allFullyReturnedAfter = false;
+        }
+      }
+
+      // 다른 OrderItem 들도 모두 fully returned 인지 확인 (이번에 처리 안 한 것들)
+      if (allFullyReturnedAfter) {
+        for (const it of order.items) {
+          const partial = partials.find((p) => p.orderItemId === it.id);
+          const finalReturned = partial
+            ? Number(it.returnedQty) + partial.returnQty
+            : Number(it.returnedQty);
+          if (finalReturned < Number(it.quantity) - 0.0001) {
+            allFullyReturnedAfter = false;
+            break;
+          }
+        }
+      }
+
+      const newStatus = allFullyReturnedAfter ? "RETURNED" : "COMPLETED";
+      const newPaymentStatus: "REFUNDED" | "PARTIAL_REFUND" | "SALES_CANCELLED" =
+        allFullyReturnedAfter
+          ? wasUnpaid
+            ? "SALES_CANCELLED"
+            : "REFUNDED"
+          : "PARTIAL_REFUND";
+
+      await tx.order.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          paymentStatus: newPaymentStatus,
+        },
+      });
+
+      // 외상이면 customer ledger ADJUSTMENT (부분 금액)
+      if (wasUnpaid && order.customerId) {
+        const lastLedger = await tx.customerLedger.findFirst({
+          where: { customerId: order.customerId },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        });
+        const prevBalance = lastLedger ? Number(lastLedger.balance) : 0;
+        await tx.customerLedger.create({
+          data: {
+            customerId: order.customerId,
+            type: "ADJUSTMENT",
+            description: `${allFullyReturnedAfter ? "매출취소" : "부분 매출취소"} — 주문 ${order.orderNo}`,
+            debitAmount: 0,
+            creditAmount: totalRefundAmount,
+            balance: prevBalance - totalRefundAmount,
+            referenceId: order.id,
+            referenceType: allFullyReturnedAfter
+              ? "ORDER_SALES_CANCELLED"
+              : "ORDER_PARTIAL_SALES_CANCELLED",
+          },
+        });
+        await rebalanceCustomerLedger(tx, order.customerId);
+      }
+
+      void wasPaidOrPending; // 결제 흐름은 paymentStatus 갱신으로 충분 (외부 PG 처리는 별도)
+
+      await recordAudit(tx, {
+        userId: auditUser?.id ?? null,
+        entity: "Order",
+        entityId: id,
+        action: "STATUS_CHANGE",
+        meta: {
+          from: order.status,
+          to: newStatus,
+          action: "partial_refund",
+          orderNo: order.orderNo,
+          refundAmount: totalRefundAmount,
+          partials,
+          fullyReturned: allFullyReturnedAfter,
+        },
+      });
+    });
+
+    // Inventory 변동 — 매핑된 채널에 가용 재고 push (best-effort, 트랜잭션 외부)
+    const productIdsToPush = Array.from(
+      new Set(
+        partials
+          .map((p) => itemMap.get(p.orderItemId)?.product?.id)
+          .filter((p): p is string => !!p),
+      ),
+    );
+    if (productIdsToPush.length > 0) {
+      await dispatchPushStock(prisma, productIdsToPush);
+    }
+
+    const updated = await prisma.order.findUnique({ where: { id } });
+    return NextResponse.json(updated);
+  }
+
   // === 취소/반품/환불/교환 시 재고 복원 + 결제 상태 전이 ===
   // PENDING 은 재고 차감 안 된 상태이므로 그냥 상태만 변경.
   // PREPARING 이상은 차감됐으므로 LotConsumption 복원 + Inventory 복원.

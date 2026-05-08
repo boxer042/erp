@@ -1067,6 +1067,14 @@ model OrderItem {
   channelCommissionRateSnapshot Decimal? @map("channel_commission_rate_snapshot") @db.Decimal(5, 4)
   cardFeeRateSnapshot           Decimal? @map("card_fee_rate_snapshot") @db.Decimal(5, 4)
   sellingCostSnapshot           Decimal? @map("selling_cost_snapshot") @db.Decimal(15, 4)
+  /**
+   * 부분 반품/환불 추적.
+   *  - returnedQty: 누적 반품 수량 (≤ quantity). 부분 반품 후에도 추가 반품 누적
+   *  - refundedAmount: 누적 환불 금액 (세전 공급가액 기준). totalPrice 와 비교해 전액/부분 판정
+   * 환불 금액 = unitPrice × returnedQty (단순화). 부분 환불은 매장 입력값 누적.
+   */
+  returnedQty                   Decimal  @default(0) @map("returned_qty") @db.Decimal(15, 4)
+  refundedAmount                Decimal  @default(0) @map("refunded_amount") @db.Decimal(15, 2)
   memo                          String?
 
   lotConsumptions LotConsumption[]

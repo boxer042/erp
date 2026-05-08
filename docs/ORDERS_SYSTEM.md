@@ -371,6 +371,9 @@ RETURN_* 만 모은 클레임 처리 batch 페이지.
 
 ## 9. 변경 이력
 
+- **2026-05-08 (8차)**: 부분 반품/환불 (OrderItem 단위) + SKU 다중 매핑 (1:N) — 도메인 큰 두 작업.
+  - **부분 반품**: `OrderItem.returnedQty/refundedAmount` 필드 신규. `refund` 액션 `body.partialItems`(orderItemId, returnQty 배열) 받으면 부분 처리. LotConsumption 부분 복원 알고리즘(createdAt DESC, 가장 최근 소진 lot 부터). 모두 fully returned 면 `RETURNED`, 일부면 `COMPLETED` 복귀 + paymentStatus `PARTIAL_REFUND`. 외상은 ledger ADJUSTMENT 부분 차감. UI: RefundDialog 에서 [전체 / 부분] 토글 + 항목별 잔여 수량 입력. 주문 항목 카드에 누적 반품 수량 + 환불 금액 표시.
+  - **다중 매핑**: `ChannelProductMapping.productId nullable` + 신규 `ChannelProductMappingComponent` (productId+quantity). 한 채널 SKU 가 ERP 상품 N개로 풀어짐. import 시 `resolveMappingResult` 헬퍼로 단일/다중 통합 (components 배열). 단가는 첫 component 가 raw 값 받고 나머지는 quantity 만 (단순화). UI: AddMappingDialog 에 [단일 / 다중] 토글 + 다중 모드는 ProductCombobox + 수량 입력 여러 개. list 에 "다중 ×N" 배지 + 각 component 세로 나열. 재고 sync 는 단일 매핑만 push (다중은 component min 알고리즘 후속).
 - **2026-05-07 (7차)**: 검수 반려 분기(reject_inspection — RETURN_COLLECTED → COMPLETED, 재고 복원 X) + 외상 반품 → customer ledger 자동 ADJUSTMENT (SALES_CANCELLED 시 잔액 차감) + Inventory 변동 시 채널에 가용 재고 자동 push (`dispatchPushStock`, autoStockSync config 토글) + 채널 설정 Dialog (polling 빈도/D+1 offset/자동 push toggle/임계값) + 알림 시스템 인터페이스 (`lib/notifications/` Mock 어댑터 + dispatch helper) + 임계값 알림(보류 큐 N건 초과 시 ADMIN 알림) + 배송완료/반품 수락·반려 시 고객 SMS 알림. 부분 처리·다중 매핑은 모델 변경 큰 작업이라 후속 PR 로 분리.
 - **2026-05-07 (6차)**: 출고 5단계화 (PENDING/PREPARING/PREPARING_PACKED/SHIPPED/COMPLETED — 출고확정 분리, 취소는 출고대기까지) + 반품/교환 5단계화 (REQUESTED/ACCEPTED/COLLECTED/INSPECTED/COMPLETED — 회수·검수 분리) + paymentStatus 확장 (REFUND_PENDING + SALES_CANCELLED) + claimType 별 라벨 동적 분기 (반품/교환) + jm `accent` 보라 토큰 + 흐름별 색 통일 (출고=파랑, 반품=노랑, 교환=보라).
 - **2026-05-07 (5차)**: 외부 채널 자동화 Phase 2-비의존 후속 — SKU 자동 매핑 추천, Outbound hook, Cron 라우트, 운영 대시보드 위젯.

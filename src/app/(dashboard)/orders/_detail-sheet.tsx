@@ -164,6 +164,10 @@ interface OrderDetail {
     quantity: string;
     unitPrice: string;
     totalPrice: string;
+    /** 부분 반품 누적 (≤ quantity) */
+    returnedQty: string;
+    /** 부분 환불 금액 누적 (세전 공급가액 기준) */
+    refundedAmount: string;
     product: { id: string; name: string; sku: string } | null;
     serviceName: string | null;
   }>;
@@ -239,6 +243,12 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
   const [exchangeKind, setExchangeKind] = useState<
     "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT"
   >("EXCHANGE_SAME");
+  // 환불 Dialog (RETURN_INSPECTED 에서 전체/부분 결정)
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundMode, setRefundMode] = useState<"full" | "partial">("full");
+  const [partialReturns, setPartialReturns] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     setEditing(false);
@@ -255,6 +265,9 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     setClaimNote("");
     setExchangeDialogOpen(false);
     setExchangeKind("EXCHANGE_SAME");
+    setRefundDialogOpen(false);
+    setRefundMode("full");
+    setPartialReturns({});
   }, [orderId, open]);
 
   // 항목 편집 모드 진입 시에만 상품 목록 fetch
@@ -358,6 +371,26 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       toast.success("반품 요청 접수 — 매장 결정 대기");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       setClaimDialogOpen(false);
+      onOpenChange(false);
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "처리 실패"),
+  });
+
+  // 부분 반품 — partialItems 배열 전송. 빈 배열이면 전체 반품(서버에서 기존 동작).
+  const partialRefundMutation = useMutation({
+    mutationFn: (
+      partialItems: Array<{ orderItemId: string; returnQty: number }>,
+    ) =>
+      apiMutate(`/api/orders/${orderId}`, "PUT", {
+        action: "refund",
+        partialItems,
+      }),
+    onSuccess: () => {
+      toast.success("부분 반품 처리 완료 — 재고 복원·환불 일부 진행");
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      setRefundDialogOpen(false);
+      setPartialReturns({});
       onOpenChange(false);
     },
     onError: (err) =>
@@ -522,6 +555,20 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
         cur === "EXCHANGE_DIFFERENT" ? "EXCHANGE_DIFFERENT" : "EXCHANGE_SAME",
       );
       setExchangeDialogOpen(true);
+      return;
+    }
+    // 환불 처리 — Dialog 로 전체/부분 분기 선택 (RETURN_INSPECTED 에서)
+    if (action === "refund" && detailQuery.data?.status === "RETURN_INSPECTED") {
+      setRefundMode("full");
+      // 잔여 반품 가능 수량 prefill (= quantity - returnedQty)
+      const init: Record<string, string> = {};
+      for (const it of detailQuery.data.items) {
+        const remaining =
+          Number(it.quantity) - Number(it.returnedQty);
+        init[it.id] = String(remaining);
+      }
+      setPartialReturns(init);
+      setRefundDialogOpen(true);
       return;
     }
     const isUnpaidReturn =
@@ -940,6 +987,148 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
           </JmDialogFooter>
         </JmDialogContent>
       </JmDialog>
+
+      {/* 환불 Dialog — RETURN_INSPECTED 에서 전체/부분 분기 */}
+      <JmDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>반품완료 — 환불 처리</JmDialogTitle>
+          </JmDialogHeader>
+          <div className="space-y-3 px-5 py-4">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRefundMode("full")}
+                className={`flex-1 rounded-lg border-2 p-3 text-left text-[12px] transition-colors ${
+                  refundMode === "full"
+                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                }`}
+              >
+                <div className="text-[14px] font-medium">전체 반품</div>
+                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                  주문 항목 모두 환불 (RETURNED 종결)
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRefundMode("partial")}
+                className={`flex-1 rounded-lg border-2 p-3 text-left text-[12px] transition-colors ${
+                  refundMode === "partial"
+                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                }`}
+              >
+                <div className="text-[14px] font-medium">부분 반품</div>
+                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                  일부 항목만. 주문은 배송완료 복귀 + paymentStatus 부분환불
+                </div>
+              </button>
+            </div>
+
+            {refundMode === "partial" && data && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-[var(--jm-text-muted)]">
+                  각 항목별 반품 수량 입력. 0 은 반품 안 함. 잔여 수량
+                  (주문수량 − 누적반품) 까지 가능.
+                </p>
+                <div className="space-y-1.5">
+                  {data.items
+                    .filter((it) => it.product) // 서비스 라인 제외
+                    .map((it) => {
+                      const ordered = Number(it.quantity);
+                      const already = Number(it.returnedQty);
+                      const remaining = ordered - already;
+                      return (
+                        <div
+                          key={it.id}
+                          className="flex items-center gap-2 rounded border border-[var(--jm-border)] p-2"
+                        >
+                          <div className="flex-1 text-[12px]">
+                            <div className="text-[var(--jm-text)]">
+                              {it.product?.name ?? "—"}
+                            </div>
+                            <div className="text-[11px] text-[var(--jm-text-muted)]">
+                              주문 {ordered.toLocaleString("ko-KR")} · 누적반품{" "}
+                              {already.toLocaleString("ko-KR")} · 잔여{" "}
+                              <span className="font-medium">
+                                {remaining.toLocaleString("ko-KR")}
+                              </span>
+                            </div>
+                          </div>
+                          <JmInput
+                            size="sm"
+                            type="text"
+                            inputMode="decimal"
+                            value={partialReturns[it.id] ?? "0"}
+                            onChange={(e) =>
+                              setPartialReturns({
+                                ...partialReturns,
+                                [it.id]: e.target.value,
+                              })
+                            }
+                            onFocus={(e) => e.currentTarget.select()}
+                            className="w-[80px] text-right"
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setRefundDialogOpen(false)}
+              disabled={
+                transitionMutation.isPending || partialRefundMutation.isPending
+              }
+            >
+              취소
+            </JmButton>
+            <JmButton
+              onClick={() => {
+                if (refundMode === "full") {
+                  setRefundDialogOpen(false);
+                  if (
+                    !confirm(
+                      "전체 반품 처리합니다. 모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.",
+                    )
+                  )
+                    return;
+                  transitionMutation.mutate("refund");
+                } else {
+                  // 부분 반품 — partialReturns 검증 후 mutation
+                  const partials: Array<{
+                    orderItemId: string;
+                    returnQty: number;
+                  }> = [];
+                  for (const [itemId, qtyStr] of Object.entries(partialReturns)) {
+                    const q = parseFloat(qtyStr);
+                    if (!Number.isFinite(q) || q <= 0) continue;
+                    partials.push({ orderItemId: itemId, returnQty: q });
+                  }
+                  if (partials.length === 0) {
+                    toast.error("반품 수량을 1개 이상 입력해주세요");
+                    return;
+                  }
+                  partialRefundMutation.mutate(partials);
+                }
+              }}
+              disabled={
+                transitionMutation.isPending || partialRefundMutation.isPending
+              }
+            >
+              {(transitionMutation.isPending ||
+                partialRefundMutation.isPending) && (
+                <JmSpinner size="sm" tone="inverted" />
+              )}
+              {refundMode === "full" ? "전체 반품 확정" : "부분 반품 확정"}
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </JmDrawer>
   );
 }
@@ -1026,31 +1215,42 @@ function ReadView({ order }: { order: OrderDetail }) {
             </JmTableRow>
           </JmTableHeader>
           <JmTableBody>
-            {order.items.map((item) => (
-              <JmTableRow key={item.id} className="hover:bg-transparent">
-                <JmTableCell>
-                  <div className="flex flex-col">
-                    <span className="text-[13px] text-[var(--jm-text)]">
-                      {item.product?.name ?? item.serviceName ?? "—"}
-                    </span>
-                    {item.product?.sku && (
-                      <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
-                        {item.product.sku}
+            {order.items.map((item) => {
+              const returned = Number(item.returnedQty ?? 0);
+              const refunded = Number(item.refundedAmount ?? 0);
+              const hasPartialReturn = returned > 0;
+              return (
+                <JmTableRow key={item.id} className="hover:bg-transparent">
+                  <JmTableCell>
+                    <div className="flex flex-col">
+                      <span className="text-[13px] text-[var(--jm-text)]">
+                        {item.product?.name ?? item.serviceName ?? "—"}
                       </span>
-                    )}
-                  </div>
-                </JmTableCell>
-                <JmTableCell className="text-right tabular-nums">
-                  {Number(item.quantity).toLocaleString("ko-KR")}
-                </JmTableCell>
-                <JmTableCell className="text-right tabular-nums">
-                  {formatCurrency(item.unitPrice)}
-                </JmTableCell>
-                <JmTableCell className="text-right tabular-nums font-semibold">
-                  {formatCurrency(item.totalPrice)}
-                </JmTableCell>
-              </JmTableRow>
-            ))}
+                      {item.product?.sku && (
+                        <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                          {item.product.sku}
+                        </span>
+                      )}
+                      {hasPartialReturn && (
+                        <span className="mt-0.5 text-[11px] text-[var(--jm-warning-fg)]">
+                          반품 {returned.toLocaleString("ko-KR")}건 · 환불{" "}
+                          {formatCurrency(refunded)}
+                        </span>
+                      )}
+                    </div>
+                  </JmTableCell>
+                  <JmTableCell className="text-right tabular-nums">
+                    {Number(item.quantity).toLocaleString("ko-KR")}
+                  </JmTableCell>
+                  <JmTableCell className="text-right tabular-nums">
+                    {formatCurrency(item.unitPrice)}
+                  </JmTableCell>
+                  <JmTableCell className="text-right tabular-nums font-semibold">
+                    {formatCurrency(item.totalPrice)}
+                  </JmTableCell>
+                </JmTableRow>
+              );
+            })}
           </JmTableBody>
         </JmTable>
       </JmCard>
