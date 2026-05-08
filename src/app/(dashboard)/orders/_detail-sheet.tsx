@@ -164,6 +164,8 @@ interface OrderDetail {
     quantity: string;
     unitPrice: string;
     totalPrice: string;
+    /** 누적 발송 수량 (≤ quantity) — 부분 출고 추적 */
+    shippedQty: string;
     /** 부분 반품 누적 (≤ quantity) */
     returnedQty: string;
     /** 부분 환불 금액 누적 (세전 공급가액 기준) */
@@ -243,6 +245,10 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
   const [exchangeKind, setExchangeKind] = useState<
     "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT"
   >("EXCHANGE_SAME");
+  const [exchangeMode, setExchangeMode] = useState<"full" | "partial">("full");
+  const [exchangePartialReturns, setExchangePartialReturns] = useState<
+    Record<string, string>
+  >({});
   // 환불 Dialog (RETURN_INSPECTED 에서 전체/부분 결정)
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [refundMode, setRefundMode] = useState<"full" | "partial">("full");
@@ -265,6 +271,8 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     setClaimNote("");
     setExchangeDialogOpen(false);
     setExchangeKind("EXCHANGE_SAME");
+    setExchangeMode("full");
+    setExchangePartialReturns({});
     setRefundDialogOpen(false);
     setRefundMode("full");
     setPartialReturns({});
@@ -397,12 +405,18 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
-  // 교환 처리 — claimType (SAME/DIFFERENT) 을 함께 보내 새 주문 항목 prefill 분기.
+  // 교환 처리 — claimType (SAME/DIFFERENT) + 선택적 partialItems.
   const exchangeMutation = useMutation({
-    mutationFn: (kind: "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT") =>
+    mutationFn: (input: {
+      kind: "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT";
+      partialItems?: Array<{ orderItemId: string; returnQty: number }>;
+    }) =>
       apiMutate(`/api/orders/${orderId}`, "PUT", {
         action: "exchange",
-        claimType: kind,
+        claimType: input.kind,
+        ...(input.partialItems && input.partialItems.length > 0
+          ? { partialItems: input.partialItems }
+          : {}),
       }),
     onSuccess: () => {
       toast.success(
@@ -410,6 +424,8 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       setExchangeDialogOpen(false);
+      setExchangeMode("full");
+      setExchangePartialReturns({});
       onOpenChange(false);
     },
     onError: (err) =>
@@ -548,12 +564,20 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       setClaimDialogOpen(true);
       return;
     }
-    // 교환 처리 — Dialog 로 SAME/DIFFERENT 분기 선택
+    // 교환 처리 — Dialog 로 SAME/DIFFERENT + 전체/부분 분기 선택
     if (action === "exchange") {
       const cur = detailQuery.data?.claimType;
       setExchangeKind(
         cur === "EXCHANGE_DIFFERENT" ? "EXCHANGE_DIFFERENT" : "EXCHANGE_SAME",
       );
+      setExchangeMode("full");
+      // 잔여 반품 가능 수량 prefill
+      const init: Record<string, string> = {};
+      for (const it of detailQuery.data?.items ?? []) {
+        const remaining = Number(it.quantity) - Number(it.returnedQty);
+        init[it.id] = String(remaining);
+      }
+      setExchangePartialReturns(init);
       setExchangeDialogOpen(true);
       return;
     }
@@ -966,6 +990,85 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
                 );
               })}
             </div>
+
+            {/* 전체/부분 토글 */}
+            <div className="flex gap-2 border-t border-[var(--jm-border)] pt-3">
+              <button
+                type="button"
+                onClick={() => setExchangeMode("full")}
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                  exchangeMode === "full"
+                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                }`}
+              >
+                <div className="text-[13px] font-medium">전체 교환</div>
+                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                  주문 항목 모두 교환 (EXCHANGED 종결)
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setExchangeMode("partial")}
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                  exchangeMode === "partial"
+                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                }`}
+              >
+                <div className="text-[13px] font-medium">부분 교환</div>
+                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                  일부 항목만. 원본은 배송완료 복귀
+                </div>
+              </button>
+            </div>
+
+            {exchangeMode === "partial" && data && (
+              <div className="space-y-1.5">
+                <p className="text-[11px] text-[var(--jm-text-muted)]">
+                  각 항목별 교환 수량 입력 (잔여 = 주문수량 − 누적반품)
+                </p>
+                {data.items
+                  .filter((it) => it.product)
+                  .map((it) => {
+                    const ordered = Number(it.quantity);
+                    const already = Number(it.returnedQty);
+                    const remaining = ordered - already;
+                    return (
+                      <div
+                        key={it.id}
+                        className="flex items-center gap-2 rounded border border-[var(--jm-border)] p-2"
+                      >
+                        <div className="flex-1 text-[12px]">
+                          <div className="text-[var(--jm-text)]">
+                            {it.product?.name ?? "—"}
+                          </div>
+                          <div className="text-[11px] text-[var(--jm-text-muted)]">
+                            잔여{" "}
+                            <span className="font-medium">
+                              {remaining.toLocaleString("ko-KR")}
+                            </span>
+                          </div>
+                        </div>
+                        <JmInput
+                          size="sm"
+                          type="text"
+                          inputMode="decimal"
+                          value={exchangePartialReturns[it.id] ?? "0"}
+                          onChange={(e) =>
+                            setExchangePartialReturns({
+                              ...exchangePartialReturns,
+                              [it.id]: e.target.value,
+                            })
+                          }
+                          onFocus={(e) => e.currentTarget.select()}
+                          className="w-[80px] text-right"
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
           <JmDialogFooter>
             <JmButton
@@ -976,13 +1079,37 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
               취소
             </JmButton>
             <JmButton
-              onClick={() => exchangeMutation.mutate(exchangeKind)}
+              onClick={() => {
+                if (exchangeMode === "full") {
+                  exchangeMutation.mutate({ kind: exchangeKind });
+                } else {
+                  const partialItems: Array<{
+                    orderItemId: string;
+                    returnQty: number;
+                  }> = [];
+                  for (const [itemId, qtyStr] of Object.entries(
+                    exchangePartialReturns,
+                  )) {
+                    const q = parseFloat(qtyStr);
+                    if (!Number.isFinite(q) || q <= 0) continue;
+                    partialItems.push({ orderItemId: itemId, returnQty: q });
+                  }
+                  if (partialItems.length === 0) {
+                    toast.error("교환 수량을 1개 이상 입력해주세요");
+                    return;
+                  }
+                  exchangeMutation.mutate({
+                    kind: exchangeKind,
+                    partialItems,
+                  });
+                }
+              }}
               disabled={exchangeMutation.isPending}
             >
               {exchangeMutation.isPending && (
                 <JmSpinner size="sm" tone="inverted" />
               )}
-              교환 처리
+              {exchangeMode === "full" ? "전체 교환 확정" : "부분 교환 확정"}
             </JmButton>
           </JmDialogFooter>
         </JmDialogContent>
@@ -1216,8 +1343,11 @@ function ReadView({ order }: { order: OrderDetail }) {
           </JmTableHeader>
           <JmTableBody>
             {order.items.map((item) => {
+              const ordered = Number(item.quantity);
+              const shipped = Number(item.shippedQty ?? 0);
               const returned = Number(item.returnedQty ?? 0);
               const refunded = Number(item.refundedAmount ?? 0);
+              const hasPartialShip = shipped > 0 && shipped < ordered;
               const hasPartialReturn = returned > 0;
               return (
                 <JmTableRow key={item.id} className="hover:bg-transparent">
@@ -1229,6 +1359,13 @@ function ReadView({ order }: { order: OrderDetail }) {
                       {item.product?.sku && (
                         <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                           {item.product.sku}
+                        </span>
+                      )}
+                      {hasPartialShip && (
+                        <span className="mt-0.5 text-[11px] text-[var(--jm-info-fg)]">
+                          발송 {shipped.toLocaleString("ko-KR")}/
+                          {ordered.toLocaleString("ko-KR")} (잔여{" "}
+                          {(ordered - shipped).toLocaleString("ko-KR")})
                         </span>
                       )}
                       {hasPartialReturn && (

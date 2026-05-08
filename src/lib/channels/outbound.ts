@@ -209,8 +209,7 @@ export async function dispatchPushStock(
       // config.autoStockSync 가 명시적 true 가 아니면 skip (default: false)
       const cfg = (m.channel.config as Record<string, unknown> | null) ?? {};
       if (cfg.autoStockSync !== true) continue;
-      // 다중 매핑 (m.product=null) 은 가용 재고 계산이 복잡하니 단일 매핑만 push.
-      // 다중 매핑 sync 는 후속 (component 별 inventory min 비례 계산 필요).
+      // 단일 매핑 — productId 직접 (m.product 사용)
       if (!m.product) continue;
       const qty = m.product.inventory
         ? Number(m.product.inventory.quantity)
@@ -220,6 +219,62 @@ export async function dispatchPushStock(
         items: [],
       };
       entry.items.push({ channelSku: m.channelSku, availableQty: qty });
+      byChannel.set(m.channel.code, entry);
+    }
+
+    // 다중 매핑 (component 기반) 가용 세트 수 계산 — 변경된 productId 가
+    // component 로 포함된 매핑들을 찾아 모든 component 의 inventory min 으로 산출.
+    //
+    // 예: 채널 SKU "선물세트A" = ERP [상품X × 2 + 상품Y × 1]
+    //     상품X 재고 10, 상품Y 재고 5 → min(floor(10/2), floor(5/1)) = 5 세트 가능
+    const multiMappings = await prisma.channelProductMapping.findMany({
+      where: {
+        components: { some: { productId: { in: productIds } } },
+      },
+      select: {
+        channelSku: true,
+        channel: { select: { code: true, isActive: true, config: true } },
+        components: {
+          select: {
+            quantity: true,
+            product: {
+              select: {
+                inventory: { select: { quantity: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    for (const m of multiMappings) {
+      if (!m.channel.isActive) continue;
+      const adapter = getChannelAdapter(m.channel.code);
+      if (!adapter || !adapter.pushStock) continue;
+      const cfg = (m.channel.config as Record<string, unknown> | null) ?? {};
+      if (cfg.autoStockSync !== true) continue;
+      if (m.components.length === 0) continue;
+
+      // 각 component 의 inventory / quantity 의 floor 중 최소값 = 가용 세트 수
+      let availableSets = Number.POSITIVE_INFINITY;
+      for (const c of m.components) {
+        const inv = c.product.inventory
+          ? Number(c.product.inventory.quantity)
+          : 0;
+        const need = Number(c.quantity);
+        if (need <= 0) continue;
+        availableSets = Math.min(availableSets, Math.floor(inv / need));
+      }
+      if (!Number.isFinite(availableSets)) availableSets = 0;
+      if (availableSets < 0) availableSets = 0;
+
+      const entry = byChannel.get(m.channel.code) ?? {
+        code: m.channel.code,
+        items: [],
+      };
+      entry.items.push({
+        channelSku: m.channelSku,
+        availableQty: availableSets,
+      });
       byChannel.set(m.channel.code, entry);
     }
     // 채널별 push (병렬)

@@ -13,6 +13,10 @@ import {
 } from "@/lib/channels/outbound";
 import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 import { notify } from "@/lib/notifications/dispatch";
+import {
+  dispatchPaymentCancel,
+  dispatchRefund,
+} from "@/lib/payments/dispatch";
 
 /**
  * 교환 새 주문번호 — 원본 주문번호 뒤에 -EX 접미사. 사용자가 한눈에 교환 새 주문임을 인지.
@@ -212,6 +216,152 @@ export async function PUT(
       to: "EXCHANGED",
     },
   };
+
+  // === 부분 출고 (partial_ship) — PREPARING/PREPARING_PACKED 에서 일부만 발송 ===
+  // 항목별 shipQty 받음 → OrderItem.shippedQty 누적 갱신.
+  // 모두 fully shipped 면 status=SHIPPED, 일부면 status 그대로 유지.
+  // 송장 정보 (carrier, trackingNumber) 도 함께 저장 — 단일 송장 (분할 송장은 후속).
+  if (action === "partial_ship") {
+    if (
+      order.status !== "PREPARING" &&
+      order.status !== "PREPARING_PACKED"
+    ) {
+      return NextResponse.json(
+        {
+          error: `${order.status} 상태에서는 부분 출고할 수 없습니다 (PREPARING/PREPARING_PACKED 만 가능)`,
+        },
+        { status: 400 },
+      );
+    }
+    if (!Array.isArray(body.partialItems) || body.partialItems.length === 0) {
+      return NextResponse.json(
+        { error: "partialItems 가 필요합니다" },
+        { status: 400 },
+      );
+    }
+    type ShipItem = { orderItemId: string; shipQty: number };
+    const ships: ShipItem[] = (
+      body.partialItems as Array<{ orderItemId?: string; shipQty?: number }>
+    )
+      .filter(
+        (p): p is ShipItem =>
+          typeof p.orderItemId === "string" &&
+          typeof p.shipQty === "number" &&
+          p.shipQty > 0,
+      )
+      .map((p) => ({ orderItemId: p.orderItemId, shipQty: p.shipQty }));
+    if (ships.length === 0) {
+      return NextResponse.json(
+        { error: "유효한 출고 수량이 없습니다" },
+        { status: 400 },
+      );
+    }
+
+    const itemMap = new Map(order.items.map((i) => [i.id, i]));
+    for (const s of ships) {
+      const it = itemMap.get(s.orderItemId);
+      if (!it) {
+        return NextResponse.json(
+          { error: `OrderItem ${s.orderItemId} 가 없습니다` },
+          { status: 400 },
+        );
+      }
+      const already = Number(it.shippedQty);
+      const newTotal = already + s.shipQty;
+      if (newTotal > Number(it.quantity) + 0.0001) {
+        return NextResponse.json(
+          {
+            error: `${it.product?.name ?? it.id}: 발송 누적 ${newTotal} > 주문 수량 ${it.quantity}`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    const trackingPatch =
+      typeof body.trackingCarrier === "string" ||
+      typeof body.trackingNumber === "string"
+        ? {
+            ...(typeof body.trackingCarrier === "string"
+              ? { trackingCarrier: body.trackingCarrier || null }
+              : {}),
+            ...(typeof body.trackingNumber === "string"
+              ? { trackingNumber: body.trackingNumber || null }
+              : {}),
+          }
+        : {};
+
+    const auditUserShip = await getCurrentUser();
+    let allFullyShipped = true;
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const s of ships) {
+        const it = itemMap.get(s.orderItemId)!;
+        const newShipped = Number(it.shippedQty) + s.shipQty;
+        await tx.orderItem.update({
+          where: { id: it.id },
+          data: { shippedQty: newShipped },
+        });
+        if (newShipped < Number(it.quantity) - 0.0001) {
+          allFullyShipped = false;
+        }
+      }
+      // 다른 OrderItem 들도 모두 fully shipped 인지 확인
+      if (allFullyShipped) {
+        for (const it of order.items) {
+          const ship = ships.find((s) => s.orderItemId === it.id);
+          const finalShipped = ship
+            ? Number(it.shippedQty) + ship.shipQty
+            : Number(it.shippedQty);
+          if (finalShipped < Number(it.quantity) - 0.0001) {
+            allFullyShipped = false;
+            break;
+          }
+        }
+      }
+      const newStatus = allFullyShipped ? "SHIPPED" : order.status;
+      const u = await tx.order.update({
+        where: { id },
+        data: { status: newStatus, ...trackingPatch },
+      });
+      await recordAudit(tx, {
+        userId: auditUserShip?.id ?? null,
+        entity: "Order",
+        entityId: id,
+        action: "STATUS_CHANGE",
+        meta: {
+          from: order.status,
+          to: newStatus,
+          action: "partial_ship",
+          orderNo: order.orderNo,
+          ships,
+          fullyShipped: allFullyShipped,
+        },
+      });
+      return u;
+    });
+
+    // Outbound — fully shipped 시점에 채널에 송장 push (best-effort)
+    if (
+      allFullyShipped &&
+      updated.channelId &&
+      updated.channelOrderNo &&
+      (updated.trackingCarrier || updated.trackingNumber)
+    ) {
+      await dispatchPushTracking(
+        prisma,
+        {
+          orderId: id,
+          channelId: updated.channelId,
+          channelOrderNo: updated.channelOrderNo,
+        },
+        updated.trackingCarrier ?? "",
+        updated.trackingNumber ?? "",
+        auditUserShip?.id ?? null,
+      );
+    }
+
+    return NextResponse.json(updated);
+  }
 
   const transition = statusTransitions[action];
   if (!transition) {
@@ -656,6 +806,251 @@ export async function PUT(
     return NextResponse.json(updated);
   }
 
+  // === 부분 교환 (exchange + body.partialItems) — 일부 OrderItem 만 교환 ===
+  // 흐름: RETURN_INSPECTED 까지 진행 → exchange 시점에 partialItems 로 일부 지정.
+  // 부분 반품과 알고리즘 동일하나 결과가 다름:
+  //  - 새 주문(-EX) 자동 생성 (EXCHANGE_SAME 이면 회수된 항목만 복제, DIFFERENT 면 빈 항목)
+  //  - paymentStatus 그대로 유지 (환불 X, 차액은 새 주문에서)
+  //  - 종결 status: 모두 fully returned → EXCHANGED, 일부면 COMPLETED 복귀
+  if (
+    action === "exchange" &&
+    Array.isArray(body.partialItems) &&
+    body.partialItems.length > 0
+  ) {
+    type PartialItem = { orderItemId: string; returnQty: number };
+    const partials: PartialItem[] = (
+      body.partialItems as Array<{ orderItemId?: string; returnQty?: number }>
+    )
+      .filter(
+        (p): p is PartialItem =>
+          typeof p.orderItemId === "string" &&
+          typeof p.returnQty === "number" &&
+          p.returnQty > 0,
+      )
+      .map((p) => ({ orderItemId: p.orderItemId, returnQty: p.returnQty }));
+
+    if (partials.length === 0) {
+      return NextResponse.json(
+        { error: "유효한 partialItems 가 없습니다" },
+        { status: 400 },
+      );
+    }
+
+    // claimType 결정 (Dialog body 우선, order 폴백, default SAME)
+    const exchangeClaimType: "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT" =
+      body.claimType === "EXCHANGE_SAME" ||
+      body.claimType === "EXCHANGE_DIFFERENT"
+        ? body.claimType
+        : order.claimType === "EXCHANGE_SAME" ||
+            order.claimType === "EXCHANGE_DIFFERENT"
+          ? order.claimType
+          : "EXCHANGE_SAME";
+    const exchangeSame = exchangeClaimType === "EXCHANGE_SAME";
+
+    // 검증 — 모든 orderItemId 가 이 주문에 속하고, returnedQty + returnQty <= quantity
+    const itemMap = new Map(order.items.map((i) => [i.id, i]));
+    for (const p of partials) {
+      const it = itemMap.get(p.orderItemId);
+      if (!it) {
+        return NextResponse.json(
+          { error: `OrderItem ${p.orderItemId} 가 이 주문에 없습니다` },
+          { status: 400 },
+        );
+      }
+      const already = Number(it.returnedQty);
+      const newTotal = already + p.returnQty;
+      if (newTotal > Number(it.quantity) + 0.0001) {
+        return NextResponse.json(
+          {
+            error: `${it.product?.name ?? it.id}: 반품 누적 ${newTotal} > 주문 수량 ${it.quantity}`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    const auditUser = await getCurrentUser();
+    let allFullyReturnedAfter = true;
+    let exchangeNewOrderId: string | null = null;
+
+    await prisma.$transaction(async (tx) => {
+      for (const p of partials) {
+        const it = itemMap.get(p.orderItemId)!;
+        const productId = it.product?.id;
+        if (!productId) continue;
+
+        // LotConsumption 부분 복원 — createdAt DESC
+        const consumptions = await tx.lotConsumption.findMany({
+          where: { orderItemId: it.id },
+          orderBy: { createdAt: "desc" },
+          include: { lot: { select: { id: true } } },
+        });
+        let restoreLeft = p.returnQty;
+        for (const c of consumptions) {
+          if (restoreLeft <= 0) break;
+          const cQty = Number(c.quantity);
+          const take = Math.min(restoreLeft, cQty);
+          await tx.inventoryLot.update({
+            where: { id: c.lotId },
+            data: { remainingQty: { increment: take } },
+          });
+          if (take >= cQty - 0.0001) {
+            await tx.lotConsumption.delete({ where: { id: c.id } });
+          } else {
+            await tx.lotConsumption.update({
+              where: { id: c.id },
+              data: { quantity: cQty - take },
+            });
+          }
+          restoreLeft -= take;
+        }
+        const inventory = await tx.inventory.update({
+          where: { productId },
+          data: { quantity: { increment: p.returnQty } },
+        });
+        await tx.inventoryMovement.create({
+          data: {
+            inventoryId: inventory.id,
+            type: "RETURN",
+            quantity: p.returnQty,
+            balanceAfter: inventory.quantity,
+            referenceId: order.id,
+            referenceType: "ORDER",
+            memo: `주문 ${order.orderNo} 부분 교환 복원 (item ${it.id})`,
+          },
+        });
+
+        // OrderItem 누적 갱신 — 부분 교환은 refundedAmount 누적 안 함 (환불 없음)
+        const newReturnedQty = Number(it.returnedQty) + p.returnQty;
+        await tx.orderItem.update({
+          where: { id: it.id },
+          data: { returnedQty: newReturnedQty },
+        });
+
+        if (newReturnedQty < Number(it.quantity) - 0.0001) {
+          allFullyReturnedAfter = false;
+        }
+      }
+
+      // 다른 OrderItem 들도 모두 fully returned 인지 확인
+      if (allFullyReturnedAfter) {
+        for (const it of order.items) {
+          const partial = partials.find((p) => p.orderItemId === it.id);
+          const finalReturned = partial
+            ? Number(it.returnedQty) + partial.returnQty
+            : Number(it.returnedQty);
+          if (finalReturned < Number(it.quantity) - 0.0001) {
+            allFullyReturnedAfter = false;
+            break;
+          }
+        }
+      }
+
+      // 새 주문(-EX) 자동 생성 — 부분 교환은 회수된 항목만 복제 (EXCHANGE_SAME) 또는 빈 항목 (DIFFERENT)
+      const newOrderNo = generateExchangeOrderNo(order.orderNo);
+      const cloneItems = exchangeSame
+        ? partials
+            .map((p) => {
+              const it = itemMap.get(p.orderItemId);
+              if (!it || !it.product) return null;
+              return {
+                productId: it.product.id,
+                quantity: p.returnQty,
+                listPrice: it.listPrice,
+                discountAmount: it.discountAmount,
+                unitPrice: it.unitPrice,
+                totalPrice: p.returnQty * Number(it.unitPrice),
+              };
+            })
+            .filter((x): x is NonNullable<typeof x> => !!x)
+        : [];
+
+      const subtotal = exchangeSame
+        ? cloneItems.reduce((s, i) => s + Number(i.totalPrice), 0)
+        : 0;
+
+      const newOrder = await tx.order.create({
+        data: {
+          orderNo: newOrderNo,
+          channelId: order.channelId,
+          customerId: order.customerId,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          recipientName: order.recipientName,
+          recipientPhone: order.recipientPhone,
+          shippingAddress: order.shippingAddress,
+          fulfillmentType: order.fulfillmentType,
+          orderDate: new Date(),
+          status: "PENDING",
+          paymentStatus: exchangeSame ? "PAID" : "UNPAID",
+          paymentMethod: exchangeSame ? order.paymentMethod : null,
+          subtotalAmount: subtotal,
+          discountAmount: 0,
+          shippingFee: 0,
+          taxAmount: 0,
+          totalAmount: subtotal,
+          commissionAmount: 0,
+          memo: `부분 교환 발송 — 원본 ${order.orderNo}${exchangeSame ? " (같은 상품 일부)" : " (다른 상품 — 항목·차액 직접 편집)"}`,
+          createdById: auditUser?.id ?? order.createdById,
+          items:
+            cloneItems.length > 0
+              ? { create: cloneItems }
+              : undefined,
+        },
+      });
+      exchangeNewOrderId = newOrder.id;
+
+      // 원본 주문 status — 모두 fully returned 면 EXCHANGED, 일부면 COMPLETED 복귀
+      // 부분 교환은 paymentStatus 변동 없음 (환불 X, 차액은 새 주문에서)
+      const newStatus = allFullyReturnedAfter ? "EXCHANGED" : "COMPLETED";
+      await tx.order.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          claimType: exchangeClaimType,
+          ...(allFullyReturnedAfter
+            ? {
+                exchangedAt: new Date(),
+                exchangeOrderId: exchangeNewOrderId,
+              }
+            : {}),
+        },
+      });
+
+      await recordAudit(tx, {
+        userId: auditUser?.id ?? null,
+        entity: "Order",
+        entityId: id,
+        action: "STATUS_CHANGE",
+        meta: {
+          from: order.status,
+          to: newStatus,
+          action: "partial_exchange",
+          orderNo: order.orderNo,
+          claimType: exchangeClaimType,
+          partials,
+          fullyReturned: allFullyReturnedAfter,
+          exchangeNewOrderId,
+        },
+      });
+    });
+
+    // Inventory 변동 — 매핑된 채널에 가용 재고 push
+    const productIdsToPush = Array.from(
+      new Set(
+        partials
+          .map((p) => itemMap.get(p.orderItemId)?.product?.id)
+          .filter((p): p is string => !!p),
+      ),
+    );
+    if (productIdsToPush.length > 0) {
+      await dispatchPushStock(prisma, productIdsToPush);
+    }
+
+    const updated = await prisma.order.findUnique({ where: { id } });
+    return NextResponse.json(updated);
+  }
+
   // === 부분 반품 (refund + body.partialItems) — 일부 OrderItem 만 환불 ===
   // 흐름: RETURN_INSPECTED 까지 정상 진행 → refund 시점에 partialItems 로 일부 지정.
   // 종결 status: 모든 OrderItem 이 returnedQty == quantity 면 RETURNED, 아니면 COMPLETED 복귀.
@@ -865,6 +1260,21 @@ export async function PUT(
     );
     if (productIdsToPush.length > 0) {
       await dispatchPushStock(prisma, productIdsToPush);
+    }
+
+    // PG hook — 부분 환불 (PAID/REFUND_PENDING 결제건만, 외상은 호출 안 함)
+    if (wasPaidOrPending && totalRefundAmount > 0) {
+      await dispatchRefund(
+        prisma,
+        {
+          orderId: id,
+          orderNo: order.orderNo,
+          amount: totalRefundAmount,
+          reason: `부분 반품 (${partials.length}건)`,
+          userId: auditUser?.id ?? null,
+        },
+        true,
+      );
     }
 
     const updated = await prisma.order.findUnique({ where: { id } });
@@ -1104,6 +1514,22 @@ export async function PUT(
       }
     }
 
+    // PG hook — PAID/REFUND_PENDING 였던 결제건 환불·취소 자동 시도 (best-effort)
+    if (wasPaidOrPending && !isExchange) {
+      const ctx = {
+        orderId: id,
+        orderNo: order.orderNo,
+        amount: Number(order.totalAmount),
+        reason: action === "cancel" ? "주문 취소" : "반품 환불",
+        userId: auditUser?.id ?? null,
+      };
+      if (action === "cancel") {
+        await dispatchPaymentCancel(prisma, ctx);
+      } else {
+        await dispatchRefund(prisma, ctx, false);
+      }
+    }
+
     return NextResponse.json(updated);
   }
 
@@ -1126,6 +1552,18 @@ export async function PUT(
       where: { id },
       data: { status: transition.to as never, ...trackingPatch },
     });
+    // ship 액션 (전체 발송) — 모든 OrderItem.shippedQty = quantity 로 set.
+    // 부분 출고 후에도 ship 호출하면 잔여까지 모두 발송 처리.
+    if (action === "ship") {
+      await Promise.all(
+        order.items.map((it) =>
+          tx.orderItem.update({
+            where: { id: it.id },
+            data: { shippedQty: it.quantity },
+          }),
+        ),
+      );
+    }
     await recordAudit(tx, {
       userId: auditUserShip?.id ?? null,
       entity: "Order",
