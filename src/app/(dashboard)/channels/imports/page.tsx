@@ -67,11 +67,21 @@ interface Channel {
   isActive: boolean;
 }
 
+interface MappingComponentRow {
+  id: string;
+  productId: string;
+  quantity: string;
+  product: { id: string; name: string; sku: string };
+}
+
 interface MappingRow {
   id: string;
   channelSku: string;
   channelName: string | null;
-  product: { id: string; name: string; sku: string };
+  /** 단일 매핑 — 다중 매핑이면 null */
+  product: { id: string; name: string; sku: string } | null;
+  /** 다중 매핑 — 비어있으면 단일 매핑 */
+  components: MappingComponentRow[];
   updatedAt: string;
 }
 
@@ -1092,42 +1102,73 @@ function MappingSection({ channels }: { channels: Channel[] }) {
               </TableCell>
             </TableRow>
           ) : (
-            (mappingsQuery.data ?? []).map((m) => (
-              <TableRow key={m.id}>
-                <TableCell className="font-mono text-[12px]">
-                  {m.channelSku}
-                </TableCell>
-                <TableCell className="text-[12px] text-muted-foreground">
-                  {m.channelName ?? "—"}
-                </TableCell>
-                <TableCell className="text-[13px]">{m.product.name}</TableCell>
-                <TableCell className="font-mono text-[12px] text-muted-foreground">
-                  {m.product.sku}
-                </TableCell>
-                <TableCell>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 p-0"
-                    onClick={() => {
-                      if (!confirm("이 매핑을 삭제하시겠습니까?")) return;
-                      deleteMutation.mutate(m.id);
-                    }}
-                    disabled={
-                      deleteMutation.isPending &&
-                      deleteMutation.variables === m.id
-                    }
-                  >
-                    {deleteMutation.isPending &&
-                    deleteMutation.variables === m.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3 w-3" />
+            (mappingsQuery.data ?? []).map((m) => {
+              const isMulti = m.components.length > 0;
+              return (
+                <TableRow key={m.id}>
+                  <TableCell className="font-mono text-[12px]">
+                    {m.channelSku}
+                    {isMulti && (
+                      <Badge variant="secondary" className="ml-1.5">
+                        다중 ×{m.components.length}
+                      </Badge>
                     )}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
+                  </TableCell>
+                  <TableCell className="text-[12px] text-muted-foreground">
+                    {m.channelName ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-[13px]">
+                    {isMulti ? (
+                      <div className="flex flex-col gap-0.5">
+                        {m.components.map((c) => (
+                          <span key={c.id}>
+                            {c.product.name}{" "}
+                            <span className="text-muted-foreground">
+                              × {Number(c.quantity).toLocaleString("ko-KR")}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      m.product?.name ?? "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-[12px] text-muted-foreground">
+                    {isMulti ? (
+                      <div className="flex flex-col gap-0.5">
+                        {m.components.map((c) => (
+                          <span key={c.id}>{c.product.sku}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      m.product?.sku ?? "—"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => {
+                        if (!confirm("이 매핑을 삭제하시겠습니까?")) return;
+                        deleteMutation.mutate(m.id);
+                      }}
+                      disabled={
+                        deleteMutation.isPending &&
+                        deleteMutation.variables === m.id
+                      }
+                    >
+                      {deleteMutation.isPending &&
+                      deleteMutation.variables === m.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
@@ -1159,9 +1200,15 @@ function AddMappingDialog({
   channelId: string;
   onCreated: () => void;
 }) {
+  type MappingMode = "single" | "multi";
+  const [mode, setMode] = useState<MappingMode>("single");
   const [channelSku, setChannelSku] = useState("");
   const [channelName, setChannelName] = useState("");
   const [productId, setProductId] = useState("");
+  // 다중 매핑용 — components 배열
+  const [components, setComponents] = useState<
+    Array<{ productId: string; quantity: string }>
+  >([{ productId: "", quantity: "1" }]);
 
   const productsQuery = useQuery({
     queryKey: queryKeys.products.list({ for: "mapping" }),
@@ -1170,18 +1217,38 @@ function AddMappingDialog({
   });
   const products = productsQuery.data ?? [];
 
+  const reset = () => {
+    setMode("single");
+    setChannelSku("");
+    setChannelName("");
+    setProductId("");
+    setComponents([{ productId: "", quantity: "1" }]);
+  };
+
   const createMutation = useMutation({
-    mutationFn: () =>
-      apiMutate(`/api/channels/${channelId}/mappings`, "POST", {
-        channelSku: channelSku.trim(),
-        channelName: channelName.trim() || undefined,
-        productId,
-      }),
+    mutationFn: () => {
+      const body =
+        mode === "single"
+          ? {
+              channelSku: channelSku.trim(),
+              channelName: channelName.trim() || undefined,
+              productId,
+            }
+          : {
+              channelSku: channelSku.trim(),
+              channelName: channelName.trim() || undefined,
+              components: components
+                .filter((c) => c.productId)
+                .map((c) => ({
+                  productId: c.productId,
+                  quantity: parseFloat(c.quantity) || 1,
+                })),
+            };
+      return apiMutate(`/api/channels/${channelId}/mappings`, "POST", body);
+    },
     onSuccess: () => {
       toast.success("매핑이 추가되었습니다");
-      setChannelSku("");
-      setChannelName("");
-      setProductId("");
+      reset();
       onOpenChange(false);
       onCreated();
     },
@@ -1189,13 +1256,78 @@ function AddMappingDialog({
       toast.error(err instanceof ApiError ? err.message : "추가 실패"),
   });
 
+  const handleSubmit = () => {
+    if (!channelSku.trim()) {
+      toast.error("채널 SKU 를 입력해주세요");
+      return;
+    }
+    if (mode === "single") {
+      if (!productId) {
+        toast.error("ERP 상품을 선택해주세요");
+        return;
+      }
+    } else {
+      const valid = components.filter((c) => c.productId);
+      if (valid.length === 0) {
+        toast.error("최소 1개 ERP 상품을 추가해주세요");
+        return;
+      }
+      for (const c of valid) {
+        const q = parseFloat(c.quantity);
+        if (!Number.isFinite(q) || q <= 0) {
+          toast.error("수량은 0보다 커야 합니다");
+          return;
+        }
+      }
+    }
+    createMutation.mutate();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>SKU 매핑 추가</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 px-1">
+          {/* 모드 토글 */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("single")}
+              className={`flex-1 rounded-md border px-3 py-2 text-[12px] transition-colors ${
+                mode === "single"
+                  ? "border-primary bg-primary/5 font-medium"
+                  : "border-border bg-background hover:border-foreground/30"
+              }`}
+            >
+              <div className="font-medium">단일 매핑</div>
+              <div className="text-[11px] text-muted-foreground">
+                채널 SKU 1개 → ERP 상품 1개
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("multi")}
+              className={`flex-1 rounded-md border px-3 py-2 text-[12px] transition-colors ${
+                mode === "multi"
+                  ? "border-primary bg-primary/5 font-medium"
+                  : "border-border bg-background hover:border-foreground/30"
+              }`}
+            >
+              <div className="font-medium">다중 매핑 (세트)</div>
+              <div className="text-[11px] text-muted-foreground">
+                채널 SKU 1개 → ERP 상품 N개
+              </div>
+            </button>
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-[12px]">채널 SKU</Label>
             <Input
@@ -1215,31 +1347,96 @@ function AddMappingDialog({
               placeholder="채널 측 표시명 (안 적어도 됨)"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-[12px]">ERP 상품</Label>
-            <ProductCombobox
-              products={products}
-              value={productId}
-              onChange={(p) => setProductId(p.id)}
-              filterType="component"
-              placeholder="ERP 상품 선택..."
-            />
-          </div>
+
+          {mode === "single" ? (
+            <div className="space-y-1.5">
+              <Label className="text-[12px]">ERP 상품</Label>
+              <ProductCombobox
+                products={products}
+                value={productId}
+                onChange={(p) => setProductId(p.id)}
+                filterType="component"
+                placeholder="ERP 상품 선택..."
+              />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label className="text-[12px]">
+                ERP 상품 구성 (채널 SKU 1개당)
+              </Label>
+              <div className="space-y-1.5">
+                {components.map((c, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <ProductCombobox
+                        products={products}
+                        value={c.productId}
+                        onChange={(p) => {
+                          const next = [...components];
+                          next[idx] = { ...next[idx], productId: p.id };
+                          setComponents(next);
+                        }}
+                        filterType="component"
+                        placeholder="ERP 상품 선택..."
+                      />
+                    </div>
+                    <div className="w-[80px]">
+                      <Input
+                        value={c.quantity}
+                        onChange={(e) => {
+                          const next = [...components];
+                          next[idx] = { ...next[idx], quantity: e.target.value };
+                          setComponents(next);
+                        }}
+                        placeholder="수량"
+                        className="text-right"
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 w-9 p-0"
+                      onClick={() =>
+                        setComponents(components.filter((_, i) => i !== idx))
+                      }
+                      disabled={components.length === 1}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setComponents([
+                    ...components,
+                    { productId: "", quantity: "1" },
+                  ])
+                }
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                구성품 추가
+              </Button>
+              <p className="text-[11px] text-muted-foreground">
+                채널 raw 단가는 첫 구성품에 적용, 나머지는 수량만 풀어 출고
+                (회계 단순화)
+              </p>
+            </div>
+          )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              reset();
+              onOpenChange(false);
+            }}
+          >
             취소
           </Button>
-          <Button
-            onClick={() => {
-              if (!channelSku.trim() || !productId) {
-                toast.error("채널 SKU 와 ERP 상품을 모두 선택해주세요");
-                return;
-              }
-              createMutation.mutate();
-            }}
-            disabled={createMutation.isPending}
-          >
+          <Button onClick={handleSubmit} disabled={createMutation.isPending}>
             {createMutation.isPending ? (
               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
             ) : (

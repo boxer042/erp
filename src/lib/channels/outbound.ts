@@ -209,6 +209,9 @@ export async function dispatchPushStock(
       // config.autoStockSync 가 명시적 true 가 아니면 skip (default: false)
       const cfg = (m.channel.config as Record<string, unknown> | null) ?? {};
       if (cfg.autoStockSync !== true) continue;
+      // 다중 매핑 (m.product=null) 은 가용 재고 계산이 복잡하니 단일 매핑만 push.
+      // 다중 매핑 sync 는 후속 (component 별 inventory min 비례 계산 필요).
+      if (!m.product) continue;
       const qty = m.product.inventory
         ? Number(m.product.inventory.quantity)
         : 0;

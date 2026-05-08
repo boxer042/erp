@@ -16,6 +16,47 @@ import type { ImportResult, RawChannelOrder } from "./types";
 
 type Tx = Prisma.TransactionClient | PrismaClient;
 
+/**
+ * 매핑 lookup 결과. 단일이든 다중이든 components 배열로 통합 표현 — 한 채널 SKU 가
+ * ERP 상품 N개로 풀어진다는 일반화 모델.
+ *  - 단일 매핑 (1:1): components 1개, quantity=1
+ *  - 다중 매핑 (1:N): components N개, 각 quantity 명시
+ *  - 매핑은 있지만 productId·components 모두 비어있으면 components=[] (미설정)
+ */
+interface MappingResult {
+  components: Array<{
+    productId: string;
+    taxType: string;
+    quantity: number;
+  }>;
+}
+
+function resolveMappingResult(m: {
+  product: { id: string; taxType: string } | null;
+  components: Array<{
+    quantity: { toString(): string };
+    product: { id: string; taxType: string };
+  }>;
+}): MappingResult {
+  if (m.components.length > 0) {
+    return {
+      components: m.components.map((c) => ({
+        productId: c.product.id,
+        taxType: c.product.taxType,
+        quantity: Number(c.quantity),
+      })),
+    };
+  }
+  if (m.product) {
+    return {
+      components: [
+        { productId: m.product.id, taxType: m.product.taxType, quantity: 1 },
+      ],
+    };
+  }
+  return { components: [] };
+}
+
 interface ImportOptions {
   /** 어떤 ERP 사용자(직원) 가 import 트리거했는지 — 감사 로그 + Order.createdById */
   importedById: string;
@@ -50,7 +91,8 @@ export async function importChannelOrders(
     };
   }
 
-  // 모든 raw 의 channelSku 를 모아 한 번에 매핑 조회
+  // 모든 raw 의 channelSku 를 모아 한 번에 매핑 조회.
+  // 다중 매핑(components) 우선, 없으면 단일 productId 사용.
   const allSkus = Array.from(
     new Set(rawOrders.flatMap((o) => o.items.map((i) => i.channelSku))),
   );
@@ -59,10 +101,16 @@ export async function importChannelOrders(
     select: {
       channelSku: true,
       product: { select: { id: true, taxType: true } },
+      components: {
+        select: {
+          quantity: true,
+          product: { select: { id: true, taxType: true } },
+        },
+      },
     },
   });
   const productByChannelSku = new Map(
-    mappings.map((m) => [m.channelSku, m.product]),
+    mappings.map((m) => [m.channelSku, resolveMappingResult(m)]),
   );
 
   for (const raw of rawOrders) {
@@ -101,7 +149,7 @@ async function importSingleOrder(
   prisma: PrismaClient,
   channel: { id: string; commissionRate: { toString(): string } },
   raw: RawChannelOrder,
-  productByChannelSku: Map<string, { id: string; taxType: string }>,
+  productByChannelSku: Map<string, MappingResult>,
   options: ImportOptions,
 ): Promise<SingleResult> {
   // 1. 중복 체크 — 이미 Order 로 import 됐는지
@@ -130,9 +178,12 @@ async function importSingleOrder(
     return "DUPLICATE";
   }
 
-  // 2. SKU 매핑 lookup
+  // 2. SKU 매핑 lookup — 매핑 자체가 없거나, 매핑은 있지만 components 비어있으면 미설정
   const unmappedSkus = raw.items
-    .filter((i) => !productByChannelSku.has(i.channelSku))
+    .filter((i) => {
+      const m = productByChannelSku.get(i.channelSku);
+      return !m || m.components.length === 0;
+    })
     .map((i) => i.channelSku);
 
   if (unmappedSkus.length > 0) {
@@ -158,19 +209,27 @@ async function createOrderFromRaw(
   prisma: PrismaClient,
   channel: { id: string; commissionRate: { toString(): string } },
   raw: RawChannelOrder,
-  productByChannelSku: Map<string, { id: string; taxType: string }>,
+  productByChannelSku: Map<string, MappingResult>,
   options: ImportOptions,
 ): Promise<{ orderId: string }> {
-  const items = raw.items.map((it) => {
-    const product = productByChannelSku.get(it.channelSku)!;
-    const total = it.quantity * it.unitPrice;
-    return {
-      productId: product.id,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice,
-      totalPrice: total,
-      _taxable: product.taxType === "TAXABLE",
-    };
+  // 다중 매핑 풀어내기 — 채널 raw item 1개가 ERP OrderItem 여러 개로 풀어짐.
+  // 단가 정책 (단순화): 첫 component 가 raw 단가·수량 받고 나머지는 quantity 만 (단가 0).
+  // 채널 정산 입장에선 raw item 1줄 = 채널 unitPrice. ERP 매출 정확도는 첫 줄에 집중.
+  const items = raw.items.flatMap((it) => {
+    const m = productByChannelSku.get(it.channelSku)!;
+    return m.components.map((c, idx) => {
+      const erpQty = it.quantity * c.quantity;
+      const isFirst = idx === 0;
+      const unitPrice = isFirst ? it.unitPrice : 0;
+      const total = erpQty * unitPrice;
+      return {
+        productId: c.productId,
+        quantity: erpQty,
+        unitPrice,
+        totalPrice: total,
+        _taxable: c.taxType === "TAXABLE",
+      };
+    });
   });
 
   const subtotalAmount = items.reduce((s, i) => s + i.totalPrice, 0);
@@ -261,19 +320,28 @@ export async function resolvePendingOrder(
 
   const raw = pending.rawPayload as unknown as RawChannelOrder;
 
-  // 매핑 다시 lookup
+  // 매핑 다시 lookup — 다중 매핑(components) 우선
   const skus = raw.items.map((i) => i.channelSku);
   const mappings = await prisma.channelProductMapping.findMany({
     where: { channelId: pending.channelId, channelSku: { in: skus } },
     select: {
       channelSku: true,
       product: { select: { id: true, taxType: true } },
+      components: {
+        select: {
+          quantity: true,
+          product: { select: { id: true, taxType: true } },
+        },
+      },
     },
   });
   const productByChannelSku = new Map(
-    mappings.map((m) => [m.channelSku, m.product]),
+    mappings.map((m) => [m.channelSku, resolveMappingResult(m)]),
   );
-  const unmapped = skus.filter((s) => !productByChannelSku.has(s));
+  const unmapped = skus.filter((s) => {
+    const r = productByChannelSku.get(s);
+    return !r || r.components.length === 0;
+  });
   if (unmapped.length > 0) {
     await prisma.pendingChannelOrder.update({
       where: { id: pendingId },

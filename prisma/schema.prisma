@@ -112,27 +112,53 @@ model SalesChannel {
 }
 
 /**
- * 채널 SKU ↔ ERP Product 매핑.
- * 외부 채널(쿠팡·네이버 등) 의 상품 코드를 ERP Product 와 연결.
- * import 시 raw order 의 channelSku 로 lookup → 매칭 안 되면 보류 큐로 격리.
+ * 채널 SKU ↔ ERP Product 매핑. 1:1 (단일) 또는 1:N (세트·번들) 지원.
  *
- * unique: 한 채널 내에서 channelSku 는 한 ERP product 에만 매핑.
+ *  - **단일 (1:1)**: productId 직접 사용. components 는 없음. 가장 흔한 케이스.
+ *  - **다중 (1:N)**: productId=null + components 여러 개. 채널의 "선물세트" SKU 가
+ *    ERP 의 [상품X 2개 + 상품Y 1개] 처럼 풀어지는 경우.
+ *
+ * import 시 components 가 있으면 우선 (productId 무시), 없으면 productId 사용.
+ *
+ * unique: 한 채널 내에서 channelSku 는 한 매핑에만 (단일이든 다중이든).
  */
 model ChannelProductMapping {
-  id          String       @id @default(uuid())
-  channelId   String       @map("channel_id")
-  channel     SalesChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  channelSku  String       @map("channel_sku")
+  id          String                            @id @default(uuid())
+  channelId   String                            @map("channel_id")
+  channel     SalesChannel                      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channelSku  String                            @map("channel_sku")
   /** 채널이 보내주는 상품명 — 매핑 UI 에서 hint 로 표시 */
-  channelName String?      @map("channel_name")
-  productId   String       @map("product_id")
-  product     Product      @relation(fields: [productId], references: [id])
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  channelName String?                           @map("channel_name")
+  /** 단일 매핑일 때 사용. components 가 있으면 무시 (다중 매핑) */
+  productId   String?                           @map("product_id")
+  product     Product?                          @relation(fields: [productId], references: [id])
+  /** 다중 매핑 — 한 채널 SKU 가 여러 ERP 상품으로 풀어짐 */
+  components  ChannelProductMappingComponent[]
+  createdAt   DateTime                          @default(now()) @map("created_at")
+  updatedAt   DateTime                          @updatedAt @map("updated_at")
 
   @@unique([channelId, channelSku])
   @@index([productId])
   @@map("channel_product_mappings")
+}
+
+/**
+ * 다중 매핑 (1:N) 의 구성품. 채널 SKU 1개당 ERP 상품 N개 + 각 수량.
+ * 예: 채널 "선물세트A" 1개 = ERP [상품X × 2, 상품Y × 1]
+ */
+model ChannelProductMappingComponent {
+  id        String                @id @default(uuid())
+  mappingId String                @map("mapping_id")
+  mapping   ChannelProductMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+  productId String                @map("product_id")
+  product   Product               @relation(fields: [productId], references: [id])
+  /** 채널 SKU 1개당 ERP 상품 몇 개 */
+  quantity  Decimal               @default(1) @db.Decimal(10, 4)
+  createdAt DateTime              @default(now()) @map("created_at")
+
+  @@index([mappingId])
+  @@index([productId])
+  @@map("channel_product_mapping_components")
 }
 
 /**
@@ -362,6 +388,7 @@ model Product {
   partOfSets         SetComponent[]      @relation("SetChild")
   productMappings    ProductMapping[]
   channelMappings    ChannelProductMapping[]
+  channelMappingComponents ChannelProductMappingComponent[]
   channelPricings    ChannelPricing[]
   repairPackageParts RepairPackagePart[]
   inventory          Inventory?
