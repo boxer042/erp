@@ -235,6 +235,9 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
   const [shipDialogOpen, setShipDialogOpen] = useState(false);
   const [trackingCarrier, setTrackingCarrier] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
+  // 부분 출고 — partial 모드면 항목별 shipQty 입력
+  const [shipMode, setShipMode] = useState<"full" | "partial">("full");
+  const [partialShips, setPartialShips] = useState<Record<string, string>>({});
   // 반품 요청 Dialog (claimType + reason 입력)
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [claimType, setClaimType] = useState<OrderClaimType>("REFUND");
@@ -265,6 +268,8 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     setShipDialogOpen(false);
     setTrackingCarrier("");
     setTrackingNumber("");
+    setShipMode("full");
+    setPartialShips({});
     setClaimDialogOpen(false);
     setClaimType("REFUND");
     setClaimReason("");
@@ -343,6 +348,31 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+
+  // 부분 출고 — partialItems(orderItemId, shipQty) + 송장 정보
+  const partialShipMutation = useMutation({
+    mutationFn: (input: {
+      partialItems: Array<{ orderItemId: string; shipQty: number }>;
+      trackingCarrier: string;
+      trackingNumber: string;
+    }) =>
+      apiMutate(`/api/orders/${orderId}`, "PUT", {
+        action: "partial_ship",
+        partialItems: input.partialItems,
+        trackingCarrier: input.trackingCarrier,
+        trackingNumber: input.trackingNumber,
+      }),
+    onSuccess: () => {
+      toast.success("부분 출고 처리 — 일부 항목 발송 완료");
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      setShipDialogOpen(false);
+      setShipMode("full");
+      setPartialShips({});
+      onOpenChange(false);
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
   const shipMutation = useMutation({
@@ -553,6 +583,15 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     if (action === "ship") {
       setTrackingCarrier(detailQuery.data?.trackingCarrier ?? "");
       setTrackingNumber(detailQuery.data?.trackingNumber ?? "");
+      setShipMode("full");
+      // 부분 출고용 잔여 prefill (= quantity - shippedQty)
+      const init: Record<string, string> = {};
+      for (const it of detailQuery.data?.items ?? []) {
+        const remaining =
+          Number(it.quantity) - Number(it.shippedQty ?? 0);
+        init[it.id] = String(remaining);
+      }
+      setPartialShips(init);
       setShipDialogOpen(true);
       return;
     }
@@ -789,13 +828,45 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
         ) : null}
       </JmDrawerContent>
 
-      {/* 송장 입력 Dialog — ship 액션 */}
+      {/* 송장 입력 Dialog — ship 또는 partial_ship */}
       <JmDialog open={shipDialogOpen} onOpenChange={setShipDialogOpen}>
         <JmDialogContent size="md">
           <JmDialogHeader>
             <JmDialogTitle>발송 처리 — 송장 정보</JmDialogTitle>
           </JmDialogHeader>
           <div className="space-y-3 px-5 py-4">
+            {/* 전체/부분 토글 */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShipMode("full")}
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                  shipMode === "full"
+                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                }`}
+              >
+                <div className="text-[13px] font-medium">전체 발송</div>
+                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                  모든 항목 발송, 배송중 상태로
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShipMode("partial")}
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                  shipMode === "partial"
+                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                }`}
+              >
+                <div className="text-[13px] font-medium">부분 발송</div>
+                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                  일부 항목만. 잔여는 출고확정 상태 유지
+                </div>
+              </button>
+            </div>
+
             <JmFormField label="택배사">
               <JmInput
                 value={trackingCarrier}
@@ -813,21 +884,98 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
                 placeholder="송장번호"
               />
             </JmFormField>
+
+            {shipMode === "partial" && data && (
+              <div className="space-y-1.5 border-t border-[var(--jm-border)] pt-3">
+                <p className="text-[11px] text-[var(--jm-text-muted)]">
+                  각 항목별 발송 수량 (잔여 = 주문수량 − 누적발송)
+                </p>
+                {data.items
+                  .filter((it) => it.product)
+                  .map((it) => {
+                    const ordered = Number(it.quantity);
+                    const already = Number(it.shippedQty ?? 0);
+                    const remaining = ordered - already;
+                    return (
+                      <div
+                        key={it.id}
+                        className="flex items-center gap-2 rounded border border-[var(--jm-border)] p-2"
+                      >
+                        <div className="flex-1 text-[12px]">
+                          <div className="text-[var(--jm-text)]">
+                            {it.product?.name ?? "—"}
+                          </div>
+                          <div className="text-[11px] text-[var(--jm-text-muted)]">
+                            잔여{" "}
+                            <span className="font-medium">
+                              {remaining.toLocaleString("ko-KR")}
+                            </span>{" "}
+                            / 주문 {ordered.toLocaleString("ko-KR")}
+                          </div>
+                        </div>
+                        <JmInput
+                          size="sm"
+                          type="text"
+                          inputMode="decimal"
+                          value={partialShips[it.id] ?? "0"}
+                          onChange={(e) =>
+                            setPartialShips({
+                              ...partialShips,
+                              [it.id]: e.target.value,
+                            })
+                          }
+                          onFocus={(e) => e.currentTarget.select()}
+                          className="w-[80px] text-right"
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
           <JmDialogFooter>
             <JmButton
               variant="outline"
               onClick={() => setShipDialogOpen(false)}
-              disabled={shipMutation.isPending}
+              disabled={
+                shipMutation.isPending || partialShipMutation.isPending
+              }
             >
               취소
             </JmButton>
             <JmButton
-              onClick={() => shipMutation.mutate()}
-              disabled={shipMutation.isPending}
+              onClick={() => {
+                if (shipMode === "full") {
+                  shipMutation.mutate();
+                } else {
+                  const partialItems: Array<{
+                    orderItemId: string;
+                    shipQty: number;
+                  }> = [];
+                  for (const [itemId, qtyStr] of Object.entries(partialShips)) {
+                    const q = parseFloat(qtyStr);
+                    if (!Number.isFinite(q) || q <= 0) continue;
+                    partialItems.push({ orderItemId: itemId, shipQty: q });
+                  }
+                  if (partialItems.length === 0) {
+                    toast.error("발송 수량을 1개 이상 입력해주세요");
+                    return;
+                  }
+                  partialShipMutation.mutate({
+                    partialItems,
+                    trackingCarrier,
+                    trackingNumber,
+                  });
+                }
+              }}
+              disabled={
+                shipMutation.isPending || partialShipMutation.isPending
+              }
             >
-              {shipMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
-              발송 처리
+              {(shipMutation.isPending || partialShipMutation.isPending) && (
+                <JmSpinner size="sm" tone="inverted" />
+              )}
+              {shipMode === "full" ? "전체 발송" : "부분 발송"}
             </JmButton>
           </JmDialogFooter>
         </JmDialogContent>

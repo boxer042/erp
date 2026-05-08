@@ -28,14 +28,20 @@ interface MappingResult {
     productId: string;
     taxType: string;
     quantity: number;
+    /** ERP product 정가 — 단가 비례 분배의 기준 */
+    sellingPrice: number;
   }>;
 }
 
 function resolveMappingResult(m: {
-  product: { id: string; taxType: string } | null;
+  product: { id: string; taxType: string; sellingPrice: { toString(): string } } | null;
   components: Array<{
     quantity: { toString(): string };
-    product: { id: string; taxType: string };
+    product: {
+      id: string;
+      taxType: string;
+      sellingPrice: { toString(): string };
+    };
   }>;
 }): MappingResult {
   if (m.components.length > 0) {
@@ -44,13 +50,19 @@ function resolveMappingResult(m: {
         productId: c.product.id,
         taxType: c.product.taxType,
         quantity: Number(c.quantity),
+        sellingPrice: Number(c.product.sellingPrice),
       })),
     };
   }
   if (m.product) {
     return {
       components: [
-        { productId: m.product.id, taxType: m.product.taxType, quantity: 1 },
+        {
+          productId: m.product.id,
+          taxType: m.product.taxType,
+          quantity: 1,
+          sellingPrice: Number(m.product.sellingPrice),
+        },
       ],
     };
   }
@@ -100,11 +112,13 @@ export async function importChannelOrders(
     where: { channelId, channelSku: { in: allSkus } },
     select: {
       channelSku: true,
-      product: { select: { id: true, taxType: true } },
+      product: { select: { id: true, taxType: true, sellingPrice: true } },
       components: {
         select: {
           quantity: true,
-          product: { select: { id: true, taxType: true } },
+          product: {
+            select: { id: true, taxType: true, sellingPrice: true },
+          },
         },
       },
     },
@@ -213,14 +227,28 @@ async function createOrderFromRaw(
   options: ImportOptions,
 ): Promise<{ orderId: string }> {
   // 다중 매핑 풀어내기 — 채널 raw item 1개가 ERP OrderItem 여러 개로 풀어짐.
-  // 단가 정책 (단순화): 첫 component 가 raw 단가·수량 받고 나머지는 quantity 만 (단가 0).
-  // 채널 정산 입장에선 raw item 1줄 = 채널 unitPrice. ERP 매출 정확도는 첫 줄에 집중.
+  // 단가 분배 정책: ERP product.sellingPrice 비례 — 비싼 component 가 더 많은 매출 차지.
+  //   ratio = raw.unitPrice / Σ(component.sellingPrice × component.quantity)
+  //   각 component 단가 = product.sellingPrice × ratio
+  //   각 component 총액 = (sellingPrice × ratio) × erpQty
+  //
+  // sellingPrice 가 모두 0 이거나 미설정 시 quantity 비례로 폴백 (totalQty 분의 1 씩 균등).
   const items = raw.items.flatMap((it) => {
     const m = productByChannelSku.get(it.channelSku)!;
-    return m.components.map((c, idx) => {
+    const setBaseTotal = m.components.reduce(
+      (sum, c) => sum + c.sellingPrice * c.quantity,
+      0,
+    );
+    const useSellingPrice = setBaseTotal > 0;
+    const totalQty = m.components.reduce((s, c) => s + c.quantity, 0);
+    const fallbackUnit = totalQty > 0 ? it.unitPrice / totalQty : it.unitPrice;
+    const ratio = useSellingPrice ? it.unitPrice / setBaseTotal : 0;
+
+    return m.components.map((c) => {
       const erpQty = it.quantity * c.quantity;
-      const isFirst = idx === 0;
-      const unitPrice = isFirst ? it.unitPrice : 0;
+      const unitPrice = useSellingPrice
+        ? Math.round(c.sellingPrice * ratio * 100) / 100
+        : Math.round(fallbackUnit * 100) / 100;
       const total = erpQty * unitPrice;
       return {
         productId: c.productId,
@@ -326,11 +354,13 @@ export async function resolvePendingOrder(
     where: { channelId: pending.channelId, channelSku: { in: skus } },
     select: {
       channelSku: true,
-      product: { select: { id: true, taxType: true } },
+      product: { select: { id: true, taxType: true, sellingPrice: true } },
       components: {
         select: {
           quantity: true,
-          product: { select: { id: true, taxType: true } },
+          product: {
+            select: { id: true, taxType: true, sellingPrice: true },
+          },
         },
       },
     },
