@@ -1,19 +1,14 @@
 /**
  * 채널 어댑터 registry — 코드별 어댑터 인스턴스 제공.
  *
- * Phase 1: Mock 어댑터만 등록 (가입 전 검증용).
- * Phase 2: 실제 채널 어댑터 (`./coupang.ts`, `./naver.ts` 등) 추가 후 매핑.
- *
- * 채널 코드는 SalesChannel.code 와 매칭. ERP 의 SalesChannel 에 등록된 채널만
- * import 가능 — 그 채널의 code 가 registry 에 없으면 어댑터 없음으로 처리.
+ * Mock 은 항상 등록. 실 채널(Coupang/Naver)은 환경변수 설정 시 자동 등록 (가입 전엔 skip).
+ * SalesChannel.code 와 매칭. registry 에 없으면 어댑터 없음으로 처리(skip).
  */
 import { MockChannelAdapter } from "./mock";
+import { buildCoupangAdapterFromEnv } from "./coupang";
+import { buildNaverAdapterFromEnv } from "./naver";
 import type { ChannelAdapter } from "./types";
 
-/**
- * Mock 어댑터는 채널 식별만 다르게 여러 개 등록 가능.
- * 실 가입 전 채널 import 흐름을 SalesChannel 별로 dev 검증.
- */
 const MOCK_ADAPTERS: ChannelAdapter[] = [
   new MockChannelAdapter({
     code: "MOCK",
@@ -25,6 +20,14 @@ const MOCK_ADAPTERS: ChannelAdapter[] = [
 const adapters: Map<string, ChannelAdapter> = new Map(
   MOCK_ADAPTERS.map((a) => [a.code, a]),
 );
+
+// 환경변수 설정된 실 채널 자동 등록 — module 로드 시 1회.
+// 미설정 시 null 반환 → registry 에 등록 안 됨 → 해당 SalesChannel 의 outbound·import 는 no-op.
+const coupang = buildCoupangAdapterFromEnv();
+if (coupang) adapters.set(coupang.code, coupang);
+
+const naver = buildNaverAdapterFromEnv();
+if (naver) adapters.set(naver.code, naver);
 
 /** 채널 코드로 어댑터 lookup. 없으면 null */
 export function getChannelAdapter(code: string): ChannelAdapter | null {

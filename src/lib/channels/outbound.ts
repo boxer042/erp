@@ -1,12 +1,12 @@
 /**
- * Outbound — ERP 액션 후 채널에 자동 통보 (송장 push / 반품 수락·반려).
+ * Outbound — ERP 액션 후 채널에 자동 통보 (송장 push / 반품 수락·반려 / 재고 sync).
  *
- * Phase 1 정책: best-effort.
+ * 정책:
  *  - 어댑터 호출 실패해도 ERP 액션은 그대로 진행 (예: 발송 처리는 성공, 채널 통보는 fail)
- *  - 실패는 audit log 에 기록 — 나중에 운영자가 수동 처리 또는 retry
- *  - Phase 4 본격 단계에서 ChannelOutboundJob 큐 모델 + 자동 retry 도입 예정
+ *  - 즉시 시도 → 실패 시 ChannelOutboundJob 큐에 enqueue (cron 이 backoff 으로 자동 retry)
+ *  - 모든 outbound 는 audit log 동시 기록 — 운영자가 추적 가능
  *
- * 호출 위치: /api/orders/[id]/route.ts 의 ship/accept_return/reject_return 액션 직후.
+ * 호출 위치: /api/orders/[id]/route.ts 의 ship/accept_return/reject_return + Inventory 변동.
  */
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getChannelAdapter } from "./registry";
@@ -19,6 +19,48 @@ interface OutboundContext {
   channelId: string | null;
   channelOrderNo: string | null;
   channelCode?: string;
+}
+
+/**
+ * 실패한 outbound 를 retry 큐에 enqueue. 이미 동일 (channelId, kind, orderId) PENDING 이 있으면 skip (중복 enqueue 방지).
+ */
+async function enqueueRetry(
+  prisma: Tx,
+  params: {
+    channelId: string;
+    kind: "PUSH_TRACKING" | "PUSH_STOCK" | "ACCEPT_RETURN" | "REJECT_RETURN";
+    payload: Prisma.InputJsonValue;
+    orderId?: string | null;
+    lastError: string;
+  },
+): Promise<void> {
+  // 같은 작업 PENDING 중복 enqueue 방지 — 그냥 새로 enqueue 하면 attempts 누적이 안 됨
+  const existing = await prisma.channelOutboundJob.findFirst({
+    where: {
+      channelId: params.channelId,
+      kind: params.kind,
+      status: "PENDING",
+      ...(params.orderId ? { orderId: params.orderId } : { orderId: null }),
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    // 기존 PENDING 항목 lastError 만 갱신 (cron 이 자동 처리)
+    await prisma.channelOutboundJob.update({
+      where: { id: existing.id },
+      data: { lastError: params.lastError, payload: params.payload },
+    });
+    return;
+  }
+  await prisma.channelOutboundJob.create({
+    data: {
+      channelId: params.channelId,
+      kind: params.kind,
+      payload: params.payload,
+      orderId: params.orderId ?? null,
+      lastError: params.lastError,
+    },
+  });
 }
 
 /**
@@ -60,7 +102,8 @@ export async function dispatchPushTracking(
       },
     });
   } catch (e) {
-    console.error("[outbound/push-tracking] 실패", e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error("[outbound/push-tracking] 실패 — retry 큐로 enqueue", e);
     await recordAudit(prisma, {
       userId,
       entity: "Order",
@@ -68,11 +111,24 @@ export async function dispatchPushTracking(
       action: "STATUS_CHANGE",
       meta: {
         outbound: "PUSH_TRACKING",
-        result: "FAILED",
+        result: "FAILED_ENQUEUED",
         channel: adapter.code,
-        error: e instanceof Error ? e.message : String(e),
+        error: errMsg,
       },
     });
+    if (ctx.channelId) {
+      await enqueueRetry(prisma, {
+        channelId: ctx.channelId,
+        kind: "PUSH_TRACKING",
+        payload: {
+          channelOrderNo: ctx.channelOrderNo,
+          carrier,
+          trackingNumber,
+        },
+        orderId: ctx.orderId,
+        lastError: errMsg,
+      });
+    }
   }
 }
 
@@ -94,7 +150,8 @@ export async function dispatchAcceptReturn(
       meta: { outbound: "ACCEPT_RETURN", result: "OK", channel: adapter.code },
     });
   } catch (e) {
-    console.error("[outbound/accept-return] 실패", e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error("[outbound/accept-return] 실패 — retry 큐로 enqueue", e);
     await recordAudit(prisma, {
       userId,
       entity: "Order",
@@ -102,11 +159,20 @@ export async function dispatchAcceptReturn(
       action: "STATUS_CHANGE",
       meta: {
         outbound: "ACCEPT_RETURN",
-        result: "FAILED",
+        result: "FAILED_ENQUEUED",
         channel: adapter.code,
-        error: e instanceof Error ? e.message : String(e),
+        error: errMsg,
       },
     });
+    if (ctx.channelId) {
+      await enqueueRetry(prisma, {
+        channelId: ctx.channelId,
+        kind: "ACCEPT_RETURN",
+        payload: { channelOrderNo: ctx.channelOrderNo },
+        orderId: ctx.orderId,
+        lastError: errMsg,
+      });
+    }
   }
 }
 
@@ -134,7 +200,8 @@ export async function dispatchRejectReturn(
       },
     });
   } catch (e) {
-    console.error("[outbound/reject-return] 실패", e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error("[outbound/reject-return] 실패 — retry 큐로 enqueue", e);
     await recordAudit(prisma, {
       userId,
       entity: "Order",
@@ -142,11 +209,20 @@ export async function dispatchRejectReturn(
       action: "STATUS_CHANGE",
       meta: {
         outbound: "REJECT_RETURN",
-        result: "FAILED",
+        result: "FAILED_ENQUEUED",
         channel: adapter.code,
-        error: e instanceof Error ? e.message : String(e),
+        error: errMsg,
       },
     });
+    if (ctx.channelId) {
+      await enqueueRetry(prisma, {
+        channelId: ctx.channelId,
+        kind: "REJECT_RETURN",
+        payload: { channelOrderNo: ctx.channelOrderNo, reason },
+        orderId: ctx.orderId,
+        lastError: errMsg,
+      });
+    }
   }
 }
 
@@ -233,7 +309,7 @@ export async function dispatchPushStock(
       },
       select: {
         channelSku: true,
-        channel: { select: { code: true, isActive: true, config: true } },
+        channel: { select: { id: true, code: true, isActive: true, config: true } },
         components: {
           select: {
             quantity: true,
@@ -277,7 +353,15 @@ export async function dispatchPushStock(
       });
       byChannel.set(m.channel.code, entry);
     }
-    // 채널별 push (병렬)
+    // 채널별 push (병렬). 실패하면 retry 큐로 enqueue.
+    // PUSH_STOCK 은 orderId 가 없는 cross-cutting 이라 channelId 단독 dedup.
+    const channelIdByCode = new Map<string, string>();
+    for (const m of mappings) {
+      if (m.channel.code) channelIdByCode.set(m.channel.code, m.channel.id);
+    }
+    for (const m of multiMappings) {
+      if (m.channel.code) channelIdByCode.set(m.channel.code, m.channel.id);
+    }
     await Promise.all(
       Array.from(byChannel.values()).map(async ({ code, items }) => {
         const adapter = getChannelAdapter(code);
@@ -285,10 +369,18 @@ export async function dispatchPushStock(
         try {
           await adapter.pushStock(items);
         } catch (e) {
-          console.error(
-            `[outbound/push-stock] ${code} push 실패`,
-            e instanceof Error ? e.message : e,
-          );
+          const errMsg = e instanceof Error ? e.message : String(e);
+          console.error(`[outbound/push-stock] ${code} 실패 — retry 큐로 enqueue`, errMsg);
+          const channelId = channelIdByCode.get(code);
+          if (channelId) {
+            await enqueueRetry(prisma, {
+              channelId,
+              kind: "PUSH_STOCK",
+              payload: { items } as Prisma.InputJsonValue,
+              orderId: null,
+              lastError: errMsg,
+            });
+          }
         }
       }),
     );

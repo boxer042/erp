@@ -17,11 +17,23 @@ const createMappingSchema = z
     channelSku: z.string().min(1, "채널 SKU 를 입력해주세요"),
     channelName: z.string().optional(),
     productId: z.string().optional(),
+    /**
+     * 옵션값 매핑 — 채널 SKU 가 ERP 옵션값 (특정 색상/사이즈) 에 해당.
+     * productId (대표 상품) 와 함께 설정. import 시 OrderItem 에:
+     *   productId = optionValue.mappedProduct.id (SWAP 결과 SKU)
+     *   optionSnapshot = { 옵션명: 라벨 }
+     *   entryProductId = mapping.productId (대표)
+     */
+    productOptionValueId: z.string().optional(),
     components: z
       .array(
         z.object({
           productId: z.string().min(1),
           quantity: z.number().positive(),
+          /** 컴포넌트 역할 — MAIN(기본·세트풀이) / OPTION / ADDON. 미지정 시 MAIN. */
+          lineRole: z.enum(["MAIN", "OPTION", "ADDON"]).optional(),
+          /** 옵션 라벨 부여용 — lineRole=OPTION 일 때 link */
+          productOptionValueId: z.string().optional(),
         }),
       )
       .optional(),
@@ -42,6 +54,12 @@ export async function GET(
     where: { channelId },
     include: {
       product: { select: { id: true, name: true, sku: true } },
+      productOptionValue: {
+        include: {
+          option: { select: { id: true, name: true } },
+          mappedProduct: { select: { id: true, name: true, sku: true } },
+        },
+      },
       components: {
         include: {
           product: { select: { id: true, name: true, sku: true } },
@@ -103,12 +121,36 @@ export async function POST(
   }
 
   try {
+    // 옵션값 매핑 정합성 검증 — productOptionValueId 가 있으면 mapping.productId 의 옵션 슬롯 소속이어야 함
+    if (data.productOptionValueId) {
+      if (!data.productId) {
+        return NextResponse.json(
+          { error: "옵션값 매핑은 productId(대표 상품) 와 함께 설정해야 합니다" },
+          { status: 400 },
+        );
+      }
+      const ov = await prisma.productOptionValue.findUnique({
+        where: { id: data.productOptionValueId },
+        select: { id: true, option: { select: { productId: true } } },
+      });
+      if (!ov || ov.option.productId !== data.productId) {
+        return NextResponse.json(
+          {
+            error:
+              "옵션값이 해당 대표 상품 (productId) 의 옵션 슬롯에 속하지 않습니다",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const mapping = await prisma.channelProductMapping.create({
       data: {
         channelId,
         channelSku: data.channelSku,
         channelName: data.channelName ?? null,
-        // 다중이면 productId=null + components, 단일이면 productId 만
+        // 다중이면 productId=null + components, 단일이면 productId 만.
+        // components 의 lineRole 이 OPTION/ADDON 이면 import.ts 가 OrderItem.lineRole=OPTION_REF/ADDON 로 자동 변환.
         ...(data.components && data.components.length > 0
           ? {
               productId: null,
@@ -116,13 +158,24 @@ export async function POST(
                 create: data.components.map((c) => ({
                   productId: c.productId,
                   quantity: c.quantity,
+                  lineRole: (c.lineRole ?? "MAIN") as never,
+                  productOptionValueId: c.productOptionValueId ?? null,
                 })),
               },
             }
-          : { productId: data.productId }),
+          : {
+              productId: data.productId,
+              productOptionValueId: data.productOptionValueId ?? null,
+            }),
       },
       include: {
         product: { select: { id: true, name: true, sku: true } },
+        productOptionValue: {
+          include: {
+            option: { select: { id: true, name: true } },
+            mappedProduct: { select: { id: true, name: true, sku: true } },
+          },
+        },
         components: {
           include: {
             product: { select: { id: true, name: true, sku: true } },

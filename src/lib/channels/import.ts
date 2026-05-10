@@ -30,28 +30,117 @@ interface MappingResult {
     quantity: number;
     /** ERP product 정가 — 단가 비례 분배의 기준 */
     sellingPrice: number;
+    /** 옵션값 매핑 — SWAP 결과 SKU 가 들어왔으면 진입 SKU 별도 보존 (funnel) */
+    entryProductId?: string;
+    /** 주문 시점 옵션값 라벨 — { 옵션명: 라벨 } */
+    optionSnapshot?: Record<string, string>;
+    /** OrderItem.lineRole — MAIN(기본) / OPTION_REF / ADDON. 미지정 시 MAIN. */
+    lineRole?: "MAIN" | "OPTION_REF" | "ADDON";
+    /** 같은 raw item 안에서 부모를 가리킬 때 사용. import.ts 가 createOrderFromRaw 에서 OrderItem.parentItemId 로 변환. */
+    parentLocalId?: number;
+    /** 자기 자신의 local id (parentLocalId 매칭용) */
+    localId?: number;
   }>;
 }
 
 function resolveMappingResult(m: {
   product: { id: string; taxType: string; sellingPrice: { toString(): string } } | null;
+  productOptionValue: {
+    id: string;
+    label: string;
+    mappedMode: "SWAP" | "ADDON";
+    option: { name: string };
+    mappedProduct: {
+      id: string;
+      taxType: string;
+      sellingPrice: { toString(): string };
+    } | null;
+  } | null;
   components: Array<{
+    lineRole: "MAIN" | "OPTION" | "ADDON";
     quantity: { toString(): string };
     product: {
       id: string;
       taxType: string;
       sellingPrice: { toString(): string };
     };
+    productOptionValue: {
+      label: string;
+      option: { name: string };
+    } | null;
   }>;
 }): MappingResult {
+  // 새 방식: components[] 가 lineRole 분리 — MAIN + OPTION + ADDON 동시 지원.
   if (m.components.length > 0) {
-    return {
-      components: m.components.map((c) => ({
+    // 모두 MAIN 인 경우 (세트 풀이) — 기존 동작과 동일 (parentLocalId 안 부여)
+    const hasNonMain = m.components.some(
+      (c) => c.lineRole === "OPTION" || c.lineRole === "ADDON",
+    );
+    if (!hasNonMain) {
+      return {
+        components: m.components.map((c) => ({
+          productId: c.product.id,
+          taxType: c.product.taxType,
+          quantity: Number(c.quantity),
+          sellingPrice: Number(c.product.sellingPrice),
+        })),
+      };
+    }
+    // 혼합 모드 — MAIN 첫 컴포넌트를 부모로, OPTION/ADDON 은 그 아래 자식 라인.
+    // 여러 MAIN 이 있어도 parentLocalId 는 첫 MAIN 으로만 attach (단순화).
+    let mainLocalId: number | null = null;
+    const out: MappingResult["components"] = [];
+    let nextId = 1;
+    for (const c of m.components) {
+      const local = nextId++;
+      const role: "MAIN" | "OPTION_REF" | "ADDON" =
+        c.lineRole === "OPTION"
+          ? "OPTION_REF"
+          : c.lineRole === "ADDON"
+            ? "ADDON"
+            : "MAIN";
+      const snapshot =
+        c.productOptionValue && c.lineRole === "OPTION"
+          ? { [c.productOptionValue.option.name]: c.productOptionValue.label }
+          : undefined;
+      const entry: MappingResult["components"][number] = {
         productId: c.product.id,
         taxType: c.product.taxType,
         quantity: Number(c.quantity),
         sellingPrice: Number(c.product.sellingPrice),
-      })),
+        lineRole: role,
+        localId: local,
+        ...(role === "MAIN"
+          ? {}
+          : { parentLocalId: mainLocalId ?? undefined }),
+        ...(snapshot ? { optionSnapshot: snapshot } : {}),
+      };
+      out.push(entry);
+      if (role === "MAIN" && mainLocalId === null) mainLocalId = local;
+    }
+    return { components: out };
+  }
+  // 옵션값 매핑 — SWAP 모드면 mappedProduct.id 가 결제 SKU. entryProductId 는 mapping.productId (대표).
+  // ADDON 모드는 별도 자식 라인이 필요하지만 import 흐름은 단순화 — SWAP 만 처리, ADDON 은 일반 productId 로 폴백.
+  if (
+    m.productOptionValue &&
+    m.productOptionValue.mappedProduct &&
+    m.productOptionValue.mappedMode === "SWAP" &&
+    m.product
+  ) {
+    const ov = m.productOptionValue;
+    const mp = ov.mappedProduct!;
+    return {
+      components: [
+        {
+          productId: mp.id,
+          taxType: mp.taxType,
+          quantity: 1,
+          sellingPrice: Number(mp.sellingPrice),
+          entryProductId: m.product.id, // 대표 진입 흔적
+          optionSnapshot: { [ov.option.name]: ov.label },
+        },
+      ],
     };
   }
   if (m.product) {
@@ -113,11 +202,29 @@ export async function importChannelOrders(
     select: {
       channelSku: true,
       product: { select: { id: true, taxType: true, sellingPrice: true } },
+      productOptionValue: {
+        select: {
+          id: true,
+          label: true,
+          mappedMode: true,
+          option: { select: { name: true } },
+          mappedProduct: {
+            select: { id: true, taxType: true, sellingPrice: true },
+          },
+        },
+      },
       components: {
         select: {
+          lineRole: true,
           quantity: true,
           product: {
             select: { id: true, taxType: true, sellingPrice: true },
+          },
+          productOptionValue: {
+            select: {
+              label: true,
+              option: { select: { name: true } },
+            },
           },
         },
       },
@@ -255,6 +362,12 @@ async function createOrderFromRaw(
         quantity: erpQty,
         unitPrice,
         totalPrice: total,
+        entryProductId: c.entryProductId,
+        optionSnapshot: c.optionSnapshot,
+        // 혼합 매핑(메인+옵션+추가) — lineRole + parentLocalId 가 있으면 트리 구성
+        lineRole: c.lineRole ?? "MAIN",
+        localId: c.localId,
+        parentLocalId: c.parentLocalId,
         _taxable: c.taxType === "TAXABLE",
       };
     });
@@ -283,34 +396,81 @@ async function createOrderFromRaw(
   const paymentStatus: "PAID" | "UNPAID" =
     raw.prepaid === false ? "UNPAID" : "PAID";
 
-  const order = await prisma.order.create({
-    data: {
-      orderNo: generateChannelOrderNo(),
-      channelId: channel.id,
-      channelOrderNo: raw.channelOrderNo,
-      status: "PENDING",
-      fulfillmentType: raw.fulfillmentType ?? "SHIPPING",
-      expectedShipDate,
-      customerName: raw.buyer.name ?? null,
-      customerPhone: raw.buyer.phone ?? null,
-      recipientName: raw.recipient.name ?? raw.buyer.name ?? null,
-      recipientPhone: raw.recipient.phone ?? raw.buyer.phone ?? null,
-      shippingAddress: raw.recipient.address ?? null,
-      orderDate: new Date(raw.orderedAt),
-      paymentStatus,
-      subtotalAmount,
-      discountAmount: 0,
-      shippingFee: 0,
-      taxAmount,
-      totalAmount,
-      commissionAmount,
-      memo: raw.memo ?? null,
-      createdById: options.importedById,
-      items: {
-        create: items.map(({ _taxable, ...it }) => it),
+  // parentLocalId 가 있으면 — items 를 순차 생성 후 두 번째 패스로 parentItemId 채움.
+  // (Order.create nested 는 생성된 itemId 를 알 수 없어 트리 구성 불가)
+  const hasTree = items.some((i) => i.parentLocalId !== undefined);
+  const order = await prisma.$transaction(async (tx) => {
+    const o = await tx.order.create({
+      data: {
+        orderNo: generateChannelOrderNo(),
+        channelId: channel.id,
+        channelOrderNo: raw.channelOrderNo,
+        status: "PENDING",
+        fulfillmentType: raw.fulfillmentType ?? "SHIPPING",
+        expectedShipDate,
+        customerName: raw.buyer.name ?? null,
+        customerPhone: raw.buyer.phone ?? null,
+        recipientName: raw.recipient.name ?? raw.buyer.name ?? null,
+        recipientPhone: raw.recipient.phone ?? raw.buyer.phone ?? null,
+        shippingAddress: raw.recipient.address ?? null,
+        orderDate: new Date(raw.orderedAt),
+        paymentStatus,
+        subtotalAmount,
+        discountAmount: 0,
+        shippingFee: 0,
+        taxAmount,
+        totalAmount,
+        commissionAmount,
+        memo: raw.memo ?? null,
+        createdById: options.importedById,
       },
-    },
-    select: { id: true },
+      select: { id: true },
+    });
+
+    // items 순차 생성 — localId → real id map 으로 두 번째 패스에서 parentItemId 채움
+    const localToReal = new Map<number, string>();
+    const createdRealIds: string[] = [];
+    for (const it of items) {
+      const created = await tx.orderItem.create({
+        data: {
+          orderId: o.id,
+          productId: it.productId,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.totalPrice,
+          ...(it.entryProductId
+            ? { entryProductId: it.entryProductId }
+            : {}),
+          ...(it.optionSnapshot
+            ? {
+                optionSnapshot: it.optionSnapshot as Prisma.InputJsonValue,
+              }
+            : {}),
+          lineRole: it.lineRole as never,
+        },
+        select: { id: true },
+      });
+      createdRealIds.push(created.id);
+      if (typeof it.localId === "number") {
+        localToReal.set(it.localId, created.id);
+      }
+    }
+
+    // 두 번째 패스 — parentItemId
+    if (hasTree) {
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = items[idx];
+        if (it.parentLocalId === undefined) continue;
+        const parentReal = localToReal.get(it.parentLocalId);
+        if (!parentReal) continue;
+        await tx.orderItem.update({
+          where: { id: createdRealIds[idx] },
+          data: { parentItemId: parentReal },
+        });
+      }
+    }
+
+    return o;
   });
 
   return { orderId: order.id };
@@ -355,11 +515,29 @@ export async function resolvePendingOrder(
     select: {
       channelSku: true,
       product: { select: { id: true, taxType: true, sellingPrice: true } },
+      productOptionValue: {
+        select: {
+          id: true,
+          label: true,
+          mappedMode: true,
+          option: { select: { name: true } },
+          mappedProduct: {
+            select: { id: true, taxType: true, sellingPrice: true },
+          },
+        },
+      },
       components: {
         select: {
+          lineRole: true,
           quantity: true,
           product: {
             select: { id: true, taxType: true, sellingPrice: true },
+          },
+          productOptionValue: {
+            select: {
+              label: true,
+              option: { select: { name: true } },
+            },
           },
         },
       },

@@ -1205,24 +1205,52 @@ function AddMappingDialog({
   const [channelSku, setChannelSku] = useState("");
   const [channelName, setChannelName] = useState("");
   const [productId, setProductId] = useState("");
-  // 다중 매핑용 — components 배열
+  // 옵션값 매핑 — single 모드 한정. 채널 SKU 가 ERP 옵션값 (특정 색상/사이즈) 에 해당
+  const [productOptionValueId, setProductOptionValueId] = useState<string>("");
+  // 다중 매핑용 — components 배열. lineRole 로 메인+옵션+추가구매 동시 매핑 가능.
+  //   MAIN: 기본 라인 (세트 풀이 또는 메인 상품)
+  //   OPTION: 옵션 매핑된 라인 (OrderItem.lineRole=OPTION_REF)
+  //   ADDON: 추가구매 (사은품 등). OrderItem.lineRole=ADDON
+  // 모두 MAIN 이면 기존 세트 풀이 동작 유지.
+  type ComponentRole = "MAIN" | "OPTION" | "ADDON";
   const [components, setComponents] = useState<
-    Array<{ productId: string; quantity: string }>
-  >([{ productId: "", quantity: "1" }]);
+    Array<{ productId: string; quantity: string; lineRole: ComponentRole }>
+  >([{ productId: "", quantity: "1", lineRole: "MAIN" }]);
 
   const productsQuery = useQuery({
     queryKey: queryKeys.products.list({ for: "mapping" }),
-    queryFn: () => apiGet<ProductOption[]>("/api/products?isBulk=all"),
+    queryFn: () => apiGet<ProductOption[]>("/api/products?isBulk=all&includeHidden=1"),
     enabled: open,
   });
   const products = productsQuery.data ?? [];
+
+  // 선택된 productId 의 옵션 슬롯 fetch — productOptionValueId picker 데이터 source
+  const selectedProductOptionsQuery = useQuery<
+    Array<{
+      id: string;
+      name: string;
+      values: Array<{
+        id: string;
+        label: string;
+        mappedMode: "SWAP" | "ADDON";
+        mappedProduct: { id: string; name: string; sku: string } | null;
+      }>;
+    }>
+  >({
+    queryKey: ["product-options", productId],
+    queryFn: () => apiGet(`/api/products/${productId}/options`),
+    enabled: open && mode === "single" && !!productId,
+  });
+  const optionSlots = selectedProductOptionsQuery.data ?? [];
+  const hasOptions = optionSlots.length > 0;
 
   const reset = () => {
     setMode("single");
     setChannelSku("");
     setChannelName("");
     setProductId("");
-    setComponents([{ productId: "", quantity: "1" }]);
+    setProductOptionValueId("");
+    setComponents([{ productId: "", quantity: "1", lineRole: "MAIN" }]);
   };
 
   const createMutation = useMutation({
@@ -1233,6 +1261,7 @@ function AddMappingDialog({
               channelSku: channelSku.trim(),
               channelName: channelName.trim() || undefined,
               productId,
+              productOptionValueId: productOptionValueId || undefined,
             }
           : {
               channelSku: channelSku.trim(),
@@ -1242,6 +1271,7 @@ function AddMappingDialog({
                 .map((c) => ({
                   productId: c.productId,
                   quantity: parseFloat(c.quantity) || 1,
+                  lineRole: c.lineRole,
                 })),
             };
       return apiMutate(`/api/channels/${channelId}/mappings`, "POST", body);
@@ -1349,16 +1379,52 @@ function AddMappingDialog({
           </div>
 
           {mode === "single" ? (
-            <div className="space-y-1.5">
-              <Label className="text-[12px]">ERP 상품</Label>
-              <ProductCombobox
-                products={products}
-                value={productId}
-                onChange={(p) => setProductId(p.id)}
-                filterType="component"
-                placeholder="ERP 상품 선택..."
-              />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-[12px]">ERP 상품</Label>
+                <ProductCombobox
+                  products={products}
+                  value={productId}
+                  onChange={(p) => {
+                    setProductId(p.id);
+                    setProductOptionValueId(""); // 상품 변경 시 옵션 선택 리셋
+                  }}
+                  filterType="component"
+                  placeholder="ERP 상품 선택..."
+                />
+              </div>
+              {/* 옵션값 매핑 — 선택된 상품에 옵션 슬롯이 있을 때만 노출 */}
+              {hasOptions && (
+                <div className="space-y-1.5">
+                  <Label className="text-[12px]">
+                    옵션값 매핑{" "}
+                    <span className="text-muted-foreground">
+                      (선택사항 — 채널 SKU 가 특정 옵션값에 해당할 때)
+                    </span>
+                  </Label>
+                  <select
+                    value={productOptionValueId}
+                    onChange={(e) => setProductOptionValueId(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-transparent px-2 text-[13px]"
+                  >
+                    <option value="">— 매핑 안 함 (대표 상품 그대로) —</option>
+                    {optionSlots.flatMap((slot) =>
+                      slot.values.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {slot.name}: {v.label}
+                          {v.mappedProduct ? ` → ${v.mappedProduct.name}` : ""}
+                          {v.mappedMode ? ` [${v.mappedMode}]` : ""}
+                        </option>
+                      )),
+                    )}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    선택 시 import 된 OrderItem 의 productId 가 옵션값의 매핑된 SKU 로 적용됨 (SWAP 모드).
+                    optionSnapshot 도 자동 채움. entryProductId = 위 ERP 상품 (funnel).
+                  </p>
+                </div>
+              )}
+            </>
           ) : (
             <div className="space-y-2">
               <Label className="text-[12px]">
@@ -1367,6 +1433,25 @@ function AddMappingDialog({
               <div className="space-y-1.5">
                 {components.map((c, idx) => (
                   <div key={idx} className="flex items-start gap-2">
+                    <div className="w-[78px]">
+                      <select
+                        value={c.lineRole}
+                        onChange={(e) => {
+                          const next = [...components];
+                          next[idx] = {
+                            ...next[idx],
+                            lineRole: e.target.value as ComponentRole,
+                          };
+                          setComponents(next);
+                        }}
+                        className="h-9 w-full rounded-md border border-input bg-transparent px-1.5 text-[12px]"
+                        title="MAIN: 기본 라인 / OPTION: 옵션 매핑 / ADDON: 추가구매·사은품"
+                      >
+                        <option value="MAIN">메인</option>
+                        <option value="OPTION">옵션</option>
+                        <option value="ADDON">추가</option>
+                      </select>
+                    </div>
                     <div className="flex-1">
                       <ProductCombobox
                         products={products}
@@ -1380,7 +1465,7 @@ function AddMappingDialog({
                         placeholder="ERP 상품 선택..."
                       />
                     </div>
-                    <div className="w-[80px]">
+                    <div className="w-[60px]">
                       <Input
                         value={c.quantity}
                         onChange={(e) => {
@@ -1412,7 +1497,7 @@ function AddMappingDialog({
                 onClick={() =>
                   setComponents([
                     ...components,
-                    { productId: "", quantity: "1" },
+                    { productId: "", quantity: "1", lineRole: "MAIN" },
                   ])
                 }
               >
@@ -1420,8 +1505,9 @@ function AddMappingDialog({
                 구성품 추가
               </Button>
               <p className="text-[11px] text-muted-foreground">
-                채널 raw 단가는 첫 구성품에 적용, 나머지는 수량만 풀어 출고
-                (회계 단순화)
+                <strong>메인</strong>: 기본 라인 (세트 풀이는 모두 메인) ·{" "}
+                <strong>옵션</strong>: 옵션 매핑된 라인 (OrderItem.lineRole=OPTION_REF) ·{" "}
+                <strong>추가</strong>: 추가구매·사은품 (OrderItem.lineRole=ADDON, 첫 메인의 자식 라인). 채널 raw 단가는 sellingPrice 비례로 분배.
               </p>
             </div>
           )}

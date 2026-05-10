@@ -2,22 +2,27 @@
  * 알림 발송 진입점 — 호출자가 직접 어댑터 선택 X.
  *
  * 정책:
- *  - 단일 글로벌 어댑터 (Phase 1: Mock, Phase 2 후 Solapi 등으로 교체)
+ *  - 글로벌 어댑터 자동 선택: 환경변수(SOLAPI_*) 가 설정되면 Solapi, 없으면 Mock 폴백
  *  - 모든 호출은 best-effort. 실패해도 ERP 흐름 영향 X
  *  - 채널 우선순위: kakao > sms > email (Phase 2 에서 정책화)
  *
  * 호출 위치:
  *  - api/orders/[id]/route.ts — complete (배송완료) / accept_return / reject_return / EXCHANGE_DIFFERENT 차액
  *  - api/cron/channel-poll/route.ts — 보류 큐 임계값 초과 시
+ *  - api/cron/noshow-policy/route.ts — 진단 대기 N일 경과 ADMIN 알림
  */
 import { mockNotificationAdapter } from "./mock";
+import { buildSolapiAdapterFromEnv } from "./solapi";
 import type {
+  NotificationAdapter,
   NotificationChannel,
   NotificationPayload,
   NotificationRecipient,
 } from "./types";
 
-const adapter = mockNotificationAdapter;
+// 글로벌 어댑터 — 환경변수 설정 시 Solapi, 아니면 Mock. 모듈 로드 시 1회만 평가.
+const adapter: NotificationAdapter =
+  buildSolapiAdapterFromEnv() ?? mockNotificationAdapter;
 
 /**
  * 알림 발송 시도. 실패해도 throw 안 함 — 호출자가 영향받지 않게.

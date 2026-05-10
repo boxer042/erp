@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Pencil, Store, Trash2, Upload, X, Library } from "lucide-react";
+import { Loader2, Pencil, Settings2, Store, Trash2, Upload, X, Library } from "lucide-react";
 import { MediaPickerDialog } from "@/components/media-picker-dialog";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -78,6 +78,7 @@ export default function ChannelsPage() {
   const [uploading, setUploading] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [configChannel, setConfigChannel] = useState<SalesChannel | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const channelsQuery = useQuery({
@@ -242,6 +243,14 @@ export default function ChannelsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setConfigChannel(channel)}
+                          title="운영 정책 설정"
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -414,6 +423,212 @@ export default function ChannelsPage() {
         }}
         onCancel={() => setPendingFile(null)}
       />
+      <ChannelConfigDialog
+        channel={configChannel}
+        onClose={() => setConfigChannel(null)}
+      />
     </>
+  );
+}
+
+interface ChannelConfig {
+  pollingMinutes?: number;
+  shipDateOffsetDays?: number;
+  autoStockSync?: boolean;
+  autoTrackingPush?: boolean;
+  pendingThreshold?: number;
+}
+
+/**
+ * 채널 운영 정책 다이얼로그.
+ * - 자동 재고 sync / 송장 자동 push 토글
+ * - polling 간격, 출고 예정일 offset, 보류 큐 임계값 숫자 입력
+ * - PATCH /api/channels/[id]/config 으로 저장 (병합 형태)
+ */
+function ChannelConfigDialog({
+  channel,
+  onClose,
+}: {
+  channel: SalesChannel | null;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const open = !!channel;
+  const configQuery = useQuery({
+    queryKey: ["channel-config", channel?.id],
+    queryFn: () =>
+      apiGet<{ id: string; name: string; code: string; config: ChannelConfig | null }>(
+        `/api/channels/${channel!.id}/config`,
+      ),
+    enabled: open,
+  });
+
+  const [autoStockSync, setAutoStockSync] = useState(false);
+  const [autoTrackingPush, setAutoTrackingPush] = useState(true);
+  const [pollingMinutes, setPollingMinutes] = useState("10");
+  const [shipDateOffsetDays, setShipDateOffsetDays] = useState("1");
+  const [pendingThreshold, setPendingThreshold] = useState("5");
+
+  // config fetch 후 폼 prefill — channel 변경 또는 query 데이터 갱신 시
+  useEffect(() => {
+    const cfg = configQuery.data?.config ?? null;
+    if (!cfg) return;
+    setAutoStockSync(!!cfg.autoStockSync);
+    setAutoTrackingPush(cfg.autoTrackingPush !== false);
+    if (typeof cfg.pollingMinutes === "number")
+      setPollingMinutes(String(cfg.pollingMinutes));
+    if (typeof cfg.shipDateOffsetDays === "number")
+      setShipDateOffsetDays(String(cfg.shipDateOffsetDays));
+    if (typeof cfg.pendingThreshold === "number")
+      setPendingThreshold(String(cfg.pendingThreshold));
+  }, [configQuery.data]);
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiMutate(`/api/channels/${channel!.id}/config`, "PATCH", {
+        autoStockSync,
+        autoTrackingPush,
+        pollingMinutes: parseInt(pollingMinutes, 10) || 10,
+        shipDateOffsetDays: parseInt(shipDateOffsetDays, 10) || 0,
+        pendingThreshold: parseInt(pendingThreshold, 10) || 0,
+      }),
+    onSuccess: () => {
+      toast.success("운영 정책이 저장되었습니다");
+      queryClient.invalidateQueries({ queryKey: ["channel-config", channel?.id] });
+      onClose();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            운영 정책 — {channel?.name ?? ""}
+          </DialogTitle>
+        </DialogHeader>
+        {configQuery.isPending ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <ToggleRow
+              label="송장 자동 push"
+              hint="발송 처리 시 채널에 송장번호 자동 통보 (어댑터 지원 시)"
+              value={autoTrackingPush}
+              onChange={setAutoTrackingPush}
+            />
+            <ToggleRow
+              label="재고 자동 sync"
+              hint="재고 변동 시 채널에 가용 재고 자동 push (단일·세트 매핑 모두)"
+              value={autoStockSync}
+              onChange={setAutoStockSync}
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <NumField
+                label="Polling (분)"
+                hint="cron 호출 간격"
+                value={pollingMinutes}
+                onChange={setPollingMinutes}
+              />
+              <NumField
+                label="출고 offset (일)"
+                hint="주문일 + N일"
+                value={shipDateOffsetDays}
+                onChange={setShipDateOffsetDays}
+              />
+              <NumField
+                label="보류 큐 임계값"
+                hint="N건 초과 시 매장 알림"
+                value={pendingThreshold}
+                onChange={setPendingThreshold}
+              />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            닫기
+          </Button>
+          <Button
+            onClick={() => saveMutation.mutate()}
+            disabled={configQuery.isPending || saveMutation.isPending}
+          >
+            {saveMutation.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            )}
+            저장
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ToggleRow({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      className="flex w-full items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:bg-muted/50"
+    >
+      <div
+        className={`mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+          value ? "bg-cta" : "bg-muted"
+        }`}
+      >
+        <span
+          className={`size-4 rounded-full bg-background transition-transform ${
+            value ? "translate-x-4" : "translate-x-0.5"
+          }`}
+        />
+      </div>
+      <div className="flex flex-col">
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        {hint && (
+          <span className="text-xs text-muted-foreground">{hint}</span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function NumField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Label className="text-xs">{label}</Label>
+      <Input
+        type="text"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ""))}
+      />
+      {hint && (
+        <span className="text-[11px] text-muted-foreground">{hint}</span>
+      )}
+    </div>
   );
 }
