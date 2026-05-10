@@ -103,6 +103,12 @@ export default function OrdersBoardPage() {
   const [claimTypeFilter, setClaimTypeFilter] = useState<
     "all" | "REFUND" | "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT"
   >("all");
+  /**
+   * 종결 주문(COMPLETED/RETURNED/EXCHANGED/CANCELLED) 포함 여부.
+   * 평소엔 false — 운영 보드는 진행 중만. true 면 종결도 함께 노출 + server 도 종결 포함.
+   * 검색이 비어있어도 켤 수 있음 (예: 최근 완료 검토용).
+   */
+  const [includeClosed, setIncludeClosed] = useState(false);
   const toggleGroupFilter = (key: BoardGroupKey) => {
     setGroupFilters((prev) => {
       const next = new Set(prev);
@@ -136,11 +142,13 @@ export default function OrdersBoardPage() {
     queryKey: queryKeys.orders.board({
       search: appliedSearch,
       channelFilter,
+      includeClosed,
     }),
     queryFn: () => {
       const params = new URLSearchParams({ view: "board" });
       if (appliedSearch) params.set("search", appliedSearch);
       if (channelFilter !== "all") params.set("channelFilter", channelFilter);
+      if (includeClosed) params.set("includeClosed", "1");
       return apiGet<BoardResponse>(`/api/orders?${params}`);
     },
   });
@@ -469,7 +477,8 @@ export default function OrdersBoardPage() {
                   paymentStatusFilter === "all" &&
                   channelFilter === "all" &&
                   fulfillmentFilter === "all" &&
-                  claimTypeFilter === "all"
+                  claimTypeFilter === "all" &&
+                  !includeClosed
                 }
                 onClick={() => {
                   setGroupFilters(new Set());
@@ -477,6 +486,7 @@ export default function OrdersBoardPage() {
                   setChannelFilter("all");
                   setFulfillmentFilter("all");
                   setClaimTypeFilter("all");
+                  setIncludeClosed(false);
                 }}
               >
                 전체
@@ -527,6 +537,20 @@ export default function OrdersBoardPage() {
                 {shortcutCounts.offline > 0 && (
                   <span className="ml-1 tabular-nums">
                     {shortcutCounts.offline}
+                  </span>
+                )}
+              </JmPill>
+              {/* 종결 포함 토글 — 평소엔 진행 중만, 켜면 COMPLETED/RETURNED/EXCHANGED/CANCELLED 도 노출 */}
+              <JmPill
+                size="sm"
+                active={includeClosed}
+                onClick={() => setIncludeClosed(!includeClosed)}
+                title="배송완료·반품완료·교환완료·취소 주문 포함 (검색 시엔 자동 포함)"
+              >
+                종결 포함
+                {includeClosed && counts.closed > 0 && (
+                  <span className="ml-1 tabular-nums">
+                    {counts.closed}
                   </span>
                 )}
               </JmPill>
@@ -648,6 +672,7 @@ export default function OrdersBoardPage() {
                   setPaymentStatusFilter("all");
                   setFulfillmentFilter("all");
                   setClaimTypeFilter("all");
+                  setIncludeClosed(false);
                 }}
                 className="font-semibold text-[var(--jm-action)] hover:underline"
               >

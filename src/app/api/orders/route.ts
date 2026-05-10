@@ -59,7 +59,10 @@ export async function GET(request: NextRequest) {
   // RETURN_REQUESTED/RETURN_ACCEPTED 는 반품 처리 대기 — 매장이 결정·회수해야 하므로 워크보드에 노출.
   if (view === "board") {
     // 평소엔 진행 중 주문만 (운영 우선순위 보드).
-    // 검색어가 있으면 종결(COMPLETED/RETURNED/EXCHANGED/CANCELLED) 도 포함 — "어제 발송된 그 주문 어딨지?" 같은 케이스 지원.
+    // - search 가 있으면 종결도 포함 ("어제 발송된 그 주문 어딨지?")
+    // - includeClosed=1 토글 켜면 종결 포함 (검색 없어도 명시적 보기)
+    const includeClosed =
+      searchParams.get("includeClosed") === "1" || !!search;
     const inProgressStatuses = [
       "PENDING",
       "PREPARING",
@@ -78,7 +81,7 @@ export async function GET(request: NextRequest) {
       "CANCELLED",
     ] as const;
     where.status = {
-      in: search
+      in: includeClosed
         ? [...inProgressStatuses, ...closedStatuses]
         : [...inProgressStatuses],
     };

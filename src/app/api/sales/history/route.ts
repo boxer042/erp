@@ -36,6 +36,7 @@ const STATUS_GROUP_MAP: Record<Exclude<SalesStatusGroup, "all">, OrderStatus[]> 
     claim: [
       "RETURN_REQUESTED",
       "RETURN_ACCEPTED",
+      "RETURN_PICKING",
       "RETURN_COLLECTED",
       "RETURN_INSPECTED",
     ],
@@ -471,6 +472,7 @@ export async function GET(request: NextRequest) {
   const claimInProgressStatuses = new Set<string>([
     "RETURN_REQUESTED",
     "RETURN_ACCEPTED",
+    "RETURN_PICKING",
     "RETURN_COLLECTED",
     "RETURN_INSPECTED",
   ]);
