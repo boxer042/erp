@@ -332,32 +332,32 @@ model Order {
 
 ### 우선순위 높음 (도메인 정합성)
 
-#### 0. 분할 송장 (Shipment / ShipmentItem) — 진행 중
-- 현재 `Order.trackingCarrier`/`trackingNumber` 단일 필드 — 라인별 다른 송장번호 등록 불가
-- 한 주문 안 여러 회차 발송할 때 마지막 송장이 이전 송장 덮어쓰기 → 운영 사고 위험
-- 모델 설계:
-  ```prisma
-  Shipment        — orderId, shipmentNo(주문 안 unique), trackingCarrier, trackingNumber, shippedAt, memo
-  ShipmentItem    — shipmentId, orderItemId, quantity
-  ```
-- 기존 `Order.trackingCarrier/Number` 는 "최신 송장 캐시" 로 deprecated 보존
-- 네이버·쿠팡·11번가·G마켓 모두 라인 단위 송장 + 분할 송장이 표준
+#### 0. 분할 송장 (Shipment / ShipmentItem) — ✓ 완료 (2026-05)
+- `Shipment`/`ShipmentItem` 모델 + 회차별 발송 이력 UI 도입. `Order.trackingCarrier/Number` 는 "최신 송장 캐시" 로 deprecated 보존.
 
 #### 1. 차액 결제 자동 청구·환불
 - EXCHANGE_DIFFERENT 차액은 표시만. 실제 결제·환불은 매장 수동
 - 알림 시스템 인터페이스 도입됨 → Phase 2 후 실 SaaS 어댑터 등록 시 차액 안내 자동화 가능
 
-#### 2. 부분 처리 (부분 출고/반품/환불) — 후속 PR
-- OrderItem 단위 status·shippedQty·returnedQty·refundedAmount 필요
-- PARTIAL_REFUND 실사용 가능
-- 외부 채널·B2B 에서 자주 발생
-- 큰 작업: schema 변경 + LotConsumption 부분 복원 알고리즘 + UI 모두 재설계
+#### 2. 부분 처리 (부분 출고/반품/환불) — ✓ 완료 (2026-05)
+- `OrderItem.shippedQty`/`returnedQty`/`refundedAmount` + partial_ship 액션 + 항목별 잔여 prefill UI 도입
+- PARTIAL_REFUND 실사용 가능 — LotConsumption 부분 복원 알고리즘 동작 중
+- 잔여 후속: 통합 판매내역 `/sales/history` 의 PARTIAL_REFUND 매출 계산이 아직 전액 매출로 잡음 — `returnedQty`/`refundedAmount` 기반 보강 필요
 
-#### 3. 다중·variant 매핑 — 후속 PR
-- 한 채널 SKU 가 ERP 세트 상품 또는 variant 여러 개로 매핑
-- 큰 작업: ChannelProductMapping 1:1 → 1:N + import.ts 풀어내기 알고리즘 + UI
+#### 3. 다중·옵션·variant 매핑 — 부분 완료 (2026-05)
+- ✓ 단일 매핑 (`productId`) / ✓ 세트 매핑 (`components[]` 1:N) / ✓ 옵션값 매핑 (`productOptionValueId` SWAP 모드 — 채널의 색상·사이즈 SKU → ERP 옵션값)
+- 미구현: 한 채널 SKU 가 메인 + 옵션 + 추가구매 조합을 동시에 결정 (현재는 셋 중 하나만 활성). 한국 오픈마켓 일부 패턴
+- variant(변형상품) 자동 매핑은 의도적으로 미구현 — 매장 운영 흐름상 출고대기 진입 시 직원이 직접 선택 (POS 와 동일). [_variant-resolve-dialog.tsx](../src/app/(dashboard)/orders/_variant-resolve-dialog.tsx) 가 그 UI
 
-#### 4. 옵션 / 추가상품 도메인 모델 — 후속 (분할 송장 후 재논의)
+#### 3-bis. 변형/옵션 출고 SKU 선택 UI — ✓ 완료 (2026-05-10)
+외부 채널이 canonical(대표상품) 또는 OPTION_PARENT SKU 로 주문을 보냈을 때, 매장이 출고대기 진입 시 실제 출고 SKU(변형 또는 SWAP 옵션 mappedProduct) 를 선택하는 흐름:
+- API: `prepare` 가드가 `isCanonical || productType === "OPTION_PARENT"` 모두 차단. 응답에 `unresolvedItemIds` 포함
+- API: `PUT /api/orders/[id]/items/[itemId]` 가 canonical→variant / OPTION_PARENT→SWAP 양쪽 통합 처리
+- UI: 워크보드 행 "변형 미확정"/"옵션 미확정" 노란 배지 + [출고대기] 가드 에러 시 자동 다이얼로그 → 일괄 해결 → prepare 자동 재시도
+- UI: 상세 시트 라인 옆 [출고 SKU 선택] 버튼 (단일 라인 처리)
+- 검증: [scripts/seed-variant-test-order.ts](../scripts/seed-variant-test-order.ts)
+
+#### 4. 옵션 / 추가상품 도메인 모델 — ✓ 완료 (2026-05)
 한국 오픈마켓(네이버·쿠팡·11번가·G마켓) 모두 옵션 SKU·추가상품을 **별도 OrderItem 라인** 으로 처리. 현재 우리는 라인 분리는 OK 지만 **메인-옵션·메인-추가상품 관계가 모델에 없음**.
 
 **필요한 모델 변경**:
@@ -407,10 +407,11 @@ model Order {
 **Phase 5 — 채널 → ERP 역방향 자동화 (Inbound)** ⏸ Phase 2 의존
 - 채널의 반품·정산 자동 ERP 전이
 
-**Phase 6+ — 운영 효율화 (부분 완료, 2026-05-07)**
+**Phase 6+ — 운영 효율화 (부분 완료, 2026-05-10)**
 - ✓ SKU 자동 매핑 추천
 - ✓ 운영 대시보드 위젯
-- 남은 작업: 재고 sync, 다중·variant 매핑, 임계값 알림, 채널 설정 페이지
+- ✓ 옵션값(SWAP) 매핑
+- 남은 작업: 재고 sync, 메인+옵션+추가구매 동시 매핑, 임계값 알림, 채널 설정 페이지
 
 ### 우선순위 낮음 (UX 개선)
 

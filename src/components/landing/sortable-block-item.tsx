@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, Copy, GripVertical, Lock, Trash2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { JmIconButton } from "@/jm";
 import { BLOCK_LABELS, type BlockType, type LandingBlock } from "@/lib/validators/landing-block";
 import { cn } from "@/lib/utils";
 
@@ -45,11 +45,18 @@ export function SortableBlockItem({
   };
 
   return (
-    <li ref={setNodeRef} style={style} className={cn("bg-background", locked && "bg-muted/40")}>
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "bg-[var(--jm-bg)]",
+        locked && "bg-[var(--jm-surface-muted)]/40",
+      )}
+    >
       <div className="flex items-center gap-2 px-3 py-2">
         {locked ? (
           <span
-            className="flex h-7 w-5 items-center justify-center text-muted-foreground/60"
+            className="flex h-7 w-5 items-center justify-center text-[var(--jm-text-muted)]/60"
             title="고정 블록 — 순서 변경 불가"
           >
             <Lock className="h-3.5 w-3.5" />
@@ -57,7 +64,7 @@ export function SortableBlockItem({
         ) : (
           <button
             type="button"
-            className="flex h-7 w-5 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
+            className="flex h-7 w-5 cursor-grab items-center justify-center text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] active:cursor-grabbing"
             {...attributes}
             {...listeners}
             aria-label="드래그해서 순서 변경"
@@ -71,46 +78,46 @@ export function SortableBlockItem({
           onClick={onToggle}
         >
           {expanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="h-4 w-4 text-[var(--jm-text-muted)]" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronRight className="h-4 w-4 text-[var(--jm-text-muted)]" />
           )}
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium">{BLOCK_LABELS[block.type]}</span>
-          <span className="truncate text-xs text-muted-foreground">{blockTitle(block)}</span>
+          <Icon className="h-4 w-4 text-[var(--jm-text-muted)]" />
+          <span className="text-xs font-medium text-[var(--jm-text)]">{BLOCK_LABELS[block.type]}</span>
+          <span className="truncate text-xs text-[var(--jm-text-muted)]">{blockTitle(block)}</span>
           {locked && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            <span className="rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)]">
               필수
             </span>
           )}
         </button>
         {!locked && (
           <>
-            <Button
-              type="button"
+            <JmIconButton
               variant="ghost"
-              size="icon"
-              className="h-7 w-7"
+              size="sm"
+              className="h-7 w-7 [&_svg]:size-3.5"
               onClick={onDuplicate}
               title="복제"
+              aria-label="복제"
             >
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
+              <Copy />
+            </JmIconButton>
+            <JmIconButton
               variant="ghost"
-              size="icon"
-              className="h-7 w-7"
+              size="sm"
+              className="h-7 w-7 [&_svg]:size-3.5"
               onClick={onDelete}
               title="삭제"
+              aria-label="삭제"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+              <Trash2 />
+            </JmIconButton>
           </>
         )}
       </div>
       {expanded && (
-        <div className="border-t border-border bg-muted/30 px-4 py-3">
+        <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-3">
           <BlockEditor block={block} onChange={onUpdate} />
         </div>
       )}

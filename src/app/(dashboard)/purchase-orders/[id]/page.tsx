@@ -188,7 +188,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
   const hasNonCancelledIncoming = data.incomings.some((i) => i.status !== "CANCELLED");
   const isTerminal = ["RECEIVED", "PARTIAL_COMPLETED", "CLOSED", "CANCELLED"].includes(data.status);
   const canEdit = data.status === "DRAFT" && !hasNonCancelledIncoming;
-  const canIncoming = ["SENT", "CONFIRMED", "PARTIAL", "PARTIAL_REACCEPTED"].includes(data.status) && progress.remaining > 0;
+  const canIncoming = ["CONFIRMED", "PARTIAL", "PARTIAL_REACCEPTED"].includes(data.status) && progress.remaining > 0;
   const canSend = data.status === "DRAFT";
   const canConfirm = data.status === "SENT";
   const canResend = data.status === "PARTIAL";

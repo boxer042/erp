@@ -152,6 +152,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "expenses", label: "경비", href: "/expenses", icon: WalletMinimal },
       { id: "margin-report", label: "마진 리포트", href: "/reports/margin", icon: TrendingUp },
+      { id: "option-funnel", label: "옵션 funnel", href: "/reports/option-funnel", icon: TrendingUp },
     ],
   },
   {

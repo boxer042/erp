@@ -51,18 +51,23 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+  JmButton,
+  JmIconButton,
+  JmDialog,
+  JmDialogContent,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmSkeleton,
+  JmTextarea,
+  JmInput,
+  JmTooltipProvider,
+  JmTooltipRoot,
+  JmTooltipTrigger,
+  JmTooltipContent,
+} from "@/jm";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
@@ -78,15 +83,8 @@ import {
 import { LandingPageView } from "@/components/landing/landing-page-view";
 import { SingleHtmlPreview } from "@/components/landing/single-html-preview";
 import { SortableBlockItem } from "@/components/landing/sortable-block-item";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
-import { BlockEditor } from "./_block-editor";
-import { blockTitle, duplicateAt, makeId } from "./_helpers";
+import { duplicateAt, makeId } from "./_helpers";
 
 type LandingMode = "BLOCKS" | "SINGLE_HTML";
 
@@ -360,8 +358,8 @@ export default function ProductLandingPage() {
   if (landingQuery.isError || !landingQuery.data) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3">
-        <p className="text-sm text-muted-foreground">상품 정보를 불러올 수 없습니다</p>
-        <Button variant="outline" onClick={() => landingQuery.refetch()}>다시 시도</Button>
+        <p className="text-sm text-[var(--jm-text-muted)]">상품 정보를 불러올 수 없습니다</p>
+        <JmButton variant="outline" size="sm" onClick={() => landingQuery.refetch()}>다시 시도</JmButton>
       </div>
     );
   }
@@ -370,23 +368,23 @@ export default function ProductLandingPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-2.5">
-        <Button
+      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--jm-border)] px-5 py-2.5">
+        <JmIconButton
           variant="ghost"
-          size="icon"
+          size="sm"
           aria-label="뒤로"
           onClick={() => navigateAway(() => router.push(`/products/${id}`))}
         >
           <ArrowLeft className="h-4 w-4" />
-        </Button>
+        </JmIconButton>
         <div className="flex flex-col">
-          <span className="text-sm font-semibold">{product.name}</span>
-          <span className="text-xs text-muted-foreground">상세페이지 편집 · {product.sku}</span>
+          <span className="text-sm font-semibold text-[var(--jm-text)]">{product.name}</span>
+          <span className="text-xs text-[var(--jm-text-muted)]">상세페이지 편집 · {product.sku}</span>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button
+          <JmButton
             variant="outline"
-            size="sm"
+            size="xs"
             onClick={() => {
               setJsonText(JSON.stringify(blocks, null, 2));
               setJsonError(null);
@@ -396,10 +394,10 @@ export default function ProductLandingPage() {
           >
             <Code2 className="h-4 w-4" />
             <span>JSON</span>
-          </Button>
-          <Button
+          </JmButton>
+          <JmButton
             variant="outline"
-            size="sm"
+            size="xs"
             disabled={landingMode === "SINGLE_HTML" || dirty}
             onClick={() => window.open(`/api/products/${id}/landing/export?format=html`, "_blank")}
             title={
@@ -412,10 +410,10 @@ export default function ProductLandingPage() {
           >
             <Download className="h-4 w-4" />
             <span>HTML</span>
-          </Button>
-          <Button
+          </JmButton>
+          <JmButton
             variant="outline"
-            size="sm"
+            size="xs"
             disabled={shooting || dirty}
             onClick={async () => {
               setShooting(true);
@@ -445,37 +443,38 @@ export default function ProductLandingPage() {
           >
             {shooting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             <span>{shooting ? "생성 중..." : "스크린샷"}</span>
-          </Button>
-          <Button
+          </JmButton>
+          <JmButton
             variant="outline"
-            size="sm"
+            size="xs"
             onClick={() => window.open(`/products/${id}/landing/preview`, "_blank")}
           >
             <ExternalLink className="h-4 w-4" />
             <span>미리보기</span>
-          </Button>
-          <Button
-            size="sm"
+          </JmButton>
+          <JmButton
+            variant="cta"
+            size="xs"
             disabled={!dirty || saveMutation.isPending}
             onClick={() => saveMutation.mutate(current)}
           >
             {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{saveMutation.isPending ? "저장 중..." : "저장"}</span>
-          </Button>
+          </JmButton>
         </div>
       </div>
 
       {/* 모드 토글 */}
-      <div className="flex items-center gap-2 border-b border-border bg-card px-5 py-2">
-        <span className="text-xs text-muted-foreground">모드:</span>
-        <div className="flex h-7 rounded-md border border-border bg-background text-[12px]">
+      <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 py-2">
+        <span className="text-xs text-[var(--jm-text-muted)]">모드:</span>
+        <div className="flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[12px]">
           <button
             type="button"
             className={cn(
               "px-3 transition-colors",
               landingMode === "BLOCKS"
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
             )}
             onClick={() => updateState({ landingMode: "BLOCKS" })}
           >
@@ -486,15 +485,15 @@ export default function ProductLandingPage() {
             className={cn(
               "px-3 transition-colors",
               landingMode === "SINGLE_HTML"
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
             )}
             onClick={() => updateState({ landingMode: "SINGLE_HTML" })}
           >
             단일 HTML
           </button>
         </div>
-        <span className="ml-2 text-[11px] text-muted-foreground">
+        <span className="ml-2 text-[11px] text-[var(--jm-text-muted)]">
           {landingMode === "BLOCKS"
             ? "블록을 조합해서 페이지 구성 + 공통 footer 자동 연결"
             : "업로드한 HTML 파일 1개를 통째로 페이지 전체로 (footer 미적용)"}
@@ -512,48 +511,48 @@ export default function ProductLandingPage() {
       ) : (
       <div className="flex flex-1 min-h-0">
         {/* 왼쪽: 블록 리스트 + 인라인 편집 */}
-        <aside className="flex w-[420px] shrink-0 flex-col border-r border-border bg-card">
-          <div className="border-b border-border px-4 py-3">
-            <p className="text-xs font-medium text-muted-foreground">
-              블록 추가 <span className="text-muted-foreground/70">(마우스 올리면 설명)</span>
+        <aside className="flex w-[420px] shrink-0 flex-col border-r border-[var(--jm-border)] bg-[var(--jm-surface)]">
+          <div className="border-b border-[var(--jm-border)] px-4 py-3">
+            <p className="text-xs font-medium text-[var(--jm-text-muted)]">
+              블록 추가 <span className="text-[var(--jm-text-muted)]/70">(마우스 올리면 설명)</span>
             </p>
-            <TooltipProvider delay={200}>
+            <JmTooltipProvider delay={200}>
               <div className="mt-2 grid grid-cols-4 gap-1">
                 {BLOCK_TYPES.map((t) => {
                   const Icon = BLOCK_ICON[t];
                   const desc = BLOCK_DESCRIPTIONS[t];
                   const alreadyHasHero = t === "product-hero" && blocks.some((b) => b.type === "product-hero");
                   return (
-                    <Tooltip key={t}>
-                      <TooltipTrigger
+                    <JmTooltipRoot key={t}>
+                      <JmTooltipTrigger
                         render={
-                          <Button
+                          <JmButton
                             type="button"
                             variant="outline"
-                            size="sm"
+                            size="xs"
                             disabled={alreadyHasHero}
                             className="flex h-auto flex-col gap-1 py-2 text-[11px]"
                             onClick={() => addBlock(t)}
                           >
                             <Icon className="h-4 w-4" />
                             <span>{BLOCK_LABELS[t]}</span>
-                          </Button>
+                          </JmButton>
                         }
                       />
-                      <TooltipContent side="bottom" className="max-w-[260px] whitespace-normal">
+                      <JmTooltipContent side="bottom" className="max-w-[260px] whitespace-normal">
                         <div className="space-y-1.5 text-left">
                           <div className="text-[12px] font-semibold">{desc.title}</div>
                           <div className="text-[11px] leading-snug opacity-90">{desc.body}</div>
                           <div className="text-[10px] italic opacity-70">{desc.example}</div>
                         </div>
-                      </TooltipContent>
-                    </Tooltip>
+                      </JmTooltipContent>
+                    </JmTooltipRoot>
                   );
                 })}
               </div>
-            </TooltipProvider>
-            <details className="mt-2 rounded-md bg-muted/40 px-2 py-1.5 text-[11px]">
-              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+            </JmTooltipProvider>
+            <details className="mt-2 rounded-md bg-[var(--jm-surface-muted)]/40 px-2 py-1.5 text-[11px]">
+              <summary className="cursor-pointer text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]">
                 블록 종류별 설명 보기
               </summary>
               <ul className="mt-2 space-y-1.5">
@@ -562,10 +561,10 @@ export default function ProductLandingPage() {
                   const desc = BLOCK_DESCRIPTIONS[t];
                   return (
                     <li key={t} className="flex gap-1.5">
-                      <Icon className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+                      <Icon className="mt-0.5 h-3 w-3 shrink-0 text-[var(--jm-text-muted)]" />
                       <div className="leading-snug">
                         <span className="font-medium">{desc.title}</span>
-                        <span className="ml-1 text-muted-foreground">— {desc.body}</span>
+                        <span className="ml-1 text-[var(--jm-text-muted)]">— {desc.body}</span>
                       </div>
                     </li>
                   );
@@ -576,7 +575,7 @@ export default function ProductLandingPage() {
 
           <div className="flex-1 overflow-y-auto min-h-0">
             {blocks.length === 0 ? (
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+              <div className="flex h-40 items-center justify-center text-sm text-[var(--jm-text-muted)]">
                 위에서 블록을 추가하세요
               </div>
             ) : (
@@ -585,7 +584,7 @@ export default function ProductLandingPage() {
                   items={blocks.map((b) => b.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <ul className="divide-y divide-border">
+                  <ul className="divide-y divide-[var(--jm-border)]">
                     {blocks.map((block) => (
                       <SortableBlockItem
                         key={block.id}
@@ -609,22 +608,22 @@ export default function ProductLandingPage() {
         </aside>
 
         {/* 오른쪽: 라이브 프리뷰 */}
-        <div className="flex flex-1 min-w-0 flex-col bg-muted/30">
-          <div className="flex items-center gap-2 border-b border-border bg-background px-4 py-2">
-            <span className="text-xs text-muted-foreground">미리보기</span>
+        <div className="flex flex-1 min-w-0 flex-col bg-[var(--jm-surface-muted)]/30">
+          <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2">
+            <span className="text-xs text-[var(--jm-text-muted)]">미리보기</span>
             {dirty && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900">
+              <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-[10px] text-[var(--jm-warning-fg)]">
                 저장되지 않은 변경사항
               </span>
             )}
-            <div className="ml-auto flex h-7 rounded-md border border-border bg-background text-[12px]">
+            <div className="ml-auto flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[12px]">
               <button
                 type="button"
                 className={cn(
                   "flex items-center gap-1 px-2",
                   previewWidth === "desktop"
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                    : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
                 )}
                 onClick={() => setPreviewWidth("desktop")}
                 title="데스크톱 폭"
@@ -634,10 +633,10 @@ export default function ProductLandingPage() {
               <button
                 type="button"
                 className={cn(
-                  "flex items-center gap-1 border-l border-border px-2",
+                  "flex items-center gap-1 border-l border-[var(--jm-border)] px-2",
                   previewWidth === "tablet"
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                    : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
                 )}
                 onClick={() => setPreviewWidth("tablet")}
                 title="태블릿 폭 (768px)"
@@ -647,10 +646,10 @@ export default function ProductLandingPage() {
               <button
                 type="button"
                 className={cn(
-                  "flex items-center gap-1 border-l border-border px-2",
+                  "flex items-center gap-1 border-l border-[var(--jm-border)] px-2",
                   previewWidth === "mobile"
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                    : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
                 )}
                 onClick={() => setPreviewWidth("mobile")}
                 title="모바일 폭 (375px)"
@@ -662,7 +661,7 @@ export default function ProductLandingPage() {
           <div className="flex-1 overflow-y-auto min-h-0">
             <div
               className={cn(
-                "mx-auto bg-background shadow-sm",
+                "mx-auto bg-[var(--jm-bg)] shadow-[var(--jm-shadow-sm)]",
                 previewWidth === "desktop" && "max-w-[960px]",
                 previewWidth === "tablet" && "max-w-[768px]",
                 previewWidth === "mobile" && "max-w-[375px]",
@@ -670,7 +669,7 @@ export default function ProductLandingPage() {
             >
               {(footerQuery.data?.headerBlocks ?? []).length > 0 && (
                 <>
-                  <div className="border-b border-dashed border-border bg-muted/30 px-4 py-2 text-center text-[11px] text-muted-foreground">
+                  <div className="border-b border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-[11px] text-[var(--jm-text-muted)]">
                     ↑ 위는 모든 상품에 공통으로 붙는 상단 공지/배너 (설정 → 상단 공지/배너)
                   </div>
                   <LandingPageView
@@ -685,7 +684,7 @@ export default function ProductLandingPage() {
               <LandingPageView blocks={blocks} productId={id} />
               {(footerQuery.data?.footerBlocks ?? []).length > 0 && (
                 <>
-                  <div className="border-t border-dashed border-border bg-muted/30 px-4 py-2 text-center text-[11px] text-muted-foreground">
+                  <div className="border-t border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-[11px] text-[var(--jm-text-muted)]">
                     ↓ 아래는 모든 상품에 공통으로 붙는 footer (설정 → 공통 footer)
                   </div>
                   <LandingPageView
@@ -702,22 +701,22 @@ export default function ProductLandingPage() {
       </div>
       )}
 
-      <Dialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>블록을 삭제할까요?</DialogTitle>
-            <DialogDescription>이 작업은 저장 전까지는 되돌릴 수 있습니다.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>취소</Button>
-            <Button variant="destructive" onClick={() => deleteId && removeBlock(deleteId)}>
+      <JmDialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>블록을 삭제할까요?</JmDialogTitle>
+            <JmDialogDescription>이 작업은 저장 전까지는 되돌릴 수 있습니다.</JmDialogDescription>
+          </JmDialogHeader>
+          <JmDialogFooter>
+            <JmButton variant="outline" size="sm" onClick={() => setDeleteId(null)}>취소</JmButton>
+            <JmButton variant="danger" size="sm" onClick={() => deleteId && removeBlock(deleteId)}>
               삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
-      <Dialog
+      <JmDialog
         open={leaveDialogOpen}
         onOpenChange={(o) => {
           if (!o) {
@@ -726,25 +725,27 @@ export default function ProductLandingPage() {
           }
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>저장하지 않은 변경사항이 있습니다</DialogTitle>
-            <DialogDescription>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>저장하지 않은 변경사항이 있습니다</JmDialogTitle>
+            <JmDialogDescription>
               지금 페이지를 나가면 저장하지 않은 변경 내용이 사라집니다. 정말 나가시겠어요?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <JmDialogFooter>
+            <JmButton
               variant="outline"
+              size="sm"
               onClick={() => {
                 pendingNavRef.current = null;
                 setLeaveDialogOpen(false);
               }}
             >
               취소 (계속 편집)
-            </Button>
-            <Button
-              variant="destructive"
+            </JmButton>
+            <JmButton
+              variant="danger"
+              size="sm"
               onClick={() => {
                 const fn = pendingNavRef.current;
                 pendingNavRef.current = null;
@@ -753,21 +754,24 @@ export default function ProductLandingPage() {
               }}
             >
               나가기 (변경 버림)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
-      <Dialog open={jsonOpen} onOpenChange={setJsonOpen}>
-        <DialogContent className="flex max-h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3 sm:max-w-none">
-          <DialogHeader>
-            <DialogTitle>JSON 가져오기 / 내보내기</DialogTitle>
-            <DialogDescription>
+      <JmDialog open={jsonOpen} onOpenChange={setJsonOpen}>
+        <JmDialogContent
+          size="xl"
+          className="flex max-h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3"
+        >
+          <JmDialogHeader>
+            <JmDialogTitle>JSON 가져오기 / 내보내기</JmDialogTitle>
+            <JmDialogDescription>
               로컬 Claude Code 등으로 만든 JSON을 붙여넣고 <b>가져오기</b>를 누르면 미리보기에 즉시 반영됩니다 (저장은 헤더의 &ldquo;저장&rdquo; 버튼).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <Textarea
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-2 px-5">
+            <JmTextarea
               value={jsonText}
               onChange={(e) => {
                 setJsonText(e.target.value);
@@ -777,19 +781,20 @@ export default function ProductLandingPage() {
               spellCheck={false}
             />
             {jsonError && (
-              <p className="rounded-md bg-destructive/15 px-2 py-1.5 text-xs text-destructive">
+              <p className="rounded-md bg-[var(--jm-danger-bg)] px-2 py-1.5 text-xs text-[var(--jm-danger-fg)]">
                 {jsonError}
               </p>
             )}
-            <p className="text-[11px] text-muted-foreground">
-              스키마: <code className="rounded bg-muted px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
-              <code className="rounded bg-muted px-1">src/lib/validators/landing-block.ts</code>{" "}
+            <p className="text-[11px] text-[var(--jm-text-muted)]">
+              스키마: <code className="rounded bg-[var(--jm-surface-muted)] px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
+              <code className="rounded bg-[var(--jm-surface-muted)] px-1">src/lib/validators/landing-block.ts</code>{" "}
               참고
             </p>
           </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
+          <JmDialogFooter className="gap-2">
+            <JmButton
               variant="outline"
+              size="sm"
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(jsonText);
@@ -800,10 +805,12 @@ export default function ProductLandingPage() {
               }}
             >
               클립보드로 복사
-            </Button>
+            </JmButton>
             <div className="flex-1" />
-            <Button variant="outline" onClick={() => setJsonOpen(false)}>닫기</Button>
-            <Button
+            <JmButton variant="outline" size="sm" onClick={() => setJsonOpen(false)}>닫기</JmButton>
+            <JmButton
+              variant="cta"
+              size="sm"
               onClick={() => {
                 try {
                   const parsedRaw = JSON.parse(jsonText);
@@ -829,10 +836,10 @@ export default function ProductLandingPage() {
               }}
             >
               가져오기 (미리보기에 반영)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </div>
   );
 }
@@ -858,18 +865,18 @@ function SingleHtmlEditorBody({
 }) {
   return (
     <div className="flex flex-1 min-h-0">
-      <aside className="flex w-[420px] shrink-0 flex-col gap-3 border-r border-border bg-card p-4">
-        <p className="rounded-md bg-muted px-3 py-2 text-[12px] text-muted-foreground">
+      <aside className="flex w-[420px] shrink-0 flex-col gap-3 border-r border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
+        <p className="rounded-md bg-[var(--jm-surface-muted)] px-3 py-2 text-[12px] text-[var(--jm-text-muted)]">
           이 모드는 업로드한 HTML 파일을 페이지 전체로 통째 보여줍니다. 블록과 공통 footer 는 적용되지 않으며, sandboxed iframe 안에 격리되어 렌더링됩니다.
         </p>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium">HTML 파일</p>
+          <p className="text-xs font-medium text-[var(--jm-text)]">HTML 파일</p>
           <div className="flex flex-wrap gap-2">
-            <Button
+            <JmButton
               type="button"
               variant="outline"
-              size="sm"
+              size="xs"
               disabled={uploading}
               onClick={() => {
                 const input = document.createElement("input");
@@ -884,54 +891,54 @@ function SingleHtmlEditorBody({
             >
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode2 className="h-4 w-4" />}
               <span>{uploading ? "업로드 중..." : singleHtmlUrl ? "다른 파일로 교체" : "파일 업로드"}</span>
-            </Button>
+            </JmButton>
             {singleHtmlUrl && (
               <>
-                <Button
+                <JmButton
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="xs"
                   onClick={() => window.open(resolveHtmlSrc(singleHtmlUrl), "_blank")}
                 >
                   <ExternalLink className="h-4 w-4" />
                   <span>새 탭에서 열기</span>
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+                </JmButton>
+                <JmButton type="button" variant="ghost" size="xs" onClick={onClear}>
                   <Trash2 className="h-4 w-4" />
                   <span>제거</span>
-                </Button>
+                </JmButton>
               </>
             )}
           </div>
           {singleHtmlUrl && (
-            <Input
+            <JmInput
               value={singleHtmlUrl}
               readOnly
-              className="h-8 text-[11px] text-muted-foreground"
+              className="h-8 text-[11px] text-[var(--jm-text-muted)]"
               onFocus={(e) => e.currentTarget.select()}
             />
           )}
         </div>
 
-        <p className="text-[11px] text-muted-foreground">
-          ⚠️ HTML 안의 <code className="rounded bg-muted px-1">{`<img>`}</code> 는 절대 URL 또는 base64 권장. 상대 경로는 storage 경로 기준이라 깨질 수 있습니다.
+        <p className="text-[11px] text-[var(--jm-text-muted)]">
+          ⚠️ HTML 안의 <code className="rounded bg-[var(--jm-surface-muted)] px-1">{`<img>`}</code> 는 절대 URL 또는 base64 권장. 상대 경로는 storage 경로 기준이라 깨질 수 있습니다.
         </p>
       </aside>
 
-      <div className="flex flex-1 min-w-0 flex-col bg-muted/30">
-        <div className="flex items-center gap-2 border-b border-border bg-background px-4 py-2">
-          <span className="text-xs text-muted-foreground">미리보기</span>
+      <div className="flex flex-1 min-w-0 flex-col bg-[var(--jm-surface-muted)]/30">
+        <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2">
+          <span className="text-xs text-[var(--jm-text-muted)]">미리보기</span>
           {dirty && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900">
+            <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-[10px] text-[var(--jm-warning-fg)]">
               저장되지 않은 변경사항
             </span>
           )}
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto bg-background">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--jm-bg)]">
           {singleHtmlUrl ? (
             <SingleHtmlPreview src={resolveHtmlSrc(singleHtmlUrl)} />
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            <div className="flex h-full items-center justify-center text-sm text-[var(--jm-text-muted)]">
               왼쪽에서 HTML 파일을 업로드하세요
             </div>
           )}
@@ -944,35 +951,36 @@ function SingleHtmlEditorBody({
 function LoadingState() {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-2.5">
-        <Skeleton className="h-8 w-8 rounded-md" />
+      <div className="flex items-center gap-3 border-b border-[var(--jm-border)] px-5 py-2.5">
+        <JmSkeleton className="h-8 w-8 rounded-md" />
         <div className="space-y-1">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-3 w-32" />
+          <JmSkeleton className="h-4 w-40" />
+          <JmSkeleton className="h-3 w-32" />
         </div>
         <div className="ml-auto flex gap-2">
-          <Skeleton className="h-8 w-20 rounded-md" />
-          <Skeleton className="h-8 w-16 rounded-md" />
+          <JmSkeleton className="h-8 w-20 rounded-md" />
+          <JmSkeleton className="h-8 w-16 rounded-md" />
         </div>
       </div>
       <div className="flex flex-1 min-h-0">
-        <aside className="w-[420px] shrink-0 border-r border-border bg-card p-4">
-          <Skeleton className="mb-3 h-3 w-16" />
+        <aside className="w-[420px] shrink-0 border-r border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
+          <JmSkeleton className="mb-3 h-3 w-16" />
           <div className="grid grid-cols-5 gap-1">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 rounded-md" />
+              <JmSkeleton key={i} className="h-12 rounded-md" />
             ))}
           </div>
           <div className="mt-6 space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-full rounded-md" />
+              <JmSkeleton key={i} className="h-9 w-full rounded-md" />
             ))}
           </div>
         </aside>
-        <div className="flex-1 bg-muted/30 p-6">
-          <Skeleton className="mx-auto h-[420px] w-full max-w-[960px]" />
+        <div className="flex-1 bg-[var(--jm-surface-muted)]/30 p-6">
+          <JmSkeleton className="mx-auto h-[420px] w-full max-w-[960px]" />
         </div>
       </div>
     </div>
   );
 }
+

@@ -4,8 +4,7 @@ import { useRef, useState } from "react";
 import { Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { JmButton, JmInput } from "@/jm";
 import { uploadImage } from "./_helpers";
 
 interface ImageUploadFieldProps {
@@ -35,35 +34,35 @@ export function ImageUploadField({ value, onChange, size = 80 }: ImageUploadFiel
   return (
     <div className="flex items-start gap-3">
       <div
-        className="relative shrink-0 overflow-hidden rounded-md border border-border bg-muted"
+        className="relative shrink-0 overflow-hidden rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]"
         style={{ width: size, height: size }}
       >
         {value ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={value} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+          <div className="flex h-full w-full items-center justify-center text-xs text-[var(--jm-text-muted)]">
             없음
           </div>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2">
         <div className="flex gap-2">
-          <Button
+          <JmButton
             type="button"
             variant="outline"
-            size="sm"
+            size="xs"
             disabled={uploading}
             onClick={() => fileRef.current?.click()}
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             <span>{uploading ? "업로드 중..." : "업로드"}</span>
-          </Button>
+          </JmButton>
           {value && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")}>
+            <JmButton type="button" variant="ghost" size="xs" onClick={() => onChange("")}>
               <X className="h-4 w-4" />
               <span>제거</span>
-            </Button>
+            </JmButton>
           )}
           <input
             ref={fileRef}
@@ -77,7 +76,7 @@ export function ImageUploadField({ value, onChange, size = 80 }: ImageUploadFiel
             }}
           />
         </div>
-        <Input
+        <JmInput
           placeholder="또는 이미지 URL 직접 입력"
           value={value}
           onChange={(e) => onChange(e.target.value)}

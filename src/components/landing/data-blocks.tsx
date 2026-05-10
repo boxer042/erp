@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Minus, Plus, ShoppingCart } from "lucide-react";
+import { Check, FileText, Minus, Plus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import {
   Bar,
@@ -22,6 +22,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
+import { JmScope, JmSkeleton, JmButton, JmIconButton } from "@/jm";
 import type {
   SpecTableBlock,
   AmbientVideoBlock,
@@ -424,34 +425,61 @@ export function StatsGridBlockView({
   );
 }
 
-/** Callout / Info-grid 의 variant 별 색상 토큰 매핑 */
+/** Callout / Info-grid 의 variant 별 jm 토큰 매핑 */
 const CALLOUT_VARIANT: Record<
   NonNullable<CalloutBlock["variant"]>,
-  { border: string; bg: string; text: string }
+  { border: string; bg: string; text: string; label: string }
 > = {
-  warning: { border: "border-warning", bg: "bg-warning/10", text: "text-warning" },
-  info: { border: "border-primary", bg: "bg-primary/5", text: "text-primary" },
-  success: { border: "border-brand", bg: "bg-brand-muted", text: "text-brand" },
-  danger: { border: "border-destructive", bg: "bg-destructive/10", text: "text-destructive" },
-  neutral: { border: "border-foreground/40", bg: "bg-muted", text: "text-foreground" },
+  warning: {
+    border: "border-[var(--jm-warning-solid)]",
+    bg: "bg-[var(--jm-warning-bg)]",
+    text: "text-[var(--jm-warning-fg)]",
+    label: "text-[var(--jm-warning-fg)]",
+  },
+  info: {
+    border: "border-[var(--jm-info-solid)]",
+    bg: "bg-[var(--jm-info-bg)]",
+    text: "text-[var(--jm-info-fg)]",
+    label: "text-[var(--jm-info-fg)]",
+  },
+  success: {
+    border: "border-[var(--jm-success-solid)]",
+    bg: "bg-[var(--jm-success-bg)]",
+    text: "text-[var(--jm-success-fg)]",
+    label: "text-[var(--jm-success-fg)]",
+  },
+  danger: {
+    border: "border-[var(--jm-danger-solid)]",
+    bg: "bg-[var(--jm-danger-bg)]",
+    text: "text-[var(--jm-danger-fg)]",
+    label: "text-[var(--jm-danger-fg)]",
+  },
+  neutral: {
+    border: "border-[var(--jm-border-strong)]",
+    bg: "bg-[var(--jm-surface-muted)]",
+    text: "text-[var(--jm-text)]",
+    label: "text-[var(--jm-text)]",
+  },
 };
 
 const CALLOUT_PADDING: Record<NonNullable<CalloutBlock["paddingY"]>, string> = {
-  sm: "py-2",
-  md: "py-3",
-  lg: "py-5",
+  sm: "px-4 py-3",
+  md: "px-5 py-4",
+  lg: "px-6 py-5",
 };
 
 /** 강조 박스 — 좌측 컬러 바 + 라벨 + 본문. info-grid 안의 notice 에서도 재사용 */
-export function CalloutBlockView({
-  block,
-}: {
-  block: CalloutBlock;
-}) {
-  return <CalloutBox {...block} />;
+export function CalloutBlockView({ block }: { block: CalloutBlock }) {
+  return (
+    <JmScope theme="light" className="w-full">
+      <section className="w-full px-6 md:px-16">
+        <CalloutBox {...block} inSection />
+      </section>
+    </JmScope>
+  );
 }
 
-/** 내부 컴포넌트 — info-grid 의 notice 에서도 사용 */
+/** 내부 컴포넌트 — info-grid 의 notice 에서도 사용. inSection=true 면 JmScope 바깥에서 호출됨 */
 export function CalloutBox({
   variant,
   icon,
@@ -471,20 +499,30 @@ export function CalloutBox({
   const style = CALLOUT_VARIANT[variant];
   const Icon = resolveLandingIcon(icon ?? null);
 
+  // 좌측 4px 컬러 바 + 둥근 모서리 + 부드러운 배경
   const inner = (
     <div
       className={cn(
-        "border-l-2 pl-4 pr-4",
+        "relative overflow-hidden rounded-xl border-l-4",
         style.border,
         style.bg,
         CALLOUT_PADDING[paddingY ?? "md"],
       )}
     >
-      <div className="flex items-start gap-2">
-        {Icon && <Icon className={cn("mt-[3px] h-4 w-4 shrink-0", style.text)} />}
-        <div className="flex-1 text-sm leading-relaxed">
-          {label && <strong className={cn("mr-1.5 font-bold", style.text)}>{label}</strong>}
-          <span className="text-muted-foreground">
+      <div className="flex items-start gap-2.5">
+        {Icon && (
+          <Icon
+            className={cn("mt-[3px] h-4 w-4 shrink-0", style.text)}
+            aria-hidden
+          />
+        )}
+        <div className="flex-1 text-jm-sm leading-relaxed text-[var(--jm-text)]">
+          {label && (
+            <strong className={cn("mr-1.5 font-bold", style.label)}>
+              {label}
+            </strong>
+          )}
+          <span className="text-[var(--jm-text-muted)]">
             <InlineMarkdown text={body} />
           </span>
         </div>
@@ -492,8 +530,7 @@ export function CalloutBox({
     </div>
   );
 
-  if (inSection) return inner;
-  return <section className="w-full px-6 md:px-16">{inner}</section>;
+  return inSection ? inner : inner;
 }
 
 const INFO_GRID_PADDING: Record<NonNullable<InfoGridBlock["paddingY"]>, string> = {
@@ -504,7 +541,7 @@ const INFO_GRID_PADDING: Record<NonNullable<InfoGridBlock["paddingY"]>, string> 
 
 const INFO_GRID_BG: Record<NonNullable<InfoGridBlock["background"]>, string> = {
   none: "",
-  muted: "bg-muted",
+  muted: "bg-[var(--jm-surface-muted)]",
 };
 
 /** 정보 그리드 — 한국 쇼핑몰 표준 footer 4섹션 패턴 */
@@ -513,88 +550,104 @@ export function InfoGridBlockView({ block }: { block: InfoGridBlock }) {
 
   if (sections.length === 0) {
     return (
-      <section className={cn("w-full px-6 md:px-16", INFO_GRID_BG[block.background ?? "muted"])}>
-        <div className="mx-auto flex h-32 max-w-5xl items-center justify-center text-sm text-muted-foreground">
-          섹션을 추가하세요
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section
+          className={cn(
+            "w-full px-6 md:px-16",
+            INFO_GRID_BG[block.background ?? "muted"],
+          )}
+        >
+          <div className="mx-auto flex h-32 max-w-5xl items-center justify-center text-jm-sm text-[var(--jm-text-muted)]">
+            섹션을 추가하세요
+          </div>
+        </section>
+      </JmScope>
     );
   }
 
   return (
-    <section
-      className={cn(
-        "w-full px-6 md:px-16",
-        INFO_GRID_PADDING[block.paddingY ?? "xl"],
-        INFO_GRID_BG[block.background ?? "muted"],
-      )}
-    >
-      <div className="mx-auto max-w-5xl">
-        {sections.map((sec, i) => {
-          const Icon = resolveLandingIcon(sec.icon);
-          return (
-            <div
-              key={i}
-              className={cn(
-                "grid gap-5 border-t border-border-strong/30 py-8 md:grid-cols-[260px_1fr] md:gap-12 md:py-10",
-                i === sections.length - 1 && "border-b",
-              )}
-            >
-              <div className="flex flex-col gap-1.5">
-                {sec.number && (
-                  <span className="text-[11px] font-semibold tracking-[0.25em] text-muted-foreground">
-                    {sec.number}
-                  </span>
+    <JmScope theme="light" className="w-full">
+      <section
+        className={cn(
+          "w-full px-6 md:px-16",
+          INFO_GRID_PADDING[block.paddingY ?? "xl"],
+          INFO_GRID_BG[block.background ?? "muted"],
+        )}
+      >
+        <div className="mx-auto max-w-5xl">
+          {sections.map((sec, i) => {
+            const Icon = resolveLandingIcon(sec.icon);
+            return (
+              <div
+                key={i}
+                className={cn(
+                  "grid gap-5 border-t border-[var(--jm-border)] py-8 md:grid-cols-[260px_1fr] md:gap-12 md:py-10",
+                  i === sections.length - 1 && "border-b",
                 )}
-                <div className="flex items-center gap-2">
-                  {Icon && <Icon className="h-5 w-5 shrink-0 text-foreground" />}
-                  <h3 className="text-xl font-bold tracking-tight md:text-[22px]">
-                    {sec.title}
-                  </h3>
+              >
+                <div className="flex flex-col gap-2">
+                  {sec.number && (
+                    <span className="text-jm-2xs font-semibold tracking-[0.25em] text-[var(--jm-text-subtle)]">
+                      {sec.number}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {Icon && (
+                      <Icon
+                        className="h-5 w-5 shrink-0 text-[var(--jm-text)]"
+                        aria-hidden
+                      />
+                    )}
+                    <h3 className="text-jm-lg font-bold tracking-tight text-[var(--jm-text)] md:text-jm-xl">
+                      {sec.title}
+                    </h3>
+                  </div>
+                </div>
+                <div className="space-y-4 text-jm-sm leading-relaxed text-[var(--jm-text)]">
+                  {sec.rows.length > 0 && (
+                    <dl className="grid gap-x-6 gap-y-3 md:grid-cols-[110px_1fr]">
+                      {sec.rows.map((row, ri) => (
+                        <div key={ri} className="contents">
+                          <dt className="text-[var(--jm-text-muted)]">
+                            {row.key}
+                          </dt>
+                          <dd className="font-medium text-[var(--jm-text)]">
+                            <InlineMarkdown text={row.value} />
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {sec.bullets.length > 0 && (
+                    <ul className="space-y-2">
+                      {sec.bullets.map((b, bi) => (
+                        <li
+                          key={bi}
+                          className="relative pl-4 text-jm-sm text-[var(--jm-text-muted)] before:absolute before:left-0 before:top-[10px] before:h-px before:w-2.5 before:bg-[var(--jm-text-subtle)]"
+                        >
+                          <InlineMarkdown text={b} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {sec.notice && (
+                    <div className="mt-2">
+                      <CalloutBox
+                        variant={sec.notice.variant}
+                        label={sec.notice.label}
+                        body={sec.notice.body}
+                        paddingY="md"
+                        inSection
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="space-y-3 text-sm leading-relaxed text-foreground/80">
-                {sec.rows.length > 0 && (
-                  <dl className="grid gap-x-6 gap-y-3 md:grid-cols-[110px_1fr]">
-                    {sec.rows.map((row, ri) => (
-                      <div key={ri} className="contents">
-                        <dt className="text-muted-foreground">{row.key}</dt>
-                        <dd className="font-medium text-foreground">
-                          <InlineMarkdown text={row.value} />
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-                {sec.bullets.length > 0 && (
-                  <ul className="mt-3 space-y-1.5">
-                    {sec.bullets.map((b, bi) => (
-                      <li
-                        key={bi}
-                        className="relative pl-3.5 text-[13px] before:absolute before:left-0 before:top-[10px] before:h-px before:w-2 before:bg-muted-foreground/60"
-                      >
-                        <InlineMarkdown text={b} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {sec.notice && (
-                  <div className="mt-4">
-                    <CalloutBox
-                      variant={sec.notice.variant}
-                      label={sec.notice.label}
-                      body={sec.notice.body}
-                      paddingY="md"
-                      inSection
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+            );
+          })}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 
@@ -614,6 +667,47 @@ interface ProductInfoApiResponse {
   asResponsible: string | null;
 }
 
+interface ProductHeroOptionValue {
+  id: string;
+  label: string;
+  addPrice: string;
+  mappedProductId: string | null;
+  mappedVariantId: string | null;
+  mappedProduct: {
+    id: string;
+    name: string;
+    sku: string;
+    sellingPrice: string;
+    listPrice: string | null;
+    taxType: string;
+  } | null;
+  mappedVariant: { id: string; name: string; sku: string } | null;
+}
+
+interface ProductHeroOption {
+  id: string;
+  name: string;
+  required: boolean;
+  values: ProductHeroOptionValue[];
+}
+
+interface ProductHeroBundle {
+  id: string;
+  defaultQuantity: string;
+  discountAmount: string | null;
+  copy: string | null;
+  bundleProduct: {
+    id: string;
+    name: string;
+    sku: string;
+    sellingPrice: string;
+    listPrice: string | null;
+    imageUrl: string | null;
+    taxType: string;
+    productType: string;
+  };
+}
+
 interface ProductHeroApiResponse {
   id: string;
   name: string;
@@ -627,6 +721,8 @@ interface ProductHeroApiResponse {
   taxRate: string;
   taxType: string;
   media: Array<{ id: string; url: string; type: string; sortOrder: number; title: string | null }>;
+  productOptions?: ProductHeroOption[];
+  bundles?: ProductHeroBundle[];
 }
 
 const PRODUCT_HERO_PADDING: Record<NonNullable<ProductHeroBlock["paddingY"]>, string> = {
@@ -637,7 +733,7 @@ const PRODUCT_HERO_PADDING: Record<NonNullable<ProductHeroBlock["paddingY"]>, st
 
 const PRODUCT_HERO_BG: Record<NonNullable<ProductHeroBlock["background"]>, string> = {
   none: "",
-  muted: "bg-muted",
+  muted: "bg-[var(--jm-surface-muted)]",
 };
 
 /** 상품 메인 — PDP 최상단 요약 영역. Product 데이터 자동 매핑 */
@@ -659,6 +755,10 @@ export function ProductHeroBlockView({
   const [activeIdx, setActiveIdx] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [busyAction, setBusyAction] = useState<"cart" | "buy" | null>(null);
+  // optionId → valueId
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  // bundle.id → quantity (0 = 선택 안 됨, 1 이상 = 선택 + 수량)
+  const [bundleQuantities, setBundleQuantities] = useState<Record<string, number>>({});
 
   const runCommerce = async (
     action: "cart" | "buy",
@@ -705,41 +805,46 @@ export function ProductHeroBlockView({
 
   if (!productId) {
     return (
-      <section
-        className={cn(
-          "w-full px-6 py-16 md:px-16",
-          PRODUCT_HERO_BG[block.background ?? "none"],
-        )}
-      >
-        <div className="mx-auto max-w-6xl rounded-md border border-dashed border-border bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
-          상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section
+          className={cn(
+            "w-full px-6 py-16 md:px-16",
+            PRODUCT_HERO_BG[block.background ?? "none"],
+          )}
+        >
+          <div className="mx-auto max-w-6xl rounded-md border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface)]/50 px-4 py-10 text-center text-sm text-[var(--jm-text-muted)]">
+            상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
+          </div>
+        </section>
+      </JmScope>
     );
   }
 
   if (productQuery.isPending) {
     return (
-      <section
-        className={cn(
-          "w-full px-6 md:px-16",
-          PRODUCT_HERO_PADDING[block.paddingY ?? "xl"],
-          PRODUCT_HERO_BG[block.background ?? "none"],
-        )}
-      >
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-8 md:grid-cols-2 md:gap-12">
-            <div className="aspect-square w-full animate-pulse rounded-lg bg-muted" />
-            <div className="space-y-4">
-              <div className="h-3 w-32 animate-pulse rounded bg-muted" />
-              <div className="h-10 w-2/3 animate-pulse rounded bg-muted" />
-              <div className="h-4 w-full animate-pulse rounded bg-muted" />
-              <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-              <div className="h-12 w-40 animate-pulse rounded bg-muted" />
+      <JmScope theme="light" className="w-full">
+        <section
+          className={cn(
+            "w-full px-6 md:px-16",
+            PRODUCT_HERO_PADDING[block.paddingY ?? "xl"],
+            PRODUCT_HERO_BG[block.background ?? "none"],
+          )}
+        >
+          <div className="mx-auto max-w-6xl">
+            <div className="grid gap-10 md:grid-cols-[1.05fr_1fr] md:gap-12">
+              <JmSkeleton className="aspect-square w-full rounded-3xl" />
+              <div className="space-y-5">
+                <JmSkeleton className="h-7 w-24 rounded-full" />
+                <JmSkeleton className="h-12 w-3/4" />
+                <JmSkeleton className="h-5 w-full" />
+                <JmSkeleton className="h-5 w-2/3" />
+                <JmSkeleton className="h-24 w-full rounded-2xl" />
+                <JmSkeleton className="h-14 w-56 rounded-full" />
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </JmScope>
     );
   }
 
@@ -767,9 +872,30 @@ export function ProductHeroBlockView({
   const safeIdx = images.length > 0 ? Math.min(activeIdx, images.length - 1) : 0;
   const mainImage = images[safeIdx];
 
+  const productOptions = product.productOptions ?? [];
+  const bundles = product.bundles ?? [];
+  const hasOptions = productOptions.length > 0;
+  const hasBundles = bundles.length > 0;
+
+  const getBundleQty = (id: string) => bundleQuantities[id] ?? 0;
+  const setBundleQty = (id: string, qty: number) => {
+    setBundleQuantities((prev) => {
+      const next = { ...prev };
+      if (qty <= 0) delete next[id];
+      else next[id] = qty;
+      return next;
+    });
+  };
+  const addBundle = (id: string, defaultQty: number) => {
+    const safe = defaultQty > 0 ? Math.floor(defaultQty) : 1;
+    setBundleQty(id, safe);
+  };
+  const selectedBundleCount = Object.keys(bundleQuantities).length;
+
+  // ─── 이미지 블록 — 둥근 카드 + 부드러운 그림자 ───
   const imageBlock = (
-    <div className="hero-fade-up-image space-y-3">
-      <div className="relative aspect-square w-full overflow-hidden">
+    <div className="hero-fade-up-image space-y-4">
+      <div className="relative aspect-square w-full overflow-hidden rounded-3xl bg-[var(--jm-surface-muted)] shadow-[var(--jm-shadow-md)]">
         {mainImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -778,22 +904,25 @@ export function ProductHeroBlockView({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+          <div className="flex h-full w-full items-center justify-center text-jm-sm text-[var(--jm-text-subtle)]">
             상품 이미지 없음
           </div>
         )}
       </div>
       {images.length > 1 && (
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="flex flex-wrap gap-2.5">
           {images.map((img, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setActiveIdx(i)}
               className={cn(
-                "h-14 w-14 overflow-hidden border-2 transition md:h-16 md:w-16",
-                i === safeIdx ? "border-foreground" : "border-transparent opacity-70 hover:opacity-100",
+                "size-16 overflow-hidden rounded-2xl bg-[var(--jm-surface-muted)] transition-all md:size-20",
+                i === safeIdx
+                  ? "ring-2 ring-[var(--jm-action)] ring-offset-2 ring-offset-[var(--jm-bg)]"
+                  : "opacity-60 hover:opacity-100",
               )}
+              aria-label={`이미지 ${i + 1}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.url} alt={img.alt} className="h-full w-full object-cover" />
@@ -804,62 +933,146 @@ export function ProductHeroBlockView({
     </div>
   );
 
+  // ─── 정보 블록 ───
   const infoBlock = (
-    <div className="hero-fade-up-stagger flex flex-col">
+    <div className="hero-fade-up-stagger flex flex-col gap-7">
+      {/* eyebrow — pill 형태 */}
       {eyebrow && (
-        <div className="mb-7 text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-          {eyebrow}
+        <div>
+          <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-3 py-1 text-jm-xs font-semibold text-[var(--jm-text-muted)]">
+            {eyebrow}
+          </span>
         </div>
       )}
-      <h1 className="mb-7 text-5xl font-black leading-[0.95] tracking-[-0.03em] md:text-7xl lg:text-[84px]">
+
+      {/* 제목 */}
+      <h1 className="text-3xl font-bold leading-tight tracking-tight text-[var(--jm-text)] md:text-4xl lg:text-5xl">
         {product.name}
       </h1>
+
+      {/* 부제목 / 모델명 */}
       {block.subheadline ? (
-        <p className="mb-12 max-w-md whitespace-pre-wrap text-base leading-[1.65] text-muted-foreground md:mb-14 md:text-lg">
+        <p className="max-w-xl whitespace-pre-wrap text-jm-base leading-relaxed text-[var(--jm-text-muted)] md:text-jm-md">
           {block.subheadline}
         </p>
       ) : product.modelName ? (
-        <p className="mb-12 max-w-md text-base leading-[1.65] text-muted-foreground md:mb-14 md:text-lg">
+        <p className="max-w-xl text-jm-base leading-relaxed text-[var(--jm-text-muted)] md:text-jm-md">
           모델명 · {product.modelName}
         </p>
-      ) : (
-        <div className="mb-2" />
-      )}
+      ) : null}
+
+      {/* 가격 — 평면 + 얇은 구분선 (회색 카드 제거) */}
       {block.priceVisible && (
-        <div className="mb-9 border-y border-border-subtle py-7">
-          {hasDiscount && (
-            <div className="mb-1.5 text-sm text-muted-foreground line-through tabular-nums tracking-[0.02em]">
-              ₩{displayList.toLocaleString("ko-KR")}
-            </div>
-          )}
-          <div className="flex items-baseline gap-3.5">
-            <div className="text-4xl font-extrabold tabular-nums tracking-[-0.03em] md:text-[38px]">
+        <div className="border-y border-[var(--jm-border)] py-6 md:py-7">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
+            <div className="text-3xl font-bold tabular-nums tracking-tight text-[var(--jm-text)] md:text-4xl">
               ₩{displaySell.toLocaleString("ko-KR")}
             </div>
+            {hasDiscount && (
+              <div className="text-jm-base text-[var(--jm-text-subtle)] line-through tabular-nums">
+                ₩{displayList.toLocaleString("ko-KR")}
+              </div>
+            )}
             {hasDiscount && block.showSaleBadge && (
-              <span className="inline-flex items-center border border-warning px-2 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-warning">
+              <span className="inline-flex items-center rounded-full bg-[var(--jm-warning-bg)] px-2.5 py-1 text-jm-xs font-bold text-[var(--jm-warning-fg)]">
                 SALE{discountPct > 0 && ` ${discountPct}%`}
               </span>
             )}
           </div>
           {block.vatIncluded && isTaxable && (
-            <div className="mt-2 text-xs text-muted-foreground">VAT 포함</div>
+            <div className="mt-2 text-jm-xs text-[var(--jm-text-muted)]">VAT 포함</div>
           )}
         </div>
       )}
+
+      {/* 옵션 선택 */}
+      {hasOptions && (
+        <div className="space-y-5">
+          {productOptions.map((opt) => {
+            const selectedValueId = selectedOptions[opt.id];
+            const selectedValue = opt.values.find((v) => v.id === selectedValueId);
+            return (
+              <div key={opt.id} className="space-y-2.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
+                    {opt.name}
+                  </span>
+                  {opt.required && (
+                    <span className="text-jm-2xs font-medium text-[var(--jm-danger-fg)]">
+                      필수
+                    </span>
+                  )}
+                  {selectedValue && (
+                    <span className="ml-auto text-jm-xs text-[var(--jm-text-muted)]">
+                      {selectedValue.label}
+                      {selectedValue.mappedProduct && (
+                        <span className="ml-1 text-[var(--jm-text-subtle)]">
+                          → {selectedValue.mappedProduct.name}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {opt.values.map((val) => {
+                    const isSelected = selectedValueId === val.id;
+                    const addPrice = parseFloat(val.addPrice) || 0;
+                    return (
+                      <button
+                        key={val.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedOptions((prev) => ({
+                            ...prev,
+                            [opt.id]: isSelected ? "" : val.id,
+                          }))
+                        }
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-jm-sm font-medium transition-all",
+                          isSelected
+                            ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
+                            : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] hover:border-[var(--jm-border-strong)]",
+                        )}
+                      >
+                        <span>{val.label}</span>
+                        {addPrice !== 0 && (
+                          <span
+                            className={cn(
+                              "text-jm-xs tabular-nums",
+                              isSelected
+                                ? "opacity-80"
+                                : "text-[var(--jm-text-muted)]",
+                            )}
+                          >
+                            {addPrice > 0 ? "+" : ""}
+                            ₩{Math.abs(addPrice).toLocaleString("ko-KR")}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 수량 + 장바구니 + 바로 구매 — pill 스타일 */}
       {(block.quantityVisible || block.addToCart.visible || block.buyNow.visible) && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-stretch gap-3">
           {block.quantityVisible && (block.addToCart.visible || block.buyNow.visible) && (
-            <div className="inline-flex h-[52px] items-center border border-border bg-background">
-              <button
-                type="button"
-                className="flex h-full w-11 items-center justify-center text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+            <div className="inline-flex h-14 items-center rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] p-1">
+              <JmIconButton
+                variant="ghost"
+                size="md"
+                className="size-12 rounded-full text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 disabled={quantity <= 1}
                 aria-label="수량 감소"
               >
-                <Minus className="h-4 w-4" />
-              </button>
+                <Minus className="h-5 w-5" />
+              </JmIconButton>
               <input
                 type="text"
                 inputMode="numeric"
@@ -868,43 +1081,202 @@ export function ProductHeroBlockView({
                   const v = parseInt(e.target.value.replace(/\D/g, ""), 10);
                   setQuantity(Number.isFinite(v) && v > 0 ? v : 1);
                 }}
-                className="h-full w-12 border-x border-border bg-transparent text-center text-sm font-semibold tabular-nums outline-none"
+                className="h-full w-12 bg-transparent text-center text-jm-base font-semibold tabular-nums text-[var(--jm-text)] outline-none"
                 aria-label="수량"
               />
-              <button
-                type="button"
-                className="flex h-full w-11 items-center justify-center text-muted-foreground transition hover:bg-muted"
+              <JmIconButton
+                variant="ghost"
+                size="md"
+                className="size-12 rounded-full text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
                 onClick={() => setQuantity((q) => q + 1)}
                 aria-label="수량 증가"
               >
-                <Plus className="h-4 w-4" />
-              </button>
+                <Plus className="h-5 w-5" />
+              </JmIconButton>
             </div>
           )}
           {block.addToCart.visible && (
-            <button
-              type="button"
+            <JmButton
+              variant="outline"
               disabled={busyAction !== null}
               onClick={() => runCommerce("cart", commerce.onAddToCart, product.id)}
-              className="group inline-flex h-[52px] items-center justify-center gap-2.5 border border-border bg-background px-7 text-[13px] font-semibold uppercase tracking-[0.18em] text-foreground transition hover:bg-muted disabled:opacity-60"
+              className="h-14 gap-2.5 rounded-full px-7 text-jm-base"
             >
-              <ShoppingCart className="h-4 w-4" />
+              <ShoppingCart className="h-5 w-5" />
               {busyAction === "cart" ? "처리 중..." : block.addToCart.label}
-            </button>
+            </JmButton>
           )}
           {block.buyNow.visible && (
-            <button
-              type="button"
+            <JmButton
+              variant="cta"
               disabled={busyAction !== null}
               onClick={() => runCommerce("buy", commerce.onBuyNow, product.id)}
-              className="group inline-flex h-[52px] items-center justify-center gap-3 bg-cta px-9 text-[13px] font-semibold uppercase tracking-[0.18em] text-cta-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="group h-14 gap-3 rounded-full px-9 text-jm-base"
             >
               {busyAction === "buy" ? "처리 중..." : block.buyNow.label}
-              <span aria-hidden className="inline-block transition-transform duration-200 group-hover:translate-x-1">→</span>
-            </button>
+              <span
+                aria-hidden
+                className="inline-block transition-transform duration-200 group-hover:translate-x-1"
+              >
+                →
+              </span>
+            </JmButton>
           )}
         </div>
       )}
+
+      {/* 추가구매 추천 */}
+      {hasBundles && (
+        <div className="space-y-3 rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="text-jm-sm font-semibold text-[var(--jm-text)]">
+              함께 사면 좋아요
+            </h3>
+            <span className="text-jm-xs text-[var(--jm-text-muted)]">
+              {selectedBundleCount > 0
+                ? `${selectedBundleCount}개 추가됨`
+                : `${bundles.length}개 추천`}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {bundles.map((bundle) => {
+              const qty = getBundleQty(bundle.id);
+              const isSelected = qty > 0;
+              const bp = bundle.bundleProduct;
+              const bpSell = parseFloat(bp.sellingPrice) || 0;
+              const bpList = parseFloat(bp.listPrice ?? "0") || 0;
+              const bundleDiscount = parseFloat(bundle.discountAmount ?? "0") || 0;
+              const bpFinal = Math.max(0, bpSell - bundleDiscount);
+              const bpTaxable = bp.taxType === "TAXABLE";
+              const bpFactor = block.vatIncluded && bpTaxable ? 1 + taxRate : 1;
+              const showFinal = Math.round(bpFinal * bpFactor);
+              const showOriginal =
+                bundleDiscount > 0
+                  ? Math.round(bpSell * bpFactor)
+                  : bpList > bpSell
+                    ? Math.round(bpList * bpFactor)
+                    : 0;
+              const defaultQty = parseFloat(bundle.defaultQuantity) || 1;
+              return (
+                <div
+                  key={bundle.id}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-xl border p-3 transition-all",
+                    isSelected
+                      ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                      : "border-[var(--jm-border)] bg-[var(--jm-bg)]",
+                  )}
+                >
+                  <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-[var(--jm-surface-muted)]">
+                    {bp.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={bp.imageUrl}
+                        alt={bp.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-jm-2xs text-[var(--jm-text-subtle)]">
+                        no img
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-jm-sm font-medium text-[var(--jm-text)]">
+                      {bp.name}
+                    </div>
+                    {bundle.copy ? (
+                      <div className="truncate text-jm-xs text-[var(--jm-text-muted)]">
+                        {bundle.copy}
+                      </div>
+                    ) : null}
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-jm-sm font-semibold tabular-nums text-[var(--jm-text)]">
+                        ₩{showFinal.toLocaleString("ko-KR")}
+                      </span>
+                      {showOriginal > 0 && showOriginal !== showFinal && (
+                        <span className="text-jm-xs text-[var(--jm-text-subtle)] line-through tabular-nums">
+                          ₩{showOriginal.toLocaleString("ko-KR")}
+                        </span>
+                      )}
+                      {isSelected && qty > 1 && (
+                        <span className="text-jm-xs tabular-nums text-[var(--jm-text-muted)]">
+                          × {qty} ={" "}
+                          <span className="font-semibold text-[var(--jm-text)]">
+                            ₩{(showFinal * qty).toLocaleString("ko-KR")}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {isSelected ? (
+                    /* 선택된 상태 — 수량 stepper pill */
+                    <div className="inline-flex h-9 items-center rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] p-0.5">
+                      <JmIconButton
+                        variant="ghost"
+                        size="sm"
+                        className="size-8 rounded-full text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                        onClick={() => setBundleQty(bundle.id, qty - 1)}
+                        aria-label="수량 감소"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </JmIconButton>
+                      <span className="w-7 text-center text-jm-sm font-semibold tabular-nums text-[var(--jm-text)]">
+                        {qty}
+                      </span>
+                      <JmIconButton
+                        variant="ghost"
+                        size="sm"
+                        className="size-8 rounded-full text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                        onClick={() => setBundleQty(bundle.id, qty + 1)}
+                        aria-label="수량 증가"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </JmIconButton>
+                    </div>
+                  ) : (
+                    /* 미선택 상태 — 추가 버튼 */
+                    <button
+                      type="button"
+                      onClick={() => addBundle(bundle.id, defaultQty)}
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors hover:bg-[var(--jm-border)] hover:text-[var(--jm-text)]"
+                      aria-label={`${bp.name} 추가`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {selectedBundleCount > 0 && (
+            <div className="flex items-baseline justify-between gap-2 border-t border-[var(--jm-border)] pt-3">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                추가상품 합계
+              </span>
+              <span className="text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
+                +₩
+                {bundles
+                  .reduce((sum, b) => {
+                    const q = getBundleQty(b.id);
+                    if (q <= 0) return sum;
+                    const bp = b.bundleProduct;
+                    const bpSell = parseFloat(bp.sellingPrice) || 0;
+                    const bd = parseFloat(b.discountAmount ?? "0") || 0;
+                    const bpFinal = Math.max(0, bpSell - bd);
+                    const bpTaxable = bp.taxType === "TAXABLE";
+                    const bpFactor =
+                      block.vatIncluded && bpTaxable ? 1 + taxRate : 1;
+                    return sum + Math.round(bpFinal * bpFactor) * q;
+                  }, 0)
+                  .toLocaleString("ko-KR")}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 추가 CTA — 라운드 pill */}
       {block.ctas.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {block.ctas
@@ -915,14 +1287,19 @@ export function ProductHeroBlockView({
                 key={i}
                 href={cta.href || "#"}
                 className={cn(
-                  "group inline-flex h-11 items-center justify-center gap-2 px-5 text-[12px] font-semibold uppercase tracking-[0.18em] transition-colors",
+                  "group inline-flex h-12 items-center justify-center gap-2 rounded-full px-6 text-jm-sm font-semibold transition-colors",
                   cta.variant === "primary"
-                    ? "bg-cta text-cta-foreground hover:opacity-90"
-                    : "border border-border text-foreground hover:bg-muted",
+                    ? "bg-[var(--jm-action)] text-[var(--jm-action-fg)] hover:bg-[var(--jm-action-hover)]"
+                    : "border border-[var(--jm-border)] text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
                 )}
               >
                 {cta.label}
-                <span aria-hidden className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">→</span>
+                <span
+                  aria-hidden
+                  className="inline-block transition-transform duration-200 group-hover:translate-x-0.5"
+                >
+                  →
+                </span>
               </a>
             ))}
         </div>
@@ -931,36 +1308,38 @@ export function ProductHeroBlockView({
   );
 
   return (
-    <section
-      className={cn(
-        "w-full px-6 md:px-16",
-        PRODUCT_HERO_PADDING[block.paddingY ?? "xl"],
-        PRODUCT_HERO_BG[block.background ?? "none"],
-      )}
-    >
-      <div className="mx-auto max-w-6xl">
-        {isImageTop ? (
-          <div className="space-y-12 md:space-y-16">
-            {imageBlock}
-            {infoBlock}
-          </div>
-        ) : (
-          <div className="grid gap-12 md:grid-cols-[1.15fr_1fr] md:gap-16 md:items-center lg:gap-[100px]">
-            {isImageRight ? (
-              <>
-                <div>{infoBlock}</div>
-                <div>{imageBlock}</div>
-              </>
-            ) : (
-              <>
-                <div>{imageBlock}</div>
-                <div>{infoBlock}</div>
-              </>
-            )}
-          </div>
+    <JmScope theme="light" className="w-full">
+      <section
+        className={cn(
+          "w-full px-6 md:px-16",
+          PRODUCT_HERO_PADDING[block.paddingY ?? "xl"],
+          PRODUCT_HERO_BG[block.background ?? "none"],
         )}
-      </div>
-    </section>
+      >
+        <div className="mx-auto max-w-6xl">
+          {isImageTop ? (
+            <div className="space-y-10 md:space-y-12">
+              {imageBlock}
+              {infoBlock}
+            </div>
+          ) : (
+            <div className="grid gap-10 md:grid-cols-[1.05fr_1fr] md:items-start md:gap-12 lg:gap-16">
+              {isImageRight ? (
+                <>
+                  <div>{infoBlock}</div>
+                  <div className="md:sticky md:top-6">{imageBlock}</div>
+                </>
+              ) : (
+                <>
+                  <div className="md:sticky md:top-6">{imageBlock}</div>
+                  <div>{infoBlock}</div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 

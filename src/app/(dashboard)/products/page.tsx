@@ -147,6 +147,8 @@ export default function ProductsPage() {
       // 토글 ON: 벌크 SKU만, OFF(기본): 일반 SKU만
       if (showBulk) params.set("isBulk", "true");
       if (showAutoMapped) params.set("autoMapped", "1");
+      // ERP 대시보드는 catalogHidden 상품도 모두 관리 가능해야 함 (옵션 swap 대상 SKU 등)
+      params.set("includeHidden", "1");
       return apiGet<Product[]>(`/api/products?${params.toString()}`);
     },
   });

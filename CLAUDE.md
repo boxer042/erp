@@ -1325,46 +1325,19 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 
 ### POS 도메인 (자세한 운영 흐름·의도는 [docs/POS.md](docs/POS.md) §9 참고)
 
-**우선순위 높음**:
-- **견적서 → POS 카트 로드** — 발행된 Quotation 을 새 PosSession 으로 부활 (CONVERTED 락 + 가격은 견적서 스냅샷 그대로). 메뉴/검색에 "견적서 검색" 진입점 추가
-- **수리관리 [결제로 이동] 완성** — 현재 손님 카드 부활까지만. RepairPart/RepairLabor 합계로 카트 라인 자동 생성 필요
-
-**우선순위 중간**:
-- **자동 만료 / 노쇼 처리** — 지난 RESERVED 임대 일괄 EXPIRED, 진단 대기 N일 알림. 매장 정책 페이지로 임계값 설정
-- **저장된 상담 검색·정렬** — `/pos/parked` 양 늘어나면 손님명/저장일 검색 필요
-- **손님 카드 X undo 토스트** — 그리드 X "그냥 닫기" 5초 안에 되돌리기 (soft delete 라 server-side 복구 가능)
-
-**우선순위 낮음**:
-- **저장된 상담 → 견적서 일괄 변환** — 1~2달 뒤 가져올 때 한 번에 견적서 발행 옵션
-- **POS_V1_V2_COMPARISON.md archive** — v1 폐기 완료, [docs/POS.md](docs/POS.md) 가 단일 출처가 됨
+(현재 우선순위 작업 없음 — 모두 완료)
 
 ### 주문 도메인 (자세한 한계는 [docs/ORDERS_SYSTEM.md §8](docs/ORDERS_SYSTEM.md#8-한계와-후속-작업) 참고)
 
-**우선순위 높음** (도메인 정합성 직결):
-- **차액 결제 자동 청구·환불** — EXCHANGE_DIFFERENT 차액은 표시만 (warning). 실제 결제 안내·환불은 매장 수동. 알림 시스템 도입 시 자동화
-- **외부 채널 자동화** — Phase 1(도메인 layer) 완료. Phase 3·4·6+ 의 Phase 2-비의존 인프라도 완료. 단계별 로드맵 ([docs/ORDERS_SYSTEM.md §8.4](docs/ORDERS_SYSTEM.md#4-외부-채널-자동화--단계별-로드맵)):
-  - **Phase 2** ⏸ 가입 대기: 실 채널 어댑터 구현 (쿠팡·네이버 등 OAuth + API 매핑)
-  - **Phase 3 부분 완료**: ✓ Cron 라우트 (`/api/cron/channel-poll`) — 외부 스케줄러 등록만 하면 자동 polling. Webhook signature 검증·retry 큐는 Phase 2 후
-  - **Phase 4 부분 완료**: ✓ Outbound hook (`lib/channels/outbound.ts`) — ERP 액션 직후 adapter 자동 호출 (best-effort). 자동 retry 큐는 Phase 2 후
-  - **Phase 5** ⏸ Phase 2 의존: Inbound webhook (채널의 반품·정산 자동 ERP 전이)
-  - **Phase 6 부분 완료**: ✓ SKU 자동 매핑 추천 (보류 큐 1클릭 매핑) + ✓ 운영 대시보드 위젯. 남음: 재고 sync, 다중 매핑, 채널 설정 페이지, 임계값 알림
-
-**우선순위 중간**:
-- **부분 출고 / 부분 취소 / 부분 반품** — `OrderItem.shippedQty`/`returnedQty` 필드 + 액션 단위 처리. PARTIAL_REFUND 실사용 가능
-- **반품 회수 단계 세분화** — RETURN_ACCEPTED 가 "회수 대기/회수 중/회수 완료"를 모두 포함. 택배 회수 라벨 발급 흐름 도입 시 분리 검토
-- **운임 자동 청구 라인** — `CLAIM_REASON_LIABILITY` 매핑은 안내만. 매장 정책 설정 페이지 + 자동 운임 라인 생성
-
-**우선순위 낮음**:
-- **알림(SMS/이메일) 훅** — 주문 상태 변경 시 고객 통지 (출고·반품 결정·차액 안내). Solapi/Twilio 등 외부 SaaS 연동
-- **송장 사전 등록** — PREPARING 단계에서 송장 미리 발급 (배송 라벨 일괄 출력)
-- **반품 처리 전용 뷰** — 워크보드 외 RETURN_REQUESTED/RETURN_ACCEPTED 만 모은 클레임 처리 batch 페이지
+**우선순위 높음** (외부 채널 가입 후 활성화):
+- **외부 채널 Phase 2 — 어댑터 endpoint 채우기** ⏸ 가입 대기: 쿠팡/네이버 어댑터 framework + 인증은 [`src/lib/channels/coupang.ts`](src/lib/channels/coupang.ts) / [`naver.ts`](src/lib/channels/naver.ts) 에 준비됨. 가입 후 환경변수 설정(`COUPANG_*` / `NAVER_*`) → registry 자동 등록 → 메서드 별 TODO endpoint 채움
+- **외부 채널 Phase 5 Inbound webhook 핸들러** ⏸ Phase 2 의존: [`/api/webhooks/channels/[code]`](src/app/api/webhooks/channels/[code]/route.ts) 라우트 + 이벤트 dispatch framework 준비됨. 어댑터의 `verifyWebhookSignature` / `parseWebhookEvent` 메서드 구현 + 라우트의 kind 별 처리 로직 채움
+- **Solapi 카카오 알림톡 템플릿 매핑** — Solapi 어댑터는 SMS 까지 작동. 카카오 비즈 채널 사전 승인 후 환경변수 (`SOLAPI_KAKAO_TPL_*`) 설정하면 알림톡 자동 활성화. 템플릿 변수는 `payload.meta.kakaoVars` 로 전달 가능
+- **참고**: 채널 SKU 가 ERP variant 를 자동 결정하는 매핑은 의도적으로 미구현 — 매장 운영 흐름상 출고대기 진입 시 매장 직원이 직접 변형 선택(POS 와 동일). [_variant-resolve-dialog.tsx](src/app/(dashboard)/orders/_variant-resolve-dialog.tsx) 가 그 UI
 
 ### 통합 판매내역 (2026-05-09 jm 리뉴얼 후 남은 항목)
 
 코드 진입점: [src/app/(dashboard)/sales/history/](src/app/(dashboard)/sales/history/) · [src/app/api/sales/history/](src/app/api/sales/history/)
-
-**보류 (의존성 있음)**:
-- **PARTIAL_REFUND 부분 환불 금액 반영** — 현재 `summary.netAmount`/`refundedAmount` 계산은 PARTIAL_REFUND 행을 전액 매출로 잡음. 위 "부분 출고 / 부분 취소 / 부분 반품" 기능 도입 시 `OrderItem.returnedQty` 기반으로 환불액·순매출 계산 로직 보강 필요
 
 **우선순위 낮음**:
 - **사이드바 메뉴 위치 검토** — `/sales/history` 가 "통합 판매내역"이라는 트랜잭션 추적 정체성을 갖게 됨. 현재 sidebar 카테고리(`sales-history`)가 매출 분석/리포트와 같은 그룹에 있는지 — 정책 결정 후 위치 재배치 검토
@@ -1377,4 +1350,12 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 > 참고 — 2026-05-07 주문 시스템 3축 분리(출고·결제·클레임), 반품 흐름 세분화(RETURN_REQUESTED/RETURN_ACCEPTED), 교환 자동화(EXCHANGE_SAME/DIFFERENT + 새 주문 자동 생성 + 양방향 link), 마진 리포트 정합성 (교환 발송 자동 제외), OrderItem 편집 UI(PENDING 한정), customerPayment FIFO 자동 매칭(외상→입금 시 paymentStatus 자동 PAID), 외부 채널 자동화 Phase 1 (`ChannelAdapter`/`MockChannelAdapter`/`ChannelProductMapping`/`PendingChannelOrder` + `/channels/imports` 페이지), Phase 3·4·6+ Phase 2-비의존 부분(SKU 자동 매핑 추천 + Outbound hook + Cron 라우트 `/api/cron/channel-poll` + 운영 대시보드 위젯) 도입 완료. 자세한 설계와 시각 위계는 [docs/ORDERS_SYSTEM.md](docs/ORDERS_SYSTEM.md).
 
 > 참고 — 2026-05-09 통합 판매내역(`/sales/history`) jm 디자인 시스템 리뉴얼 완료. 3축(출고·결제·클레임) 컬럼 분리, 채널별 매출 분포 한 줄, 환불·매출취소 행 시각 분리(strike + bg muted), `JmDateRangePicker` + `JmComboboxModal`(고객 풀스크린 검색), KPI 5개(총거래액·순매출·미수·환불취소·진행중클레임), `-EX` 교환 새 주문 기본 제외 토글. API 응답에 `paymentStatus`/`claimType`/`claimReason`/`fulfillmentType`/`channelOrderNo`/`isExchangeReplacement` 추가, 신규 필터(`statusGroup`/`paymentStatus`/`channelFilter`/`includeExchangeReplacement`). `OrderDetailSheet` 의 9개 mutation 이 `queryKeys.sales.all` 도 함께 invalidate (orders 액션 → sales 자동 갱신). 부수: 동일 sheet 의 pre-existing setState-in-effect lint 에러도 렌더 중 비교 패턴으로 정리.
+
+> 참고 — 2026-05-10 채널 SKU 옵션값 매핑(SWAP) UI + import.ts 통합(`ChannelProductMapping.productOptionValueId` + `entryProductId`/`optionSnapshot` 자동 부여), POS 견적서 → 카트 로드(빈 카트 CTA + 액션 그리드 1×5→2×3 + `replaceItems` context helper + `/api/quotations` `customerId` 필터), POS 수리관리 [결제로 이동] 자동 카트 라인 추가(`calcFinal` → repair 라인 inject + 중복 가드), POS 카트 시트 액션 그리드 [할인][배송비][시리얼출력]/[장바구니저장][견적서][불러오기], OPTION_PARENT prepare 가드 추가(canonical 가드 확장), 주문 변형/옵션 출고 SKU 선택 UI([_variant-resolve-dialog.tsx](src/app/(dashboard)/orders/_variant-resolve-dialog.tsx)) — 상세 시트 라인별 [출고 SKU 선택] 버튼 + 워크보드 행 "변형 미확정"/"옵션 미확정" 노란 배지 + [출고대기] 가드 에러 시 다이얼로그 자동 오픈 → 일괄 해결 → prepare 자동 재시도. ProductOption MappingPicker → ProductCombobox 교체. 검증 시드: [scripts/seed-variant-test-order.ts](scripts/seed-variant-test-order.ts).
+
+> 참고 — 2026-05-10 후속 — 주문/POS 도메인 batch 마무리: (1) 알림 EXCHANGE_DIFFERENT_PAYMENT 자동 SMS 안내 (전체·부분 교환 양쪽), (2) 송장 사전 등록 카드 ([_detail-sheet.tsx](src/app/(dashboard)/orders/_detail-sheet.tsx) `PreShipmentTrackingCard`) — PREPARING 단계에서 송장 미리 입력 → ship 다이얼로그 자동 prefill, (3) POS 손님 카드 X 그냥닫기 5초 undo 토스트 (`restoreSession` context helper), (4) `/pos/parked` 검색·정렬(이름·전화·라벨 / 최근·오래된·라인많은·이름순), (5) 저장된 상담 → 견적서 일괄 변환 (`/api/pos/sessions/[sid]/issue-quotation` + 행 [견적서] 버튼 + 새 탭 PDF), (6) PARTIAL_REFUND 매출 계산 보강 — sales/history `partialRefundAmount` 필드 + summary `refundedAmount` 가산, (7) 자동 만료/노쇼 cron `/api/cron/noshow-policy` (RESERVED 임대 → CANCELLED + 진단 대기 N일 ADMIN 이메일), (8) 반품 처리 전용 뷰 `/orders/claims` (4 그룹 KPI + 액션 inline + view=claims API filter), (9) 운임 자동 청구 정책 — claimReason → liability(shop/customer/shared) → -EX 새 주문 `shippingPaymentType` 자동 STORE_BURDEN/COD/PREPAID + memo 안내, (10) 채널 운영 정책 다이얼로그 ([channels/page.tsx](src/app/(dashboard)/channels/page.tsx) `ChannelConfigDialog`) — 자동 송장 push / 자동 재고 sync 토글 + polling 분 / 출고 offset / 보류 큐 임계값 숫자 입력 → `/api/channels/[id]/config` PATCH 저장, (11) 주문 페이지 모든 하드코딩 폰트 사이즈를 `text-jm-*` 토큰으로 통일 (page/_detail-sheet/_parts/_create-sheet/_variant-resolve-dialog/help/stats), (12) [docs/POS_V1_V2_COMPARISON.md](docs/archive/POS_V1_V2_COMPARISON.md) 를 docs/archive/ 로 이동.
+
+> 참고 — 2026-05-10 추가 — 외부 채널·알림 인프라 보강: (1) `ChannelOutboundJob` 모델 + `ChannelOutboundJobStatus`/`ChannelOutboundJobKind` enum 도입 (PUSH_TRACKING/PUSH_STOCK/ACCEPT_RETURN/REJECT_RETURN). 실패한 outbound 가 audit log 뿐 아니라 retry 큐로 자동 enqueue (중복 PENDING 은 lastError·payload 만 갱신). (2) [/api/cron/outbound-retry](src/app/api/cron/outbound-retry/route.ts) 라우트 — PENDING + nextAttemptAt ≤ now 항목을 batch drain, exponential backoff(2^attempts 분), maxAttempts(5) 도달 시 FAILED 종결. 채널 비활성·어댑터 미등록 시 즉시 FAILED. (3) [Solapi 어댑터](src/lib/notifications/solapi.ts) 스캐폴드 — HMAC-SHA256 인증 + SMS 전송 작동. 카카오 알림톡은 PFID 설정 시 자동 분기, 템플릿 매핑은 추후. (4) `dispatch.ts` 환경변수 자동 분기 — `SOLAPI_API_KEY/SECRET/SENDER_PHONE` 설정되면 Solapi, 아니면 Mock 폴백. ENV 미설정 환경은 그대로 dev mock 동작.
+
+> 참고 — 2026-05-10 추가² — 모든 backlog 마무리: (1) [Coupang](src/lib/channels/coupang.ts) / [Naver](src/lib/channels/naver.ts) 어댑터 스캐폴드 — HMAC/OAuth 인증 framework 완성, 메서드별 endpoint TODO. registry 가 환경변수 (`COUPANG_VENDOR_ID/ACCESS_KEY/SECRET_KEY` / `NAVER_CLIENT_ID/SECRET`) 설정 시 자동 등록. (2) [Inbound webhook 라우트](src/app/api/webhooks/channels/[code]/route.ts) `/api/webhooks/channels/[code]` — 채널 lookup → adapter.verifyWebhookSignature → parseWebhookEvent → kind 별 dispatch framework. 어댑터 메서드 채워지면 자동 활성화. (3) Solapi 카카오 알림톡 템플릿 매핑 — `KAKAO_TEMPLATE_BY_KIND` 가 환경변수 (`SOLAPI_KAKAO_TPL_ORDER_DELIVERED/RETURN_ACCEPTED/...`) 에서 templateId 자동 lookup. payload.meta.kakaoVars 로 변수 전달. 미설정 kind 는 SMS 폴백. (4) `RETURN_PICKING` enum 추가 — 반품 회수 단계 세분화 (RETURN_ACCEPTED → RETURN_PICKING → RETURN_COLLECTED). `start_picking` 액션 신규, 기존 `collect_return` 은 양쪽 from 허용 (직접 회수 + 라벨 발급 후 도착). 워크보드/상세시트/claims 페이지 라벨·필터 모두 갱신. (5) **메인+옵션+추가구매 동시 매핑** — `ChannelProductMappingComponent` 에 `lineRole` (MAIN/OPTION/ADDON) + `productOptionValueId` 추가. 한 채널 SKU 가 메인·옵션·추가구매 라인 동시 매핑 가능. import.ts 가 lineRole 기반으로 OrderItem.lineRole(MAIN/OPTION_REF/ADDON) + parentItemId 트리 자동 구성 (Order 생성 후 두 패스 — items 생성 → parent link). 단순 1:N 세트 풀이는 기존 동작 유지 (모두 MAIN). (6) `/channels/imports` AddMappingDialog 다중 모드에 **메인/옵션/추가** 라인 역할 셀렉터 추가 — 사용자가 한 채널 SKU 에 메인+옵션+추가구매 라인 동시 등록 가능 (UI 까지 end-to-end 완성).
 

@@ -1,3 +1,5 @@
+import "@/jm/tokens.css";
+
 import { requireAuth } from "@/lib/auth";
 
 export default async function LandingPreviewLayout({

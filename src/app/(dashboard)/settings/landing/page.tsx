@@ -45,17 +45,26 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCardDescription,
+  JmCardHeader,
+  JmCardTitle,
+  JmDialog,
+  JmDialogContent,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmSkeleton,
+  JmTextarea,
+  JmTooltipProvider,
+  JmTooltipRoot,
+  JmTooltipTrigger,
+  JmTooltipContent,
+} from "@/jm";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -66,16 +75,9 @@ import {
   type LandingBlock,
   makeEmptyBlock,
 } from "@/lib/validators/landing-block";
-import { Textarea } from "@/components/ui/textarea";
 
 import { LandingPageView } from "@/components/landing/landing-page-view";
 import { SortableBlockItem } from "@/components/landing/sortable-block-item";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import { duplicateAt, makeId } from "../../products/[id]/landing/_helpers";
@@ -237,14 +239,14 @@ export default function LandingSettingsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
-          <div className="flex h-8 w-fit rounded-md border border-border bg-card text-[13px]">
+          <div className="flex h-8 w-fit rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[13px]">
             <button
               type="button"
               className={cn(
                 "px-3 transition",
                 section === "header"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                  : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
               )}
               onClick={() => {
                 setSection("header");
@@ -252,15 +254,15 @@ export default function LandingSettingsPage() {
               }}
             >
               상단 공지/배너 (header)
-              {headerDirty && <span className="ml-1 text-warning">●</span>}
+              {headerDirty && <span className="ml-1 text-[var(--jm-warning-fg)]">●</span>}
             </button>
             <button
               type="button"
               className={cn(
-                "border-l border-border px-3 transition",
+                "border-l border-[var(--jm-border)] px-3 transition",
                 section === "footer"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                  : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
               )}
               onClick={() => {
                 setSection("footer");
@@ -268,16 +270,16 @@ export default function LandingSettingsPage() {
               }}
             >
               공통 footer
-              {footerDirty && <span className="ml-1 text-warning">●</span>}
+              {footerDirty && <span className="ml-1 text-[var(--jm-warning-fg)]">●</span>}
             </button>
           </div>
-          <h2 className="text-lg font-semibold">{sectionTitle}</h2>
-          <p className="text-sm text-muted-foreground">{sectionDesc}</p>
+          <h2 className="text-lg font-semibold text-[var(--jm-text)]">{sectionTitle}</h2>
+          <p className="text-sm text-[var(--jm-text-muted)]">{sectionDesc}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
+          <JmButton
             variant="outline"
-            size="sm"
+            size="xs"
             onClick={() => {
               setJsonText(JSON.stringify(blocks, null, 2));
               setJsonError(null);
@@ -287,61 +289,62 @@ export default function LandingSettingsPage() {
           >
             <Code2 className="h-4 w-4" />
             <span>JSON</span>
-          </Button>
-          <Button
-            size="sm"
+          </JmButton>
+          <JmButton
+            variant="cta"
+            size="xs"
             disabled={!dirty || saveMutation.isPending}
             onClick={onSave}
           >
             {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{saveMutation.isPending ? "저장 중..." : "저장"}</span>
-          </Button>
+          </JmButton>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>블록 추가</CardTitle>
-          <CardDescription>
+      <JmCard>
+        <JmCardHeader>
+          <JmCardTitle>블록 추가</JmCardTitle>
+          <JmCardDescription>
             아래 블록 종류를 클릭하면 {sectionLabel} 끝에 추가됩니다. 각 블록 위에 마우스를 올리면 어떤 용도인지 설명이 표시됩니다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <TooltipProvider delay={200}>
+          </JmCardDescription>
+        </JmCardHeader>
+        <JmCardContent className="space-y-3">
+          <JmTooltipProvider delay={200}>
             <div className="grid grid-cols-4 gap-2 md:grid-cols-8">
               {blockTypes.map((t) => {
                 const Icon = BLOCK_ICON[t];
                 const desc = BLOCK_DESCRIPTIONS[t];
                 return (
-                  <Tooltip key={t}>
-                    <TooltipTrigger
+                  <JmTooltipRoot key={t}>
+                    <JmTooltipTrigger
                       render={
-                        <Button
+                        <JmButton
                           type="button"
                           variant="outline"
-                          size="sm"
+                          size="xs"
                           className="flex h-auto flex-col gap-1 py-2 text-[11px]"
                           onClick={() => addBlock(t)}
                         >
                           <Icon className="h-4 w-4" />
                           <span>{BLOCK_LABELS[t]}</span>
-                        </Button>
+                        </JmButton>
                       }
                     />
-                    <TooltipContent side="bottom" className="max-w-[280px] whitespace-normal">
+                    <JmTooltipContent side="bottom" className="max-w-[280px] whitespace-normal">
                       <div className="space-y-1.5 text-left">
                         <div className="text-[12px] font-semibold">{desc.title}</div>
                         <div className="text-[11px] leading-snug opacity-90">{desc.body}</div>
                         <div className="text-[10px] italic opacity-70">{desc.example}</div>
                       </div>
-                    </TooltipContent>
-                  </Tooltip>
+                    </JmTooltipContent>
+                  </JmTooltipRoot>
                 );
               })}
             </div>
-          </TooltipProvider>
-          <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
-            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+          </JmTooltipProvider>
+          <details className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-3 py-2 text-xs">
+            <summary className="cursor-pointer text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]">
               블록 종류별 설명 보기 (터치 환경 대안)
             </summary>
             <ul className="mt-2 space-y-2">
@@ -350,29 +353,29 @@ export default function LandingSettingsPage() {
                 const desc = BLOCK_DESCRIPTIONS[t];
                 return (
                   <li key={t} className="flex gap-2">
-                    <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--jm-text-muted)]" />
                     <div>
-                      <span className="font-medium">{desc.title}</span>
-                      <span className="ml-1 text-muted-foreground">— {desc.body}</span>
+                      <span className="font-medium text-[var(--jm-text)]">{desc.title}</span>
+                      <span className="ml-1 text-[var(--jm-text-muted)]">— {desc.body}</span>
                     </div>
                   </li>
                 );
               })}
             </ul>
           </details>
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>블록 목록</CardTitle>
-          <CardDescription>
+      <JmCard>
+        <JmCardHeader>
+          <JmCardTitle>블록 목록</JmCardTitle>
+          <JmCardDescription>
             위에서 아래 순서로 모든 상품 상세페이지 {isHeader ? "최상단" : "끝"}에 붙습니다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
+          </JmCardDescription>
+        </JmCardHeader>
+        <JmCardContent className="p-0">
           {blocks.length === 0 ? (
-            <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+            <div className="flex h-32 items-center justify-center text-sm text-[var(--jm-text-muted)]">
               아직 등록된 {sectionLabel} 블록이 없습니다
             </div>
           ) : (
@@ -381,7 +384,7 @@ export default function LandingSettingsPage() {
                 items={blocks.map((b) => b.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <ul className="divide-y divide-border border-y border-border">
+                <ul className="divide-y divide-[var(--jm-border)] border-y border-[var(--jm-border)]">
                   {blocks.map((block) => (
                     <SortableBlockItem
                       key={block.id}
@@ -402,20 +405,20 @@ export default function LandingSettingsPage() {
               </SortableContext>
             </DndContext>
           )}
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>미리보기</CardTitle>
-          <div className="flex h-7 rounded-md border border-border bg-background text-[12px]">
+      <JmCard>
+        <JmCardHeader className="flex flex-row items-center justify-between gap-3">
+          <JmCardTitle>미리보기</JmCardTitle>
+          <div className="flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[12px]">
             <button
               type="button"
               className={cn(
                 "flex items-center px-2",
                 previewWidth === "desktop"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                  : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
               )}
               onClick={() => setPreviewWidth("desktop")}
               title="데스크톱 폭"
@@ -425,10 +428,10 @@ export default function LandingSettingsPage() {
             <button
               type="button"
               className={cn(
-                "flex items-center border-l border-border px-2",
+                "flex items-center border-l border-[var(--jm-border)] px-2",
                 previewWidth === "tablet"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                  : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
               )}
               onClick={() => setPreviewWidth("tablet")}
               title="태블릿 폭 (768px)"
@@ -438,10 +441,10 @@ export default function LandingSettingsPage() {
             <button
               type="button"
               className={cn(
-                "flex items-center border-l border-border px-2",
+                "flex items-center border-l border-[var(--jm-border)] px-2",
                 previewWidth === "mobile"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                  : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
               )}
               onClick={() => setPreviewWidth("mobile")}
               title="모바일 폭 (375px)"
@@ -449,12 +452,12 @@ export default function LandingSettingsPage() {
               <Smartphone className="h-3.5 w-3.5" />
             </button>
           </div>
-        </CardHeader>
-        <CardContent className="bg-muted/30 p-0">
-          <div className="border-t border-border">
+        </JmCardHeader>
+        <JmCardContent className="bg-[var(--jm-surface-muted)]/30 p-0">
+          <div className="border-t border-[var(--jm-border)]">
             <div
               className={cn(
-                "mx-auto bg-background",
+                "mx-auto bg-[var(--jm-bg)]",
                 previewWidth === "desktop" && "max-w-[960px]",
                 previewWidth === "tablet" && "max-w-[768px]",
                 previewWidth === "mobile" && "max-w-[375px]",
@@ -462,42 +465,45 @@ export default function LandingSettingsPage() {
             >
               <LandingPageView blocks={blocks} emptyMessage="블록을 추가하면 여기에 표시됩니다" />
               {isHeader && (
-                <div className="border-t border-dashed border-border bg-muted/30 px-4 py-2 text-center text-[11px] text-muted-foreground">
+                <div className="border-t border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-[11px] text-[var(--jm-text-muted)]">
                   ↓ (실제 페이지에서는 여기에 상품별 본문 + 공통 footer 가 이어집니다)
                 </div>
               )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
 
-      <Dialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>블록을 삭제할까요?</DialogTitle>
-            <DialogDescription>
+      <JmDialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>블록을 삭제할까요?</JmDialogTitle>
+            <JmDialogDescription>
               저장 전까지는 페이지를 새로고침하면 되돌릴 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>취소</Button>
-            <Button variant="destructive" onClick={() => deleteId && removeBlock(deleteId)}>
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <JmDialogFooter>
+            <JmButton variant="outline" size="sm" onClick={() => setDeleteId(null)}>취소</JmButton>
+            <JmButton variant="danger" size="sm" onClick={() => deleteId && removeBlock(deleteId)}>
               삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
-      <Dialog open={jsonOpen} onOpenChange={setJsonOpen}>
-        <DialogContent className="flex max-h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3 sm:max-w-none">
-          <DialogHeader>
-            <DialogTitle>{sectionLabel} JSON 가져오기 / 내보내기</DialogTitle>
-            <DialogDescription>
+      <JmDialog open={jsonOpen} onOpenChange={setJsonOpen}>
+        <JmDialogContent
+          size="xl"
+          className="flex max-h-[90vh] w-[min(1100px,95vw)] max-w-none flex-col gap-3"
+        >
+          <JmDialogHeader>
+            <JmDialogTitle>{sectionLabel} JSON 가져오기 / 내보내기</JmDialogTitle>
+            <JmDialogDescription>
               Claude Code 등으로 만든 {sectionLabel} 블록 JSON 을 붙여넣고 <b>가져오기</b> 누르면 미리보기에 즉시 반영됩니다 (저장은 헤더의 &ldquo;저장&rdquo; 버튼).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <Textarea
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-2 px-5">
+            <JmTextarea
               value={jsonText}
               onChange={(e) => {
                 setJsonText(e.target.value);
@@ -507,19 +513,20 @@ export default function LandingSettingsPage() {
               spellCheck={false}
             />
             {jsonError && (
-              <p className="rounded-md bg-destructive/15 px-2 py-1.5 text-xs text-destructive">
+              <p className="rounded-md bg-[var(--jm-danger-bg)] px-2 py-1.5 text-xs text-[var(--jm-danger-fg)]">
                 {jsonError}
               </p>
             )}
-            <p className="text-[11px] text-muted-foreground">
-              스키마: <code className="rounded bg-muted px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
-              <code className="rounded bg-muted px-1">src/lib/validators/landing-block.ts</code>{" "}
+            <p className="text-[11px] text-[var(--jm-text-muted)]">
+              스키마: <code className="rounded bg-[var(--jm-surface-muted)] px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
+              <code className="rounded bg-[var(--jm-surface-muted)] px-1">src/lib/validators/landing-block.ts</code>{" "}
               참고
             </p>
           </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
+          <JmDialogFooter className="gap-2">
+            <JmButton
               variant="outline"
+              size="sm"
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(jsonText);
@@ -530,10 +537,12 @@ export default function LandingSettingsPage() {
               }}
             >
               클립보드로 복사
-            </Button>
+            </JmButton>
             <div className="flex-1" />
-            <Button variant="outline" onClick={() => setJsonOpen(false)}>닫기</Button>
-            <Button
+            <JmButton variant="outline" size="sm" onClick={() => setJsonOpen(false)}>닫기</JmButton>
+            <JmButton
+              variant="cta"
+              size="sm"
               onClick={() => {
                 try {
                   const parsedRaw = JSON.parse(jsonText);
@@ -559,10 +568,10 @@ export default function LandingSettingsPage() {
               }}
             >
               가져오기 (미리보기에 반영)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </div>
   );
 }
@@ -570,31 +579,31 @@ export default function LandingSettingsPage() {
 function LoadingState() {
   return (
     <div className="p-6 space-y-6">
-      <Skeleton className="h-6 w-48" />
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-4 w-20" />
-        </CardHeader>
-        <CardContent>
+      <JmSkeleton className="h-6 w-48" />
+      <JmCard>
+        <JmCardHeader>
+          <JmSkeleton className="h-4 w-20" />
+        </JmCardHeader>
+        <JmCardContent>
           <div className="grid grid-cols-4 gap-2 md:grid-cols-8">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 rounded-md" />
+              <JmSkeleton key={i} className="h-14 rounded-md" />
             ))}
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-4 w-24" />
-        </CardHeader>
-        <CardContent>
+        </JmCardContent>
+      </JmCard>
+      <JmCard>
+        <JmCardHeader>
+          <JmSkeleton className="h-4 w-24" />
+        </JmCardHeader>
+        <JmCardContent>
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
+              <JmSkeleton key={i} className="h-12 w-full" />
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
     </div>
   );
 }

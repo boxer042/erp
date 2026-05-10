@@ -133,6 +133,8 @@ export const queryKeys = {
   reports: {
     all: ["reports"] as const,
     margin: (params?: Record<string, unknown>) => ["reports", "margin", params ?? {}] as const,
+    optionFunnel: (params?: Record<string, unknown>) =>
+      ["reports", "option-funnel", params ?? {}] as const,
   },
   ledger: {
     suppliers: (params?: Record<string, unknown>) => ["ledger", "suppliers", params ?? {}] as const,

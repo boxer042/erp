@@ -1,22 +1,19 @@
 "use client";
 
+import * as React from "react";
 import { useRef, useState } from "react";
 import { ExternalLink, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  JmButton,
+  JmInput as Input,
+  JmTextarea as Textarea,
+  JmSwitch as Switch,
+  JmSelect,
+  type JmButtonProps,
+} from "@/jm";
+import { cn } from "@/lib/utils";
 import type {
   HeroBlock,
   ImageBlock,
@@ -45,6 +42,106 @@ import {
 
 import { ImageUploadField } from "./_image-upload";
 import { uploadHtml } from "./_helpers";
+
+// ─── shadcn-shaped 로컬 어댑터 — 내부는 jm 컴포넌트 ───
+// 기존 markup 을 보존하면서 jm 디자인 시스템으로 렌더링.
+
+function Button({
+  variant = "default",
+  size = "default",
+  className,
+  ...props
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "size"> & {
+  variant?: "default" | "outline" | "ghost" | "destructive";
+  size?: "default" | "sm" | "lg" | "icon";
+}) {
+  const jmVariant: JmButtonProps["variant"] =
+    variant === "destructive"
+      ? "danger"
+      : variant === "default"
+        ? "cta"
+        : variant;
+  const jmSize: JmButtonProps["size"] =
+    size === "lg" ? "md" : size === "sm" || size === "icon" ? "xs" : "sm";
+  // icon 모드: explicit h-X w-X 가 className 에 있고 잡다한 padding/text 가 끼면
+  // 아이콘이 셀 박스 밖으로 밀림. p-0 + svg auto-size 보정.
+  const sizeOverride =
+    size === "icon" ? "p-0 [&_svg]:size-3.5" : "";
+  return (
+    <JmButton
+      variant={jmVariant}
+      size={jmSize}
+      className={cn(sizeOverride, className)}
+      {...props}
+    />
+  );
+}
+
+function Label({
+  className,
+  ...props
+}: React.LabelHTMLAttributes<HTMLLabelElement>) {
+  return (
+    <label
+      className={cn("font-medium text-[var(--jm-text-muted)]", className)}
+      {...props}
+    />
+  );
+}
+
+// shadcn Select 의 합성 패턴(<Select><SelectTrigger/><SelectContent><SelectItem/></SelectContent></Select>)
+// 을 JmSelect (options 배열 props) 로 매핑. SelectTrigger/Value 는 시각 trigger 가 아니라
+// 그냥 children 위치 마커로만 동작 (실제 트리거는 JmSelect 가 그림).
+function Select({
+  value,
+  onValueChange,
+  children,
+}: {
+  value: string;
+  onValueChange: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  const options: { value: string; label: string }[] = [];
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement(child)) return;
+    if (child.type !== SelectContent) return;
+    const inner = (child.props as { children?: React.ReactNode }).children;
+    React.Children.forEach(inner, (item) => {
+      if (!React.isValidElement(item)) return;
+      if (item.type !== SelectItem) return;
+      const ip = item.props as { value: string; children: React.ReactNode };
+      const label =
+        typeof ip.children === "string"
+          ? ip.children
+          : React.Children.toArray(ip.children).join("");
+      options.push({ value: ip.value, label });
+    });
+  });
+  return (
+    <JmSelect
+      options={options}
+      value={value}
+      onChange={onValueChange}
+      size="sm"
+    />
+  );
+}
+
+function SelectTrigger(_props: {
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  return null;
+}
+function SelectValue() {
+  return null;
+}
+function SelectContent({ children: _ }: { children?: React.ReactNode }) {
+  return null;
+}
+function SelectItem(_props: { value: string; children: React.ReactNode }) {
+  return null;
+}
 
 interface EditorProps<T extends LandingBlock> {
   block: T;
@@ -276,10 +373,10 @@ function TextEditor({ block, onChange }: EditorProps<TextBlock>) {
           rows={6}
         />
       </Field>
-      <p className="text-[10px] text-muted-foreground">
-        본문에 마크다운 사용 가능 — <code className="rounded bg-muted px-1">{`**굵게**`}</code>{" "}
-        <code className="rounded bg-muted px-1">{`*기울임*`}</code>{" "}
-        <code className="rounded bg-muted px-1">{`[링크](https://...)`}</code>
+      <p className="text-[10px] text-[var(--jm-text-muted)]">
+        본문에 마크다운 사용 가능 — <code className="rounded bg-[var(--jm-surface-muted)] px-1">{`**굵게**`}</code>{" "}
+        <code className="rounded bg-[var(--jm-surface-muted)] px-1">{`*기울임*`}</code>{" "}
+        <code className="rounded bg-[var(--jm-surface-muted)] px-1">{`[링크](https://...)`}</code>
       </p>
       <div className="grid grid-cols-2 gap-2">
         <Field label="제목 크기">
@@ -530,7 +627,7 @@ function GalleryEditor({ block, onChange }: EditorProps<GalleryBlock>) {
         <Label className="text-xs">이미지</Label>
         <div className="space-y-2">
           {block.images.map((img, i) => (
-            <div key={i} className="flex items-start gap-2 rounded-md border border-border p-2">
+            <div key={i} className="flex items-start gap-2 rounded-md border border-[var(--jm-border)] p-2">
               <div className="flex-1">
                 <ImageUploadField
                   value={img.url}
@@ -587,7 +684,7 @@ function GalleryEditor({ block, onChange }: EditorProps<GalleryBlock>) {
 function ScrollyHeroEditor({ block, onChange }: EditorProps<ScrollyHeroBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         스크롤 진입 시 텍스트와 이미지가 부드럽게 등장하는 히어로 블록입니다.
       </p>
       <Field label="배경 이미지">
@@ -651,7 +748,7 @@ function ScrollyHeroEditor({ block, onChange }: EditorProps<ScrollyHeroBlock>) {
 function StickyFeatureEditor({ block, onChange }: EditorProps<StickyFeatureBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         한쪽에 텍스트가 고정되고 반대쪽에서 이미지 패널들이 스크롤되는 레이아웃 (애플 feature 섹션 스타일).
       </p>
       <Field label="제목">
@@ -687,7 +784,7 @@ function StickyFeatureEditor({ block, onChange }: EditorProps<StickyFeatureBlock
         <Label className="text-xs">패널 이미지 (위에서 아래로)</Label>
         <div className="space-y-2">
           {block.panels.map((p, i) => (
-            <div key={i} className="flex items-start gap-2 rounded-md border border-border p-2">
+            <div key={i} className="flex items-start gap-2 rounded-md border border-[var(--jm-border)] p-2">
               <div className="flex-1">
                 <ImageUploadField
                   value={p.imageUrl}
@@ -744,7 +841,7 @@ function StickyFeatureEditor({ block, onChange }: EditorProps<StickyFeatureBlock
 function ParallaxEditor({ block, onChange }: EditorProps<ParallaxBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         배경 이미지가 고정되고 콘텐츠가 그 위로 흐르는 패럴럭스 효과 (모바일에서는 일반 배경으로 폴백).
       </p>
       <Field label="배경 이미지">
@@ -805,7 +902,7 @@ function ParallaxEditor({ block, onChange }: EditorProps<ParallaxBlock>) {
 function SpecTableEditor({ block, onChange }: EditorProps<SpecTableBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         이 블록은 상품에 등록된 스펙(specValues)을 자동으로 표로 그립니다. 스펙 수정은 상품 상세 페이지에서 하세요.
       </p>
       <Field label="제목 (선택)">
@@ -821,7 +918,7 @@ function SpecTableEditor({ block, onChange }: EditorProps<SpecTableBlock>) {
 function AmbientVideoEditor({ block, onChange }: EditorProps<AmbientVideoBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         컨트롤 없이 자동 재생되는 무한루프 영상. mp4/webm 직접 URL을 사용하세요. (YouTube 불가)
       </p>
       <Field label="영상 URL (mp4/webm)">
@@ -951,12 +1048,12 @@ function TableEditor({ block, onChange }: EditorProps<TableBlock>) {
             </Button>
           </div>
         </div>
-        <div className="overflow-x-auto rounded-md border border-border">
+        <div className="overflow-x-auto rounded-md border border-[var(--jm-border)]">
           <table className="w-full border-collapse text-xs">
             <thead>
-              <tr className="bg-muted/40">
+              <tr className="bg-[var(--jm-surface-muted)]/40">
                 {block.headers.map((h, i) => (
-                  <th key={i} className="border-b border-border p-1">
+                  <th key={i} className="border-b border-[var(--jm-border)] p-1">
                     <div className="flex items-center gap-1">
                       <Input
                         value={h}
@@ -985,7 +1082,7 @@ function TableEditor({ block, onChange }: EditorProps<TableBlock>) {
               {block.rows.map((row, r) => (
                 <tr key={r}>
                   {block.headers.map((_, c) => (
-                    <td key={c} className="border-b border-border p-1">
+                    <td key={c} className="border-b border-[var(--jm-border)] p-1">
                       <Input
                         value={row[c] ?? ""}
                         onChange={(e) => updateCell(r, c, e.target.value)}
@@ -993,7 +1090,7 @@ function TableEditor({ block, onChange }: EditorProps<TableBlock>) {
                       />
                     </td>
                   ))}
-                  <td className="border-b border-border p-1">
+                  <td className="border-b border-[var(--jm-border)] p-1">
                     <Button
                       type="button"
                       size="icon"
@@ -1024,7 +1121,7 @@ function ChartEditor({ block, onChange }: EditorProps<ChartBlock>) {
 
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         막대/선/원형 그래프. 외부 채널 export 시 스크린샷으로만 변환됩니다.
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -1107,7 +1204,7 @@ function StatsGridEditor({ block, onChange }: EditorProps<StatsGridBlock>) {
 
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         Apple 스타일의 큰 숫자 + 단위 + 라벨 그리드. 컬럼 수와 항목을 자유롭게 조정.
       </p>
       <Field label="작은 라벨 (eyebrow)">
@@ -1201,10 +1298,10 @@ function StatsGridEditor({ block, onChange }: EditorProps<StatsGridBlock>) {
         </Field>
       </div>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">컬럼 사이 구분선</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             데스크톱에서 항목 사이에 세로선 표시 (Apple 스타일)
           </div>
         </div>
@@ -1214,10 +1311,10 @@ function StatsGridEditor({ block, onChange }: EditorProps<StatsGridBlock>) {
         />
       </div>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">상품 스펙 자동 사용</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             켜면 상품에 등록된 스펙(specValues)을 자동으로 항목으로 사용. 아래 수동 입력은 무시됨
           </div>
         </div>
@@ -1248,7 +1345,7 @@ function StatsGridEditor({ block, onChange }: EditorProps<StatsGridBlock>) {
         </div>
         <div className="space-y-1.5">
           {block.items.map((it, i) => (
-            <div key={i} className="flex items-center gap-1.5 rounded-md border border-border p-2">
+            <div key={i} className="flex items-center gap-1.5 rounded-md border border-[var(--jm-border)] p-2">
               <div className="grid flex-1 grid-cols-3 gap-1.5">
                 <Input
                   value={it.value}
@@ -1322,7 +1419,7 @@ function IconSelect({
 function CalloutEditor({ block, onChange }: EditorProps<CalloutBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         좌측 컬러 바 + 라벨 + 본문 형태의 강조 박스. 본문은 마크다운 사용 가능 (**굵게**, [링크](url)).
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -1423,7 +1520,7 @@ function InfoGridEditor({ block, onChange }: EditorProps<InfoGridBlock>) {
 
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         한국 쇼핑몰 표준 footer 디자인. 섹션마다 번호 + 제목 + 키-값 표 + 추가 불릿 + 선택적 notice 박스.
       </p>
 
@@ -1473,9 +1570,9 @@ function InfoGridEditor({ block, onChange }: EditorProps<InfoGridBlock>) {
         </div>
         <div className="space-y-3">
           {block.sections.map((sec, sIdx) => (
-            <div key={sIdx} className="space-y-2 rounded-md border border-border bg-card p-3">
+            <div key={sIdx} className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-medium text-muted-foreground">
+                <span className="text-[11px] font-medium text-[var(--jm-text-muted)]">
                   섹션 #{sIdx + 1}
                 </span>
                 <div className="flex gap-1">
@@ -1644,10 +1741,10 @@ function InfoGridEditor({ block, onChange }: EditorProps<InfoGridBlock>) {
               </div>
 
               {/* notice */}
-              <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
+              <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] px-3 py-2">
                 <div className="space-y-0.5">
                   <div className="text-[11px] font-medium">하단 알림 박스</div>
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="text-[10px] text-[var(--jm-text-muted)]">
                     주황 컬러바가 있는 강조 박스를 섹션 끝에 표시
                   </div>
                 </div>
@@ -1663,7 +1760,7 @@ function InfoGridEditor({ block, onChange }: EditorProps<InfoGridBlock>) {
                 />
               </div>
               {sec.notice && (
-                <div className="space-y-2 rounded-md border border-border bg-muted/40 p-2">
+                <div className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 p-2">
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="색상">
                       <Select
@@ -1729,7 +1826,7 @@ function InfoGridEditor({ block, onChange }: EditorProps<InfoGridBlock>) {
 function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         Product 의 이미지·상품명·브랜드·가격을 자동으로 매핑합니다. 이 블록은 모든 상품 공통 — 상품 정보가 바뀌면 자동 반영됩니다.
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -1802,10 +1899,10 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
         />
       </Field>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">가격 표시</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             끄면 가격·SALE 배지 모두 숨김 (B2B 비공개 상품)
           </div>
         </div>
@@ -1815,10 +1912,10 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
         />
       </div>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">VAT 포함 표시</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             과세 상품일 때 가격을 ×1.1 로 표시. 아래 작은 글씨 "VAT 포함" 노출
           </div>
         </div>
@@ -1828,10 +1925,10 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
         />
       </div>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">SALE 배지 자동 표시</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             정가 &gt; 판매가 일 때 자동 표시. 끄면 강제 숨김
           </div>
         </div>
@@ -1841,13 +1938,13 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
         />
       </div>
 
-      <div className="space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
+      <div className="space-y-1.5 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 p-2">
         <div className="text-xs font-semibold">구매 액션</div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] text-[var(--jm-text-muted)]">
           POS / 자사몰 환경에 따라 클릭 핸들러가 자동 분기됩니다 (편집기 미리보기에서는 토스트 안내).
         </p>
 
-        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-1.5">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] px-3 py-1.5">
           <span className="text-xs">수량 선택기 표시</span>
           <Switch
             checked={block.quantityVisible}
@@ -1855,7 +1952,7 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
           />
         </div>
 
-        <div className="space-y-1.5 rounded-md border border-border bg-background p-2">
+        <div className="space-y-1.5 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-medium">장바구니 버튼</span>
             <Switch
@@ -1880,7 +1977,7 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
           )}
         </div>
 
-        <div className="space-y-1.5 rounded-md border border-border bg-background p-2">
+        <div className="space-y-1.5 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-medium">바로 구매 버튼</span>
             <Switch
@@ -1928,9 +2025,9 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
           )}
         </div>
         {block.ctas.map((cta, i) => (
-          <div key={i} className="space-y-1.5 rounded-md border border-border p-2">
+          <div key={i} className="space-y-1.5 rounded-md border border-[var(--jm-border)] p-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-muted-foreground">
+              <span className="text-[11px] font-semibold text-[var(--jm-text-muted)]">
                 버튼 {i + 1}
               </span>
               <Button
@@ -1996,7 +2093,7 @@ function ProductHeroEditor({ block, onChange }: EditorProps<ProductHeroBlock>) {
 function ProductInfoEditor({ block, onChange }: EditorProps<ProductInfoBlock>) {
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         Product 의 의무 필드 (제조국·제조자·인증·품질보증기준 등) 와 ProductSpec 을 자동 매핑합니다. 누락된 필드는 상품 편집 → "기본 정보" 의 "상품정보 고시" 섹션에서 입력하세요.
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -2047,10 +2144,10 @@ function ProductInfoEditor({ block, onChange }: EditorProps<ProductInfoBlock>) {
         </Field>
       </div>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">주요 사양 자동 사용 (ProductSpec)</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             켜면 상품에 등록된 Spec 항목 (출력/배기량 등) 을 "주요 사양" 으로 자동 추가
           </div>
         </div>
@@ -2157,7 +2254,7 @@ function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
 
   return (
     <div className="space-y-3">
-      <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+      <p className="rounded-md bg-[var(--jm-surface-muted)] px-2 py-1.5 text-[11px] text-[var(--jm-text-muted)]">
         직접 만든 .html 파일을 업로드해 sandboxed iframe 으로 표시합니다. 본인 작성 HTML 권장 — 외부 페이지에 있을 수 있는 트래커가 함께 들어오지 않도록.
       </p>
 
@@ -2216,7 +2313,7 @@ function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
             <Input
               value={block.htmlUrl}
               readOnly
-              className="h-8 text-[11px] text-muted-foreground"
+              className="h-8 text-[11px] text-[var(--jm-text-muted)]"
               onFocus={(e) => e.currentTarget.select()}
             />
           )}
@@ -2261,10 +2358,10 @@ function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
         </Field>
       </div>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">자동 높이</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             iframe 내부 콘텐츠 높이를 자동 측정해 스크롤 없이 펼침. 끄면 위 높이로 고정.
           </div>
         </div>
@@ -2274,10 +2371,10 @@ function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
         />
       </div>
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2">
         <div className="space-y-0.5">
           <div className="text-xs font-medium">폼 사용 허용</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-[var(--jm-text-muted)]">
             iframe 안에서 form 제출이 필요할 때만 켜세요. 보안상 기본은 꺼짐.
           </div>
         </div>
@@ -2287,8 +2384,8 @@ function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
         />
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
-        ⚠️ HTML 안의 <code className="rounded bg-muted px-1">{`<img>`}</code> 는 절대 URL 또는 base64 권장.
+      <p className="text-[11px] text-[var(--jm-text-muted)]">
+        ⚠️ HTML 안의 <code className="rounded bg-[var(--jm-surface-muted)] px-1">{`<img>`}</code> 는 절대 URL 또는 base64 권장.
         상대 경로는 storage 경로 기준이라 깨질 수 있습니다.
       </p>
     </div>

@@ -27,6 +27,7 @@ import {
   ProductChannelPricingTable,
   ProductSpecsTable,
   ProductOptionsTable,
+  ProductBundlesTable,
   ProductDescriptionBlock,
   ProductHeaderBar,
   ProductInfoCard,
@@ -52,6 +53,7 @@ import { ProductCostsEditSheet } from "@/components/product/edit/product-costs-e
 import { ProductChannelPricingEditSheet } from "@/components/product/edit/product-channel-pricing-edit-sheet";
 import { ProductSpecsEditSheet } from "@/components/product/edit/product-specs-edit-sheet";
 import { ProductOptionsEditSheet } from "@/components/product/edit/product-options-edit-sheet";
+import { ProductBundlesEditSheet } from "@/components/product/edit/product-bundles-edit-sheet";
 import { ProductSetComponentsEditSheet } from "@/components/product/edit/product-set-components-edit-sheet";
 import { Pencil } from "lucide-react";
 import { ProductMediaManager } from "@/components/product-media-manager";
@@ -70,6 +72,7 @@ export default function ProductDetailPage() {
   const [channelEditOpen, setChannelEditOpen] = useState(false);
   const [specsEditOpen, setSpecsEditOpen] = useState(false);
   const [optionsEditOpen, setOptionsEditOpen] = useState(false);
+  const [bundlesEditOpen, setBundlesEditOpen] = useState(false);
   const [setComponentsEditOpen, setSetComponentsEditOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
@@ -384,6 +387,25 @@ export default function ProductDetailPage() {
             <ProductOptionsTable options={product.productOptions ?? []} />
           </ProductSection>
 
+          <ProductSection
+            title="추가구매 추천"
+            description="이 상품과 함께 사면 좋은 단독 카탈로그 상품들. 카트 추가 시 손님에게 추천 노출되고, 선택 시 자식 OrderItem(ADDON) 으로 함께 결제됨"
+            noPadding
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => setBundlesEditOpen(true)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                편집
+              </Button>
+            }
+          >
+            <ProductBundlesTable bundles={product.bundles ?? []} />
+          </ProductSection>
+
           {/* 3. 공급·재고 */}
           <ProductSection
             title="공급자 매핑"
@@ -514,6 +536,11 @@ export default function ProductDetailPage() {
       <ProductOptionsEditSheet
         open={optionsEditOpen}
         onOpenChange={setOptionsEditOpen}
+        product={product}
+      />
+      <ProductBundlesEditSheet
+        open={bundlesEditOpen}
+        onOpenChange={setBundlesEditOpen}
         product={product}
       />
       <ProductSetComponentsEditSheet
