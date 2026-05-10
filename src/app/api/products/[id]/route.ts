@@ -116,6 +116,21 @@ export async function GET(
         include: { slot: true },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
       },
+      // 고객 옵션 도메인 (variant 와 분리됨) — 옵션 슬롯 + 값 + 매핑
+      productOptions: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+        include: {
+          values: {
+            where: { isActive: true },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              mappedProduct: { select: { id: true, name: true, sku: true } },
+              mappedVariant: { select: { id: true, name: true, sku: true } },
+            },
+          },
+        },
+      },
     },
   });
 

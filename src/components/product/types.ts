@@ -119,6 +119,30 @@ export interface BulkParentRef {
   sellingPrice?: string;
 }
 
+/** 고객 옵션 (ProductOption) — variant 와 분리된 별도 도메인 */
+export interface ProductOptionValueItem {
+  id: string;
+  label: string;
+  addPrice: string;
+  sortOrder: number;
+  isActive: boolean;
+  /** 다른 Product 매핑 (메모리·SSD 같은 단독 판매 가능 상품) — OrderItem OPTION_REF */
+  mappedProductId: string | null;
+  mappedProduct: { id: string; name: string; sku: string } | null;
+  /** 매장 variant 매핑 (쿨러 → 수냉쿨러 variant) */
+  mappedVariantId: string | null;
+  mappedVariant: { id: string; name: string; sku: string } | null;
+}
+
+export interface ProductOptionItem {
+  id: string;
+  name: string;
+  required: boolean;
+  sortOrder: number;
+  isActive: boolean;
+  values: ProductOptionValueItem[];
+}
+
 // 상세 페이지 전체 응답 (GET /api/products/[id])
 export interface ProductDetail {
   id: string;
@@ -173,6 +197,7 @@ export interface ProductDetail {
   media?: ProductMediaItem[];
   inventoryLots?: InventoryLotItem[];
   specValues?: ProductSpecValueItem[];
+  productOptions?: ProductOptionItem[];
   estimatedUnitCost?: number | null;
   estimatedMargin?: number | null;
   estimatedMarginRate?: number | null;

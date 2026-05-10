@@ -26,6 +26,7 @@ import {
   ProductBulkCard,
   ProductChannelPricingTable,
   ProductSpecsTable,
+  ProductOptionsTable,
   ProductDescriptionBlock,
   ProductHeaderBar,
   ProductInfoCard,
@@ -50,6 +51,7 @@ import { ProductMappingEditSheet } from "@/components/product/edit/product-mappi
 import { ProductCostsEditSheet } from "@/components/product/edit/product-costs-edit-sheet";
 import { ProductChannelPricingEditSheet } from "@/components/product/edit/product-channel-pricing-edit-sheet";
 import { ProductSpecsEditSheet } from "@/components/product/edit/product-specs-edit-sheet";
+import { ProductOptionsEditSheet } from "@/components/product/edit/product-options-edit-sheet";
 import { ProductSetComponentsEditSheet } from "@/components/product/edit/product-set-components-edit-sheet";
 import { Pencil } from "lucide-react";
 import { ProductMediaManager } from "@/components/product-media-manager";
@@ -67,6 +69,7 @@ export default function ProductDetailPage() {
   const [costsEditOpen, setCostsEditOpen] = useState(false);
   const [channelEditOpen, setChannelEditOpen] = useState(false);
   const [specsEditOpen, setSpecsEditOpen] = useState(false);
+  const [optionsEditOpen, setOptionsEditOpen] = useState(false);
   const [setComponentsEditOpen, setSetComponentsEditOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
@@ -362,6 +365,25 @@ export default function ProductDetailPage() {
             <ProductSpecsTable values={product.specValues ?? []} />
           </ProductSection>
 
+          <ProductSection
+            title="고객 옵션"
+            description="고객이 카탈로그·POS 에서 선택하는 옵션 (변형상품과 분리). 옵션값마다 단순 텍스트 / 다른 Product 매핑 / 매장 variant 매핑 중 선택"
+            noPadding
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => setOptionsEditOpen(true)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                편집
+              </Button>
+            }
+          >
+            <ProductOptionsTable options={product.productOptions ?? []} />
+          </ProductSection>
+
           {/* 3. 공급·재고 */}
           <ProductSection
             title="공급자 매핑"
@@ -487,6 +509,11 @@ export default function ProductDetailPage() {
       <ProductSpecsEditSheet
         open={specsEditOpen}
         onOpenChange={setSpecsEditOpen}
+        product={product}
+      />
+      <ProductOptionsEditSheet
+        open={optionsEditOpen}
+        onOpenChange={setOptionsEditOpen}
         product={product}
       />
       <ProductSetComponentsEditSheet

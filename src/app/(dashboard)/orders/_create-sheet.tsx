@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -65,6 +65,8 @@ interface OrderItemForm {
   sku: string;
   quantity: string;
   unitPrice: string;
+  /** 선택된 옵션값 ID 들 — API 에 그대로 전달 → OPTION_REF 자동 생성 */
+  optionValueIds: string[];
 }
 
 const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string }[] = [
@@ -199,6 +201,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
         sku: item.sku,
         quantity: "1",
         unitPrice: item.sellingPrice,
+        optionValueIds: [],
       },
     ]);
     setProductPick("");
@@ -251,6 +254,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
           productId: it.productId,
           quantity: it.quantity,
           unitPrice: it.unitPrice,
+          optionValueIds: it.optionValueIds,
         })),
       });
     },
@@ -453,58 +457,68 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                         parseFloat(it.quantity || "0") *
                         parseFloat(it.unitPrice || "0");
                       return (
-                        <JmTableRow key={idx} className="hover:bg-transparent">
-                          <JmTableCell>
-                            <div className="flex flex-col">
-                              <span className="text-[13px] text-[var(--jm-text)]">
-                                {it.productName}
-                              </span>
-                              <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
-                                {it.sku}
-                              </span>
-                            </div>
-                          </JmTableCell>
-                          <JmTableCell>
-                            <JmInput
-                              size="sm"
-                              type="text"
-                              inputMode="decimal"
-                              value={it.quantity}
-                              onChange={(e) =>
-                                updateItem(idx, { quantity: e.target.value })
-                              }
-                              onFocus={(e) => e.currentTarget.select()}
-                            />
-                          </JmTableCell>
-                          <JmTableCell>
-                            <JmInput
-                              size="sm"
-                              type="text"
-                              inputMode="numeric"
-                              value={formatComma(it.unitPrice)}
-                              onChange={(e) =>
-                                updateItem(idx, {
-                                  unitPrice: parseComma(e.target.value),
-                                })
-                              }
-                              onFocus={(e) => e.currentTarget.select()}
-                              className="text-right"
-                            />
-                          </JmTableCell>
-                          <JmTableCell className="text-right tabular-nums font-semibold">
-                            ₩{lineTotal.toLocaleString("ko-KR")}
-                          </JmTableCell>
-                          <JmTableCell>
-                            <JmIconButton
-                              variant="ghost"
-                              size="sm"
-                              aria-label="삭제"
-                              onClick={() => removeItem(idx)}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </JmIconButton>
-                          </JmTableCell>
-                        </JmTableRow>
+                        <Fragment key={idx}>
+                          <JmTableRow className="hover:bg-transparent">
+                            <JmTableCell>
+                              <div className="flex flex-col">
+                                <span className="text-[13px] text-[var(--jm-text)]">
+                                  {it.productName}
+                                </span>
+                                <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                                  {it.sku}
+                                </span>
+                              </div>
+                            </JmTableCell>
+                            <JmTableCell>
+                              <JmInput
+                                size="sm"
+                                type="text"
+                                inputMode="decimal"
+                                value={it.quantity}
+                                onChange={(e) =>
+                                  updateItem(idx, { quantity: e.target.value })
+                                }
+                                onFocus={(e) => e.currentTarget.select()}
+                              />
+                            </JmTableCell>
+                            <JmTableCell>
+                              <JmInput
+                                size="sm"
+                                type="text"
+                                inputMode="numeric"
+                                value={formatComma(it.unitPrice)}
+                                onChange={(e) =>
+                                  updateItem(idx, {
+                                    unitPrice: parseComma(e.target.value),
+                                  })
+                                }
+                                onFocus={(e) => e.currentTarget.select()}
+                                className="text-right"
+                              />
+                            </JmTableCell>
+                            <JmTableCell className="text-right tabular-nums font-semibold">
+                              ₩{lineTotal.toLocaleString("ko-KR")}
+                            </JmTableCell>
+                            <JmTableCell>
+                              <JmIconButton
+                                variant="ghost"
+                                size="sm"
+                                aria-label="삭제"
+                                onClick={() => removeItem(idx)}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </JmIconButton>
+                            </JmTableCell>
+                          </JmTableRow>
+                          {/* 옵션 선택 — 옵션 등록된 상품에만 노출. 5개 컬럼 colspan */}
+                          <OrderItemOptionsRow
+                            productId={it.productId}
+                            selectedIds={it.optionValueIds}
+                            onChange={(ids) =>
+                              updateItem(idx, { optionValueIds: ids })
+                            }
+                          />
+                        </Fragment>
                       );
                     })}
                   </JmTableBody>
@@ -637,5 +651,107 @@ function SumRow({
         {value < 0 ? "−" : ""}₩{Math.abs(value).toLocaleString("ko-KR")}
       </span>
     </div>
+  );
+}
+
+/**
+ * 옵션 선택 행 — 상품에 등록된 ProductOption 들을 슬롯별 dropdown 으로 노출.
+ * 옵션 없는 상품은 null 반환 (행 생략).
+ *
+ * 매핑별 표시:
+ *  - 단순 텍스트: "화이트"
+ *  - mappedProduct: "교체용 필터 추가 → 테스트 가습기 필터"
+ *  - mappedVariant: "수냉 쿨러 → 수냉쿨러-i7" (variant Product 이름)
+ */
+function OrderItemOptionsRow({
+  productId,
+  selectedIds,
+  onChange,
+}: {
+  productId: string;
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  type OptionValue = {
+    id: string;
+    label: string;
+    addPrice: string;
+    mappedProduct: { id: string; name: string; sku: string } | null;
+    mappedVariant: { id: string; name: string; sku: string } | null;
+  };
+  type Option = {
+    id: string;
+    name: string;
+    required: boolean;
+    values: OptionValue[];
+  };
+  const optionsQuery = useQuery({
+    queryKey: ["product-options", productId],
+    queryFn: () => apiGet<Option[]>(`/api/products/${productId}/options`),
+    enabled: !!productId,
+  });
+  const options = optionsQuery.data ?? [];
+  if (options.length === 0) return null;
+
+  return (
+    <JmTableRow className="hover:bg-transparent">
+      <JmTableCell colSpan={5} className="bg-[var(--jm-surface-muted)] py-2">
+        <div className="flex flex-col gap-1.5">
+          {options.map((opt) => {
+            // 이 옵션 슬롯 에서 선택된 값 (single-select 정책)
+            const selectedForOpt =
+              selectedIds.find((id) =>
+                opt.values.some((v) => v.id === id),
+              ) ?? "";
+            return (
+              <div
+                key={opt.id}
+                className="flex items-center gap-2 text-[12px]"
+              >
+                <span className="w-[80px] text-[var(--jm-text-muted)]">
+                  {opt.name}
+                  {opt.required && (
+                    <span className="text-[var(--jm-danger-fg)]"> *</span>
+                  )}
+                </span>
+                <select
+                  value={selectedForOpt}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    // 같은 옵션 슬롯의 기존 선택 제거 후 새 값 추가
+                    const otherIds = selectedIds.filter(
+                      (id) => !opt.values.some((v) => v.id === id),
+                    );
+                    onChange(newId ? [...otherIds, newId] : otherIds);
+                  }}
+                  className="h-7 rounded border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2 text-[12px]"
+                >
+                  <option value="">— 선택 안 함 —</option>
+                  {opt.values.map((v) => {
+                    const addPrice = Number(v.addPrice);
+                    const suffix = v.mappedProduct
+                      ? ` → ${v.mappedProduct.name}`
+                      : v.mappedVariant
+                        ? ` → ${v.mappedVariant.name}`
+                        : "";
+                    const priceLabel =
+                      addPrice > 0
+                        ? ` (+₩${addPrice.toLocaleString("ko-KR")})`
+                        : "";
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                        {priceLabel}
+                        {suffix}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      </JmTableCell>
+    </JmTableRow>
   );
 }

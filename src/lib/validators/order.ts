@@ -4,6 +4,11 @@ export const orderItemSchema = z.object({
   productId: z.string().min(1, "상품을 선택해주세요"),
   quantity: z.string().min(1, "수량을 입력해주세요"),
   unitPrice: z.string().min(1, "단가를 입력해주세요"),
+  /**
+   * 고객이 선택한 옵션값 ID 들 — 결제 시 OrderItem 의 optionSnapshot + OPTION_REF 자식 라인 자동 생성에 사용.
+   * 주문 후 보존되는 건 optionSnapshot (옵션값 라벨 mapping). 이 ID 들은 transient 용.
+   */
+  optionValueIds: z.array(z.string()).optional(),
 });
 
 export const fulfillmentTypeSchema = z.enum(["PICKUP", "DELIVERY", "SHIPPING"]);

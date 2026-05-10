@@ -10,6 +10,7 @@ export { ProductMappingsTable } from "./product-mappings-table";
 export { ProductSellingCostsTable } from "./product-selling-costs-table";
 export { ProductChannelPricingTable } from "./product-channel-pricing-table";
 export { ProductSpecsTable } from "./product-specs-table";
+export { ProductOptionsTable } from "./product-options-table";
 export { ProductSetComponentsTable } from "./product-set-components-table";
 export { ProductInventoryLotsTable } from "./product-inventory-lots-table";
 export { ProductMovementsTable } from "./product-movements-table";
