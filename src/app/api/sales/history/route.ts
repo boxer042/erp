@@ -1,43 +1,104 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
-import type { OrderPaymentMethod, Prisma } from "@prisma/client";
+import type {
+  OrderClaimReason,
+  OrderClaimType,
+  OrderPaymentMethod,
+  OrderPaymentStatus,
+  OrderStatus,
+  Prisma,
+} from "@prisma/client";
 
 /**
- * 통합 판매내역 — 판매(Order) / 수리(RepairTicket PICKED_UP) / 임대(Rental RETURNED) UNION.
+ * 통합 판매내역 — 판매(Order) / 수리(orphan RepairTicket PICKED_UP) / 임대(orphan Rental RETURNED) UNION.
  *
  * Order 는 POS 결제 시 항상 생성되며 repairTicketId / rentalId 로 분류된다.
- * 직접 픽업(/api/repair-tickets/[id]/transition?action=pickup) 또는 직접 반납
- * (/api/rentals/[id]/return) 으로 처리된 케이스는 Order 가 없으므로 orphan
- * RepairTicket / Rental 도 함께 가져와 dedup 한다.
+ * 직접 픽업(/api/repair-tickets/[id]/transition?action=pickup) 또는 직접 반납으로
+ * 처리된 케이스는 Order 가 없으므로 orphan RepairTicket / Rental 도 포함해 dedup.
  *
- * Query params:
- *  - from, to       : YYYY-MM-DD (date 필터, 양쪽 inclusive)
- *  - type           : "product" | "repair" | "rental" (생략 시 전체)
- *  - paymentMethod  : OrderPaymentMethod
- *  - customerId     : 특정 고객만
- *  - search         : 번호/고객명/전화 부분일치
- *  - limit          : 기본 200, 최대 1000
+ * 주문 시스템 3축 모델 반영:
+ *  - 출고(status), 결제(paymentStatus), 클레임(claimType + claimReason)
+ *  - 교환 새 주문(-EX) 은 매출 중복 방지를 위해 기본 제외 (마진 리포트와 일관)
  */
+
+export type SalesStatusGroup =
+  | "all"
+  | "in_progress" // PENDING~SHIPPED
+  | "confirmed" // COMPLETED
+  | "claim" // RETURN_REQUESTED~RETURN_INSPECTED
+  | "terminal"; // RETURNED, EXCHANGED
+
+const STATUS_GROUP_MAP: Record<Exclude<SalesStatusGroup, "all">, OrderStatus[]> =
+  {
+    in_progress: ["PENDING", "PREPARING", "PREPARING_PACKED", "SHIPPED"],
+    confirmed: ["COMPLETED"],
+    claim: [
+      "RETURN_REQUESTED",
+      "RETURN_ACCEPTED",
+      "RETURN_COLLECTED",
+      "RETURN_INSPECTED",
+    ],
+    terminal: ["RETURNED", "EXCHANGED"],
+  };
 
 export type SalesHistoryRow = {
   id: string;
   type: "product" | "repair" | "rental";
   refNo: string;
+  /** 외부 채널 주문번호 — Order 만 가짐 */
+  channelOrderNo: string | null;
   date: string; // ISO
   customerId: string | null;
   customerName: string | null;
   customerPhone: string | null;
+  channelId: string | null;
   channelName: string | null;
   paymentMethod: OrderPaymentMethod | null;
+  paymentStatus: OrderPaymentStatus;
+  status: OrderStatus | "PICKED_UP" | "RETURNED";
+  claimType: OrderClaimType | null;
+  claimReason: OrderClaimReason | null;
+  fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING" | null;
   amount: number;
-  status: string;
-  /** 연결된 원천 — 판매:Order id, 수리:ticket id, 임대:rental id */
+  /** 순매출 기여분 — 환불/매출취소면 0, 그 외엔 amount */
+  netAmount: number;
+  /** 교환 새 주문 (-EX) 인지 — 마진 리포트는 항상 제외, 이 페이지는 토글로만 노출 */
+  isExchangeReplacement: boolean;
+  /** 연결된 원천 — 판매:Order id, 수리:ticket id (orphan), 임대:rental id (orphan) */
   sourceId: string;
-  /** 수리·임대일 때 추가 식별자 */
-  ticketNo?: string | null;
-  rentalNo?: string | null;
+  /** orphan 인지 — 클릭 시 라우팅 분기용 */
+  isOrphan: boolean;
 };
+
+export type SalesHistorySummary = {
+  totalCount: number;
+  /** 표면 거래액 — 모든 행 amount 합 */
+  totalAmount: number;
+  /** 순매출 — 환불/매출취소 제외 */
+  netAmount: number;
+  /** 환불·취소 합 (REFUNDED + SALES_CANCELLED + RETURNED status) */
+  refundedAmount: number;
+  /** 미수 — paymentStatus=UNPAID 합 */
+  unpaidAmount: number;
+  /** 진행 중 클레임 건수 (RETURN_REQUESTED~RETURN_INSPECTED) */
+  claimInProgressCount: number;
+  byType: {
+    product: { count: number; amount: number };
+    repair: { count: number; amount: number };
+    rental: { count: number; amount: number };
+  };
+  /** 채널별 매출 분포 — 순매출 기준, 내림차순 */
+  byChannel: Array<{
+    channelId: string | null;
+    channelName: string;
+    count: number;
+    amount: number;
+  }>;
+  truncated: boolean;
+};
+
+const FETCH_CAP = 5000;
 
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -54,8 +115,16 @@ export async function GET(request: NextRequest) {
   const paymentMethod = searchParams.get(
     "paymentMethod",
   ) as OrderPaymentMethod | null;
+  const paymentStatus = searchParams.get(
+    "paymentStatus",
+  ) as OrderPaymentStatus | null;
+  const statusGroup =
+    (searchParams.get("statusGroup") as SalesStatusGroup | null) ?? "all";
+  const channelFilter = searchParams.get("channelFilter"); // "all" | "offline" | "<id>"
   const customerId = searchParams.get("customerId");
   const search = (searchParams.get("search") || "").trim();
+  const includeExchangeReplacement =
+    searchParams.get("includeExchangeReplacement") === "1";
   const sort = (searchParams.get("sort") || "date_desc") as
     | "date_desc"
     | "date_asc"
@@ -67,15 +136,29 @@ export async function GET(request: NextRequest) {
     200,
     Math.max(10, parseInt(searchParams.get("pageSize") || "50", 10) || 50),
   );
-  // 내부 fetch 한도 (정렬 후 페이지네이션 적용 위해 큰 값) — CSV 는 별도 endpoint
-  const FETCH_CAP = 5000;
 
   const fromDate = from ? new Date(`${from}T00:00:00`) : null;
   const toDate = to ? new Date(`${to}T23:59:59`) : null;
 
-  // ── Order: 전체 (수리/임대 링크 포함) — 추후 type 필터 적용 ──────────
+  // ── Order 필터 ─────────────────────────────────────────────
+  const statusFilter: Prisma.OrderWhereInput =
+    statusGroup === "all"
+      ? { status: { not: "CANCELLED" } }
+      : { status: { in: STATUS_GROUP_MAP[statusGroup] } };
+
+  const channelWhere: Prisma.OrderWhereInput =
+    channelFilter === "offline"
+      ? { channelId: null }
+      : channelFilter && channelFilter !== "all"
+        ? { channelId: channelFilter }
+        : {};
+
   const orderWhere: Prisma.OrderWhereInput = {
-    status: { not: "CANCELLED" },
+    ...statusFilter,
+    ...channelWhere,
+    ...(includeExchangeReplacement
+      ? {}
+      : { exchangedFromOrders: { none: {} } }),
     ...(fromDate || toDate
       ? {
           orderDate: {
@@ -85,11 +168,13 @@ export async function GET(request: NextRequest) {
         }
       : {}),
     ...(paymentMethod ? { paymentMethod } : {}),
+    ...(paymentStatus ? { paymentStatus } : {}),
     ...(customerId ? { customerId } : {}),
     ...(search
       ? {
           OR: [
             { orderNo: { contains: search, mode: "insensitive" } },
+            { channelOrderNo: { contains: search, mode: "insensitive" } },
             { customerName: { contains: search, mode: "insensitive" } },
             { customerPhone: { contains: search } },
           ],
@@ -102,24 +187,31 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       orderNo: true,
+      channelOrderNo: true,
       orderDate: true,
       customerId: true,
       customerName: true,
       customerPhone: true,
       paymentMethod: true,
+      paymentStatus: true,
       totalAmount: true,
       status: true,
+      claimType: true,
+      claimReason: true,
+      fulfillmentType: true,
       repairTicketId: true,
       rentalId: true,
-      channel: { select: { name: true } },
+      channelId: true,
+      channel: { select: { id: true, name: true } },
       repairTicket: { select: { ticketNo: true } },
       rental: { select: { rentalNo: true } },
+      exchangedFromOrders: { select: { id: true } },
     },
     orderBy: { orderDate: "desc" },
     take: FETCH_CAP,
   });
 
-  // 이미 Order 로 잡힌 ticket/rental id 들 — orphan 쿼리에서 제외
+  // 이미 Order 로 잡힌 ticket/rental id — orphan 쿼리에서 제외
   const linkedTicketIds = new Set(
     orders.map((o) => o.repairTicketId).filter((v): v is string => !!v),
   );
@@ -127,9 +219,12 @@ export async function GET(request: NextRequest) {
     orders.map((o) => o.rentalId).filter((v): v is string => !!v),
   );
 
-  // ── Orphan RepairTicket: PICKED_UP 인데 연결된 Order 없음 ─────────────
+  // orphan 은 채널 개념이 없으므로 channelFilter=offline/all 일 때만 포함
+  const orphanIncluded = !channelFilter || channelFilter === "all" || channelFilter === "offline";
+
+  // ── Orphan RepairTicket — PICKED_UP, Order 없음 ────────────
   const orphanTickets =
-    type === "product" || type === "rental"
+    type === "product" || type === "rental" || !orphanIncluded
       ? []
       : await prisma.repairTicket.findMany({
           where: {
@@ -171,16 +266,15 @@ export async function GET(request: NextRequest) {
             customerId: true,
             paymentMethod: true,
             finalAmount: true,
-            status: true,
             customer: { select: { name: true, phone: true } },
           },
           orderBy: { pickedUpAt: "desc" },
           take: FETCH_CAP,
         });
 
-  // ── Orphan Rental: RETURNED 인데 연결된 Order 없음 ─────────────────────
+  // ── Orphan Rental — RETURNED, Order 없음 ───────────────────
   const orphanRentals =
-    type === "product" || type === "repair"
+    type === "product" || type === "repair" || !orphanIncluded
       ? []
       : await prisma.rental.findMany({
           where: {
@@ -222,20 +316,24 @@ export async function GET(request: NextRequest) {
             customerId: true,
             paymentMethod: true,
             finalAmount: true,
-            status: true,
             customer: { select: { name: true, phone: true } },
           },
           orderBy: { actualReturnedAt: "desc" },
           take: FETCH_CAP,
         });
 
-  // ── 정규화 ────────────────────────────────────────────────────────
+  // ── 정규화 ────────────────────────────────────────────────
   const orderRows: SalesHistoryRow[] = orders.map((o) => {
     const t: SalesHistoryRow["type"] = o.repairTicketId
       ? "repair"
       : o.rentalId
         ? "rental"
         : "product";
+    const amount = Number(o.totalAmount);
+    const isReversed =
+      o.status === "RETURNED" ||
+      o.paymentStatus === "REFUNDED" ||
+      o.paymentStatus === "SALES_CANCELLED";
     return {
       id: `order-${o.id}`,
       type: t,
@@ -245,51 +343,83 @@ export async function GET(request: NextRequest) {
           : t === "rental" && o.rental
             ? o.rental.rentalNo
             : o.orderNo,
+      channelOrderNo: o.channelOrderNo,
       date: o.orderDate.toISOString(),
       customerId: o.customerId,
       customerName: o.customerName,
       customerPhone: o.customerPhone,
+      channelId: o.channelId,
       channelName: o.channel?.name ?? null,
       paymentMethod: o.paymentMethod,
-      amount: Number(o.totalAmount),
+      paymentStatus: o.paymentStatus,
       status: o.status,
+      claimType: o.claimType,
+      claimReason: o.claimReason,
+      fulfillmentType: o.fulfillmentType,
+      amount,
+      netAmount: isReversed ? 0 : amount,
+      isExchangeReplacement: (o.exchangedFromOrders?.length ?? 0) > 0,
       sourceId: o.id,
-      ticketNo: o.repairTicket?.ticketNo ?? null,
-      rentalNo: o.rental?.rentalNo ?? null,
+      isOrphan: false,
     };
   });
 
-  const orphanRepairRows: SalesHistoryRow[] = orphanTickets.map((t) => ({
-    id: `repair-${t.id}`,
-    type: "repair",
-    refNo: t.ticketNo,
-    date: (t.pickedUpAt ?? t.createdAt).toISOString(),
-    customerId: t.customerId,
-    customerName: t.customer?.name ?? null,
-    customerPhone: t.customer?.phone ?? null,
-    channelName: null,
-    paymentMethod: t.paymentMethod,
-    amount: Number(t.finalAmount),
-    status: t.status,
-    sourceId: t.id,
-    ticketNo: t.ticketNo,
-  }));
+  const orphanRepairRows: SalesHistoryRow[] = orphanTickets.map((t) => {
+    const amount = Number(t.finalAmount);
+    return {
+      id: `repair-${t.id}`,
+      type: "repair",
+      refNo: t.ticketNo,
+      channelOrderNo: null,
+      date: (t.pickedUpAt ?? t.createdAt).toISOString(),
+      customerId: t.customerId,
+      customerName: t.customer?.name ?? null,
+      customerPhone: t.customer?.phone ?? null,
+      channelId: null,
+      channelName: null,
+      paymentMethod: t.paymentMethod,
+      // orphan 은 paymentStatus 없음 — 결제수단으로 추정 (UNPAID/null → UNPAID, 그 외 → PAID)
+      paymentStatus:
+        !t.paymentMethod || t.paymentMethod === "UNPAID" ? "UNPAID" : "PAID",
+      status: "PICKED_UP",
+      claimType: null,
+      claimReason: null,
+      fulfillmentType: null,
+      amount,
+      netAmount: amount,
+      isExchangeReplacement: false,
+      sourceId: t.id,
+      isOrphan: true,
+    };
+  });
 
-  const orphanRentalRows: SalesHistoryRow[] = orphanRentals.map((r) => ({
-    id: `rental-${r.id}`,
-    type: "rental",
-    refNo: r.rentalNo,
-    date: (r.actualReturnedAt ?? r.createdAt).toISOString(),
-    customerId: r.customerId,
-    customerName: r.customer?.name ?? null,
-    customerPhone: r.customer?.phone ?? null,
-    channelName: null,
-    paymentMethod: r.paymentMethod,
-    amount: Number(r.finalAmount),
-    status: r.status,
-    sourceId: r.id,
-    rentalNo: r.rentalNo,
-  }));
+  const orphanRentalRows: SalesHistoryRow[] = orphanRentals.map((r) => {
+    const amount = Number(r.finalAmount);
+    return {
+      id: `rental-${r.id}`,
+      type: "rental",
+      refNo: r.rentalNo,
+      channelOrderNo: null,
+      date: (r.actualReturnedAt ?? r.createdAt).toISOString(),
+      customerId: r.customerId,
+      customerName: r.customer?.name ?? null,
+      customerPhone: r.customer?.phone ?? null,
+      channelId: null,
+      channelName: null,
+      paymentMethod: r.paymentMethod,
+      paymentStatus:
+        !r.paymentMethod || r.paymentMethod === "UNPAID" ? "UNPAID" : "PAID",
+      status: "RETURNED",
+      claimType: null,
+      claimReason: null,
+      fulfillmentType: null,
+      amount,
+      netAmount: amount,
+      isExchangeReplacement: false,
+      sourceId: r.id,
+      isOrphan: true,
+    };
+  });
 
   // type 필터 — Order 분류 후
   const filteredOrders = type
@@ -299,58 +429,104 @@ export async function GET(request: NextRequest) {
   const all = [...filteredOrders, ...orphanRepairRows, ...orphanRentalRows];
 
   // 정렬
-  const TYPE_ORDER: Record<string, number> = { product: 0, repair: 1, rental: 2 };
+  const TYPE_ORDER: Record<string, number> = {
+    product: 0,
+    repair: 1,
+    rental: 2,
+  };
   all.sort((a, b) => {
-    if (sort === "date_asc") {
-      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
-    }
-    if (sort === "amount_desc") {
-      return b.amount - a.amount;
-    }
-    if (sort === "amount_asc") {
-      return a.amount - b.amount;
-    }
+    if (sort === "date_asc") return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    if (sort === "amount_desc") return b.amount - a.amount;
+    if (sort === "amount_asc") return a.amount - b.amount;
     if (sort === "type") {
       const t = TYPE_ORDER[a.type] - TYPE_ORDER[b.type];
       if (t !== 0) return t;
       return a.date < b.date ? 1 : -1;
     }
-    // date_desc (default)
     return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
   });
 
-  const totalCount = all.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  // 요약 — 페이지네이션 전 전체
+  const claimInProgressStatuses = new Set<string>([
+    "RETURN_REQUESTED",
+    "RETURN_ACCEPTED",
+    "RETURN_COLLECTED",
+    "RETURN_INSPECTED",
+  ]);
+
+  const channelMap = new Map<
+    string,
+    { channelId: string | null; channelName: string; count: number; amount: number }
+  >();
+
+  let totalAmount = 0;
+  let netAmount = 0;
+  let refundedAmount = 0;
+  let unpaidAmount = 0;
+  let claimInProgressCount = 0;
+  const byTypeAcc = {
+    product: { count: 0, amount: 0 },
+    repair: { count: 0, amount: 0 },
+    rental: { count: 0, amount: 0 },
+  };
+
+  for (const r of all) {
+    totalAmount += r.amount;
+    netAmount += r.netAmount;
+    if (
+      r.status === "RETURNED" ||
+      r.paymentStatus === "REFUNDED" ||
+      r.paymentStatus === "SALES_CANCELLED"
+    ) {
+      refundedAmount += r.amount;
+    }
+    if (r.paymentStatus === "UNPAID") unpaidAmount += r.amount;
+    if (claimInProgressStatuses.has(r.status)) claimInProgressCount += 1;
+
+    byTypeAcc[r.type].count += 1;
+    byTypeAcc[r.type].amount += r.netAmount;
+
+    const key = r.channelId ?? "__offline__";
+    const label = r.channelName ?? "오프라인";
+    const cur = channelMap.get(key) ?? {
+      channelId: r.channelId,
+      channelName: label,
+      count: 0,
+      amount: 0,
+    };
+    cur.count += 1;
+    cur.amount += r.netAmount;
+    channelMap.set(key, cur);
+  }
+
+  const byChannel = Array.from(channelMap.values()).sort(
+    (a, b) => b.amount - a.amount,
+  );
+
+  const summary: SalesHistorySummary = {
+    totalCount: all.length,
+    totalAmount,
+    netAmount,
+    refundedAmount,
+    unpaidAmount,
+    claimInProgressCount,
+    byType: byTypeAcc,
+    byChannel,
+    truncated: all.length >= FETCH_CAP,
+  };
+
+  const totalPages = Math.max(1, Math.ceil(all.length / pageSize));
   const start = (page - 1) * pageSize;
   const rows = all.slice(start, start + pageSize);
 
-  // 요약 — 필터 적용 결과 전체 (페이지네이션 전)
-  const summary = {
-    totalCount,
-    totalAmount: all.reduce((s, r) => s + r.amount, 0),
-    byType: {
-      product: all.filter((r) => r.type === "product").reduce(
-        (s, r) => ({ count: s.count + 1, amount: s.amount + r.amount }),
-        { count: 0, amount: 0 },
-      ),
-      repair: all.filter((r) => r.type === "repair").reduce(
-        (s, r) => ({ count: s.count + 1, amount: s.amount + r.amount }),
-        { count: 0, amount: 0 },
-      ),
-      rental: all.filter((r) => r.type === "rental").reduce(
-        (s, r) => ({ count: s.count + 1, amount: s.amount + r.amount }),
-        { count: 0, amount: 0 },
-      ),
+  return NextResponse.json({
+    rows,
+    summary,
+    pagination: {
+      page,
+      pageSize,
+      totalPages,
+      totalCount: all.length,
     },
-    truncated: totalCount >= FETCH_CAP,
-  };
-
-  const pagination = {
-    page,
-    pageSize,
-    totalPages,
-    totalCount,
-  };
-
-  return NextResponse.json({ rows, summary, pagination });
+  });
 }

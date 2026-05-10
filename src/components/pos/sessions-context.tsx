@@ -109,6 +109,8 @@ interface SessionsContextValue {
   clear: (sessionId?: string) => void;
   totalItemCount: number;
   getSession: (id: string) => CartSession | undefined;
+  /** 서버 상태를 즉시 가져와 로컬 sessions 에 반영. 부활/주차 후 navigation 직전에 호출. */
+  forceSync: () => Promise<void>;
 }
 
 const SessionsContext = createContext<SessionsContextValue | null>(null);
@@ -272,6 +274,9 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     // 1) 마운트 직후 첫 sync
     sync();
 
+    // 외부 forceSync 노출 — 부활/주차 직후 호출용
+    forceSyncRef.current = sync;
+
     // 2) 5초 polling
     pollTimer = setInterval(sync, 5000);
 
@@ -290,11 +295,18 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (pollTimer) clearInterval(pollTimer);
       debouncePushRef.current = null;
+      forceSyncRef.current = null;
     };
   }, [hydrated]);
 
+  const forceSync = useCallback(async () => {
+    if (forceSyncRef.current) await forceSyncRef.current();
+  }, []);
+
   // sessions 변경 → debounced push trigger
   const debouncePushRef = useRef<(() => void) | null>(null);
+  // 외부에서 호출 가능한 즉시 sync — useEffect 내부의 sync() 를 가리킴
+  const forceSyncRef = useRef<(() => Promise<void>) | null>(null);
   const activeIdRef = useRef<string>("");
   // eslint-disable-next-line react-hooks/immutability
   activeIdRef.current = activeId;
@@ -725,8 +737,9 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       clear,
       totalItemCount,
       getSession,
+      forceSync,
     }),
-    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateUnitPrice, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionRepairTicketIds, setSessionOpenRepairCount, clear, totalItemCount, getSession]
+    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateUnitPrice, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionRepairTicketIds, setSessionOpenRepairCount, clear, totalItemCount, getSession, forceSync]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

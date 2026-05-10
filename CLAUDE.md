@@ -1359,7 +1359,22 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 - **송장 사전 등록** — PREPARING 단계에서 송장 미리 발급 (배송 라벨 일괄 출력)
 - **반품 처리 전용 뷰** — 워크보드 외 RETURN_REQUESTED/RETURN_ACCEPTED 만 모은 클레임 처리 batch 페이지
 
+### 통합 판매내역 (2026-05-09 jm 리뉴얼 후 남은 항목)
+
+코드 진입점: [src/app/(dashboard)/sales/history/](src/app/(dashboard)/sales/history/) · [src/app/api/sales/history/](src/app/api/sales/history/)
+
+**보류 (의존성 있음)**:
+- **PARTIAL_REFUND 부분 환불 금액 반영** — 현재 `summary.netAmount`/`refundedAmount` 계산은 PARTIAL_REFUND 행을 전액 매출로 잡음. 위 "부분 출고 / 부분 취소 / 부분 반품" 기능 도입 시 `OrderItem.returnedQty` 기반으로 환불액·순매출 계산 로직 보강 필요
+
+**우선순위 낮음**:
+- **사이드바 메뉴 위치 검토** — `/sales/history` 가 "통합 판매내역"이라는 트랜잭션 추적 정체성을 갖게 됨. 현재 sidebar 카테고리(`sales-history`)가 매출 분석/리포트와 같은 그룹에 있는지 — 정책 결정 후 위치 재배치 검토
+
+**검증되지 않은 부분**:
+- **모달 in 모달 z-index/포커스 트랩** — `JmTableToolbarMore` 의 모바일 드로어 안에서 `JmComboboxModal` 트리거 → 모달이 드로어 위에 정상 노출되는지 (브라우저 직접 확인 필요)
+
 > 참고 — 2026-04 견적서·거래명세표 도입 당시 MVP에서 제외했던 ① 견적서 → Order/Incoming/PurchaseOrder 전환, ② 견적서 → 거래명세표 전환 UI, ③ 회사 정보 DB 이전(`CompanyInfo` 싱글턴) 은 모두 구현 완료. `/api/quotations/[id]/convert` 와 `/quotations` 페이지 전환 다이얼로그, `/api/company-info` 가 그 결과.
 
 > 참고 — 2026-05-07 주문 시스템 3축 분리(출고·결제·클레임), 반품 흐름 세분화(RETURN_REQUESTED/RETURN_ACCEPTED), 교환 자동화(EXCHANGE_SAME/DIFFERENT + 새 주문 자동 생성 + 양방향 link), 마진 리포트 정합성 (교환 발송 자동 제외), OrderItem 편집 UI(PENDING 한정), customerPayment FIFO 자동 매칭(외상→입금 시 paymentStatus 자동 PAID), 외부 채널 자동화 Phase 1 (`ChannelAdapter`/`MockChannelAdapter`/`ChannelProductMapping`/`PendingChannelOrder` + `/channels/imports` 페이지), Phase 3·4·6+ Phase 2-비의존 부분(SKU 자동 매핑 추천 + Outbound hook + Cron 라우트 `/api/cron/channel-poll` + 운영 대시보드 위젯) 도입 완료. 자세한 설계와 시각 위계는 [docs/ORDERS_SYSTEM.md](docs/ORDERS_SYSTEM.md).
+
+> 참고 — 2026-05-09 통합 판매내역(`/sales/history`) jm 디자인 시스템 리뉴얼 완료. 3축(출고·결제·클레임) 컬럼 분리, 채널별 매출 분포 한 줄, 환불·매출취소 행 시각 분리(strike + bg muted), `JmDateRangePicker` + `JmComboboxModal`(고객 풀스크린 검색), KPI 5개(총거래액·순매출·미수·환불취소·진행중클레임), `-EX` 교환 새 주문 기본 제외 토글. API 응답에 `paymentStatus`/`claimType`/`claimReason`/`fulfillmentType`/`channelOrderNo`/`isExchangeReplacement` 추가, 신규 필터(`statusGroup`/`paymentStatus`/`channelFilter`/`includeExchangeReplacement`). `OrderDetailSheet` 의 9개 mutation 이 `queryKeys.sales.all` 도 함께 invalidate (orders 액션 → sales 자동 갱신). 부수: 동일 sheet 의 pre-existing setState-in-effect lint 에러도 렌더 중 비교 패턴으로 정리.
 

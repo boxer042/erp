@@ -16,9 +16,17 @@ export async function GET(request: NextRequest) {
       isActive: true,
       ...(status ? { status: status as never } : {}),
     },
+    include: {
+      product: { select: { imageUrl: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(assets);
+  // 자산 자체에 imageUrl 필드는 없으므로 product.imageUrl 을 펼쳐 응답에 포함
+  const shaped = assets.map(({ product, ...a }) => ({
+    ...a,
+    imageUrl: product?.imageUrl ?? null,
+  }));
+  return NextResponse.json(shaped);
 }
 
 export async function POST(request: NextRequest) {

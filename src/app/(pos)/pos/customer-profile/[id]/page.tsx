@@ -284,7 +284,7 @@ export default function CustomerProfilePage({
                     primary={r.ticketNo}
                     secondary={`${repairStatusLabel(r.status)} · ${format(new Date(r.receivedAt), "yyyy-MM-dd")}`}
                     tail={`₩${Number(r.finalAmount).toLocaleString("ko-KR")}`}
-                    onClick={() => router.push(`/pos/repair-v2/${r.id}`)}
+                    onClick={() => router.push(`/pos/repairs/${r.id}`)}
                   />
                 ))}
               </div>

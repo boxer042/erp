@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <style>
+      .bg { fill: #111111; }
+      .fg { fill: #ffffff; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #f0f0f0; }
+        .fg { fill: #111111; }
+      }
+    </style>
+  </defs>
+  <rect class="bg" width="32" height="32" rx="6" />
+  <text
+    class="fg"
+    x="16"
+    y="22"
+    text-anchor="middle"
+    font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+    font-size="15"
+    font-weight="800"
+    letter-spacing="-0.5"
+  >jm</text>
+</svg>

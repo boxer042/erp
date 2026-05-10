@@ -28,7 +28,7 @@ export interface ActionDef {
 
 /**
  * @param canSendToCart v2 손님 페이지 안에서 호출 시 true — 픽업 대신 "카트에 추가" 노출.
- *                     repair-v2 standalone 진입 시 false — 자체 PickupSheet 사용 (v1 호환).
+ *                     repairs standalone 진입 시 false — 자체 PickupSheet 사용 (v1 호환).
  */
 export function nextActions(
   status: RepairStatus,

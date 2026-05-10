@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
-import type { RepairTicketRow } from "@/app/(pos)/pos/repair-v2/_types";
+import type { RepairTicketRow } from "@/app/(pos)/pos/repairs/_types";
 
 /**
  * 손님의 수리 티켓을 fetch + sessions 동기화.

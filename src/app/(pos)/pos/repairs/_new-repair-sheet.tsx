@@ -41,7 +41,7 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
 
   // 고객 검색
   const customersQuery = useQuery<Customer[]>({
-    queryKey: ["repair-v2", "customer-search", customerSearch],
+    queryKey: ["repairs", "customer-search", customerSearch],
     queryFn: () =>
       apiGet<Customer[]>(
         `/api/customers?search=${encodeURIComponent(customerSearch)}&limit=8`,

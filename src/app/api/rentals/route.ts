@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
           name: true,
           dailyRate: true,
           depositAmount: true,
+          product: { select: { imageUrl: true } },
         },
       },
       customer: { select: { id: true, name: true, phone: true } },
@@ -51,7 +52,19 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
     take: 200,
   });
-  return NextResponse.json(rentals);
+  // 클라이언트 편의 — asset.imageUrl 으로 펼침
+  const shaped = rentals.map((r) => ({
+    ...r,
+    asset: {
+      id: r.asset.id,
+      assetNo: r.asset.assetNo,
+      name: r.asset.name,
+      dailyRate: r.asset.dailyRate,
+      depositAmount: r.asset.depositAmount,
+      imageUrl: r.asset.product?.imageUrl ?? null,
+    },
+  }));
+  return NextResponse.json(shaped);
 }
 
 function diffUnits(rateType: "DAILY" | "MONTHLY", start: Date, end: Date) {

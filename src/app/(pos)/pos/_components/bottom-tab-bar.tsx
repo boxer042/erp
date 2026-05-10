@@ -60,7 +60,7 @@ export function BottomTabBar<T extends string>({
             <div className="relative text-[var(--jm-text)]">
               {prefixAction.icon}
               {prefixAction.badge != null && prefixAction.badge > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-bg)]0 px-1 text-[10px] font-bold tabular-nums text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-[10px] font-bold tabular-nums text-white">
                   {prefixAction.badge}
                 </span>
               )}
@@ -92,7 +92,7 @@ export function BottomTabBar<T extends string>({
               >
                 {t.icon}
                 {t.badge != null && t.badge > 0 && (
-                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-bg)]0 px-1 text-[10px] font-bold tabular-nums text-white">
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-[10px] font-bold tabular-nums text-white">
                     {t.badge}
                   </span>
                 )}
@@ -116,7 +116,7 @@ export function BottomTabBar<T extends string>({
             <div className="relative text-[var(--jm-text)]">
               {suffixAction.icon}
               {suffixAction.badge != null && suffixAction.badge > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-bg)]0 px-1 text-[10px] font-bold tabular-nums text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-[10px] font-bold tabular-nums text-white">
                   {suffixAction.badge}
                 </span>
               )}

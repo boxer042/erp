@@ -11,8 +11,8 @@ import {
   useSessions,
   type CartSession,
 } from "@/components/pos/sessions-context";
-import type { RepairTicketRow } from "@/app/(pos)/pos/repair-v2/_types";
-import { STATUS_META } from "@/app/(pos)/pos/repair-v2/_types";
+import type { RepairTicketRow } from "@/app/(pos)/pos/repairs/_types";
+import { STATUS_META } from "@/app/(pos)/pos/repairs/_types";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { useRepairSync } from "./_use-repair-sync";
 

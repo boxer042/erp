@@ -1,29 +1,43 @@
 "use client";
 
+import * as React from "react";
 import { useState } from "react";
 import {
   Activity,
+  BarChart3,
   Bell,
   Check,
+  Columns2,
   Copy,
   Edit,
+  FileText,
   Grid3x3,
   Heart,
+  Home,
   Inbox,
   List,
+  LogOut,
   MoreHorizontal,
+  Package,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
   ShoppingBag,
   ShoppingCart,
+  Square,
   Star,
   Trash2,
   Users,
+  Wrench,
   X,
 } from "lucide-react";
 import {
   JmBadge,
+  JmBrandMark,
+  type JmBrandMarkTone,
+  type JmBrandMarkVariant,
+  type JmBrandMarkShape,
   JmButton,
   JmCard,
   JmCardContent,
@@ -61,6 +75,7 @@ import {
   JmDrawerTrigger,
   JmDropdownMenu,
   JmDropdownMenuContent,
+  JmDropdownMenuGroup,
   JmDropdownMenuItem,
   JmDropdownMenuLabel,
   JmDropdownMenuSeparator,
@@ -86,7 +101,18 @@ import {
   JmTableToolbar,
   JmTableToolbarActions,
   JmTableToolbarFilters,
+  JmTableToolbarMore,
   JmTableToolbarSearch,
+  JmSidebar,
+  JmSidebarBody,
+  JmSidebarFooter,
+  JmSidebarGroup,
+  JmSidebarHeader,
+  JmSidebarItem,
+  JmSidebarProvider,
+  JmSidebarSeparator,
+  JmSidebarTrigger,
+  useJmSidebar,
   JmTabs,
   JmTabsIndicator,
   JmTabsList,
@@ -101,6 +127,7 @@ import {
   JmKbd,
   JmProgress,
   JmScope,
+  JmScrollArea,
   JmSegmentedControl,
   JmSeparator,
   JmSkeleton,
@@ -247,6 +274,7 @@ export default function JmShowcasePage() {
   const [tableSearch, setTableSearch] = useState("");
   const [tableStatus, setTableStatus] = useState<"all" | "active" | "inactive">("all");
   const [tableStock, setTableStock] = useState<"all" | "in" | "out">("all");
+  const [tableCategory, setTableCategory] = useState<string>("all");
 
   const filteredRows = SAMPLE_ROWS.filter((r) => {
     if (tableStatus !== "all" && r.status !== tableStatus) return false;
@@ -267,12 +295,17 @@ export default function JmShowcasePage() {
   const activeFilterCount =
     (tableStatus !== "all" ? 1 : 0) +
     (tableStock !== "all" ? 1 : 0) +
+    (tableCategory !== "all" ? 1 : 0) +
     (tableSearch.trim() ? 1 : 0);
+
+  const moreFilterCount =
+    (tableCategory !== "all" ? 1 : 0);
 
   const resetFilters = () => {
     setTableSearch("");
     setTableStatus("all");
     setTableStock("all");
+    setTableCategory("all");
   };
 
   return (
@@ -683,7 +716,7 @@ export default function JmShowcasePage() {
         {/* TABLE + TOOLBAR + FILTERING */}
         <Section
           title="테이블 + 필터 툴바"
-          subtitle="JmTableToolbar(Search/Filters/Actions) + JmTable. 아래 검색·필터를 조작하면 실제로 행이 줄어듭니다."
+          subtitle="JmTableToolbar — Grid 레이아웃 반응형. sm 미만에선 검색이 자기 행을 차지하고 칩은 가로 스크롤. 카테고리(Select) 처럼 폭 큰 필터는 JmTableToolbarMore 로 감싸 모바일에서 [필터 N] 버튼 → bottom drawer 로 보낸다. 창 폭을 줄여 확인."
         >
           <JmCard className="overflow-hidden p-0">
             <JmTableToolbar>
@@ -721,6 +754,23 @@ export default function JmShowcasePage() {
                     {v === "all" ? "재고 전체" : v === "in" ? "재고 있음" : "품절"}
                   </JmPill>
                 ))}
+                <JmTableToolbarMore
+                  count={moreFilterCount}
+                  onReset={() => setTableCategory("all")}
+                >
+                  <JmSelect
+                    size="sm"
+                    value={tableCategory}
+                    onChange={setTableCategory}
+                    options={[
+                      { value: "all", label: "전체 카테고리" },
+                      { value: "lens", label: "렌즈" },
+                      { value: "frame", label: "프레임" },
+                      { value: "accessory", label: "부속" },
+                    ]}
+                    className="w-[180px]"
+                  />
+                </JmTableToolbarMore>
                 {activeFilterCount > 0 && (
                   <button
                     type="button"
@@ -2214,6 +2264,22 @@ export default function JmShowcasePage() {
           </div>
         </Section>
 
+        {/* BRAND MARK */}
+        <Section
+          title="브랜드 마크"
+          subtitle="JmBrandMark — 브랜드/제품 모노그램. 사이드바 헤더, 빈 상태, 알림 source, 카드 헤더 등에 사용. 5 size × 3 variant × 6 tone × 3 shape. 다크모드 자동."
+        >
+          <BrandMarkShowcase />
+        </Section>
+
+        {/* SIDEBAR */}
+        <Section
+          title="사이드바"
+          subtitle="JmSidebar — 데스크톱 영구 노출, 모바일은 햄버거 → overlay drawer. expanded ↔ collapsed (icon-only) 토글. Active 는 user 가 직접 active prop 으로 넘김 (라우팅 모름). 아래 프레임 안에서 동작 — 창 폭을 줄이거나 토글 버튼을 눌러보세요."
+        >
+          <SidebarDemo />
+        </Section>
+
         {/* COMPOSITION DEMO */}
         <Section title="조합 예시" subtitle="실제 화면에서 어떻게 쓰이는지">
           <JmCard className="p-5">
@@ -2264,6 +2330,424 @@ export default function JmShowcasePage() {
     </div>
     </JmTooltipProvider>
     </JmScope>
+  );
+}
+
+function BrandMarkShowcase() {
+  const tones: { value: JmBrandMarkTone; label: string }[] = [
+    { value: "default", label: "default" },
+    { value: "success", label: "success" },
+    { value: "warning", label: "warning" },
+    { value: "danger", label: "danger" },
+    { value: "info", label: "info" },
+    { value: "accent", label: "accent" },
+  ];
+  const variants: JmBrandMarkVariant[] = ["solid", "subtle", "outline"];
+  const shapes: JmBrandMarkShape[] = ["square", "round", "squircle"];
+
+  return (
+    <div className="space-y-6">
+      {/* Size scale */}
+      <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+        <div className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          Size scale
+        </div>
+        <div className="flex items-end gap-6">
+          {(["xs", "sm", "md", "lg", "xl"] as const).map((s) => (
+            <div key={s} className="flex flex-col items-center gap-2">
+              <JmBrandMark text="jm" size={s} />
+              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                {s}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tone × Variant matrix */}
+      <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+        <div className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          Tone × Variant
+        </div>
+        <div className="grid grid-cols-[80px_1fr] gap-y-3">
+          <div />
+          <div className="grid grid-cols-3 gap-3 text-jm-xs text-[var(--jm-text-muted)]">
+            {variants.map((v) => (
+              <span key={v}>{v}</span>
+            ))}
+          </div>
+          {tones.map((t) => (
+            <React.Fragment key={t.value}>
+              <span className="self-center text-jm-xs text-[var(--jm-text-muted)]">
+                {t.label}
+              </span>
+              <div className="grid grid-cols-3 gap-3">
+                {variants.map((v) => (
+                  <JmBrandMark
+                    key={v}
+                    text="jm"
+                    size="md"
+                    tone={t.value}
+                    variant={v}
+                  />
+                ))}
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* Shape variants */}
+      <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+        <div className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          Shape (size lg 에서 차이가 잘 보임)
+        </div>
+        <div className="flex items-end gap-6">
+          {shapes.map((sh) => (
+            <div key={sh} className="flex flex-col items-center gap-2">
+              <JmBrandMark text="jm" size="lg" shape={sh} />
+              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                {sh}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Icon mode */}
+      <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+        <div className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          Icon mode (텍스트 대신 아이콘)
+        </div>
+        <div className="flex items-end gap-6">
+          <div className="flex flex-col items-center gap-2">
+            <JmBrandMark icon={<Package />} size="md" />
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+              상품
+            </span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <JmBrandMark icon={<Users />} size="md" tone="info" />
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+              고객
+            </span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <JmBrandMark
+              icon={<Wrench />}
+              size="md"
+              tone="warning"
+              variant="subtle"
+            />
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+              수리
+            </span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <JmBrandMark
+              icon={<ShoppingCart />}
+              size="md"
+              tone="accent"
+              shape="squircle"
+            />
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+              주문
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Light vs Dark side-by-side */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <JmScope theme="light">
+          <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+            <div className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+              Light theme
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {tones.map((t) => (
+                <JmBrandMark
+                  key={t.value}
+                  text="jm"
+                  size="md"
+                  tone={t.value}
+                  variant="solid"
+                />
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {tones.map((t) => (
+                <JmBrandMark
+                  key={t.value}
+                  text="jm"
+                  size="md"
+                  tone={t.value}
+                  variant="subtle"
+                />
+              ))}
+            </div>
+          </div>
+        </JmScope>
+        <JmScope theme="dark">
+          <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+            <div className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+              Dark theme
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {tones.map((t) => (
+                <JmBrandMark
+                  key={t.value}
+                  text="jm"
+                  size="md"
+                  tone={t.value}
+                  variant="solid"
+                />
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {tones.map((t) => (
+                <JmBrandMark
+                  key={t.value}
+                  text="jm"
+                  size="md"
+                  tone={t.value}
+                  variant="subtle"
+                />
+              ))}
+            </div>
+          </div>
+        </JmScope>
+      </div>
+
+      {/* Real-world examples */}
+      <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
+        <div className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          실제 사용 예시
+        </div>
+        <div className="space-y-3">
+          {/* Header brand pattern */}
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] px-3 py-2">
+            <JmBrandMark text="jm" size="sm" />
+            <span className="text-jm-sm font-bold text-[var(--jm-text)]">
+              jaewoomade
+            </span>
+            <span className="ml-auto text-jm-xs text-[var(--jm-text-muted)]">
+              헤더 / 사이드바 패턴
+            </span>
+          </div>
+          {/* Notification source */}
+          <div className="flex items-center gap-3 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] px-3 py-2">
+            <JmBrandMark
+              icon={<ShoppingCart />}
+              size="md"
+              tone="success"
+              variant="subtle"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-jm-sm font-semibold text-[var(--jm-text)]">
+                주문 #ORD260509-0042 결제 완료
+              </div>
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">
+                3분 전
+              </div>
+            </div>
+            <span className="text-jm-xs text-[var(--jm-text-muted)]">
+              알림 source 패턴
+            </span>
+          </div>
+          {/* Empty state */}
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] py-8">
+            <JmBrandMark
+              icon={<Inbox />}
+              size="xl"
+              tone="default"
+              variant="subtle"
+              shape="squircle"
+            />
+            <div className="text-jm-base font-semibold text-[var(--jm-text)]">
+              알림이 없습니다
+            </div>
+            <div className="text-jm-xs text-[var(--jm-text-muted)]">
+              빈 상태 패턴
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 아바타 → dropdown menu — 사이드바 모드 전환 + 로그아웃. */
+function SidebarDemoAvatarMenu() {
+  const { mode, setMode } = useJmSidebar();
+
+  const modeOptions: {
+    mode: "expanded" | "collapsed" | "expand-on-hover";
+    icon: React.ReactNode;
+    label: string;
+  }[] = [
+    { mode: "expanded", icon: <Columns2 className="size-4" />, label: "Expanded" },
+    { mode: "collapsed", icon: <Square className="size-4" />, label: "Collapsed" },
+    {
+      mode: "expand-on-hover",
+      icon: <PanelLeftOpen className="size-4" />,
+      label: "Expand on hover",
+    },
+  ];
+
+  return (
+    <JmDropdownMenu>
+      <JmDropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            aria-label="사용자 메뉴"
+            className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1 outline-none transition-colors hover:bg-[var(--jm-surface-muted)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+          />
+        }
+      >
+        <JmAvatar fallback="재" size="sm" />
+        <div className="min-w-0 flex-1 overflow-hidden text-left">
+          <div className="truncate text-jm-xs font-semibold text-[var(--jm-text)]">
+            재우
+          </div>
+          <div className="truncate text-jm-3xs text-[var(--jm-text-muted)]">
+            admin@jaewoo.dev
+          </div>
+        </div>
+        <MoreHorizontal className="size-4 shrink-0 text-[var(--jm-text-muted)]" />
+      </JmDropdownMenuTrigger>
+      <JmDropdownMenuContent side="top" align="start" className="w-56">
+        <JmDropdownMenuGroup>
+          <JmDropdownMenuLabel>Sidebar control</JmDropdownMenuLabel>
+          {modeOptions.map((opt) => {
+            const selected = mode === opt.mode;
+            return (
+              <JmDropdownMenuItem
+                key={opt.mode}
+                onClick={() => setMode(opt.mode)}
+              >
+                {opt.icon}
+                <span className="flex-1">{opt.label}</span>
+                {selected && (
+                  <span className="size-1.5 rounded-full bg-[var(--jm-action)]" />
+                )}
+              </JmDropdownMenuItem>
+            );
+          })}
+        </JmDropdownMenuGroup>
+        <JmDropdownMenuSeparator />
+        <JmDropdownMenuItem danger onClick={() => jmToast.info("로그아웃 (데모)")}>
+          <LogOut className="size-4" />
+          <span>로그아웃</span>
+        </JmDropdownMenuItem>
+      </JmDropdownMenuContent>
+    </JmDropdownMenu>
+  );
+}
+
+function SidebarDemo() {
+  const [active, setActive] = useState<string>("home");
+  const NAV: { key: string; icon: React.ReactNode; label: string; badge?: number }[] = [
+    { key: "home", icon: <Home />, label: "대시보드" },
+    { key: "orders", icon: <ShoppingCart />, label: "주문", badge: 3 },
+    { key: "products", icon: <Package />, label: "상품" },
+    { key: "customers", icon: <Users />, label: "고객" },
+    { key: "repairs", icon: <Wrench />, label: "수리" },
+    { key: "reports", icon: <BarChart3 />, label: "리포트" },
+    { key: "documents", icon: <FileText />, label: "문서" },
+  ];
+  const current = NAV.find((n) => n.key === active);
+
+  return (
+    <JmSidebarProvider defaultMode="expanded">
+      {/* 시연용 프레임 — 실제 사용에선 페이지 루트가 이 flex 컨테이너 */}
+      <div className="flex h-[520px] overflow-hidden rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-bg)]">
+        <JmSidebar>
+          <JmSidebarHeader>
+            <JmBrandMark text="jm" size="sm" />
+            <span className="min-w-0 truncate text-jm-sm font-bold text-[var(--jm-text)]">
+              jaewoomade
+            </span>
+          </JmSidebarHeader>
+
+          <JmSidebarBody>
+            <JmSidebarGroup label="메뉴">
+              {NAV.map((n) => (
+                <JmSidebarItem
+                  key={n.key}
+                  icon={n.icon}
+                  active={active === n.key}
+                  onClick={() => setActive(n.key)}
+                  trailing={
+                    n.badge ? (
+                      <JmBadge size="sm" variant="solid">
+                        {n.badge}
+                      </JmBadge>
+                    ) : null
+                  }
+                >
+                  {n.label}
+                </JmSidebarItem>
+              ))}
+            </JmSidebarGroup>
+
+            <JmSidebarSeparator />
+
+            <JmSidebarGroup label="설정">
+              <JmSidebarItem
+                icon={<Settings />}
+                active={active === "settings"}
+                onClick={() => setActive("settings")}
+              >
+                회사 정보
+              </JmSidebarItem>
+              <JmSidebarItem
+                icon={<Bell />}
+                active={active === "notifications"}
+                onClick={() => setActive("notifications")}
+                trailing={<JmKbd>⌘N</JmKbd>}
+              >
+                알림
+              </JmSidebarItem>
+            </JmSidebarGroup>
+          </JmSidebarBody>
+
+          <JmSidebarFooter>
+            <SidebarDemoAvatarMenu />
+          </JmSidebarFooter>
+        </JmSidebar>
+
+        {/* 메인 영역 */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-surface)] px-4">
+            <JmSidebarTrigger className="sm:hidden" />
+            <h3 className="text-jm-base font-bold text-[var(--jm-text)]">
+              {current?.label ?? "대시보드"}
+            </h3>
+            <JmBadge variant="outline" size="sm" className="ml-2">
+              {active}
+            </JmBadge>
+          </div>
+          <div className="flex-1 min-h-0">
+            <JmScrollArea className="h-full" viewportClassName="p-6">
+              {/* 일부러 길게 — 스크롤바가 콘텐츠 폭을 잠식하지 않는지 확인 */}
+              <div className="space-y-3 text-jm-sm text-[var(--jm-text-muted)]">
+                <div className="text-jm-base font-bold text-[var(--jm-text)]">
+                  {current?.label} 콘텐츠 영역
+                </div>
+                {Array.from({ length: 30 }).map((_, i) => (
+                  <p key={i}>
+                    {i + 1}. JmScrollArea 는 콘텐츠 영역, 사이드바, 카드 본문 등
+                    어디든 같은 컴포넌트 그대로 사용. props 로 두께·가시성·방향 조절.
+                  </p>
+                ))}
+              </div>
+            </JmScrollArea>
+          </div>
+        </div>
+      </div>
+    </JmSidebarProvider>
   );
 }
 

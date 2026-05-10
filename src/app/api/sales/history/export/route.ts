@@ -2,7 +2,14 @@ import { NextRequest } from "next/server";
 import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
-import type { OrderPaymentMethod, Prisma } from "@prisma/client";
+import type {
+  OrderClaimReason,
+  OrderClaimType,
+  OrderPaymentMethod,
+  OrderPaymentStatus,
+  OrderStatus,
+  Prisma,
+} from "@prisma/client";
 
 const TYPE_LABEL: Record<string, string> = {
   product: "판매",
@@ -18,6 +25,52 @@ const PAYMENT_LABEL: Record<string, string> = {
   UNPAID: "외상",
 };
 
+const PAYMENT_STATUS_LABEL: Record<OrderPaymentStatus, string> = {
+  UNPAID: "외상",
+  PAID: "결제완료",
+  REFUND_PENDING: "환불진행",
+  PARTIAL_REFUND: "부분환불",
+  REFUNDED: "환불완료",
+  SALES_CANCELLED: "매출취소",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: "주문/접수",
+  PREPARING: "출고대기",
+  PREPARING_PACKED: "출고확정",
+  SHIPPED: "배송중",
+  COMPLETED: "배송완료",
+  RETURN_REQUESTED: "반품요청",
+  RETURN_ACCEPTED: "회수대기",
+  RETURN_COLLECTED: "회수완료",
+  RETURN_INSPECTED: "검수완료",
+  RETURNED: "반품완료",
+  EXCHANGED: "교환완료",
+  CANCELLED: "취소",
+  PICKED_UP: "수리완료(픽업)",
+};
+
+const CLAIM_TYPE_LABEL: Record<OrderClaimType, string> = {
+  REFUND: "환불",
+  EXCHANGE_SAME: "같은상품교환",
+  EXCHANGE_DIFFERENT: "다른상품교환",
+};
+
+const CLAIM_REASON_LABEL: Record<OrderClaimReason, string> = {
+  DEFECTIVE: "불량/하자",
+  DAMAGED_IN_TRANSIT: "배송파손",
+  WRONG_ITEM: "오배송",
+  CHANGE_MIND: "단순변심",
+  SIZE_COLOR: "사이즈/색상",
+  OTHER: "기타",
+};
+
+const FULFILLMENT_LABEL: Record<string, string> = {
+  PICKUP: "매장수령",
+  DELIVERY: "배달",
+  SHIPPING: "택배",
+};
+
 function csvEscape(value: unknown): string {
   if (value == null) return "";
   const s = String(value);
@@ -27,9 +80,21 @@ function csvEscape(value: unknown): string {
   return s;
 }
 
+const STATUS_GROUP_MAP: Record<string, OrderStatus[]> = {
+  in_progress: ["PENDING", "PREPARING", "PREPARING_PACKED", "SHIPPED"],
+  confirmed: ["COMPLETED"],
+  claim: [
+    "RETURN_REQUESTED",
+    "RETURN_ACCEPTED",
+    "RETURN_COLLECTED",
+    "RETURN_INSPECTED",
+  ],
+  terminal: ["RETURNED", "EXCHANGED"],
+};
+
 /**
- * 통합 판매내역 CSV — /api/sales/history 와 동일한 필터.
- * 정규화된 한 행을 그대로 한 row 로 직렬화.
+ * 통합 판매내역 CSV — /api/sales/history 와 동일한 필터를 적용.
+ * 정규화된 한 행을 그대로 한 row 로 직렬화. 3축(출고/결제/클레임) 모두 포함.
  */
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -46,15 +111,37 @@ export async function GET(request: NextRequest) {
   const paymentMethod = searchParams.get(
     "paymentMethod",
   ) as OrderPaymentMethod | null;
+  const paymentStatus = searchParams.get(
+    "paymentStatus",
+  ) as OrderPaymentStatus | null;
+  const statusGroup = searchParams.get("statusGroup") ?? "all";
+  const channelFilter = searchParams.get("channelFilter");
   const customerId = searchParams.get("customerId");
   const search = (searchParams.get("search") || "").trim();
+  const includeExchangeReplacement =
+    searchParams.get("includeExchangeReplacement") === "1";
 
   const fromDate = from ? new Date(`${from}T00:00:00`) : null;
   const toDate = to ? new Date(`${to}T23:59:59`) : null;
 
-  // ── Order ──
+  const statusFilter: Prisma.OrderWhereInput =
+    statusGroup === "all" || !STATUS_GROUP_MAP[statusGroup]
+      ? { status: { not: "CANCELLED" } }
+      : { status: { in: STATUS_GROUP_MAP[statusGroup] } };
+
+  const channelWhere: Prisma.OrderWhereInput =
+    channelFilter === "offline"
+      ? { channelId: null }
+      : channelFilter && channelFilter !== "all"
+        ? { channelId: channelFilter }
+        : {};
+
   const orderWhere: Prisma.OrderWhereInput = {
-    status: { not: "CANCELLED" },
+    ...statusFilter,
+    ...channelWhere,
+    ...(includeExchangeReplacement
+      ? {}
+      : { exchangedFromOrders: { none: {} } }),
     ...(fromDate || toDate
       ? {
           orderDate: {
@@ -64,11 +151,13 @@ export async function GET(request: NextRequest) {
         }
       : {}),
     ...(paymentMethod ? { paymentMethod } : {}),
+    ...(paymentStatus ? { paymentStatus } : {}),
     ...(customerId ? { customerId } : {}),
     ...(search
       ? {
           OR: [
             { orderNo: { contains: search, mode: "insensitive" } },
+            { channelOrderNo: { contains: search, mode: "insensitive" } },
             { customerName: { contains: search, mode: "insensitive" } },
             { customerPhone: { contains: search } },
           ],
@@ -81,12 +170,17 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       orderNo: true,
+      channelOrderNo: true,
       orderDate: true,
       customerName: true,
       customerPhone: true,
       paymentMethod: true,
+      paymentStatus: true,
       totalAmount: true,
       status: true,
+      claimType: true,
+      claimReason: true,
+      fulfillmentType: true,
       repairTicketId: true,
       rentalId: true,
       channel: { select: { name: true } },
@@ -104,8 +198,10 @@ export async function GET(request: NextRequest) {
     orders.map((o) => o.rentalId).filter((v): v is string => !!v),
   );
 
+  const orphanIncluded = !channelFilter || channelFilter === "all" || channelFilter === "offline";
+
   const orphanTickets =
-    type === "product" || type === "rental"
+    type === "product" || type === "rental" || !orphanIncluded
       ? []
       : await prisma.repairTicket.findMany({
           where: {
@@ -153,7 +249,7 @@ export async function GET(request: NextRequest) {
         });
 
   const orphanRentals =
-    type === "product" || type === "repair"
+    type === "product" || type === "repair" || !orphanIncluded
       ? []
       : await prisma.rental.findMany({
           where: {
@@ -204,56 +300,71 @@ export async function GET(request: NextRequest) {
   type Row = {
     type: string;
     refNo: string;
+    channelOrderNo: string | null;
     date: Date;
     customerName: string | null;
     customerPhone: string | null;
     channelName: string | null;
     paymentMethod: OrderPaymentMethod | null;
-    amount: number;
+    paymentStatus: OrderPaymentStatus;
     status: string;
+    claimType: OrderClaimType | null;
+    claimReason: OrderClaimReason | null;
+    fulfillmentType: string | null;
+    amount: number;
   };
 
   const orderRows: Row[] = orders.map((o) => ({
-    type: o.repairTicketId
-      ? "repair"
-      : o.rentalId
-        ? "rental"
-        : "product",
-    refNo:
-      o.repairTicket?.ticketNo ??
-      o.rental?.rentalNo ??
-      o.orderNo,
+    type: o.repairTicketId ? "repair" : o.rentalId ? "rental" : "product",
+    refNo: o.repairTicket?.ticketNo ?? o.rental?.rentalNo ?? o.orderNo,
+    channelOrderNo: o.channelOrderNo,
     date: o.orderDate,
     customerName: o.customerName,
     customerPhone: o.customerPhone,
     channelName: o.channel?.name ?? null,
     paymentMethod: o.paymentMethod,
-    amount: Number(o.totalAmount),
+    paymentStatus: o.paymentStatus,
     status: o.status,
+    claimType: o.claimType,
+    claimReason: o.claimReason,
+    fulfillmentType: o.fulfillmentType,
+    amount: Number(o.totalAmount),
   }));
 
   const orphanRepairRows: Row[] = orphanTickets.map((t) => ({
     type: "repair",
     refNo: t.ticketNo,
+    channelOrderNo: null,
     date: t.pickedUpAt ?? t.createdAt,
     customerName: t.customer?.name ?? null,
     customerPhone: t.customer?.phone ?? null,
     channelName: null,
     paymentMethod: t.paymentMethod,
-    amount: Number(t.finalAmount),
+    paymentStatus:
+      !t.paymentMethod || t.paymentMethod === "UNPAID" ? "UNPAID" : "PAID",
     status: "PICKED_UP",
+    claimType: null,
+    claimReason: null,
+    fulfillmentType: null,
+    amount: Number(t.finalAmount),
   }));
 
   const orphanRentalRows: Row[] = orphanRentals.map((r) => ({
     type: "rental",
     refNo: r.rentalNo,
+    channelOrderNo: null,
     date: r.actualReturnedAt ?? r.createdAt,
     customerName: r.customer?.name ?? null,
     customerPhone: r.customer?.phone ?? null,
     channelName: null,
     paymentMethod: r.paymentMethod,
-    amount: Number(r.finalAmount),
+    paymentStatus:
+      !r.paymentMethod || r.paymentMethod === "UNPAID" ? "UNPAID" : "PAID",
     status: "RETURNED",
+    claimType: null,
+    claimReason: null,
+    fulfillmentType: null,
+    amount: Number(r.finalAmount),
   }));
 
   const filteredOrders = type
@@ -268,12 +379,17 @@ export async function GET(request: NextRequest) {
     [
       "타입",
       "번호",
+      "채널주문번호",
       "일시",
       "채널",
       "고객",
       "전화",
+      "출고상태",
+      "결제상태",
       "결제수단",
-      "상태",
+      "클레임유형",
+      "클레임사유",
+      "출고방식",
       "금액",
     ]
       .map(csvEscape)
@@ -285,12 +401,17 @@ export async function GET(request: NextRequest) {
       [
         TYPE_LABEL[r.type] ?? r.type,
         r.refNo,
+        r.channelOrderNo ?? "",
         format(r.date, "yyyy-MM-dd HH:mm"),
         r.channelName ?? "",
         r.customerName ?? "(미등록)",
         r.customerPhone ?? "",
+        STATUS_LABEL[r.status] ?? r.status,
+        PAYMENT_STATUS_LABEL[r.paymentStatus] ?? r.paymentStatus,
         r.paymentMethod ? PAYMENT_LABEL[r.paymentMethod] ?? r.paymentMethod : "",
-        r.status,
+        r.claimType ? CLAIM_TYPE_LABEL[r.claimType] : "",
+        r.claimReason ? CLAIM_REASON_LABEL[r.claimReason] : "",
+        r.fulfillmentType ? FULFILLMENT_LABEL[r.fulfillmentType] : "",
         r.amount.toString(),
       ]
         .map(csvEscape)

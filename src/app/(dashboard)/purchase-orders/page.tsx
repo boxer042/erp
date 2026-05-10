@@ -11,7 +11,6 @@ import {
   jmToast as toast,
   JmButton,
   JmCard,
-  JmContainer,
   JmIconButton,
   JmPill,
   JmSearchInput,
@@ -192,8 +191,8 @@ function PurchaseOrdersPageInner() {
   }, [listQuery.data, search]);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-[var(--jm-bg)]">
-      <JmContainer width="wide" padded={false} className="flex flex-col gap-6 p-6">
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex w-full flex-col gap-6 p-4">
         <JmCard className="overflow-hidden p-0">
           <JmTableToolbar>
             <JmTableToolbarSearch>
@@ -306,7 +305,7 @@ function PurchaseOrdersPageInner() {
             </JmTable>
           </div>
         </JmCard>
-      </JmContainer>
+      </div>
 
       <PurchaseOrderCreateSheet
         open={sheetOpen}

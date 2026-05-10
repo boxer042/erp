@@ -252,7 +252,7 @@ function Body({
                     key={r.id}
                     onClick={() => {
                       close();
-                      router.push(`/pos/repair-v2/${r.id}`);
+                      router.push(`/pos/repairs/${r.id}`);
                     }}
                   >
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text)]">

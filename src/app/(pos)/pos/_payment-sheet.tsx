@@ -259,7 +259,7 @@ function Body({
   const [shippingAddress, setShippingAddress] = useState("");
 
   // 결제 대상 = 상품 + 임대 + 수리(미연결: repairTicketId 없는 즉석 수리). 수리는 자체 픽업 흐름이 별도라
-  // RepairTicket 픽업은 RepairV2Detail 의 PickupSheet 에서 처리. 여기선 카트 라인만.
+  // RepairTicket 픽업은 RepairDetail 의 PickupSheet 에서 처리. 여기선 카트 라인만.
   const productItems = session.items.filter((i) => i.itemType === "product");
   const rentalItems = session.items.filter((i) => i.itemType === "rental");
   const repairItems = session.items.filter((i) => i.itemType === "repair");

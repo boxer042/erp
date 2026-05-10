@@ -34,7 +34,7 @@ export function PartsSection({
   const [search, setSearch] = useState("");
 
   const productsQuery = useQuery({
-    queryKey: ["repair-v2", "products"],
+    queryKey: ["repairs", "products"],
     queryFn: () =>
       apiGet<ProductOption[]>(`/api/products?isBulk=all&excludeVariants=true`),
     enabled: adding,

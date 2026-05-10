@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
@@ -39,7 +40,8 @@ interface Props {
  * 거래명세표는 결제 완료(PaymentSheet onSuccess)에서 자동 발행 — 영수증 성격.
  */
 export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabels }: Props) {
-  const { setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels } =
+  const router = useRouter();
+  const { setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, forceSync } =
     useSessions();
   const items = session.items;
   const totals = calcCartTotals(session);
@@ -53,9 +55,24 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
     session.quotationFingerprint !== "" &&
     session.quotationFingerprint !== currentFingerprint;
 
-  const [issuingKind, setIssuingKind] = useState<"quotation" | "serial" | null>(null);
+  const [issuingKind, setIssuingKind] = useState<"quotation" | "serial" | "park" | null>(null);
   const [discountOpen, setDiscountOpen] = useState(false);
   const [shippingOpen, setShippingOpen] = useState(false);
+
+  const parkMutation = useMutation({
+    mutationFn: () =>
+      apiMutate<{ ok: true }>(`/api/pos/sessions/${session.id}/park`, "POST"),
+    onMutate: () => setIssuingKind("park"),
+    onSuccess: async () => {
+      toast.success("장바구니에 저장되었습니다");
+      onOpenChange(false);
+      await forceSync();
+      router.push("/pos");
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장에 실패했습니다"),
+    onSettled: () => setIssuingKind(null),
+  });
 
   // 트래커블 발번 후보 — 상품 라인 중 productId 있는 것
   const trackableCandidates = items
@@ -180,9 +197,9 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
           </div>
         )}
 
-        {/* 액션 — [할인][배송비][시리얼출력][견적서] (5번째 슬롯 보류) */}
+        {/* 액션 — [할인][배송비][시리얼출력][장바구니저장][견적서] */}
         {items.length > 0 && (
-          <div className="mt-3 grid grid-cols-4 gap-1.5">
+          <div className="mt-3 grid grid-cols-5 gap-1.5">
             <ActionButton
               label="할인"
               sub={
@@ -217,6 +234,19 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               pending={issuingKind === "serial"}
             />
             <ActionButton
+              label="장바구니저장"
+              sub="저장된 상담"
+              disabled={issuingKind !== null}
+              onClick={() => {
+                const ok = window.confirm(
+                  "이 카트를 장바구니로 저장합니다.\n그리드에서 사라지지만 \"저장된 상담\" 페이지에서 다시 불러올 수 있습니다.",
+                );
+                if (!ok) return;
+                parkMutation.mutate();
+              }}
+              pending={issuingKind === "park"}
+            />
+            <ActionButton
               label={hasPriorQuotation ? "견적서" : "견적서"}
               sub={
                 !canIssue
@@ -242,7 +272,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               pending={issuingKind === "quotation"}
             />
             {cartChangedSinceQuotation && (
-              <p className="col-span-4 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
+              <p className="col-span-5 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
                 ⚠ 카트가 발행 후 변경됨 — 견적서 버튼 다시 눌러 재발행
               </p>
             )}

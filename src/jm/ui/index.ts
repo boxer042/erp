@@ -2,6 +2,14 @@ export { JmButton, jmButtonVariants, type JmButtonProps } from "./button";
 export { JmIconButton, type JmIconButtonProps } from "./icon-button";
 export { JmBadge, type JmBadgeProps } from "./badge";
 export {
+  JmBrandMark,
+  type JmBrandMarkProps,
+  type JmBrandMarkSize,
+  type JmBrandMarkVariant,
+  type JmBrandMarkTone,
+  type JmBrandMarkShape,
+} from "./brand-mark";
+export {
   JmCard,
   JmCardHeader,
   JmCardTitle,
@@ -30,7 +38,27 @@ export {
   JmTableToolbarSearch,
   JmTableToolbarFilters,
   JmTableToolbarActions,
+  JmTableToolbarMore,
+  type JmTableToolbarMoreProps,
 } from "./table-toolbar";
+export { JmScrollArea, type JmScrollAreaProps } from "./scroll-area";
+export {
+  JmSidebarProvider,
+  JmSidebar,
+  JmSidebarHeader,
+  JmSidebarBody,
+  JmSidebarFooter,
+  JmSidebarGroup,
+  JmSidebarSeparator,
+  JmSidebarItem,
+  JmSidebarTrigger,
+  useJmSidebar,
+  type JmSidebarProviderProps,
+  type JmSidebarProps,
+  type JmSidebarGroupProps,
+  type JmSidebarItemProps,
+  type JmSidebarTriggerProps,
+} from "./sidebar";
 export {
   JmDrawer,
   JmDrawerTrigger,

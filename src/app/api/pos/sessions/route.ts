@@ -45,7 +45,7 @@ export async function GET() {
   if (deny) return deny;
 
   const rows = await prisma.posSession.findMany({
-    where: { userId: user.id, deletedAt: null },
+    where: { userId: user.id, deletedAt: null, parkedAt: null },
     include: {
       customer: {
         select: { type: true, businessNumber: true },
@@ -196,8 +196,9 @@ export async function POST(request: NextRequest) {
     if (deletedIds.includes(s.id)) continue;
     const server = existingById.get(s.id);
 
-    // 다른 기기가 삭제한 세션 — 거부 (클라이언트가 sessionStorage 에서 제거하도록 알림)
-    if (server && server.deletedAt) {
+    // 다른 기기가 삭제 / 장바구니 저장한 세션 — 거부 (클라이언트가 sessionStorage 에서 제거하도록 알림)
+    // parkedAt 도 거부 사유에 포함 — 한 번 저장된 세션은 unpark API 로만 활성화 가능
+    if (server && (server.deletedAt || server.parkedAt)) {
       rejectedIds.push(s.id);
       continue;
     }
@@ -236,9 +237,9 @@ export async function POST(request: NextRequest) {
   }
   if (upserts.length > 0) await Promise.all(upserts);
 
-  // 3) 응답 — 현재 user 의 활성 세션 + rejected ID 들
+  // 3) 응답 — 현재 user 의 활성 세션 + rejected ID 들 (장바구니 저장된 것은 별도 API 에서 조회)
   const fresh = await prisma.posSession.findMany({
-    where: { userId: user.id, deletedAt: null },
+    where: { userId: user.id, deletedAt: null, parkedAt: null },
     include: {
       customer: { select: { type: true, businessNumber: true } },
     },

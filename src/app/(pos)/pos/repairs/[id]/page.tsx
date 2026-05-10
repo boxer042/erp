@@ -22,23 +22,23 @@ import { PickupSheet } from "../_pickup-sheet";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 import { BottomSheet } from "@/app/(pos)/pos/_components/bottom-sheet";
 
-/** 라우트 진입점 — params 받아 RepairV2Detail 에 위임. */
-export default function RepairV2DetailPage({
+/** 라우트 진입점 — params 받아 RepairDetail 에 위임. */
+export default function RepairDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <RepairV2Detail ticketId={id} />;
+  return <RepairDetail ticketId={id} />;
 }
 
-interface RepairV2DetailProps {
+interface RepairDetailProps {
   ticketId: string;
-  /** ← 버튼 클릭 — 미제공이면 router.push("/pos/repair-v2") 로 fallback */
+  /** ← 버튼 클릭 — 미제공이면 router.push("/pos/repairs") 로 fallback */
   onBack?: () => void;
   /**
    * READY 상태에서 "카트에 추가" 버튼을 누르면 호출.
-   * 미제공이면 자체 PickupSheet 가 결제 처리 (repair-v2 standalone 호환).
+   * 미제공이면 자체 PickupSheet 가 결제 처리 (repairs standalone 호환).
    * v2 손님 페이지(수리 탭) 가 이 prop 으로 카트에 라인 추가 + 카트 시트 열기.
    */
   onAddToCart?: (ticket: RepairTicketDetail, finalAmount: number) => void;
@@ -49,16 +49,16 @@ interface RepairV2DetailProps {
 }
 
 /**
- * 수리 v2 작업 화면 — repair-v2 라우트와 v2 손님 페이지(수리 탭) 가 공유.
+ * 수리 v2 작업 화면 — repairs 라우트와 v2 손님 페이지(수리 탭) 가 공유.
  * shadcn 0개. 부속·공임·진단비·할인 입력 + (onAddToCart 있으면 카트 통합 결제, 없으면 자체 픽업).
  */
-export function RepairV2Detail({
+export function RepairDetail({
   ticketId,
   onBack,
   onAddToCart,
   hideHeader,
   onCustomerClick,
-}: RepairV2DetailProps) {
+}: RepairDetailProps) {
   const id = ticketId;
   const router = useRouter();
   const qc = useQueryClient();
@@ -66,20 +66,20 @@ export function RepairV2Detail({
   const [cancelOpen, setCancelOpen] = useState(false);
 
   const ticketQuery = useQuery({
-    queryKey: ["repair-v2", "detail", id],
+    queryKey: ["repairs", "detail", id],
     queryFn: () => apiGet<RepairTicketDetail>(`/api/repair-tickets/${id}`),
   });
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["repair-v2", "detail", id] });
-    qc.invalidateQueries({ queryKey: ["repair-v2", "list"] });
+    qc.invalidateQueries({ queryKey: ["repairs", "detail", id] });
+    qc.invalidateQueries({ queryKey: ["repairs", "list"] });
     // POS v2 손님 페이지의 수리 리스트 (useRepairSync) — 새로고침 없이 즉시 반영
     qc.invalidateQueries({ queryKey: ["pos-v2", "repairs"] });
     // 어드민/POS 기존 페이지도 함께
     qc.invalidateQueries({ queryKey: ["repairs"] });
   };
 
-  const goBack = onBack ?? (() => router.push("/pos/repair-v2"));
+  const goBack = onBack ?? (() => router.push("/pos/repairs"));
 
   const transitionMutation = useMutation<
     { success: boolean; hardDeleted?: boolean },
@@ -234,7 +234,7 @@ export function RepairV2Detail({
               serialItemId={t.serialItem.id}
               serialCode={t.serialItem.code}
               currentTicketId={t.id}
-              onClickTicket={(id) => router.push(`/pos/repair-v2/${id}`)}
+              onClickTicket={(id) => router.push(`/pos/repairs/${id}`)}
             />
           )}
 
@@ -243,7 +243,7 @@ export function RepairV2Detail({
             <RevisitCard
               parent={t.parentRepairTicket}
               revisits={t.revisits}
-              onClickTicket={(id) => router.push(`/pos/repair-v2/${id}`)}
+              onClickTicket={(id) => router.push(`/pos/repairs/${id}`)}
             />
           )}
 
@@ -720,7 +720,7 @@ function CategoryModeForm({
   const historyQuery = useQuery<
     Array<{ id: string; name: string; sku: string }>
   >({
-    queryKey: ["repair-v2", "category-history", customerId, categoryId ?? "all"],
+    queryKey: ["repairs", "category-history", customerId, categoryId ?? "all"],
     queryFn: () =>
       apiGet<Array<{ id: string; name: string; sku: string }>>(
         `/api/customers/${customerId}/repair-devices${
@@ -734,7 +734,7 @@ function CategoryModeForm({
   const productsQuery = useQuery<
     Array<{ id: string; name: string; sku: string; imageUrl: string | null }>
   >({
-    queryKey: ["repair-v2", "category-search", categoryId ?? "all", trimmed],
+    queryKey: ["repairs", "category-search", categoryId ?? "all", trimmed],
     queryFn: () => {
       const sp = new URLSearchParams();
       if (categoryId) sp.set("categoryId", categoryId);
@@ -1028,7 +1028,7 @@ function SearchModeForm({
 }) {
   const [query, setQuery] = useState("");
   const productsQuery = useQuery<ProductSearchResult[]>({
-    queryKey: ["repair-v2", "device-product-search", query],
+    queryKey: ["repairs", "device-product-search", query],
     queryFn: () =>
       apiGet<ProductSearchResult[]>(
         `/api/products?search=${encodeURIComponent(query)}&excludeVariants=true`,
@@ -1173,7 +1173,7 @@ function SerialHistoryCard({
   onClickTicket: (id: string) => void;
 }) {
   const historyQuery = useQuery<RepairTicketRow[]>({
-    queryKey: ["repair-v2", "serial-history", serialItemId, currentTicketId],
+    queryKey: ["repairs", "serial-history", serialItemId, currentTicketId],
     queryFn: () =>
       apiGet<RepairTicketRow[]>(
         `/api/repair-tickets?serialItemId=${serialItemId}&excludeId=${currentTicketId}`,
@@ -1343,7 +1343,7 @@ function PackagesCard({
   onApplied: () => void;
 }) {
   const packagesQuery = useQuery<RepairPackageRow[]>({
-    queryKey: ["repair-v2", "packages"],
+    queryKey: ["repairs", "packages"],
     queryFn: () => apiGet<RepairPackageRow[]>("/api/repair-packages"),
     staleTime: 1000 * 60 * 5,
   });
@@ -1838,10 +1838,10 @@ function HardDeleteButton({
     mutationFn: () => apiMutate(`/api/repair-tickets/${ticketId}`, "DELETE"),
     onSuccess: () => {
       toast.success("영구 삭제됨");
-      // 호출 측 caches 모두 무효화 — RepairMode 의 useRepairSync, repair-v2 list, 어드민 repairs
+      // 호출 측 caches 모두 무효화 — RepairMode 의 useRepairSync, repairs list, 어드민 repairs
       qc.invalidateQueries({ queryKey: ["pos-v2", "repairs"] });
-      qc.invalidateQueries({ queryKey: ["repair-v2", "list"] });
-      qc.invalidateQueries({ queryKey: ["repair-v2", "detail", ticketId] });
+      qc.invalidateQueries({ queryKey: ["repairs", "list"] });
+      qc.invalidateQueries({ queryKey: ["repairs", "detail", ticketId] });
       qc.invalidateQueries({ queryKey: ["repairs"] });
       onDeleted();
     },

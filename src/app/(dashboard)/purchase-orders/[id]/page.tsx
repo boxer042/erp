@@ -198,7 +198,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
   const canDelete = data.status === "DRAFT" && !hasNonCancelledIncoming;
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-[var(--jm-bg)]">
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
       {/* 헤더 — sticky, 페이지 폭 제한 없음 (액션 버튼 다 보이도록) */}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
         <JmIconButton aria-label="뒤로" onClick={() => router.push("/purchase-orders")} size="sm">
@@ -458,7 +458,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
             </div>
           </JmCard>
         )}
-      </div>
+      </JmContainer>
 
       {/* 토큰 링크 다이얼로그 */}
       <JmDialog open={tokenLink !== null} onOpenChange={(v) => !v && setTokenLink(null)}>

@@ -15,7 +15,7 @@ import {
   deriveTempColor,
 } from "@/components/pos/temp-customer";
 import { BottomSheet } from "./_components/bottom-sheet";
-import { fmtKRW } from "./repair-v2/_helpers";
+import { fmtKRW } from "./repairs/_helpers";
 
 interface RentalAsset {
   id: string;

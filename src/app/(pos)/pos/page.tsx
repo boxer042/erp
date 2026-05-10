@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSessions } from "@/components/pos/sessions-context";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { apiMutate, ApiError } from "@/lib/api-client";
+import { useSessions, type CartSession } from "@/components/pos/sessions-context";
 import { CustomerCard } from "./_components/customer-card";
 import { MenuSheet } from "./_components/menu-sheet";
+import { BottomSheet } from "./_components/bottom-sheet";
 import { LinkCustomerSheet } from "./_link-customer-sheet";
 import { QuickCustomerSheet } from "./_quick-customer-sheet";
 import { GlobalSearchSheet } from "./_global-search-sheet";
@@ -28,6 +33,7 @@ export default function PosV2HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickRegister, setQuickRegister] = useState<{ defaultText: string } | null>(null);
+  const [closeTarget, setCloseTarget] = useState<CartSession | null>(null);
   const [gridFilter, setGridFilter] = useState("");
   const [gridTypeFilter, setGridTypeFilter] = useState<
     "ALL" | "INDIVIDUAL" | "BUSINESS" | "UNREGISTERED"
@@ -234,20 +240,34 @@ export default function PosV2HomePage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {filteredSessions.map((s) => (
-                    <CustomerCard
-                      key={s.id}
-                      session={s}
-                      onClick={() => goToCustomer(s.id)}
-                      onClose={
-                        s.items.length === 0 && (s.openRepairCount ?? 0) === 0
-                          ? () => {
-                              removeSession(s.id);
-                            }
-                          : undefined
-                      }
-                    />
-                  ))}
+                  {filteredSessions.map((s) => {
+                    // X 정책 (B안):
+                    //   카트 비어있음 + (등록 || 수리 0) → 즉시 제거
+                    //   카트 비어있음 + 미등록 + 수리 ≥ 1   → X 막음 (수리 추적 끊김 방지)
+                    //   카트 ≥ 1                            → 다이얼로그 (장바구니저장 / 그냥닫기 / 취소)
+                    const isRegistered = !!s.customerId;
+                    const hasItems = s.items.length > 0;
+                    const hasOpenRepair = (s.openRepairCount ?? 0) > 0;
+                    const blocked = !hasItems && !isRegistered && hasOpenRepair;
+                    return (
+                      <CustomerCard
+                        key={s.id}
+                        session={s}
+                        onClick={() => goToCustomer(s.id)}
+                        onClose={
+                          blocked
+                            ? undefined
+                            : () => {
+                                if (!hasItems) {
+                                  removeSession(s.id);
+                                  return;
+                                }
+                                setCloseTarget(s);
+                              }
+                        }
+                      />
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -305,6 +325,8 @@ export default function PosV2HomePage() {
         onOpenChange={setMenuOpen}
         onSearch={() => setSearchOpen(true)}
         onRentalManagement={() => router.push("/pos/rentals")}
+        onRepairManagement={() => router.push("/pos/repairs")}
+        onParkedSessions={() => router.push("/pos/parked")}
       />
       <GlobalSearchSheet open={searchOpen} onOpenChange={setSearchOpen} />
 
@@ -353,7 +375,136 @@ export default function PosV2HomePage() {
           goToCustomer(sid);
         }}
       />
+
+      {/* 카트 ≥ 1 인 세션 닫기 — 장바구니 저장 / 그냥 닫기 분기 */}
+      <CloseSessionSheet
+        target={closeTarget}
+        onClose={() => setCloseTarget(null)}
+        onConfirmDiscard={(s) => {
+          removeSession(s.id);
+          setCloseTarget(null);
+        }}
+      />
     </div>
+  );
+}
+
+function CloseSessionSheet({
+  target,
+  onClose,
+  onConfirmDiscard,
+}: {
+  target: CartSession | null;
+  onClose: () => void;
+  onConfirmDiscard: (s: CartSession) => void;
+}) {
+  const [pending, setPending] = useState<"park" | null>(null);
+  const parkMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiMutate<{ ok: true }>(`/api/pos/sessions/${id}/park`, "POST"),
+    onMutate: () => setPending("park"),
+    onSuccess: () => {
+      toast.success("저장된 상담으로 보관했습니다");
+      onClose();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장에 실패했습니다"),
+    onSettled: () => setPending(null),
+  });
+
+  if (!target) return null;
+  const itemCount = target.items.length;
+  const hasOpenRepair = (target.openRepairCount ?? 0) > 0;
+  const isRegistered = !!target.customerId;
+  const customerLabel =
+    target.customerName ?? `미등록 손님 #${target.id.slice(0, 6)}`;
+
+  return (
+    <BottomSheet
+      open
+      onOpenChange={(v) => !v && onClose()}
+      title="이 손님 카드 닫기"
+    >
+      <div className="flex flex-col gap-3 pb-2">
+        <div className="rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
+          <div className="text-[14px] font-semibold text-[var(--jm-text)]">
+            {customerLabel}
+          </div>
+          <div className="mt-0.5 text-[12px] text-[var(--jm-text-muted)]">
+            카트에 {itemCount}건 담겨있습니다
+          </div>
+          {hasOpenRepair && (
+            <div className="mt-2 rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-[11px] text-[var(--jm-warning-fg)]">
+              이 손님의 진행중 수리 {target.openRepairCount}건은 그대로 진행되며
+              수리관리에서 추적됩니다
+              {!isRegistered &&
+                " (단, 미등록 손님이라 다음에 찾을 때 헷갈릴 수 있어요)"}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => parkMutation.mutate(target.id)}
+          disabled={pending !== null}
+          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-action)] px-4 py-3.5 text-left text-white ring-1 ring-[var(--jm-action)] transition-all active:scale-[0.99] disabled:opacity-50"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/20">
+            {pending === "park" ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M4 7l6-3 6 3v8l-6 3-6-3V7z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </span>
+          <div className="flex flex-col">
+            <span className="text-[14px] font-semibold">장바구니로 저장</span>
+            <span className="text-[11px] text-white/70">
+              상담 메모로 보관 — 가격은 부활 시 현재가로 갱신
+            </span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onConfirmDiscard(target)}
+          disabled={pending !== null}
+          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] px-4 py-3.5 text-left text-[var(--jm-danger-fg)] ring-1 ring-[var(--jm-border)] transition-all active:scale-[0.99] disabled:opacity-50"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M5 5l10 10M15 5L5 15"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          <div className="flex flex-col">
+            <span className="text-[14px] font-semibold">그냥 닫기</span>
+            <span className="text-[11px] text-[var(--jm-text-muted)]">
+              카트 {itemCount}건이 사라집니다 — 되돌릴 수 없음
+            </span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={pending !== null}
+          className="rounded-2xl px-4 py-3 text-[13px] font-semibold text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
+        >
+          취소
+        </button>
+      </div>
+    </BottomSheet>
   );
 }
 

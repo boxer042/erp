@@ -17,7 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { fmtKRW } from "../repair-v2/_helpers";
+import { fmtKRW } from "../repairs/_helpers";
 import { BottomSheet } from "../_components/bottom-sheet";
 import { LinkCustomerSheet } from "../_link-customer-sheet";
 

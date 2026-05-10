@@ -23,11 +23,11 @@ import { QuickCustomerSheet } from "../../_quick-customer-sheet";
 import { CustomerActionSheet } from "../../_customer-action-sheet";
 import { useRepairSync } from "../../_use-repair-sync";
 import { ProductDetailView, type LandingResponse } from "../../_product-detail-view";
-import { RepairV2Detail } from "@/app/(pos)/pos/repair-v2/[id]/page";
+import { RepairDetail } from "@/app/(pos)/pos/repairs/[id]/page";
 import {
   STATUS_META,
   type RepairTicketDetail,
-} from "@/app/(pos)/pos/repair-v2/_types";
+} from "@/app/(pos)/pos/repairs/_types";
 
 type Mode = "product" | "repair" | "rental";
 type Detail = { type: "repair-ticket"; id: string } | { type: "product"; id: string } | null;
@@ -358,7 +358,9 @@ export default function PosV2CustomerPage({
         open={menuOpen}
         onOpenChange={setMenuOpen}
         onSearch={() => setSearchOpen(true)}
+        onRepairManagement={() => router.push("/pos/repairs")}
         onRentalManagement={() => router.push("/pos/rentals")}
+        onParkedSessions={() => router.push("/pos/parked")}
       />
       <GlobalSearchSheet
         open={searchOpen}
@@ -412,7 +414,7 @@ export default function PosV2CustomerPage({
       {/* 본문 — flex-1 + min-h-0 필수 (안 그러면 하단 탭바 가려짐) */}
       <main className="min-h-0 flex-1 overflow-hidden">
         {detail?.type === "repair-ticket" ? (
-          <RepairV2Detail
+          <RepairDetail
             ticketId={detail.id}
             hideHeader
             onBack={() => setDetail(null)}
@@ -544,11 +546,11 @@ export default function PosV2CustomerPage({
 }
 
 // ─── 헤더 안에 표시하는 detail 정보 ─────────────────────────────────────────
-// 같은 queryKey 로 RepairV2Detail / ProductDetailView 가 사용 중이라 cache 공유 (추가 fetch 없음)
+// 같은 queryKey 로 RepairDetail / ProductDetailView 가 사용 중이라 cache 공유 (추가 fetch 없음)
 
 function RepairTicketHeader({ ticketId }: { ticketId: string }) {
   const q = useQuery({
-    queryKey: ["repair-v2", "detail", ticketId],
+    queryKey: ["repairs", "detail", ticketId],
     queryFn: () => apiGet<RepairTicketDetail>(`/api/repair-tickets/${ticketId}`),
   });
   if (!q.data) {

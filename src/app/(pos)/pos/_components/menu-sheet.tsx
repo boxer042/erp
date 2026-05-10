@@ -12,6 +12,10 @@ interface Props {
   onSearch?: () => void;
   /** 임대관리 항목 클릭 — 부모가 RentalManagementSheet 띄움 */
   onRentalManagement?: () => void;
+  /** 수리관리 항목 클릭 — 부모가 /pos/repairs 로 이동. 미전달 시 항목 숨김 (수리관리 페이지 자기 자신에서 숨김) */
+  onRepairManagement?: () => void;
+  /** 저장된 상담(parked) 항목 클릭 — 부모가 /pos/parked 로 이동. 자기 자신 페이지에서 숨김 */
+  onParkedSessions?: () => void;
 }
 
 /**
@@ -23,6 +27,8 @@ export function MenuSheet({
   onOpenChange,
   onSearch,
   onRentalManagement,
+  onRepairManagement,
+  onParkedSessions,
 }: Props) {
   const router = useRouter();
   const { theme, setTheme } = usePosTheme();
@@ -62,6 +68,28 @@ export function MenuSheet({
           }}
         />
 
+        {onRepairManagement && (
+          <Item
+            icon={
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M14.7 6.3a4 4 0 1 1-5.4 5.4l-5.6 5.6a1.4 1.4 0 0 0 2 2l5.6-5.6a4 4 0 0 1 5.4-5.4z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            }
+            label="수리관리"
+            desc="픽업대기·진행중·진단 현황"
+            onClick={() => {
+              onOpenChange(false);
+              onRepairManagement();
+            }}
+          />
+        )}
+
         {onRentalManagement && (
           <Item
             icon={
@@ -88,6 +116,33 @@ export function MenuSheet({
             onClick={() => {
               onOpenChange(false);
               onRentalManagement();
+            }}
+          />
+        )}
+
+        {onParkedSessions && (
+          <Item
+            icon={
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M4 7l6-3 6 3v8l-6 3-6-3V7z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M10 11v4M10 11l4-2M10 11L6 9"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            }
+            label="저장된 상담"
+            desc="장바구니로 저장한 손님들"
+            onClick={() => {
+              onOpenChange(false);
+              onParkedSessions();
             }}
           />
         )}

@@ -283,7 +283,7 @@ export default function RepairsPage() {
                 <TableRow
                   key={t.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/pos/repair-v2/${t.id}`)}
+                  onClick={() => router.push(`/pos/repairs/${t.id}`)}
                 >
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
