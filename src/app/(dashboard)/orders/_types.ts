@@ -268,7 +268,8 @@ export interface BoardResponse {
 }
 
 /** 채널 필터 — 오프라인(channelId=null) / 외부 채널(<id>) / 전체 */
-export type ChannelFilter = "all" | "offline" | string;
+/** 채널 필터 — 오프라인(channelId=null) / 외부 채널 전체(channelId!=null) / 특정 channelId / 전체 */
+export type ChannelFilter = "all" | "offline" | "external" | string;
 
 /**
  * 상태 라벨 — 정적 매핑.

@@ -74,6 +74,8 @@ export async function GET(request: NextRequest) {
     where.fulfillmentType = { in: ["DELIVERY", "SHIPPING"] };
     if (channelFilter === "offline") {
       where.channelId = null;
+    } else if (channelFilter === "external") {
+      where.channelId = { not: null };
     } else if (channelFilter && channelFilter !== "all") {
       where.channelId = channelFilter;
     }
@@ -92,6 +94,8 @@ export async function GET(request: NextRequest) {
     };
     if (channelFilter === "offline") {
       where.channelId = null;
+    } else if (channelFilter === "external") {
+      where.channelId = { not: null };
     } else if (channelFilter && channelFilter !== "all") {
       where.channelId = channelFilter;
     }

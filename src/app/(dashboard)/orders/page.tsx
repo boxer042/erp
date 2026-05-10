@@ -255,7 +255,7 @@ export default function OrdersBoardPage() {
   };
 
   /** KPI 카운트는 order 단위, rows 는 OrderItemRow 평탄화 + 그룹 메타 */
-  const { counts, rows, totalOrders, filteredOrderCount } = useMemo(() => {
+  const { counts, shortcutCounts, rows, totalOrders, filteredOrderCount } = useMemo(() => {
     const empty: Record<BoardGroupKey, OrderListItem[]> = {
       overdue: [],
       today: [],
@@ -335,8 +335,15 @@ export default function OrdersBoardPage() {
         });
       });
     }
+    // 단축 칩 카운트 — 매장 운영 빈도 높은 필터들
+    const shortcutCounts = {
+      unpaid: orders.filter((o) => o.paymentStatus === "UNPAID").length,
+      external: orders.filter((o) => !!o.channel).length,
+      offline: orders.filter((o) => !o.channel).length,
+    };
     return {
       counts,
+      shortcutCounts,
       rows: itemRows,
       totalOrders: orders.length,
       filteredOrderCount: filteredOrders.length,
@@ -352,11 +359,12 @@ export default function OrdersBoardPage() {
   const isPending = boardQuery.isPending;
   const isError = boardQuery.isError;
 
-  /** 채널 필터 옵션 — "전체 / 오프라인 / 활성 채널들" */
+  /** 채널 필터 옵션 — "전체 / 오프라인 / 외부 채널 / 활성 채널 개별" */
   const channelOptions = useMemo(() => {
     const base: { value: ChannelFilter; label: string }[] = [
-      { value: "all", label: "전체 채널" },
+      { value: "all", label: "채널 전체" },
       { value: "offline", label: "오프라인 (POS·수동)" },
+      { value: "external", label: "외부 채널 전체" },
     ];
     for (const c of boardQuery.data?.channels ?? []) {
       base.push({ value: c.id, label: c.name });
@@ -445,29 +453,77 @@ export default function OrdersBoardPage() {
               />
             </JmTableToolbarSearch>
             <JmTableToolbarFilters>
-              {/* 전체 — 모든 그룹 선택 해제 */}
+              {/* 단축 필터 칩 — 매장 운영 빈도 높은 필터에 1클릭 접근.
+                  KPI 5개(지연/오늘/발송중/예정일미정/반품) 는 카드 클릭 토글, 정밀 필터는 더보기. */}
+              {/* 전체 — 모든 필터 한 번에 해제 */}
               <JmPill
                 size="sm"
-                active={groupFilters.size === 0}
-                onClick={() => setGroupFilters(new Set())}
+                active={
+                  groupFilters.size === 0 &&
+                  paymentStatusFilter === "all" &&
+                  channelFilter === "all" &&
+                  fulfillmentFilter === "all" &&
+                  claimTypeFilter === "all"
+                }
+                onClick={() => {
+                  setGroupFilters(new Set());
+                  setPaymentStatusFilter("all");
+                  setChannelFilter("all");
+                  setFulfillmentFilter("all");
+                  setClaimTypeFilter("all");
+                }}
               >
                 전체
                 <span className="ml-1 tabular-nums">{counts.all}</span>
               </JmPill>
-              {/* KPI 카드와 안 겹치는 시점 그룹만 칩으로 — KPI 5개(지연/오늘/발송중/예정일미정/반품) 는 카드 클릭으로 토글 */}
-              {(["thisWeek", "future"] as const).map((g) => (
-                <JmPill
-                  key={g}
-                  size="sm"
-                  active={groupFilters.has(g)}
-                  onClick={() => toggleGroupFilter(g)}
-                >
-                  {GROUP_LABELS[g]}
-                  {counts[g] > 0 && (
-                    <span className="ml-1 tabular-nums">{counts[g]}</span>
-                  )}
-                </JmPill>
-              ))}
+              <JmPill
+                size="sm"
+                active={paymentStatusFilter === "UNPAID"}
+                onClick={() =>
+                  setPaymentStatusFilter(
+                    paymentStatusFilter === "UNPAID" ? "all" : "UNPAID",
+                  )
+                }
+              >
+                외상만
+                {shortcutCounts.unpaid > 0 && (
+                  <span className="ml-1 tabular-nums">
+                    {shortcutCounts.unpaid}
+                  </span>
+                )}
+              </JmPill>
+              <JmPill
+                size="sm"
+                active={channelFilter === "external"}
+                onClick={() =>
+                  setChannelFilter(
+                    channelFilter === "external" ? "all" : "external",
+                  )
+                }
+              >
+                외부 채널
+                {shortcutCounts.external > 0 && (
+                  <span className="ml-1 tabular-nums">
+                    {shortcutCounts.external}
+                  </span>
+                )}
+              </JmPill>
+              <JmPill
+                size="sm"
+                active={channelFilter === "offline"}
+                onClick={() =>
+                  setChannelFilter(
+                    channelFilter === "offline" ? "all" : "offline",
+                  )
+                }
+              >
+                오프라인
+                {shortcutCounts.offline > 0 && (
+                  <span className="ml-1 tabular-nums">
+                    {shortcutCounts.offline}
+                  </span>
+                )}
+              </JmPill>
               <JmTableToolbarMore
                 count={
                   (groupFilters.size > 0 ? 1 : 0) +
@@ -484,76 +540,57 @@ export default function OrdersBoardPage() {
                   setClaimTypeFilter("all");
                 }}
               >
-                <div className="flex flex-col gap-2">
-                  <label className="flex flex-col gap-1 text-jm-2xs font-medium text-[var(--jm-text-muted)]">
-                    채널
-                    <JmSelect
-                      size="sm"
-                      value={channelFilter}
-                      onChange={(v) => setChannelFilter(v as ChannelFilter)}
-                      options={channelOptions}
-                      className="w-[200px]"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-jm-2xs font-medium text-[var(--jm-text-muted)]">
-                    결제 상태
-                    <JmSelect
-                      size="sm"
-                      value={paymentStatusFilter}
-                      onChange={(v) =>
-                        setPaymentStatusFilter(
-                          v as typeof paymentStatusFilter,
-                        )
-                      }
-                      options={[
-                        { value: "all", label: "전체" },
-                        { value: "UNPAID", label: "미수 (외상)" },
-                        { value: "PAID", label: "결제완료" },
-                        { value: "REFUND_PENDING", label: "환불진행" },
-                        { value: "PARTIAL_REFUND", label: "부분환불" },
-                        { value: "REFUNDED", label: "환불완료" },
-                        { value: "SALES_CANCELLED", label: "매출취소" },
-                      ]}
-                      className="w-[200px]"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-jm-2xs font-medium text-[var(--jm-text-muted)]">
-                    출고 방식
-                    <JmSelect
-                      size="sm"
-                      value={fulfillmentFilter}
-                      onChange={(v) =>
-                        setFulfillmentFilter(v as typeof fulfillmentFilter)
-                      }
-                      options={[
-                        { value: "all", label: "전체" },
-                        { value: "DELIVERY", label: "배달" },
-                        { value: "SHIPPING", label: "택배" },
-                      ]}
-                      className="w-[200px]"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-jm-2xs font-medium text-[var(--jm-text-muted)]">
-                    클레임 유형
-                    <JmSelect
-                      size="sm"
-                      value={claimTypeFilter}
-                      onChange={(v) =>
-                        setClaimTypeFilter(v as typeof claimTypeFilter)
-                      }
-                      options={[
-                        { value: "all", label: "전체" },
-                        { value: "REFUND", label: "반품" },
-                        { value: "EXCHANGE_SAME", label: "교환 (같은 상품)" },
-                        {
-                          value: "EXCHANGE_DIFFERENT",
-                          label: "교환 (다른 상품)",
-                        },
-                      ]}
-                      className="w-[200px]"
-                    />
-                  </label>
-                </div>
+                <JmSelect
+                  size="sm"
+                  value={channelFilter}
+                  onChange={(v) => setChannelFilter(v as ChannelFilter)}
+                  options={channelOptions}
+                  className="w-[150px]"
+                />
+                <JmSelect
+                  size="sm"
+                  value={paymentStatusFilter}
+                  onChange={(v) =>
+                    setPaymentStatusFilter(v as typeof paymentStatusFilter)
+                  }
+                  options={[
+                    { value: "all", label: "결제상태 전체" },
+                    { value: "UNPAID", label: "미수 (외상)" },
+                    { value: "PAID", label: "결제완료" },
+                    { value: "REFUND_PENDING", label: "환불진행" },
+                    { value: "PARTIAL_REFUND", label: "부분환불" },
+                    { value: "REFUNDED", label: "환불완료" },
+                    { value: "SALES_CANCELLED", label: "매출취소" },
+                  ]}
+                  className="w-[140px]"
+                />
+                <JmSelect
+                  size="sm"
+                  value={fulfillmentFilter}
+                  onChange={(v) =>
+                    setFulfillmentFilter(v as typeof fulfillmentFilter)
+                  }
+                  options={[
+                    { value: "all", label: "출고방식 전체" },
+                    { value: "DELIVERY", label: "배달" },
+                    { value: "SHIPPING", label: "택배" },
+                  ]}
+                  className="w-[130px]"
+                />
+                <JmSelect
+                  size="sm"
+                  value={claimTypeFilter}
+                  onChange={(v) =>
+                    setClaimTypeFilter(v as typeof claimTypeFilter)
+                  }
+                  options={[
+                    { value: "all", label: "클레임 전체" },
+                    { value: "REFUND", label: "반품" },
+                    { value: "EXCHANGE_SAME", label: "교환 (같은 상품)" },
+                    { value: "EXCHANGE_DIFFERENT", label: "교환 (다른 상품)" },
+                  ]}
+                  className="w-[150px]"
+                />
               </JmTableToolbarMore>
             </JmTableToolbarFilters>
             <JmTableToolbarActions>
