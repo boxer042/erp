@@ -27,6 +27,8 @@ export type BoardGroupKey =
   | "today"
   | "unscheduled"
   | "shipped"
+  /** 종결 — COMPLETED/RETURNED/EXCHANGED/CANCELLED. 검색 시에만 결과 표시 (평소엔 server-side 에서 미포함) */
+  | "closed"
   | "thisWeek"
   | "future"
   | "returnPending";
@@ -81,6 +83,15 @@ export function classifyBoardGroup(
     status === "RETURN_INSPECTED"
   ) {
     return "returnPending";
+  }
+  // 종결 상태 — 검색 시에만 노출 (server-side 에서 search 없으면 미포함)
+  if (
+    status === "COMPLETED" ||
+    status === "RETURNED" ||
+    status === "EXCHANGED" ||
+    status === "CANCELLED"
+  ) {
+    return "closed";
   }
   const isPrepFlow =
     status === "PENDING" ||

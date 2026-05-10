@@ -49,7 +49,9 @@ export type BoardGroupKey =
   | "shipped"
   | "thisWeek"
   | "future"
-  | "returnPending";
+  | "returnPending"
+  /** 종결 — COMPLETED/RETURNED/EXCHANGED/CANCELLED. 검색 시에만 server 가 포함시켜 반환 */
+  | "closed";
 
 export interface OrderListItem {
   id: string;
@@ -396,6 +398,7 @@ export const BOARD_SECTION_TITLES: Record<BoardGroupKey, string> = {
   thisWeek: "이번 주",
   future: "이후",
   returnPending: "반품 처리",
+  closed: "종결",
 };
 
 /** 카드에 보일 다음 액션 — null 이면 액션 버튼 없음.

@@ -78,6 +78,7 @@ const GROUP_LABELS: Record<GroupFilter, string> = {
   thisWeek: "이번 주",
   future: "이후",
   returnPending: "반품 처리",
+  closed: "종결",
 };
 
 export default function OrdersBoardPage() {
@@ -264,9 +265,11 @@ export default function OrdersBoardPage() {
       thisWeek: [],
       future: [],
       returnPending: [],
+      closed: [],
     };
     const groups = boardQuery.data?.groups ?? empty;
-    // KPI 카운트 — 주문 단위 유지 (행이 늘어났다고 카운트 부풀리지 않음)
+    // KPI 카운트 — 주문 단위 유지 (행이 늘어났다고 카운트 부풀리지 않음).
+    // closed 는 검색 결과로만 노출 (KPI/카운트 합계에서 제외)
     const counts: Record<GroupFilter, number> = {
       all: 0,
       overdue: groups.overdue.length,
@@ -276,6 +279,7 @@ export default function OrdersBoardPage() {
       thisWeek: groups.thisWeek.length,
       future: groups.future.length,
       returnPending: groups.returnPending.length,
+      closed: groups.closed.length,
     };
     counts.all =
       counts.overdue +
@@ -284,7 +288,8 @@ export default function OrdersBoardPage() {
       counts.shipped +
       counts.thisWeek +
       counts.future +
-      counts.returnPending;
+      counts.returnPending +
+      counts.closed;
 
     const order: BoardGroupKey[] = [
       "returnPending",
@@ -294,6 +299,7 @@ export default function OrdersBoardPage() {
       "shipped",
       "thisWeek",
       "future",
+      "closed",
     ];
     const orders = order.flatMap((k) =>
       groups[k].map((o) => ({ ...o, _group: k })),
