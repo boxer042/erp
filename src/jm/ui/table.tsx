@@ -22,6 +22,7 @@ export const JmTableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={cn(
+      // 헤더와 본문 사이 1줄만 — 행간 보더는 본문에서 divide-y 로 처리
       "bg-[var(--jm-surface-muted)] [&_tr]:border-b [&_tr]:border-[var(--jm-border)]",
       className,
     )}
@@ -36,7 +37,11 @@ export const JmTableBody = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tbody
     ref={ref}
-    className={cn("[&_tr:last-child]:border-0", className)}
+    className={cn(
+      // 행 사이는 subtle divide — 누적된 border 누설 방지 (jm-border 보다 한 단계 옅음)
+      "[&_tr]:border-b [&_tr]:border-[color-mix(in_oklch,var(--jm-border)_50%,transparent)] [&_tr:last-child]:border-0",
+      className,
+    )}
     {...props}
   />
 ));
@@ -64,7 +69,8 @@ export const JmTableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b border-[var(--jm-border)] transition-colors hover:bg-[var(--jm-surface-muted)] data-[state=selected]:bg-[var(--jm-surface-muted)]",
+      // 행간 보더는 부모(JmTableBody/Header) 가 부여 — 여기서 직접 부여하면 누적 누설
+      "transition-colors hover:bg-[var(--jm-surface-muted)] data-[state=selected]:bg-[var(--jm-surface-muted)]",
       className,
     )}
     {...props}
