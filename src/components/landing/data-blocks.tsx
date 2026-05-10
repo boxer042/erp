@@ -61,44 +61,57 @@ export function SpecTableBlockView({
   const values = query.data ?? [];
 
   return (
-    <section className="w-full px-6 py-10 md:px-16 md:py-12">
-      <div className="mx-auto max-w-3xl">
-        {block.title && (
-          <h3 className="mb-4 text-2xl font-semibold md:text-3xl">{block.title}</h3>
-        )}
-        {!productId ? (
-          <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-            상품 컨텍스트 없이는 스펙을 표시할 수 없습니다 (편집기 미리보기에서 정상 동작)
-          </div>
-        ) : query.isPending ? (
-          <div className="rounded-md border border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
-            스펙 불러오는 중...
-          </div>
-        ) : values.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-            아직 등록된 스펙이 없습니다 (상품 상세에서 등록 후 표시됩니다)
-          </div>
-        ) : (
-          <table className="w-full border-collapse text-sm">
-            <tbody>
-              {values.map((v) => (
-                <tr key={v.id} className="border-b border-border">
-                  <th className="w-1/3 bg-muted/40 px-4 py-3 text-left font-medium text-muted-foreground">
-                    {v.slot.name}
-                  </th>
-                  <td className="px-4 py-3 tabular-nums">
-                    {v.value}
-                    {v.slot.type === "NUMBER" && v.slot.unit && (
-                      <span className="ml-1 text-muted-foreground">{v.slot.unit}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </section>
+    <JmScope theme="light" className="w-full">
+      <section className="w-full px-6 py-10 md:px-16 md:py-12">
+        <div className="mx-auto max-w-3xl">
+          {block.title && (
+            <h3 className="mb-5 text-2xl font-bold tracking-tight text-[var(--jm-text)] md:text-3xl">
+              {block.title}
+            </h3>
+          )}
+          {!productId ? (
+            <div className="rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+              상품 컨텍스트 없이는 스펙을 표시할 수 없습니다 (편집기 미리보기에서 정상 동작)
+            </div>
+          ) : query.isPending ? (
+            <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+              스펙 불러오는 중...
+            </div>
+          ) : values.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+              아직 등록된 스펙이 없습니다 (상품 상세에서 등록 후 표시됩니다)
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)]">
+              <table className="w-full border-collapse text-jm-sm">
+                <tbody>
+                  {values.map((v, i) => (
+                    <tr
+                      key={v.id}
+                      className={cn(
+                        i !== values.length - 1 && "border-b border-[var(--jm-border)]",
+                      )}
+                    >
+                      <th className="w-1/3 bg-[var(--jm-surface-muted)]/60 px-5 py-3.5 text-left font-medium text-[var(--jm-text-muted)]">
+                        {v.slot.name}
+                      </th>
+                      <td className="px-5 py-3.5 tabular-nums text-[var(--jm-text)]">
+                        {v.value}
+                        {v.slot.type === "NUMBER" && v.slot.unit && (
+                          <span className="ml-1 text-[var(--jm-text-muted)]">
+                            {v.slot.unit}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 
@@ -109,51 +122,64 @@ const AMBIENT_HEIGHT: Record<AmbientVideoBlock["height"], string> = {
 };
 
 export function AmbientVideoBlockView({ block }: { block: AmbientVideoBlock }) {
-  const color = block.textColor === "dark" ? "text-foreground" : "text-white";
-  const overlay = block.textColor === "light" && block.videoUrl ? "bg-black/35" : "";
+  const color =
+    block.textColor === "dark" ? "text-[var(--jm-text)]" : "text-white";
+  const overlay =
+    block.textColor === "light" && block.videoUrl ? "bg-black/35" : "";
 
   return (
-    <section className={cn("relative w-full overflow-hidden bg-black", AMBIENT_HEIGHT[block.height])}>
-      {block.videoUrl ? (
-        <video
-          src={block.videoUrl}
-          poster={block.posterUrl || undefined}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : block.posterUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={block.posterUrl}
-          alt={block.headline || ""}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-white/60">
-          영상 URL을 입력하세요 (mp4)
-        </div>
-      )}
-      {overlay && <div className={cn("absolute inset-0", overlay)} />}
-      {(block.headline || block.subheadline) && (
-        <div
-          className={cn(
-            "relative z-10 flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center md:px-16",
-            color,
-          )}
-        >
-          {block.headline && (
-            <h2 className="text-3xl font-semibold leading-tight md:text-5xl">{block.headline}</h2>
-          )}
-          {block.subheadline && (
-            <p className="max-w-2xl text-base opacity-90 md:text-lg">{block.subheadline}</p>
-          )}
-        </div>
-      )}
-    </section>
+    <JmScope theme="light" className="w-full">
+      <section
+        className={cn(
+          "relative w-full overflow-hidden bg-black",
+          AMBIENT_HEIGHT[block.height],
+        )}
+      >
+        {block.videoUrl ? (
+          <video
+            src={block.videoUrl}
+            poster={block.posterUrl || undefined}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : block.posterUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={block.posterUrl}
+            alt={block.headline || ""}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-jm-sm text-white/60">
+            영상 URL을 입력하세요 (mp4)
+          </div>
+        )}
+        {overlay && <div className={cn("absolute inset-0", overlay)} />}
+        {(block.headline || block.subheadline) && (
+          <div
+            className={cn(
+              "relative z-10 flex h-full w-full flex-col items-center justify-center gap-4 px-6 text-center md:px-16",
+              color,
+            )}
+          >
+            {block.headline && (
+              <h2 className="text-3xl font-bold leading-tight tracking-tight md:text-5xl lg:text-6xl">
+                {block.headline}
+              </h2>
+            )}
+            {block.subheadline && (
+              <p className="max-w-2xl text-jm-base leading-relaxed opacity-90 md:text-jm-md">
+                {block.subheadline}
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+    </JmScope>
   );
 }
 
@@ -163,116 +189,225 @@ export function TableBlockView({ block }: { block: TableBlock }) {
 
   if (rows.length === 0) {
     return (
-      <section className="w-full px-6 py-8 md:px-16">
-        <div className="mx-auto flex max-w-3xl items-center justify-center rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
-          행을 추가하세요
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section className="w-full px-6 py-8 md:px-16">
+          <div className="mx-auto flex max-w-3xl items-center justify-center rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-jm-sm text-[var(--jm-text-muted)]">
+            행을 추가하세요
+          </div>
+        </section>
+      </JmScope>
     );
   }
 
   return (
-    <section className="w-full px-6 py-10 md:px-16 md:py-12">
-      <div className="mx-auto max-w-4xl overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b-2 border-foreground/20 bg-muted/40">
-              {headers.map((h, i) => (
-                <th key={i} className="px-4 py-3 text-left font-semibold">
-                  {h || `열 ${i + 1}`}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, r) => (
-              <tr key={r} className="border-b border-border">
-                {headers.map((_, c) => (
-                  <td key={c} className="px-4 py-2.5 tabular-nums">
-                    {row[c] ?? ""}
-                  </td>
+    <JmScope theme="light" className="w-full">
+      <section className="w-full px-6 py-10 md:px-16 md:py-12">
+        <div className="mx-auto max-w-4xl">
+          <div className="overflow-hidden overflow-x-auto rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)]">
+            <table className="w-full border-collapse text-jm-sm">
+              <thead>
+                <tr className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/60">
+                  {headers.map((h, i) => (
+                    <th
+                      key={i}
+                      className="px-5 py-3.5 text-left font-semibold text-[var(--jm-text)]"
+                    >
+                      {h || `열 ${i + 1}`}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, r) => (
+                  <tr
+                    key={r}
+                    className={cn(
+                      r !== rows.length - 1 &&
+                        "border-b border-[var(--jm-border)]",
+                    )}
+                  >
+                    {headers.map((_, c) => (
+                      <td
+                        key={c}
+                        className="px-5 py-3 tabular-nums text-[var(--jm-text)]"
+                      >
+                        {row[c] ?? ""}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {block.caption && (
-          <div className="mt-2 px-4 text-xs text-muted-foreground">{block.caption}</div>
-        )}
-      </div>
-    </section>
+              </tbody>
+            </table>
+          </div>
+          {block.caption && (
+            <div className="mt-3 px-1 text-jm-xs text-[var(--jm-text-muted)]">
+              {block.caption}
+            </div>
+          )}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 
-const CHART_COLORS = [
-  "var(--chart-1, #3b82f6)",
-  "var(--chart-2, #10b981)",
-  "var(--chart-3, #f59e0b)",
-  "var(--chart-4, #ef4444)",
-  "var(--chart-5, #8b5cf6)",
-  "var(--chart-6, #ec4899)",
+// jm semantic 토큰 기반 차트 색상 매핑 (token + oklch fallback)
+const CHART_COLOR_MAP: Record<
+  Exclude<NonNullable<ChartBlock["color"]>, "palette">,
+  string
+> = {
+  action: "oklch(0.21 0 0)", // jm-action (검정)
+  success: "oklch(0.6 0.15 145)", // jm-success-solid
+  warning: "oklch(0.75 0.15 85)", // jm-warning-solid
+  danger: "oklch(0.6 0.2 25)", // jm-danger-solid
+  info: "oklch(0.6 0.15 240)", // jm-info-solid
+  accent: "oklch(0.6 0.2 295)", // jm-accent-solid
+};
+
+const CHART_PALETTE: string[] = [
+  CHART_COLOR_MAP.action,
+  CHART_COLOR_MAP.success,
+  CHART_COLOR_MAP.warning,
+  CHART_COLOR_MAP.danger,
+  CHART_COLOR_MAP.info,
+  CHART_COLOR_MAP.accent,
 ];
+
+/**
+ * 선택된 컬러를 기준으로 차트 색상 시리즈 빌드.
+ * - "palette" → 전체 팔레트 회전 (pie 다색)
+ * - 그 외 → 선택 색을 첫 색으로, 나머지는 그 색에서 시작하는 팔레트 회전 (pie slice 다색 보장)
+ */
+function buildChartColors(
+  color: NonNullable<ChartBlock["color"]>,
+  count: number,
+): string[] {
+  if (color === "palette") {
+    return Array.from(
+      { length: count },
+      (_, i) => CHART_PALETTE[i % CHART_PALETTE.length],
+    );
+  }
+  const first = CHART_COLOR_MAP[color];
+  const rest = CHART_PALETTE.filter((c) => c !== first);
+  const ordered = [first, ...rest];
+  return Array.from(
+    { length: count },
+    (_, i) => ordered[i % ordered.length],
+  );
+}
 
 export function ChartBlockView({ block }: { block: ChartBlock }) {
   const data = block.data.filter((d) => d.label || d.value);
+  const colorChoice = block.color ?? "action";
+  const colors = buildChartColors(colorChoice, data.length);
+  const primaryColor = colors[0];
 
   if (data.length === 0) {
     return (
-      <section className="w-full px-6 py-8 md:px-16">
-        <div className="mx-auto flex max-w-3xl items-center justify-center rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
-          데이터를 추가하세요
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section className="w-full px-6 py-8 md:px-16">
+          <div className="mx-auto flex max-w-3xl items-center justify-center rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-jm-sm text-[var(--jm-text-muted)]">
+            데이터를 추가하세요
+          </div>
+        </section>
+      </JmScope>
     );
   }
 
   return (
-    <section className="w-full px-6 py-10 md:px-16 md:py-12">
-      <div className="mx-auto max-w-4xl">
-        {block.title && (
-          <h3 className="mb-4 text-center text-xl font-semibold md:text-2xl">{block.title}</h3>
-        )}
-        <div className="h-[320px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            {block.chartType === "bar" ? (
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill={CHART_COLORS[0]} />
-              </BarChart>
-            ) : block.chartType === "line" ? (
-              <LineChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="value" stroke={CHART_COLORS[0]} strokeWidth={2} />
-              </LineChart>
-            ) : (
-              <PieChart>
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="label"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={110}
-                  label
-                >
-                  {data.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            )}
-          </ResponsiveContainer>
+    <JmScope theme="light" className="w-full">
+      <section className="w-full px-6 py-10 md:px-16 md:py-12">
+        <div className="mx-auto max-w-4xl">
+          {block.title && (
+            <h3 className="mb-5 text-center text-xl font-bold tracking-tight text-[var(--jm-text)] md:text-2xl">
+              {block.title}
+            </h3>
+          )}
+          <div className="h-[320px] w-full rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4 md:p-6">
+            <ResponsiveContainer width="100%" height="100%">
+              {block.chartType === "bar" ? (
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--jm-border)" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: "var(--jm-text-muted)", fontSize: 12 }}
+                    stroke="var(--jm-border-strong)"
+                  />
+                  <YAxis
+                    tick={{ fill: "var(--jm-text-muted)", fontSize: 12 }}
+                    stroke="var(--jm-border-strong)"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--jm-surface)",
+                      border: "1px solid var(--jm-border)",
+                      borderRadius: "0.75rem",
+                      color: "var(--jm-text)",
+                    }}
+                  />
+                  <Bar dataKey="value" fill={primaryColor} radius={[8, 8, 0, 0]} />
+                </BarChart>
+              ) : block.chartType === "line" ? (
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--jm-border)" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: "var(--jm-text-muted)", fontSize: 12 }}
+                    stroke="var(--jm-border-strong)"
+                  />
+                  <YAxis
+                    tick={{ fill: "var(--jm-text-muted)", fontSize: 12 }}
+                    stroke="var(--jm-border-strong)"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--jm-surface)",
+                      border: "1px solid var(--jm-border)",
+                      borderRadius: "0.75rem",
+                      color: "var(--jm-text)",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={primaryColor}
+                    strokeWidth={2.5}
+                    dot={{ fill: primaryColor, r: 4 }}
+                  />
+                </LineChart>
+              ) : (
+                <PieChart>
+                  <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={110}
+                    label={{ fill: "var(--jm-text)", fontSize: 12 }}
+                  >
+                    {data.map((_, i) => (
+                      <Cell key={i} fill={colors[i % colors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--jm-surface)",
+                      border: "1px solid var(--jm-border)",
+                      borderRadius: "0.75rem",
+                      color: "var(--jm-text)",
+                    }}
+                  />
+                  <Legend
+                    wrapperStyle={{ color: "var(--jm-text-muted)", fontSize: 12 }}
+                  />
+                </PieChart>
+              )}
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </JmScope>
   );
 }
 
@@ -285,8 +420,8 @@ const STATS_PADDING: Record<NonNullable<StatsGridBlock["paddingY"]>, string> = {
 
 const STATS_BG: Record<NonNullable<StatsGridBlock["background"]>, string> = {
   none: "",
-  muted: "bg-muted",
-  dark: "bg-foreground text-background",
+  muted: "bg-[var(--jm-surface-muted)]",
+  dark: "bg-[var(--jm-text)] text-white",
 };
 
 const STATS_COLS: Record<2 | 3 | 4 | 5, string> = {
@@ -322,106 +457,115 @@ export function StatsGridBlockView({
     : block.items.filter((it) => it.value || it.label);
 
   return (
-    <section
-      className={cn(
-        "w-full px-6 md:px-16",
-        STATS_PADDING[block.paddingY ?? "xl"],
-        STATS_BG[block.background ?? "muted"],
-      )}
-    >
-      <div className="mx-auto max-w-6xl">
-        {(block.eyebrow || block.heading || block.body) && (
-          <div className={cn("mb-12 space-y-4 md:mb-16", headerAlign)}>
-            {block.eyebrow && (
-              <div
-                className={cn(
-                  "text-xs font-semibold uppercase tracking-[0.18em]",
-                  isDark ? "text-background/70" : "text-muted-foreground",
-                )}
-              >
-                {block.eyebrow}
-              </div>
-            )}
-            {block.heading && (
-              <h3
-                className={cn(
-                  "whitespace-pre-line text-3xl font-bold leading-[1.1] tracking-tight md:text-5xl",
-                  isDark ? "text-background" : "text-foreground",
-                )}
-              >
-                {block.heading}
-              </h3>
-            )}
-            {block.body && (
-              <p
-                className={cn(
-                  "whitespace-pre-wrap text-base leading-relaxed md:text-lg",
-                  isDark ? "text-background/80" : "text-muted-foreground",
-                )}
-              >
-                {block.body}
-              </p>
-            )}
-          </div>
+    <JmScope theme="light" className="w-full">
+      <section
+        className={cn(
+          "w-full px-6 md:px-16",
+          STATS_PADDING[block.paddingY ?? "xl"],
+          STATS_BG[block.background ?? "muted"],
         )}
-        {items.length > 0 && (
-          <div
-            className={cn(
-              "grid border-t pt-8 md:pt-10",
-              STATS_COLS[block.columns],
-              isDark ? "border-background/20" : "border-border",
-            )}
-          >
-            {items.map((it, i) => {
-              const isLastInRow = (i + 1) % block.columns === 0;
-              const isLastItem = i === items.length - 1;
-              const showDivider = block.dividers && !isLastInRow && !isLastItem;
-              return (
+      >
+        <div className="mx-auto max-w-6xl">
+          {(block.eyebrow || block.heading || block.body) && (
+            <div className={cn("mb-12 space-y-4 md:mb-16", headerAlign)}>
+              {block.eyebrow && (
                 <div
-                  key={i}
                   className={cn(
-                    "px-3 py-4 md:px-6",
-                    showDivider &&
-                      (isDark
-                        ? "md:border-r md:border-background/20"
-                        : "md:border-r md:border-border"),
+                    "inline-flex w-fit items-center rounded-full px-3 py-1 text-jm-xs font-semibold uppercase tracking-[0.18em]",
+                    block.align === "center" && "mx-auto",
+                    isDark
+                      ? "bg-white/15 text-white/80"
+                      : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)]",
                   )}
                 >
-                  <div className="mb-2 flex items-baseline gap-1">
-                    <span
-                      className={cn(
-                        "text-4xl font-bold leading-none tracking-tight md:text-5xl",
-                        isDark ? "text-background" : "text-foreground",
-                      )}
-                    >
-                      {it.value || "—"}
-                    </span>
-                    {it.unit && (
-                      <span
-                        className={cn(
-                          "text-base font-medium md:text-lg",
-                          isDark ? "text-background/70" : "text-muted-foreground",
-                        )}
-                      >
-                        {it.unit}
-                      </span>
-                    )}
-                  </div>
+                  {block.eyebrow}
+                </div>
+              )}
+              {block.heading && (
+                <h3
+                  className={cn(
+                    "whitespace-pre-line text-3xl font-bold leading-[1.1] tracking-tight md:text-5xl lg:text-6xl",
+                    isDark ? "text-white" : "text-[var(--jm-text)]",
+                  )}
+                >
+                  {block.heading}
+                </h3>
+              )}
+              {block.body && (
+                <p
+                  className={cn(
+                    "whitespace-pre-wrap text-jm-base leading-relaxed md:text-jm-md",
+                    isDark ? "text-white/80" : "text-[var(--jm-text-muted)]",
+                  )}
+                >
+                  {block.body}
+                </p>
+              )}
+            </div>
+          )}
+          {items.length > 0 && (
+            <div
+              className={cn(
+                "grid border-t pt-8 md:pt-10",
+                STATS_COLS[block.columns],
+                isDark ? "border-white/15" : "border-[var(--jm-border)]",
+              )}
+            >
+              {items.map((it, i) => {
+                const isLastInRow = (i + 1) % block.columns === 0;
+                const isLastItem = i === items.length - 1;
+                const showDivider = block.dividers && !isLastInRow && !isLastItem;
+                return (
                   <div
+                    key={i}
                     className={cn(
-                      "text-xs md:text-sm",
-                      isDark ? "text-background/70" : "text-muted-foreground",
+                      "px-3 py-4 md:px-6",
+                      showDivider &&
+                        (isDark
+                          ? "md:border-r md:border-white/15"
+                          : "md:border-r md:border-[var(--jm-border)]"),
                     )}
                   >
-                    {it.label}
+                    <div className="mb-2 flex items-baseline gap-1">
+                      <span
+                        className={cn(
+                          "text-4xl font-bold leading-none tracking-tight md:text-5xl",
+                          isDark ? "text-white" : "text-[var(--jm-text)]",
+                        )}
+                      >
+                        {it.value || "—"}
+                      </span>
+                      {it.unit && (
+                        <span
+                          className={cn(
+                            "text-jm-base font-medium md:text-jm-md",
+                            isDark
+                              ? "text-white/70"
+                              : "text-[var(--jm-text-muted)]",
+                          )}
+                        >
+                          {it.unit}
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className={cn(
+                        "text-jm-xs md:text-jm-sm",
+                        isDark
+                          ? "text-white/70"
+                          : "text-[var(--jm-text-muted)]",
+                      )}
+                    >
+                      {it.label}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </section>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 
@@ -1436,76 +1580,89 @@ export function ProductInfoBlockView({
   // 데이터 미준비/오류 상태
   if (!productId) {
     return (
-      <section
-        className={cn(
-          "w-full px-6 py-12 md:px-16",
-          block.background === "muted" ? "bg-muted" : "",
-        )}
-      >
-        <div className="mx-auto max-w-5xl rounded-md border border-dashed border-border bg-background/50 px-4 py-6 text-center text-sm text-muted-foreground">
-          상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section
+          className={cn(
+            "w-full px-6 py-12 md:px-16",
+            block.background === "muted"
+              ? "bg-[var(--jm-surface-muted)]"
+              : "",
+          )}
+        >
+          <div className="mx-auto max-w-5xl rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface)]/50 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+            상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
+          </div>
+        </section>
+      </JmScope>
     );
   }
 
   if (productQuery.isPending) {
     return (
-      <section
-        className={cn(
-          "w-full px-6 py-12 md:px-16",
-          block.background === "muted" ? "bg-muted" : "",
-        )}
-      >
-        <div className="mx-auto h-32 max-w-5xl animate-pulse rounded-md bg-muted" />
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section
+          className={cn(
+            "w-full px-6 py-12 md:px-16",
+            block.background === "muted"
+              ? "bg-[var(--jm-surface-muted)]"
+              : "",
+          )}
+        >
+          <div className="mx-auto h-32 max-w-5xl animate-pulse rounded-2xl bg-[var(--jm-surface-muted)]" />
+        </section>
+      </JmScope>
     );
   }
 
   return (
-    <section
-      className={cn(
-        "w-full px-6 md:px-16",
-        INFO_GRID_PADDING[block.paddingY ?? "xl"],
-        INFO_GRID_BG[block.background ?? "muted"],
-      )}
-    >
-      <div className="mx-auto max-w-5xl">
-        <div className="grid gap-5 border-y border-border-strong/30 py-8 md:grid-cols-[260px_1fr] md:gap-12 md:py-10">
-          <div className="flex flex-col gap-1.5">
-            {block.number && (
-              <span className="text-[11px] font-semibold tracking-[0.25em] text-muted-foreground">
-                {block.number}
-              </span>
-            )}
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 shrink-0 text-foreground" />
-              <h3 className="text-xl font-bold tracking-tight md:text-[22px]">
-                {block.title}
-              </h3>
+    <JmScope theme="light" className="w-full">
+      <section
+        className={cn(
+          "w-full px-6 md:px-16",
+          INFO_GRID_PADDING[block.paddingY ?? "xl"],
+          INFO_GRID_BG[block.background ?? "muted"],
+        )}
+      >
+        <div className="mx-auto max-w-5xl">
+          <div className="grid gap-5 border-y border-[var(--jm-border)] py-8 md:grid-cols-[260px_1fr] md:gap-12 md:py-10">
+            <div className="flex flex-col gap-2">
+              {block.number && (
+                <span className="text-jm-2xs font-semibold tracking-[0.25em] text-[var(--jm-text-subtle)]">
+                  {block.number}
+                </span>
+              )}
+              <div className="flex items-center gap-2">
+                <FileText
+                  className="h-5 w-5 shrink-0 text-[var(--jm-text)]"
+                  aria-hidden
+                />
+                <h3 className="text-jm-lg font-bold tracking-tight text-[var(--jm-text)] md:text-jm-xl">
+                  {block.title}
+                </h3>
+              </div>
+            </div>
+            <div className="space-y-3 text-jm-sm leading-relaxed text-[var(--jm-text)]">
+              {allRows.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[var(--jm-border)] px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+                  표시할 항목이 없습니다 — 상품 정보 또는 ProductSpec 을 먼저 등록하세요
+                </div>
+              ) : (
+                <dl className="grid gap-x-6 gap-y-3 md:grid-cols-[110px_1fr]">
+                  {allRows.map((row, ri) => (
+                    <div key={ri} className="contents">
+                      <dt className="text-[var(--jm-text-muted)]">{row.key}</dt>
+                      <dd className="font-medium text-[var(--jm-text)]">
+                        <InlineMarkdown text={row.value} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </div>
           </div>
-          <div className="space-y-3 text-sm leading-relaxed text-foreground/80">
-            {allRows.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                표시할 항목이 없습니다 — 상품 정보 또는 ProductSpec 을 먼저 등록하세요
-              </div>
-            ) : (
-              <dl className="grid gap-x-6 gap-y-3 md:grid-cols-[110px_1fr]">
-                {allRows.map((row, ri) => (
-                  <div key={ri} className="contents">
-                    <dt className="text-muted-foreground">{row.key}</dt>
-                    <dd className="font-medium text-foreground">
-                      <InlineMarkdown text={row.value} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </JmScope>
   );
 }
 
@@ -1521,7 +1678,7 @@ export function HtmlEmbedBlockView({ block }: { block: HtmlEmbedBlock }) {
   const sandbox = block.allowForms ? "allow-scripts allow-forms" : "allow-scripts";
   const wrapClass = cn(
     block.displayMode === "cover"
-      ? "relative left-1/2 w-screen -translate-x-1/2 bg-background"
+      ? "relative left-1/2 w-screen -translate-x-1/2 bg-[var(--jm-bg)]"
       : "w-full",
   );
 
@@ -1550,30 +1707,35 @@ export function HtmlEmbedBlockView({ block }: { block: HtmlEmbedBlock }) {
     setMeasuredHeight(null);
   }, [block.htmlUrl]);
 
-  const finalHeight = block.autoHeight && measuredHeight ? measuredHeight : block.heightPx;
+  const finalHeight =
+    block.autoHeight && measuredHeight ? measuredHeight : block.heightPx;
 
   if (!block.htmlUrl) {
     return (
-      <section className={wrapClass} style={{ height: block.heightPx }}>
-        <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
-          HTML 파일을 업로드하세요
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section className={wrapClass} style={{ height: block.heightPx }}>
+          <div className="flex h-full items-center justify-center bg-[var(--jm-surface-muted)] text-jm-sm text-[var(--jm-text-muted)]">
+            HTML 파일을 업로드하세요
+          </div>
+        </section>
+      </JmScope>
     );
   }
 
   return (
-    <section className={wrapClass} style={{ height: finalHeight }}>
-      <iframe
-        ref={iframeRef}
-        src={resolveHtmlUrl(block.htmlUrl)}
-        sandbox={sandbox}
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        className="block h-full w-full border-0"
-        title="custom-html"
-        scrolling={block.autoHeight ? "no" : "auto"}
-      />
-    </section>
+    <JmScope theme="light" className="w-full">
+      <section className={wrapClass} style={{ height: finalHeight }}>
+        <iframe
+          ref={iframeRef}
+          src={resolveHtmlUrl(block.htmlUrl)}
+          sandbox={sandbox}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="block h-full w-full border-0"
+          title="custom-html"
+          scrolling={block.autoHeight ? "no" : "auto"}
+        />
+      </section>
+    </JmScope>
   );
 }

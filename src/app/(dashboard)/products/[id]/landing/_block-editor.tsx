@@ -1112,12 +1112,35 @@ function TableEditor({ block, onChange }: EditorProps<TableBlock>) {
   );
 }
 
+/** 차트 색상 선택지 — view 의 CHART_COLOR_MAP 과 1:1 대응 */
+const CHART_COLOR_OPTIONS: Array<{
+  value: NonNullable<ChartBlock["color"]>;
+  label: string;
+  swatch: string;
+}> = [
+  { value: "action", label: "기본 (검정)", swatch: "oklch(0.21 0 0)" },
+  { value: "success", label: "녹색", swatch: "oklch(0.6 0.15 145)" },
+  { value: "warning", label: "주황", swatch: "oklch(0.75 0.15 85)" },
+  { value: "danger", label: "빨강", swatch: "oklch(0.6 0.2 25)" },
+  { value: "info", label: "파랑", swatch: "oklch(0.6 0.15 240)" },
+  { value: "accent", label: "보라", swatch: "oklch(0.6 0.2 295)" },
+  // 팔레트 = 자동 회전 (pie 다색에 적합)
+  {
+    value: "palette",
+    label: "팔레트",
+    swatch:
+      "conic-gradient(from 0deg, oklch(0.21 0 0), oklch(0.6 0.15 145), oklch(0.75 0.15 85), oklch(0.6 0.2 25), oklch(0.6 0.15 240), oklch(0.6 0.2 295), oklch(0.21 0 0))",
+  },
+];
+
 function ChartEditor({ block, onChange }: EditorProps<ChartBlock>) {
   const updatePoint = (i: number, patch: Partial<ChartBlock["data"][number]>) => {
     const next = block.data.slice();
     next[i] = { ...next[i], ...patch };
     onChange({ ...block, data: next });
   };
+
+  const currentColor = block.color ?? "action";
 
   return (
     <div className="space-y-3">
@@ -1147,6 +1170,40 @@ function ChartEditor({ block, onChange }: EditorProps<ChartBlock>) {
           />
         </Field>
       </div>
+      <Field
+        label={`색상 — ${
+          CHART_COLOR_OPTIONS.find((o) => o.value === currentColor)?.label ??
+          "기본"
+        }`}
+      >
+        <div className="flex flex-wrap gap-2">
+          {CHART_COLOR_OPTIONS.map((opt) => {
+            const isSelected = currentColor === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onChange({ ...block, color: opt.value })}
+                title={opt.label}
+                aria-label={opt.label}
+                aria-pressed={isSelected}
+                className={cn(
+                  "size-8 rounded-full border transition-all",
+                  isSelected
+                    ? "border-[var(--jm-action)] ring-2 ring-[var(--jm-action)] ring-offset-2 ring-offset-[var(--jm-bg)]"
+                    : "border-[var(--jm-border)] hover:border-[var(--jm-border-strong)]",
+                )}
+                style={{ background: opt.swatch }}
+              />
+            );
+          })}
+        </div>
+        <p className="mt-1 text-[10px] text-[var(--jm-text-muted)]">
+          {block.chartType === "pie"
+            ? "원형 차트는 슬라이스마다 색이 다르게 회전됩니다 (선택 색이 첫 슬라이스). 팔레트 옵션은 검정부터 회전."
+            : "막대·선 차트는 선택한 한 가지 색으로 표시됩니다."}
+        </p>
+      </Field>
       <div className="space-y-1.5">
         <Label className="text-xs">데이터</Label>
         <div className="space-y-1.5">

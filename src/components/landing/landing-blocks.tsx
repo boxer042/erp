@@ -1,3 +1,4 @@
+import { JmScope } from "@/jm";
 import { cn } from "@/lib/utils";
 import type {
   HeroBlock,
@@ -40,42 +41,55 @@ export function HeroBlockView({ block }: { block: HeroBlock }) {
       : block.textAlign === "right"
         ? "items-end text-right"
         : "items-center text-center";
-  const color = block.textColor === "dark" ? "text-foreground" : "text-white";
-  const overlay = block.textColor === "light" && block.imageUrl ? "bg-black/35" : "";
+  const color =
+    block.textColor === "dark" ? "text-[var(--jm-text)]" : "text-white";
+  const overlay =
+    block.textColor === "light" && block.imageUrl ? "bg-black/35" : "";
 
   return (
-    <section className={cn("relative w-full overflow-hidden", HERO_HEIGHT[block.height])}>
-      {block.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={block.imageUrl}
-          alt={block.headline || ""}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-muted" />
-      )}
-      {overlay && <div className={cn("absolute inset-0", overlay)} />}
-      <div
+    <JmScope theme="light" className="w-full">
+      <section
         className={cn(
-          "relative z-10 flex h-full w-full flex-col justify-center gap-3 px-6 md:px-16",
-          align,
-          color,
+          "relative w-full overflow-hidden",
+          HERO_HEIGHT[block.height],
         )}
       >
-        {block.eyebrow && (
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] opacity-80">
-            {block.eyebrow}
-          </div>
+        {block.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={block.imageUrl}
+            alt={block.headline || ""}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[var(--jm-surface-muted)]" />
         )}
-        {block.headline && (
-          <h2 className="text-3xl font-semibold leading-tight md:text-5xl">{block.headline}</h2>
-        )}
-        {block.subheadline && (
-          <p className="max-w-2xl text-base opacity-90 md:text-lg">{block.subheadline}</p>
-        )}
-      </div>
-    </section>
+        {overlay && <div className={cn("absolute inset-0", overlay)} />}
+        <div
+          className={cn(
+            "relative z-10 flex h-full w-full flex-col justify-center gap-4 px-6 md:px-16",
+            align,
+            color,
+          )}
+        >
+          {block.eyebrow && (
+            <div className="inline-flex w-fit items-center rounded-full bg-white/15 px-3 py-1 text-jm-xs font-semibold uppercase tracking-[0.18em] backdrop-blur-sm">
+              {block.eyebrow}
+            </div>
+          )}
+          {block.headline && (
+            <h2 className="text-3xl font-bold leading-tight tracking-tight md:text-5xl lg:text-6xl">
+              {block.headline}
+            </h2>
+          )}
+          {block.subheadline && (
+            <p className="max-w-2xl text-jm-base leading-relaxed opacity-90 md:text-jm-md">
+              {block.subheadline}
+            </p>
+          )}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 
@@ -87,17 +101,17 @@ const IMG_MAXW: Record<NonNullable<ImageBlock["maxWidth"]>, string> = {
 };
 const IMG_ROUNDED: Record<NonNullable<ImageBlock["rounded"]>, string> = {
   none: "rounded-none",
-  sm: "rounded-sm",
-  md: "rounded-md",
-  lg: "rounded-lg",
-  xl: "rounded-2xl",
+  sm: "rounded-md",
+  md: "rounded-xl",
+  lg: "rounded-2xl",
+  xl: "rounded-3xl",
   full: "rounded-full",
 };
 const IMG_SHADOW: Record<NonNullable<ImageBlock["shadow"]>, string> = {
   none: "",
-  sm: "shadow-sm",
-  md: "shadow-md",
-  lg: "shadow-xl",
+  sm: "shadow-[var(--jm-shadow-sm)]",
+  md: "shadow-[var(--jm-shadow-md)]",
+  lg: "shadow-[var(--jm-shadow-lg)]",
 };
 const IMG_PADDING: Record<NonNullable<ImageBlock["paddingY"]>, string> = {
   none: "",
@@ -107,8 +121,8 @@ const IMG_PADDING: Record<NonNullable<ImageBlock["paddingY"]>, string> = {
 };
 const IMG_BG: Record<NonNullable<ImageBlock["background"]>, string> = {
   none: "",
-  muted: "bg-muted",
-  dark: "bg-foreground",
+  muted: "bg-[var(--jm-surface-muted)]",
+  dark: "bg-[var(--jm-text)]",
 };
 
 export function ImageBlockView({ block }: { block: ImageBlock }) {
@@ -119,6 +133,29 @@ export function ImageBlockView({ block }: { block: ImageBlock }) {
 
   if (!block.imageUrl) {
     return (
+      <JmScope theme="light" className="w-full">
+        <section
+          className={cn(
+            "w-full px-6 md:px-16",
+            IMG_PADDING[block.paddingY ?? "none"],
+            IMG_BG[block.background ?? "none"],
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto flex h-48 items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-jm-sm text-[var(--jm-text-muted)]",
+              isNarrow && IMG_MAXW[effMaxWidth],
+            )}
+          >
+            이미지를 업로드하세요
+          </div>
+        </section>
+      </JmScope>
+    );
+  }
+
+  return (
+    <JmScope theme="light" className="w-full">
       <section
         className={cn(
           "w-full px-6 md:px-16",
@@ -126,54 +163,37 @@ export function ImageBlockView({ block }: { block: ImageBlock }) {
           IMG_BG[block.background ?? "none"],
         )}
       >
-        <div
+        <figure
           className={cn(
-            "mx-auto flex h-48 items-center justify-center bg-muted text-muted-foreground",
-            isNarrow && IMG_MAXW[effMaxWidth],
+            "w-full",
+            isNarrow && cn("mx-auto", IMG_MAXW[effMaxWidth]),
           )}
         >
-          이미지를 업로드하세요
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section
-      className={cn(
-        "w-full px-6 md:px-16",
-        IMG_PADDING[block.paddingY ?? "none"],
-        IMG_BG[block.background ?? "none"],
-      )}
-    >
-      <figure
-        className={cn(
-          "w-full",
-          isNarrow && cn("mx-auto", IMG_MAXW[effMaxWidth]),
-        )}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={block.imageUrl}
-          alt={block.alt}
-          className={cn(
-            "block h-auto w-full",
-            IMG_ROUNDED[block.rounded ?? "none"],
-            IMG_SHADOW[block.shadow ?? "none"],
-          )}
-        />
-        {block.caption && (
-          <figcaption
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={block.imageUrl}
+            alt={block.alt}
             className={cn(
-              "mt-2 px-4 text-center text-sm",
-              block.background === "dark" ? "text-background/80" : "text-muted-foreground",
+              "block h-auto w-full",
+              IMG_ROUNDED[block.rounded ?? "none"],
+              IMG_SHADOW[block.shadow ?? "none"],
             )}
-          >
-            {block.caption}
-          </figcaption>
-        )}
-      </figure>
-    </section>
+          />
+          {block.caption && (
+            <figcaption
+              className={cn(
+                "mt-3 px-4 text-center text-jm-sm",
+                block.background === "dark"
+                  ? "text-white/80"
+                  : "text-[var(--jm-text-muted)]",
+              )}
+            >
+              {block.caption}
+            </figcaption>
+          )}
+        </figure>
+      </section>
+    </JmScope>
   );
 }
 
@@ -187,8 +207,8 @@ const TEXT_PADDING: Record<NonNullable<TextBlock["paddingY"]>, string> = {
 const HEADING_SIZE: Record<NonNullable<TextBlock["headingSize"]>, string> = {
   sm: "text-lg md:text-xl",
   md: "text-2xl md:text-3xl",
-  lg: "text-3xl md:text-5xl",
-  xl: "text-4xl md:text-6xl",
+  lg: "text-3xl md:text-4xl lg:text-5xl",
+  xl: "text-4xl md:text-5xl lg:text-6xl",
 };
 
 const HEADING_WEIGHT: Record<NonNullable<TextBlock["headingWeight"]>, string> = {
@@ -198,88 +218,102 @@ const HEADING_WEIGHT: Record<NonNullable<TextBlock["headingWeight"]>, string> = 
 };
 
 const BODY_SIZE: Record<NonNullable<TextBlock["bodySize"]>, string> = {
-  sm: "text-sm md:text-base",
-  md: "text-base md:text-lg",
-  lg: "text-lg md:text-xl",
+  sm: "text-jm-sm md:text-jm-base",
+  md: "text-jm-base md:text-jm-md",
+  lg: "text-jm-md md:text-jm-lg",
 };
 
 const TEXT_BG: Record<NonNullable<TextBlock["background"]>, string> = {
   none: "",
-  muted: "bg-muted",
-  dark: "bg-foreground text-background",
+  muted: "bg-[var(--jm-surface-muted)]",
+  dark: "bg-[var(--jm-text)]",
 };
 
 export function TextBlockView({ block }: { block: TextBlock }) {
   const align =
-    block.align === "center" ? "text-center" : block.align === "right" ? "text-right" : "text-left";
+    block.align === "center"
+      ? "text-center"
+      : block.align === "right"
+        ? "text-right"
+        : "text-left";
 
   // color 별로 헤딩/본문/라벨 색 결정
   const isDarkBg = block.background === "dark";
   const headingColor =
     block.color === "muted"
-      ? "text-muted-foreground"
+      ? "text-[var(--jm-text-muted)]"
       : block.color === "brand"
-        ? "text-primary"
+        ? "text-[var(--jm-action)]"
         : isDarkBg
-          ? "text-background"
-          : "text-foreground";
+          ? "text-white"
+          : "text-[var(--jm-text)]";
   const bodyColor =
     block.color === "brand"
-      ? "text-primary/80"
+      ? "text-[var(--jm-action)]/80"
       : isDarkBg
-        ? "text-background/80"
-        : "text-muted-foreground";
-  const eyebrowColor =
-    block.color === "brand"
-      ? "text-primary"
-      : isDarkBg
-        ? "text-background/70"
-        : "text-muted-foreground";
+        ? "text-white/80"
+        : "text-[var(--jm-text-muted)]";
+  const eyebrowColor = isDarkBg
+    ? "text-white/70"
+    : "text-[var(--jm-text-muted)]";
+  const eyebrowBg = isDarkBg
+    ? "bg-white/15"
+    : "bg-[var(--jm-surface-muted)]";
 
   return (
-    <section
-      className={cn(
-        "w-full px-6 md:px-16",
-        TEXT_PADDING[block.paddingY ?? "lg"],
-        TEXT_BG[block.background ?? "none"],
-      )}
-    >
-      <div className={cn("mx-auto max-w-3xl space-y-4", align)}>
-        {block.eyebrow && (
-          <div
-            className={cn(
-              "text-xs font-semibold uppercase tracking-[0.18em]",
-              eyebrowColor,
-            )}
-          >
-            {block.eyebrow}
-          </div>
+    <JmScope theme="light" className="w-full">
+      <section
+        className={cn(
+          "w-full px-6 md:px-16",
+          TEXT_PADDING[block.paddingY ?? "lg"],
+          TEXT_BG[block.background ?? "none"],
         )}
-        {block.heading && (
-          <h3
-            className={cn(
-              "leading-tight tracking-tight",
-              HEADING_SIZE[block.headingSize ?? "md"],
-              HEADING_WEIGHT[block.headingWeight ?? "semibold"],
-              headingColor,
-            )}
-          >
-            {block.heading}
-          </h3>
-        )}
-        {block.body && (
-          <p
-            className={cn(
-              "whitespace-pre-wrap leading-relaxed",
-              BODY_SIZE[block.bodySize ?? "md"],
-              bodyColor,
-            )}
-          >
-            <InlineMarkdown text={block.body} />
-          </p>
-        )}
-      </div>
-    </section>
+      >
+        <div
+          className={cn(
+            "mx-auto max-w-3xl space-y-5",
+            align,
+            block.align === "center" && "flex flex-col items-center",
+            block.align === "right" && "flex flex-col items-end",
+          )}
+        >
+          {block.eyebrow && (
+            <div
+              className={cn(
+                "inline-flex w-fit items-center rounded-full px-3 py-1 text-jm-xs font-semibold uppercase tracking-[0.18em]",
+                eyebrowBg,
+                eyebrowColor,
+              )}
+            >
+              {block.eyebrow}
+            </div>
+          )}
+          {block.heading && (
+            <h3
+              className={cn(
+                "leading-tight tracking-tight",
+                HEADING_SIZE[block.headingSize ?? "md"],
+                HEADING_WEIGHT[block.headingWeight ?? "semibold"],
+                headingColor,
+              )}
+            >
+              {block.heading}
+            </h3>
+          )}
+          {block.body && (
+            <p
+              className={cn(
+                "whitespace-pre-wrap leading-relaxed",
+                BODY_SIZE[block.bodySize ?? "md"],
+                bodyColor,
+              )}
+            >
+              <InlineMarkdown text={block.body} />
+            </p>
+          )}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 
@@ -302,45 +336,49 @@ function youtubeEmbedUrl(value: string, autoplay: boolean): string | null {
 export function VideoBlockView({ block }: { block: VideoBlock }) {
   if (!block.value) {
     return (
-      <section className="w-full px-6 md:px-16">
-        <div className="mx-auto flex h-72 w-full max-w-4xl items-center justify-center bg-muted text-muted-foreground">
-          비디오 URL을 입력하세요
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section className="w-full px-6 md:px-16">
+          <div className="mx-auto flex h-72 w-full max-w-4xl items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-jm-sm text-[var(--jm-text-muted)]">
+            비디오 URL을 입력하세요
+          </div>
+        </section>
+      </JmScope>
     );
   }
 
   return (
-    <section className="w-full px-6 md:px-16">
-      <figure className="mx-auto w-full max-w-4xl">
-        <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black">
-        {block.source === "youtube" ? (
-          <iframe
-            src={youtubeEmbedUrl(block.value, block.autoplay) ?? ""}
-            title="video"
-            className="absolute inset-0 h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        ) : (
-          <video
-            src={block.value}
-            controls
-            autoPlay={block.autoplay}
-            muted={block.autoplay}
-            loop={block.autoplay}
-            playsInline
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
-      </div>
-        {block.caption && (
-          <figcaption className="mt-2 text-center text-sm text-muted-foreground">
-            {block.caption}
-          </figcaption>
-        )}
-      </figure>
-    </section>
+    <JmScope theme="light" className="w-full">
+      <section className="w-full px-6 md:px-16">
+        <figure className="mx-auto w-full max-w-4xl">
+          <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-[var(--jm-shadow-md)]">
+            {block.source === "youtube" ? (
+              <iframe
+                src={youtubeEmbedUrl(block.value, block.autoplay) ?? ""}
+                title="video"
+                className="absolute inset-0 h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <video
+                src={block.value}
+                controls
+                autoPlay={block.autoplay}
+                muted={block.autoplay}
+                loop={block.autoplay}
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+          </div>
+          {block.caption && (
+            <figcaption className="mt-3 text-center text-jm-sm text-[var(--jm-text-muted)]">
+              {block.caption}
+            </figcaption>
+          )}
+        </figure>
+      </section>
+    </JmScope>
   );
 }
 
@@ -353,29 +391,31 @@ const GALLERY_GAP: Record<NonNullable<GalleryBlock["gap"]>, string> = {
 
 const GALLERY_ROUNDED: Record<NonNullable<GalleryBlock["rounded"]>, string> = {
   none: "rounded-none",
-  sm: "rounded-sm",
-  md: "rounded-md",
-  lg: "rounded-lg",
-  xl: "rounded-2xl",
+  sm: "rounded-md",
+  md: "rounded-xl",
+  lg: "rounded-2xl",
+  xl: "rounded-3xl",
   full: "rounded-full",
 };
 
 const GALLERY_SHADOW: Record<NonNullable<GalleryBlock["shadow"]>, string> = {
   none: "",
-  sm: "shadow-sm",
-  md: "shadow-md",
-  lg: "shadow-xl",
+  sm: "shadow-[var(--jm-shadow-sm)]",
+  md: "shadow-[var(--jm-shadow-md)]",
+  lg: "shadow-[var(--jm-shadow-lg)]",
 };
 
 export function GalleryBlockView({ block }: { block: GalleryBlock }) {
   const items = block.images.filter((img) => img.url);
   if (items.length === 0) {
     return (
-      <section className="w-full px-6 md:px-16">
-        <div className="mx-auto flex h-40 w-full max-w-4xl items-center justify-center bg-muted text-muted-foreground">
-          이미지를 추가하세요
-        </div>
-      </section>
+      <JmScope theme="light" className="w-full">
+        <section className="w-full px-6 md:px-16">
+          <div className="mx-auto flex h-40 w-full max-w-4xl items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-jm-sm text-[var(--jm-text-muted)]">
+            이미지를 추가하세요
+          </div>
+        </section>
+      </JmScope>
     );
   }
   const cols =
@@ -386,23 +426,25 @@ export function GalleryBlockView({ block }: { block: GalleryBlock }) {
         : "grid-cols-2 md:grid-cols-3";
 
   return (
-    <section className="w-full px-6 py-6 md:px-16">
-      <div className={cn("grid", cols, GALLERY_GAP[block.gap ?? "sm"])}>
-        {items.map((img, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={i}
-            src={img.url}
-            alt={img.alt}
-            className={cn(
-              "aspect-square w-full object-cover",
-              GALLERY_ROUNDED[block.rounded ?? "md"],
-              GALLERY_SHADOW[block.shadow ?? "none"],
-            )}
-          />
-        ))}
-      </div>
-    </section>
+    <JmScope theme="light" className="w-full">
+      <section className="w-full px-6 py-8 md:px-16 md:py-10">
+        <div className={cn("grid", cols, GALLERY_GAP[block.gap ?? "sm"])}>
+          {items.map((img, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={i}
+              src={img.url}
+              alt={img.alt}
+              className={cn(
+                "aspect-square w-full bg-[var(--jm-surface-muted)] object-cover",
+                GALLERY_ROUNDED[block.rounded ?? "md"],
+                GALLERY_SHADOW[block.shadow ?? "none"],
+              )}
+            />
+          ))}
+        </div>
+      </section>
+    </JmScope>
   );
 }
 

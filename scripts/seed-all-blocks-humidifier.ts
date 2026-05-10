@@ -242,13 +242,14 @@ const blocks = [
   },
 
   // ─────────────────────────────────────
-  // 13) Chart — recharts
+  // 13) Chart — recharts (color="info" 로 파랑 데모)
   // ─────────────────────────────────────
   {
     id: "b-chart",
     type: "chart",
     chartType: "bar",
     title: "운전 소음 비교 (dB) — 낮을수록 조용",
+    color: "info",
     data: [
       { label: "우리 가습기", value: 20 },
       { label: "경쟁사 A", value: 32 },

@@ -20,6 +20,10 @@ export interface JmStatProps extends React.HTMLAttributes<HTMLDivElement> {
   /** "증가가 좋은 지표" 인지 여부. 기본 true. false 면 부호별 색 반전 (예: 결제 실패율) */
   positiveIsGood?: boolean;
   size?: "sm" | "md" | "lg";
+  /** onClick 부여 시 자동 활성화 — 클릭 가능 시각(hover/active border + cursor-pointer) */
+  interactive?: boolean;
+  /** 인터랙티브 모드일 때 활성 상태 — border/배경 강조 */
+  active?: boolean;
 }
 
 /**
@@ -39,10 +43,14 @@ export const JmStat = React.forwardRef<HTMLDivElement, JmStatProps>(
       hint,
       positiveIsGood = true,
       size = "md",
+      interactive,
+      active,
+      onClick,
       ...props
     },
     ref,
   ) => {
+    const isInteractive = interactive ?? !!onClick;
     const showDelta = typeof delta === "number" && !Number.isNaN(delta);
     const isUp = (delta ?? 0) > 0;
     const isDown = (delta ?? 0) < 0;
@@ -69,8 +77,25 @@ export const JmStat = React.forwardRef<HTMLDivElement, JmStatProps>(
     return (
       <div
         ref={ref}
+        onClick={onClick}
+        role={isInteractive ? "button" : undefined}
+        tabIndex={isInteractive ? 0 : undefined}
+        onKeyDown={
+          isInteractive
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLElement).click();
+                }
+              }
+            : undefined
+        }
         className={cn(
           "flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] border border-[var(--jm-border)] p-5",
+          isInteractive &&
+            "cursor-pointer transition-colors hover:border-[var(--jm-border-strong)] hover:bg-[var(--jm-bg)]",
+          active &&
+            "border-[var(--jm-action)] bg-[var(--jm-bg)] shadow-[0_0_0_1px_var(--jm-action)]",
           className,
         )}
         {...props}

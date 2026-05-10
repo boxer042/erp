@@ -153,6 +153,23 @@ export const chartBlockSchema = z.object({
   type: z.literal("chart"),
   chartType: z.enum(["bar", "line", "pie"]).default("bar"),
   title: z.string().default(""),
+  /**
+   * 차트 컬러 — jm semantic 팔레트 중 선택.
+   * - "action" 기본 (검정 톤)
+   * - "palette" 자동 회전 (pie 처럼 색이 여러 개 필요할 때 좋음)
+   * - bar/line 은 메인 색 1개, pie 는 첫 슬라이스 색으로 사용 + 나머지 자동 회전
+   */
+  color: z
+    .enum([
+      "action",
+      "success",
+      "warning",
+      "danger",
+      "info",
+      "accent",
+      "palette",
+    ])
+    .default("action"),
   data: z
     .array(
       z.object({
@@ -594,6 +611,7 @@ export function makeEmptyBlock(type: BlockType, id: string): LandingBlock {
         type: "chart",
         chartType: "bar",
         title: "",
+        color: "action",
         data: [
           { label: "A", value: 0 },
           { label: "B", value: 0 },
