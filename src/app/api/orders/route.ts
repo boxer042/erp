@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
         "SHIPPED",
         "RETURN_REQUESTED",
         "RETURN_ACCEPTED",
+        "RETURN_PICKING",
         "RETURN_COLLECTED",
         "RETURN_INSPECTED",
       ],
@@ -78,11 +79,30 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // 반품 처리 전용 뷰 — RETURN_* 단계만, fulfillmentType 무관(매장 픽업 반품도 포함).
+  if (view === "claims") {
+    where.status = {
+      in: [
+        "RETURN_REQUESTED",
+        "RETURN_ACCEPTED",
+        "RETURN_PICKING",
+        "RETURN_COLLECTED",
+        "RETURN_INSPECTED",
+      ],
+    };
+    if (channelFilter === "offline") {
+      where.channelId = null;
+    } else if (channelFilter && channelFilter !== "all") {
+      where.channelId = channelFilter;
+    }
+  }
+
   const orders = await prisma.order.findMany({
     where,
     include: {
       channel: { select: { name: true, code: true } },
       createdBy: { select: { name: true } },
+      // shippingPaymentType, shippingFee 자동 포함 (Order 의 scalar 필드)
       repairTicket: { select: { id: true, ticketNo: true, status: true } },
       // 교환 새 주문 식별용 — 비어있으면 일반 주문, 있으면 -EX
       exchangedFromOrders: { select: { id: true } },
@@ -97,8 +117,19 @@ export async function GET(request: NextRequest) {
           lineRole: true,
           parentItemId: true,
           optionSnapshot: true,
-          product: { select: { name: true, sku: true } },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              isCanonical: true,
+              productType: true,
+            },
+          },
           serviceName: true,
+          // 진입 경로 SKU — 워크보드 chip 표시용 (자사몰/외부 채널만 채워짐, POS 는 null)
+          entryProductId: true,
+          entryProduct: { select: { id: true, name: true, sku: true } },
         },
         // 품목별 행 워크보드 — 모든 OrderItem 노출 (take 제거)
         // MAIN 먼저, OPTION_REF/ADDON 자식 라인은 parentItemId 따라 정렬됨 (클라이언트 평탄화에서 처리)
@@ -234,6 +265,7 @@ export async function POST(request: NextRequest) {
     lineRole: "MAIN" | "OPTION_REF";
     parentItemIndex: number | null;
     optionSnapshot: Record<string, string> | null;
+    entryProductId: string | null;
     _taxable: boolean;
   };
 
@@ -267,6 +299,7 @@ export async function POST(request: NextRequest) {
       lineRole: "MAIN",
       parentItemIndex: null,
       optionSnapshot: Object.keys(snapshot).length > 0 ? snapshot : null,
+      entryProductId: item.entryProductId ?? null,
       _taxable: (taxTypeById.get(item.productId) ?? "TAXABLE") === "TAXABLE",
     });
 
@@ -284,6 +317,7 @@ export async function POST(request: NextRequest) {
         lineRole: "OPTION_REF",
         parentItemIndex: mainIdx,
         optionSnapshot: null,
+        entryProductId: null, // OPTION_REF 자식은 funnel 분석 대상 아님
         _taxable: (mp.taxType ?? "TAXABLE") === "TAXABLE",
       });
       // OPTION_REF 의 unitPrice 가 메인 라인 unitPrice 에 이미 포함되지 않게 조정 —
@@ -338,6 +372,7 @@ export async function POST(request: NextRequest) {
         subtotalAmount,
         discountAmount,
         shippingFee,
+        shippingPaymentType: data.shippingPaymentType,
         taxAmount,
         totalAmount,
         commissionAmount,
@@ -360,6 +395,7 @@ export async function POST(request: NextRequest) {
           lineRole: it.lineRole as never,
           parentItemId: parentId,
           optionSnapshot: it.optionSnapshot ?? undefined,
+          entryProductId: it.entryProductId,
         },
       });
       createdIds.push(created.id);

@@ -9,9 +9,19 @@ export const orderItemSchema = z.object({
    * 주문 후 보존되는 건 optionSnapshot (옵션값 라벨 mapping). 이 ID 들은 transient 용.
    */
   optionValueIds: z.array(z.string()).optional(),
+  /**
+   * 진입 경로 SKU — 자사몰/외부 채널 한정. SWAP 옵션으로 productId 가 swap 된 후 손님이 본 카탈로그 SKU 보존.
+   * POS 는 직원 입력이라 노이즈 우려로 안 쓰는 게 정책 (analytics 쿼리에서 IS NOT NULL 로 필터).
+   */
+  entryProductId: z.string().nullable().optional(),
 });
 
 export const fulfillmentTypeSchema = z.enum(["PICKUP", "DELIVERY", "SHIPPING"]);
+export const shippingPaymentTypeSchema = z.enum([
+  "PREPAID",       // 손님 결제 시 함께 (자사몰/일반 POS 택배)
+  "COD",           // 착불 (받는 사람이 택배기사에게)
+  "STORE_BURDEN",  // 매장 부담 (배송비 무료 / 도매)
+]);
 export const orderPaymentMethodSchema = z.enum([
   "CASH",
   "CARD",
@@ -35,6 +45,7 @@ export const orderSchema = z.object({
   paymentMethod: orderPaymentMethodSchema.optional(),
   discountAmount: z.string().default("0"),
   shippingFee: z.string().default("0"),
+  shippingPaymentType: shippingPaymentTypeSchema.default("PREPAID"),
   memo: z.string().optional(),
   items: z.array(orderItemSchema).min(1, "주문 항목을 추가해주세요"),
 });
@@ -65,6 +76,7 @@ export const orderUpdateSchema = z.object({
   items: z.array(orderItemSchema).optional(),
   discountAmount: z.string().optional(),
   shippingFee: z.string().optional(),
+  shippingPaymentType: shippingPaymentTypeSchema.optional(),
 });
 
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;

@@ -111,6 +111,9 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
   const [discountAmount, setDiscountAmount] = useState("0");
   const [shippingFee, setShippingFee] = useState("0");
+  const [shippingPaymentType, setShippingPaymentType] = useState<
+    "PREPAID" | "COD" | "STORE_BURDEN"
+  >("PREPAID");
   const [memo, setMemo] = useState("");
   const [items, setItems] = useState<OrderItemForm[]>([]);
   const [productPick, setProductPick] = useState("");
@@ -249,6 +252,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
         paymentMethod: paymentMethod || undefined,
         discountAmount: discountAmount || "0",
         shippingFee: shippingFee || "0",
+        shippingPaymentType,
         memo: memo || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -368,7 +372,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                       key={opt.value}
                       type="button"
                       onClick={() => setFulfillmentType(opt.value)}
-                      className={`h-11 rounded-xl border-2 text-[14px] font-medium transition-colors ${
+                      className={`h-11 rounded-xl border-2 text-jm-base font-medium transition-colors ${
                         active
                           ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                           : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
@@ -461,10 +465,10 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                           <JmTableRow className="hover:bg-transparent">
                             <JmTableCell>
                               <div className="flex flex-col">
-                                <span className="text-[13px] text-[var(--jm-text)]">
+                                <span className="text-jm-sm text-[var(--jm-text)]">
                                   {it.productName}
                                 </span>
-                                <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                                <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                                   {it.sku}
                                 </span>
                               </div>
@@ -565,6 +569,35 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                   onFocus={(e) => e.currentTarget.select()}
                 />
               </JmFormField>
+              {fulfillmentType !== "PICKUP" && (
+                <JmFormField label="배송비 결제">
+                  <div className="flex gap-1.5">
+                    {(
+                      [
+                        { value: "PREPAID" as const, label: "선불" },
+                        { value: "COD" as const, label: "착불" },
+                        { value: "STORE_BURDEN" as const, label: "무료" },
+                      ]
+                    ).map((opt) => {
+                      const active = shippingPaymentType === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setShippingPaymentType(opt.value)}
+                          className={`flex-1 rounded-md border px-2 py-1.5 text-jm-xs font-medium transition-colors ${
+                            active
+                              ? "border-[var(--jm-action)] bg-[var(--jm-bg)] text-[var(--jm-text)]"
+                              : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text-muted)] hover:border-[var(--jm-border-strong)]"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </JmFormField>
+              )}
               <JmFormField label="메모">
                 <JmTextarea
                   rows={3}
@@ -631,7 +664,7 @@ function SumRow({
   bold?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between text-[13px]">
+    <div className="flex items-baseline justify-between text-jm-sm">
       <span
         className={
           muted ? "text-[var(--jm-text-muted)]" : "text-[var(--jm-text)]"
@@ -642,7 +675,7 @@ function SumRow({
       <span
         className={`tabular-nums ${
           bold
-            ? "text-[18px] font-bold text-[var(--jm-text)]"
+            ? "text-jm-xl font-bold text-[var(--jm-text)]"
             : muted
               ? "text-[var(--jm-text-muted)]"
               : "text-[var(--jm-text)]"
@@ -706,7 +739,7 @@ function OrderItemOptionsRow({
             return (
               <div
                 key={opt.id}
-                className="flex items-center gap-2 text-[12px]"
+                className="flex items-center gap-2 text-jm-xs"
               >
                 <span className="w-[80px] text-[var(--jm-text-muted)]">
                   {opt.name}
@@ -724,7 +757,7 @@ function OrderItemOptionsRow({
                     );
                     onChange(newId ? [...otherIds, newId] : otherIds);
                   }}
-                  className="h-7 rounded border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2 text-[12px]"
+                  className="h-7 rounded border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2 text-jm-xs"
                 >
                   <option value="">— 선택 안 함 —</option>
                   {opt.values.map((v) => {

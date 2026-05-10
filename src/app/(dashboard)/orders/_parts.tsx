@@ -19,6 +19,7 @@ import {
 import {
   FULFILLMENT_LABELS,
   ITEM_PHASE_LABELS,
+  ITEM_PHASE_LABELS_EXCHANGE,
   PAYMENT_STATUS_LABELS,
   statusLabel,
   type FulfillmentType,
@@ -63,6 +64,7 @@ const STATUS_VISUAL_DEFAULT: Record<OrderStatus, StatusVisual> = {
   COMPLETED: { variant: "success", icon: PackageCheck },
   RETURN_REQUESTED: { variant: "warning", icon: RotateCcw },
   RETURN_ACCEPTED: { variant: "warning", icon: PackageOpen },
+  RETURN_PICKING: { variant: "warning", icon: Truck },
   RETURN_COLLECTED: { variant: "warning", icon: PackageOpen },
   RETURN_INSPECTED: { variant: "warning", icon: Search },
   CANCELLED: { variant: "outline", icon: XCircle },
@@ -113,15 +115,24 @@ const ITEM_PHASE_VISUAL: Record<
     icon: React.ComponentType<{ className?: string }> | null;
   }
 > = {
+  // 출고 흐름 — 진행 단계는 info, 완료는 success
   PENDING_LINE: { variant: "info", icon: Clock },
   WAITING_SHIP: { variant: "info", icon: Package },
+  PACKED_LINE: { variant: "info", icon: PackageCheck },
   PARTIAL_SHIP: { variant: "info", icon: Truck },
-  FULLY_SHIPPED: { variant: "success", icon: Check },
-  DELIVERED: { variant: "success", icon: PackageCheck },
-  RETURNING: { variant: "warning", icon: PackageOpen },
+  FULLY_SHIPPED: { variant: "info", icon: Truck }, // 배송중 (info)
+  DELIVERED: { variant: "success", icon: Check },  // 배송완료 (success)
+  // 반품 흐름 — warning. 종결(반품완료)은 outline 으로 가벼움
+  RETURN_REQUESTED_LINE: { variant: "warning", icon: PackageOpen },
+  RETURN_ACCEPTED_LINE: { variant: "warning", icon: PackageOpen },
+  RETURN_PICKING_LINE: { variant: "warning", icon: Truck },
+  RETURN_COLLECTED_LINE: { variant: "warning", icon: PackageOpen },
+  RETURN_INSPECTED_LINE: { variant: "warning", icon: PackageOpen },
   PARTIAL_RETURN: { variant: "warning", icon: RotateCcw },
   RETURNED_LINE: { variant: "outline", icon: RotateCcw },
+  // 교환 — outline (claimType 기반 색 분기는 ItemPhaseBadge 에서 accent 로)
   EXCHANGED_LINE: { variant: "outline", icon: ArrowLeftRight },
+  // 취소
   CANCELLED_LINE: { variant: "outline", icon: XCircle },
 };
 
@@ -138,23 +149,41 @@ const ITEM_PHASE_VISUAL: Record<
 export function ItemPhaseBadge({
   phase,
   claimType,
+  shipmentCount = 0,
 }: {
   phase: ItemPhase;
   claimType?: OrderClaimType | null;
+  /** 분할 발송 회차 수 — 발송 완료/배송 완료 phase 일 때 라벨에 prefix "{N}회 " 노출 */
+  shipmentCount?: number;
 }) {
   const base = ITEM_PHASE_VISUAL[phase];
   const isExchange =
     claimType === "EXCHANGE_SAME" || claimType === "EXCHANGE_DIFFERENT";
-  // 반품 진행 중 라벨이 교환 흐름이면 보라색으로 분기 (StatusBadge 정책과 동일)
+  // 반품 단계 + 교환 흐름이면 색을 accent(보라) 로 분기 + 라벨도 "교환…" 으로 swap
+  const isReturnFlow =
+    phase === "RETURN_REQUESTED_LINE" ||
+    phase === "RETURN_ACCEPTED_LINE" ||
+    phase === "RETURN_PICKING_LINE" ||
+    phase === "RETURN_COLLECTED_LINE" ||
+    phase === "RETURN_INSPECTED_LINE" ||
+    phase === "PARTIAL_RETURN";
   const variant: BadgeVariant =
-    isExchange && (phase === "RETURNING" || phase === "PARTIAL_RETURN")
-      ? "accent"
-      : base.variant;
+    isExchange && isReturnFlow ? "accent" : base.variant;
   const Icon = base.icon;
+  // 발송 완료 / 배송 완료 phase 에서 분할이 발생했으면 라벨에 회차 prefix
+  const showShipmentCount =
+    shipmentCount >= 2 &&
+    (phase === "FULLY_SHIPPED" || phase === "DELIVERED");
+  // 라벨 결정 — 교환 흐름이면 ITEM_PHASE_LABELS_EXCHANGE 우선, 없으면 기본 라벨
+  const baseLabel =
+    isExchange && ITEM_PHASE_LABELS_EXCHANGE[phase]
+      ? ITEM_PHASE_LABELS_EXCHANGE[phase]!
+      : ITEM_PHASE_LABELS[phase];
+  const label = showShipmentCount ? `${shipmentCount}회 ${baseLabel}` : baseLabel;
   return (
     <JmBadge variant={variant} size="md" shape="square">
       {Icon && <Icon className="size-3" />}
-      {ITEM_PHASE_LABELS[phase]}
+      {label}
     </JmBadge>
   );
 }
@@ -219,6 +248,8 @@ export function PartialProgress({
   let value = 0;
   let tone: Tone = "info";
 
+  // 잔량 추적용 — 부분 발송/반품 케이스에만 노출.
+  // 발송 회차 정보는 ItemPhaseBadge 의 라벨(예: "2회 발송완료") 로 분리 표시.
   const isShippingPhase =
     status === "PREPARING" ||
     status === "PREPARING_PACKED" ||
@@ -269,7 +300,7 @@ export function PartialProgress({
 
   return (
     <span
-      className={`mt-1 inline-flex items-center gap-1.5 text-[11px] tabular-nums ${c.text}`}
+      className={`mt-1 inline-flex items-center gap-1.5 text-jm-2xs tabular-nums ${c.text}`}
     >
       <span className={`relative h-1 w-16 overflow-hidden rounded-full ${c.track}`}>
         <span
@@ -310,10 +341,35 @@ export function ShipmentSummaryChip({
   }
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-1.5 py-px text-[10px] font-medium text-[var(--jm-info-fg)] tabular-nums"
+      className="inline-flex items-center gap-1 rounded-full border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-1.5 py-px text-jm-3xs font-medium text-[var(--jm-info-fg)] tabular-nums"
       title={`${shipmentCount}회에 걸쳐 발송됨 — 한 품목을 여러 회차로 나누거나(수량 분할), 카트의 다른 품목을 별도 회차로 보낸 경우(라인 분할) 모두 포함`}
     >
       분할 {shipmentCount}회 발송
+    </span>
+  );
+}
+
+/**
+ * 배송비 결제 방식 표시 — 워크보드의 "배송비" 컬럼 (결제 컬럼 앞).
+ * chip 아닌 텍스트로 가벼운 노이즈. 착불만 운영 주의 톤(warning fg) 으로 구분.
+ *  - PREPAID: 선불 (일반 텍스트)
+ *  - COD: 착불 (warning fg — 매장이 받지 않음, 출고 시 라벨 주의)
+ *  - STORE_BURDEN: 매장 부담 (muted — 비용 처리, 손님 결제 무관)
+ * fulfillmentType=PICKUP 인 주문은 배송비 자체 무관 — 셀 비움 (호출 측에서 분기).
+ */
+export function ShippingPaymentBadge({
+  type,
+}: {
+  type: "PREPAID" | "COD" | "STORE_BURDEN";
+}) {
+  const labels: Record<typeof type, string> = {
+    PREPAID: "선불",
+    COD: "착불",
+    STORE_BURDEN: "무료",
+  };
+  return (
+    <span className="text-jm-xs tabular-nums text-[var(--jm-text)]">
+      {labels[type]}
     </span>
   );
 }
@@ -352,22 +408,22 @@ export function PaymentStatusBadge({
 }
 
 /**
- * 출고 방식 — 정보 전달용. default(muted gray) + 아이콘.
- * 출고 상태가 색을 가져가니 여기선 색 빠짐.
+ * 출고 방식 — 아이콘 + 텍스트 (chip 없음).
+ * 출고 상태 (ItemPhaseBadge) 가 색을 가져가니 여기선 시각 무게 가볍게.
  */
 export function FulfillmentBadge({ type }: { type: FulfillmentType }) {
   const Icon = type === "DELIVERY" ? Truck : type === "SHIPPING" ? Package : Store;
   return (
-    <JmBadge variant="default" size="sm" shape="square">
-      <Icon className="size-3" />
+    <span className="inline-flex items-center gap-1 text-jm-xs text-[var(--jm-text)]">
+      <Icon className="size-3.5 text-[var(--jm-text-muted)]" />
       {FULFILLMENT_LABELS[type]}
-    </JmBadge>
+    </span>
   );
 }
 
 /**
- * 채널 — 오프라인은 default(muted), 외부 채널은 info(파랑).
- * 외부 채널이 시각적으로 도드라져 워크보드 한 눈에 origin 분류.
+ * 채널 — 아이콘 + 텍스트. 오프라인 (channelId=null) 은 회색 muted 톤,
+ * 외부 채널은 일반 텍스트 (이름 자체가 식별자라 시각 색 강조 불필요).
  */
 export function ChannelBadge({
   channel,
@@ -376,17 +432,17 @@ export function ChannelBadge({
 }) {
   if (!channel) {
     return (
-      <JmBadge variant="default" size="sm" shape="square">
-        <Store className="size-3" />
+      <span className="inline-flex items-center gap-1 text-jm-xs text-[var(--jm-text-muted)]">
+        <Store className="size-3.5" />
         오프라인
-      </JmBadge>
+      </span>
     );
   }
   return (
-    <JmBadge variant="info" size="sm" shape="square">
-      <Globe className="size-3" />
+    <span className="inline-flex items-center gap-1 text-jm-xs text-[var(--jm-text)]">
+      <Globe className="size-3.5 text-[var(--jm-text-muted)]" />
       {channel.name}
-    </JmBadge>
+    </span>
   );
 }
 
@@ -407,35 +463,35 @@ export function ShipDateCell({
   // 반품 처리 중인 주문 — 출고예정일은 의미 없음. 단계 텍스트 표시.
   if (status === "RETURN_REQUESTED") {
     return (
-      <span className="text-[12px] text-[var(--jm-warning-fg)]">
+      <span className="text-jm-xs text-[var(--jm-warning-fg)]">
         결정 대기
       </span>
     );
   }
   if (status === "RETURN_ACCEPTED") {
     return (
-      <span className="text-[12px] text-[var(--jm-warning-fg)]">회수 대기</span>
+      <span className="text-jm-xs text-[var(--jm-warning-fg)]">회수 대기</span>
     );
   }
   if (status === "RETURN_COLLECTED") {
     return (
-      <span className="text-[12px] text-[var(--jm-warning-fg)]">검수 대기</span>
+      <span className="text-jm-xs text-[var(--jm-warning-fg)]">검수 대기</span>
     );
   }
   if (status === "RETURN_INSPECTED") {
     return (
-      <span className="text-[12px] text-[var(--jm-warning-fg)]">종결 대기</span>
+      <span className="text-jm-xs text-[var(--jm-warning-fg)]">종결 대기</span>
     );
   }
   if (!expectedShipDate) {
     return (
-      <span className="text-[12px] text-[var(--jm-warning-fg)]">예정일 미정</span>
+      <span className="text-jm-xs text-[var(--jm-warning-fg)]">예정일 미정</span>
     );
   }
   if (daysUntil == null) return null;
   if (daysUntil < 0) {
     return (
-      <span className="text-[12px] font-semibold text-[var(--jm-danger-fg)] tabular-nums">
+      <span className="text-jm-xs font-semibold text-[var(--jm-danger-fg)] tabular-nums">
         {Math.abs(daysUntil)}일 지연
       </span>
     );
@@ -446,24 +502,24 @@ export function ShipDateCell({
   });
   if (daysUntil === 0) {
     return (
-      <span className="flex flex-col text-[12px] tabular-nums">
+      <span className="flex flex-col text-jm-xs tabular-nums">
         <span className="font-semibold text-[var(--jm-text)]">오늘</span>
-        <span className="text-[11px] text-[var(--jm-text-muted)]">{dateStr}</span>
+        <span className="text-jm-2xs text-[var(--jm-text-muted)]">{dateStr}</span>
       </span>
     );
   }
   if (daysUntil === 1) {
     return (
-      <span className="flex flex-col text-[12px] tabular-nums">
+      <span className="flex flex-col text-jm-xs tabular-nums">
         <span className="text-[var(--jm-text)]">내일</span>
-        <span className="text-[11px] text-[var(--jm-text-muted)]">{dateStr}</span>
+        <span className="text-jm-2xs text-[var(--jm-text-muted)]">{dateStr}</span>
       </span>
     );
   }
   return (
-    <span className="flex flex-col text-[12px] tabular-nums">
+    <span className="flex flex-col text-jm-xs tabular-nums">
       <span className="text-[var(--jm-text)]">{dateStr}</span>
-      <span className="text-[11px] text-[var(--jm-text-muted)]">D+{daysUntil}</span>
+      <span className="text-jm-2xs text-[var(--jm-text-muted)]">D+{daysUntil}</span>
     </span>
   );
 }
@@ -488,7 +544,7 @@ export function StatusFlowGuide() {
     { status: "RETURNED" },
   ];
   return (
-    <div className="flex flex-col gap-2 px-4 py-3 text-[11px] text-[var(--jm-text-muted)]">
+    <div className="flex flex-col gap-2 px-4 py-3 text-jm-2xs text-[var(--jm-text-muted)]">
       <FlowRow
         label="출고"
         steps={flowSteps}

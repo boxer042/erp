@@ -24,14 +24,14 @@ export default function OrderHelpPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/orders"
-            className="inline-flex items-center gap-1 text-[12px] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+            className="inline-flex items-center gap-1 text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
           >
             <ArrowLeft className="size-3.5" />
             워크보드로
           </Link>
         </div>
-        <h1 className="mt-1 text-[18px] font-semibold">주문 시스템 가이드</h1>
-        <p className="mt-0.5 text-[12px] text-[var(--jm-text-muted)]">
+        <h1 className="mt-1 text-jm-xl font-semibold">주문 시스템 가이드</h1>
+        <p className="mt-0.5 text-jm-xs text-[var(--jm-text-muted)]">
           매장 운영자와 신규 직원이 주문/반품/교환의 모든 흐름과 결제 처리 방식을
           한 곳에서 확인하도록 정리한 페이지입니다.
         </p>
@@ -60,7 +60,8 @@ function Toc() {
     { href: "#overview", label: "1. 개요 — 3축 모델" },
     { href: "#shipping", label: "2. 출고 흐름 (5단계)" },
     { href: "#partial", label: "3. 부분 처리 / 분할 발송 정책" },
-    { href: "#options", label: "4. 옵션 도메인 — 변형상품과 분리" },
+    { href: "#options", label: "4. 옵션 도메인 — SWAP / ADDON / OPTION_PARENT" },
+    { href: "#addon", label: "4-3. ADDON 도메인 — 추가구매 추천 (BundleProduct)" },
     { href: "#refund", label: "5. 반품 흐름 (5단계)" },
     { href: "#exchange", label: "6. 교환 흐름 + 새 주문" },
     { href: "#payment", label: "7. 결제 상태 (paymentStatus)" },
@@ -73,7 +74,7 @@ function Toc() {
         <JmCardTitle>목차</JmCardTitle>
       </JmCardHeader>
       <JmCardContent>
-        <ul className="space-y-1 text-[13px]">
+        <ul className="space-y-1 text-jm-sm">
           {items.map((it) => (
             <li key={it.href}>
               <a
@@ -100,9 +101,9 @@ function SectionOverview() {
         한 주문은 <strong>세 가지 독립적 축</strong>으로 동시에 추적됩니다.
         같은 주문이 동시에 여러 축에서 다른 상태일 수 있어요.
       </p>
-      <table className="mt-3 w-full table-fixed text-[13px]">
+      <table className="mt-3 w-full table-fixed text-jm-sm">
         <thead>
-          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+          <tr className="border-b border-[var(--jm-border)] text-left text-jm-xs text-[var(--jm-text-muted)]">
             <th className="w-[80px] py-2">축</th>
             <th className="w-[140px] py-2">필드</th>
             <th className="py-2">추적 대상</th>
@@ -111,27 +112,27 @@ function SectionOverview() {
         <tbody>
           <tr className="border-b border-[var(--jm-border-subtle)]">
             <td className="py-2 font-medium">출고</td>
-            <td className="py-2 font-mono text-[12px]">status</td>
+            <td className="py-2 font-mono text-jm-xs">status</td>
             <td className="py-2">물리적 흐름 — 재고 위치, 손님 인도 여부</td>
           </tr>
           <tr className="border-b border-[var(--jm-border-subtle)]">
             <td className="py-2 font-medium">결제</td>
-            <td className="py-2 font-mono text-[12px]">paymentStatus</td>
+            <td className="py-2 font-mono text-jm-xs">paymentStatus</td>
             <td className="py-2">재무 흐름 — 입금·환불·매출취소 추적</td>
           </tr>
           <tr>
             <td className="py-2 font-medium">클레임</td>
-            <td className="py-2 font-mono text-[12px]">claimType / claimReason</td>
+            <td className="py-2 font-mono text-jm-xs">claimType / claimReason</td>
             <td className="py-2">의도 — 환불인지 교환인지, 누가 책임인지</td>
           </tr>
         </tbody>
       </table>
 
       <div className="mt-4 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
-        <p className="mb-2 text-[12px] font-medium text-[var(--jm-text-subtle)]">
+        <p className="mb-2 text-jm-xs font-medium text-[var(--jm-text-subtle)]">
           예시
         </p>
-        <ul className="space-y-1 text-[12px]">
+        <ul className="space-y-1 text-jm-xs">
           <li>
             <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
               출고대기
@@ -170,7 +171,7 @@ function SectionOverview() {
       </div>
 
       <div className="mt-4">
-        <p className="mb-2 text-[12px] font-medium text-[var(--jm-text-subtle)]">
+        <p className="mb-2 text-jm-xs font-medium text-[var(--jm-text-subtle)]">
           전체 흐름 한눈에
         </p>
         <div className="overflow-hidden rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)]">
@@ -269,11 +270,11 @@ function SectionPartial() {
       </p>
 
       <div className="mt-3 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
-        <p className="mb-2 text-[12px] font-medium text-[var(--jm-text-subtle)]">
+        <p className="mb-2 text-jm-xs font-medium text-[var(--jm-text-subtle)]">
           진행 중 progress bar — 고객/항목 셀에 표시
         </p>
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-3 text-[12px]">
+          <div className="flex items-center gap-3 text-jm-xs">
             <span className="w-[110px] text-[var(--jm-text-muted)]">출고 진행</span>
             <PartialProgress
               status="PREPARING"
@@ -282,7 +283,7 @@ function SectionPartial() {
               returnedQty={0}
             />
           </div>
-          <div className="flex items-center gap-3 text-[12px]">
+          <div className="flex items-center gap-3 text-jm-xs">
             <span className="w-[110px] text-[var(--jm-text-muted)]">반품 진행</span>
             <PartialProgress
               status="COMPLETED"
@@ -291,14 +292,14 @@ function SectionPartial() {
               returnedQty={1}
             />
           </div>
-          <div className="flex items-center gap-3 text-[12px]">
+          <div className="flex items-center gap-3 text-jm-xs">
             <span className="w-[110px] text-[var(--jm-text-muted)]">분할 발송 이력</span>
             <ShipmentSummaryChip shipmentCount={2} status="SHIPPED" />
           </div>
         </div>
       </div>
 
-      <h3 className="mt-5 text-[13px] font-semibold">
+      <h3 className="mt-5 text-jm-sm font-semibold">
         ⚠️ 시스템이 의미하는 "분할 발송"
       </h3>
       <p>
@@ -306,9 +307,9 @@ function SectionPartial() {
         표시는 <strong>주문이 몇 회차에 나눠 발송되었는지</strong>를 의미합니다.{" "}
         다음 두 케이스를 모두 포함합니다:
       </p>
-      <table className="mt-3 w-full table-fixed text-[13px]">
+      <table className="mt-3 w-full table-fixed text-jm-sm">
         <thead>
-          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+          <tr className="border-b border-[var(--jm-border)] text-left text-jm-xs text-[var(--jm-text-muted)]">
             <th className="w-[120px] py-2">유형</th>
             <th className="py-2">설명</th>
           </tr>
@@ -331,7 +332,7 @@ function SectionPartial() {
           </tr>
         </tbody>
       </table>
-      <p className="mt-3 rounded-md border border-[var(--jm-warning-border)] bg-[var(--jm-warning-bg)] p-3 text-[12px] text-[var(--jm-warning-fg)]">
+      <p className="mt-3 rounded-md border border-[var(--jm-warning-border)] bg-[var(--jm-warning-bg)] p-3 text-jm-xs text-[var(--jm-warning-fg)]">
         💡 <strong>왜 둘 다 "분할" 로 묶었나?</strong> 손님 입장에선 두 케이스 모두
         "여러 박스가 따로 도착" 한 사실이 동일하고, 매장 입장에서도 "여러 번 송장
         발급" 운영 부담이 같습니다. 따라서 <strong>주문 단위로 몇 번 발송했는가</strong>{" "}
@@ -339,8 +340,8 @@ function SectionPartial() {
         일반 발송으로 간주하고 노이즈를 줄이려 표시 생략.
       </p>
 
-      <h3 className="mt-5 text-[13px] font-semibold">진행 중 표시 규칙</h3>
-      <ul className="space-y-1.5 text-[13px]">
+      <h3 className="mt-5 text-jm-sm font-semibold">진행 중 표시 규칙</h3>
+      <ul className="space-y-1.5 text-jm-sm">
         <li>
           <strong>출고 진행</strong> (info, 파랑) — 출고대기/출고확정/배송중에서 일부만
           발송된 경우. <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">발송 N/M</code>{" "}
@@ -356,14 +357,14 @@ function SectionPartial() {
         </li>
       </ul>
 
-      <h3 className="mt-5 text-[13px] font-semibold">워크보드 행 단위 = 품목 (item)</h3>
+      <h3 className="mt-5 text-jm-sm font-semibold">워크보드 행 단위 = 품목 (item)</h3>
       <p>
         같은 주문이라도 카트에 여러 품목이 있으면 <strong>품목마다 행이 분리</strong>되어
         표시됩니다 (네이버 스마트스토어·쿠팡 WING 패턴). 같은 주문번호가 그룹화되어 첫
         행에만 주문번호·고객·채널·결제 등 주문 단위 정보가 표시되고, 나머지 행은 좌측
         세로 라인으로 그룹임을 표시합니다.
       </p>
-      <ul className="mt-2 space-y-1.5 text-[13px]">
+      <ul className="mt-2 space-y-1.5 text-jm-sm">
         <li>
           행 클릭 시 상세 시트가 열리며 클릭한 <strong>품목이 자동 강조 + 해당 위치로
           스크롤</strong>됩니다
@@ -385,14 +386,14 @@ function SectionPartial() {
         </li>
       </ul>
 
-      <h3 className="mt-5 text-[13px] font-semibold">상세 시트에서의 부분 처리</h3>
+      <h3 className="mt-5 text-jm-sm font-semibold">상세 시트에서의 부분 처리</h3>
       <p>
         상세 시트(행 클릭) 의 항목 카드에서{" "}
         <strong>라인별 진행 상황</strong>을 확인하고, [부분 발송] / [부분 반품] /
         [부분 교환] dialog 로 라인마다 처리할 수량을 입력합니다.
       </p>
 
-      <h3 className="mt-5 text-[13px] font-semibold">
+      <h3 className="mt-5 text-jm-sm font-semibold">
         분할 송장 — 회차별 송장번호 보관
       </h3>
       <p>
@@ -400,7 +401,7 @@ function SectionPartial() {
         먼저 보낼 때, 다른 창고에서 발송할 때 등) 회차마다 다른 송장번호를 보관합니다.
         한국 오픈마켓 (네이버·쿠팡·11번가·G마켓) 모두 같은 패턴.
       </p>
-      <ul className="mt-2 space-y-1.5 text-[13px]">
+      <ul className="mt-2 space-y-1.5 text-jm-sm">
         <li>
           [발송] 또는 [부분 발송] 액션 시 <strong>1차·2차·3차 회차 Shipment</strong> 가
           자동 생성됨
@@ -424,121 +425,170 @@ function SectionPartial() {
 
 function SectionOptions() {
   return (
-    <Section id="options" title="4. 옵션 도메인 — 변형상품과 분리">
+    <Section id="options" title="4. 옵션 도메인 — SWAP / ADDON / OPTION_PARENT">
       <p>
-        고객이 직접 선택하는 옵션 (색상·용량·메모리 등) 은{" "}
-        <strong>변형상품(매장 분기) 과 별도 도메인</strong>으로 모델링됩니다.
+        고객이 직접 선택하는 옵션 (색상·용량·필터 등) 은{" "}
+        <strong>변형상품(매장 조립 분기) 과 별도 도메인</strong>으로 모델링됩니다.
       </p>
 
-      <h3 className="mt-4 text-[13px] font-semibold">개념 분리</h3>
-      <table className="mt-2 w-full table-fixed text-[13px]">
-        <thead>
-          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
-            <th className="w-[100px] py-2"></th>
-            <th className="py-2">변형상품 (variant)</th>
-            <th className="py-2">고객 옵션 (ProductOption)</th>
-          </tr>
-        </thead>
-        <tbody className="text-[12px]">
-          <tr className="border-b border-[var(--jm-border-subtle)]">
-            <td className="py-2 font-medium">결정 주체</td>
-            <td className="py-2">매장 (출고 시점)</td>
-            <td className="py-2">고객 (카탈로그·POS)</td>
-          </tr>
-          <tr className="border-b border-[var(--jm-border-subtle)]">
-            <td className="py-2 font-medium">노출</td>
-            <td className="py-2">canonical 만, variant 숨김</td>
-            <td className="py-2">옵션 슬롯·값 노출, 고객 선택 UI</td>
-          </tr>
-          <tr className="border-b border-[var(--jm-border-subtle)]">
-            <td className="py-2 font-medium">실현 방식</td>
-            <td className="py-2">SetComponent + Assembly (조립 부속)</td>
-            <td className="py-2">옵션값마다 다른 처리 (3가지)</td>
-          </tr>
-          <tr>
-            <td className="py-2 font-medium">데이터 모델</td>
-            <td className="py-2">Product.canonicalProductId + variants</td>
-            <td className="py-2">ProductOption + ProductOptionValue</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3 className="mt-5 text-[13px] font-semibold">옵션값 처리 방식 (3가지 모드)</h3>
-      <ul className="space-y-2 text-[13px]">
+      <h3 className="mt-4 text-jm-sm font-semibold">옵션값 처리 모드 (mappedMode)</h3>
+      <p className="text-jm-xs text-[var(--jm-text-muted)]">
+        ProductOptionValue 가 다른 Product 를 매핑할 때 결제 라인에 어떻게 반영할지 결정.
+      </p>
+      <ul className="mt-2 space-y-2 text-jm-sm">
         <li>
-          <strong>(A) 단순 텍스트</strong> — 색상·사이즈 같은 attribute. ProductOptionValue 가
-          단순 라벨만 가짐. 옵션 등록 시 시스템이 variant Product 자동 생성 (variant 자체
-          inventory 보유)
+          <strong>SWAP</strong> (
+          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">mappedMode=SWAP</code>
+          ) — 메인 라인의 productId 를 매핑된 SKU 로 교체. 색상·사이즈 변형 같은 케이스. 예:
+          대표 "가습기" + 색상=블랙 → 메인 라인이 가습기-블랙 SKU 로 swap. 매장은 색상별
+          별도 SKU (재고/입고/시리얼 분리) 등록.
         </li>
         <li>
-          <strong>(B) 매장 variant 매핑</strong> (
-          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">
-            mappedVariantId
-          </code>
-          ) — 쿨러 교체 같은 부속 차이. 옵션값이 매장 variant 를 가리킴. SetComponent +
-          Assembly 인프라 그대로 활용
+          <strong>ADDON</strong> (
+          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">mappedMode=ADDON</code>
+          ) — 옵션 선택 시 자식 OrderItem 자동 추가 (메인 + 부속). 본 상품 내부 부속이 별도
+          SKU 인 드문 케이스. 일반적인 추가구매 추천은 BundleProduct 도메인을 쓰는 게
+          권장 (아래 §4-3 참고).
         </li>
         <li>
-          <strong>(C) 다른 Product 매핑</strong> (
-          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">
-            mappedProductId
-          </code>
-          ) — 메모리·SSD 같이 단독 판매도 되는 상품. 옵션값이 그 Product 를 가리킴 →
-          OrderItem 별도 라인 (lineRole=OPTION_REF, parentItemId=메인) 생성
+          <strong>단순 텍스트</strong> (mappedProductId 없음) — 라벨만 보존. addPrice 가
+          있으면 메인 unitPrice 에 가산.
+        </li>
+        <li>
+          <strong>매장 variant 매핑</strong> (mappedVariantId, Phase 3) — 부속 변형 자동
+          Assembly. 현재 미구현, 단순 텍스트와 동일 처리.
         </li>
       </ul>
 
-      <h3 className="mt-5 text-[13px] font-semibold">OrderItem 라인 역할</h3>
-      <table className="mt-2 w-full table-fixed text-[13px]">
+      <h3 className="mt-5 text-jm-sm font-semibold">ProductType.OPTION_PARENT</h3>
+      <p>
+        자체 재고 없는 카탈로그 placeholder. 색상/사이즈 옵션의 SWAP 으로만 실제 SKU 가
+        결정되는 운영을 위함. 등록 시 가격/재고/매핑 입력 비활성, 옵션 슬롯에 SWAP 옵션값
+        들을 등록해서 손님이 선택하면 메인 라인이 그 SKU 로 swap. 결제 시 SWAP 옵션값
+        선택 강제.
+      </p>
+
+      <h3 className="mt-5 text-jm-sm font-semibold">Product.catalogHidden</h3>
+      <p>
+        카탈로그 노출 차단 토글. 옵션 swap 의 대상 SKU 단독 노출을 막을 때 사용 (가습기-블랙
+        은 단독 카탈로그 안 보이지만 가습기-화이트 / 대표 가습기의 옵션 SWAP 으로만 도달).
+      </p>
+
+      <h3 className="mt-5 text-jm-sm font-semibold">OrderItem 라인 역할</h3>
+      <table className="mt-2 w-full table-fixed text-jm-sm">
         <thead>
-          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+          <tr className="border-b border-[var(--jm-border)] text-left text-jm-xs text-[var(--jm-text-muted)]">
             <th className="w-[120px] py-2">lineRole</th>
             <th className="py-2">의미</th>
           </tr>
         </thead>
-        <tbody className="text-[12px]">
+        <tbody className="text-jm-xs">
           <tr className="border-b border-[var(--jm-border-subtle)]">
             <td className="py-2 font-mono">MAIN</td>
-            <td className="py-2">기본 라인. 일반 상품·variant 모두 여기. optionSnapshot 으로 옵션값 보존</td>
+            <td className="py-2">기본 라인. SWAP 결과 swap 된 SKU 도 여기. optionSnapshot 으로 옵션값 보존</td>
           </tr>
           <tr className="border-b border-[var(--jm-border-subtle)]">
             <td className="py-2 font-mono">OPTION_REF</td>
-            <td className="py-2">메인의 옵션이 다른 Product 매핑 (모드 C). parentItemId 가 메인 OrderItem 가리킴</td>
+            <td className="py-2">옵션값의 mappedMode=ADDON 분기 — 자식 OrderItem. parentItemId 가 메인 가리킴</td>
           </tr>
           <tr>
             <td className="py-2 font-mono">ADDON</td>
-            <td className="py-2">추가구매 — 별도 추천 상품 (후속 도메인)</td>
+            <td className="py-2">BundleProduct 추천에서 손님이 선택한 추가구매 (별도 카탈로그 상품)</td>
           </tr>
         </tbody>
       </table>
 
-      <h3 className="mt-5 text-[13px] font-semibold">워크보드 시각 (D 안)</h3>
-      <ul className="space-y-1.5 text-[13px]">
+      <h3 className="mt-5 text-jm-sm font-semibold">진입 경로 (entryProductId) — 자사몰 funnel</h3>
+      <p>
+        SWAP 으로 메인 라인 SKU 가 바뀐 후에도 손님이 진입한 카탈로그 SKU 를 보존하는 컬럼.
+        예: 대표 "가습기" 페이지 → 색상=블랙 swap → OrderItem.productId=가습기-블랙,
+        entryProductId=대표가습기. POS 결제는 직원 입력이라 항상 null (funnel 노이즈 회피).
+      </p>
+      <p className="mt-2">
+        분석은 <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">/reports/option-funnel</code>
+        에서 진입 SKU × 결제 SKU 매트릭스 + SWAP 비율 집계.
+      </p>
+
+      <h3 className="mt-5 text-jm-sm font-semibold">워크보드 시각</h3>
+      <ul className="space-y-1.5 text-jm-sm">
         <li>
-          <strong>옵션값</strong> — 상품명 옆에 부속 텍스트로 노출 (예: "가습기
-          (화이트 · L)"). 별도 배지 없음
+          <strong>자식 라인</strong> — 들여쓰기 + prefix 라벨{" "}
+          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">↳ 옵션</code> /
+          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5"> ↳ 추가구매</code>
         </li>
         <li>
-          <strong>OPTION_REF 라인</strong> — outline info 배지{" "}
-          <span className="inline-flex items-center rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-1 py-px text-[9px] font-medium text-[var(--jm-info-fg)]">
-            옵션
-          </span>
+          <strong>SWAP 발생</strong> — 상품명 옆 회색 chip{" "}
+          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">← 진입: ○○○</code>
+          (entryProductId ≠ productId)
         </li>
         <li>
-          <strong>ADDON 라인</strong> — outline accent 배지{" "}
-          <span className="inline-flex items-center rounded-md border border-[var(--jm-accent-border)] bg-[var(--jm-accent-bg)] px-1 py-px text-[9px] font-medium text-[var(--jm-accent-fg)]">
-            추가구매
-          </span>{" "}
-          (후속)
+          <strong>옵션값 부속</strong> — SWAP 안 일어났을 때만 "(화이트 · L)" 표시 (SWAP
+          결과는 상품명에 이미 포함)
         </li>
       </ul>
 
-      <h3 className="mt-5 text-[13px] font-semibold">재고 정합성</h3>
+      <h3 className="mt-5 text-jm-sm font-semibold">재고 정합성</h3>
       <p>
-        옵션값이 다른 Product 를 매핑(C 모드) 하면 그 Product 의 inventory 가 직접 차감되어
-        <strong> 단독 판매와 옵션 판매가 같은 재고 source</strong> 를 공유합니다 (이중 등록
-        방지). 매장 variant 매핑(B 모드) 은 기존 Assembly·SetComponent 인프라가 그대로
-        부속 재고를 추적합니다.
+        SWAP 결과 productId 기준으로 inventory/lot/시리얼 발번/매출 집계 모두 정확.
+        OPTION_PARENT 자체는 거래 흔적 안 남음 (placeholder). 색상별 매출 통계 가능
+        (가습기-블랙 30개 / 가습기-화이트 50개).
+      </p>
+    </Section>
+  );
+}
+
+// ─────────── 4-3. ADDON 도메인 (BundleProduct)
+
+function SectionAddon() {
+  return (
+    <Section id="addon" title="4-3. ADDON 도메인 — 추가구매 추천 (BundleProduct)">
+      <p>
+        메인 상품과 함께 사면 좋은 <strong>별도 카탈로그 상품</strong> 을 추천 목록으로 등록.
+        ProductOption 과 다른 도메인 — 손님이 명시적으로 선택해서 함께 구매.
+      </p>
+
+      <h3 className="mt-4 text-jm-sm font-semibold">옵션 vs 추가구매 차이</h3>
+      <table className="mt-2 w-full table-fixed text-jm-sm">
+        <thead>
+          <tr className="border-b border-[var(--jm-border)] text-left text-jm-xs text-[var(--jm-text-muted)]">
+            <th className="w-[140px] py-2"></th>
+            <th className="py-2">ProductOption</th>
+            <th className="py-2">BundleProduct</th>
+          </tr>
+        </thead>
+        <tbody className="text-jm-xs">
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-medium">본질</td>
+            <td className="py-2">메인 상품의 선택지 (필수 결정)</td>
+            <td className="py-2">별도 카탈로그 상품 추천 (선택 결정)</td>
+          </tr>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-medium">단독 판매</td>
+            <td className="py-2">의미 없음 (예: 색상만 따로 X)</td>
+            <td className="py-2">단독으로도 카탈로그 노출 + 판매 가능</td>
+          </tr>
+          <tr>
+            <td className="py-2 font-medium">예시</td>
+            <td className="py-2">색상, 사이즈, 메모리 사양</td>
+            <td className="py-2">필터, 케이스, 액세서리</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 className="mt-5 text-jm-sm font-semibold">흐름 (POS)</h3>
+      <ol className="ml-4 list-decimal space-y-1 text-jm-sm">
+        <li>메인 상품 카트 추가 (자동 모달 X)</li>
+        <li>카트 시트에서 라인의 [+ 추가구매] 버튼 클릭</li>
+        <li>추천 시트 → 손님이 추가 상품 선택 (수량/할인 표시)</li>
+        <li>[추가] → 카트에 ADDON 자식 라인 (parentCartItemId=메인) 추가</li>
+        <li>결제 시 OrderItem.lineRole=ADDON, parentItemId=메인 으로 생성</li>
+        <li>메인 라인 삭제/취소 시 ADDON 자식 cascade</li>
+      </ol>
+
+      <h3 className="mt-5 text-jm-sm font-semibold">번들 할인</h3>
+      <p>
+        BundleProduct.discountAmount 로 메인과 함께 살 때 할인 적용. 예: 필터 정가 ₩12,000
+        → 가습기 + 함께 사면 ₩11,000 (₩1,000 번들 할인).
       </p>
     </Section>
   );
@@ -662,7 +712,7 @@ function SectionExchange() {
         색은 <strong>보라</strong> (accent) 톤으로 통일되어 반품과 시각 분리.
       </p>
 
-      <div className="mt-3 rounded-md border border-[var(--jm-accent-bg)] bg-[var(--jm-accent-bg)] p-3 text-[12px] text-[var(--jm-accent-fg)]">
+      <div className="mt-3 rounded-md border border-[var(--jm-accent-bg)] bg-[var(--jm-accent-bg)] p-3 text-jm-xs text-[var(--jm-accent-fg)]">
         <strong>반품 5단계와 동일</strong>한 진행을 따릅니다 — 요청 → 수락 → 회수
         → 검수 → 종결. 단, claimType 이{" "}
         <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
@@ -726,10 +776,10 @@ function SectionExchange() {
       />
 
       <div className="mt-4">
-        <p className="mb-2 text-[12px] font-medium text-[var(--jm-text-subtle)]">
+        <p className="mb-2 text-jm-xs font-medium text-[var(--jm-text-subtle)]">
           마진 리포트 정합성
         </p>
-        <p className="text-[13px]">
+        <p className="text-jm-sm">
           교환 발송 새 주문(-EX)은 <strong>매출 중복 인식 방지</strong>를 위해
           마진 리포트에서 자동 제외됩니다 (
           <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
@@ -752,9 +802,9 @@ function SectionPayment() {
         매출 취소 등을 표현.
       </p>
 
-      <table className="mt-3 w-full text-[13px]">
+      <table className="mt-3 w-full text-jm-sm">
         <thead>
-          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+          <tr className="border-b border-[var(--jm-border)] text-left text-jm-xs text-[var(--jm-text-muted)]">
             <th className="w-[140px] py-2">상태</th>
             <th className="py-2">의미 / 전이 시점</th>
           </tr>
@@ -821,9 +871,9 @@ function SectionCancel() {
         취소 대신 <strong>반품 흐름</strong>으로 처리해야 합니다.
       </p>
 
-      <table className="mt-3 w-full text-[13px]">
+      <table className="mt-3 w-full text-jm-sm">
         <thead>
-          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+          <tr className="border-b border-[var(--jm-border)] text-left text-jm-xs text-[var(--jm-text-muted)]">
             <th className="w-[180px] py-2">현재 상태</th>
             <th className="w-[100px] py-2">취소 가능?</th>
             <th className="py-2">대안</th>
@@ -922,7 +972,7 @@ function Section({
         <JmCardHeader>
           <JmCardTitle>{title}</JmCardTitle>
         </JmCardHeader>
-        <JmCardContent className="space-y-2 text-[13px] text-[var(--jm-text)]">
+        <JmCardContent className="space-y-2 text-jm-sm text-[var(--jm-text)]">
           {children}
         </JmCardContent>
       </JmCard>
@@ -948,19 +998,19 @@ function StepRow({
   return (
     <div className="mt-4 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[12px] font-semibold text-[var(--jm-text-muted)]">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-xs font-semibold text-[var(--jm-text-muted)]">
           {no}
         </span>
         {badge}
-        <span className="text-[14px] font-medium">{title}</span>
+        <span className="text-jm-base font-medium">{title}</span>
       </div>
-      <p className="mt-2 text-[13px] text-[var(--jm-text)]">{what}</p>
+      <p className="mt-2 text-jm-sm text-[var(--jm-text)]">{what}</p>
       {actions && actions.length > 0 && (
         <div className="mt-2">
-          <p className="text-[11px] font-medium text-[var(--jm-text-subtle)]">
+          <p className="text-jm-2xs font-medium text-[var(--jm-text-subtle)]">
             액션
           </p>
-          <ul className="mt-1 space-y-0.5 text-[12px]">
+          <ul className="mt-1 space-y-0.5 text-jm-xs">
             {actions.map((a, i) => (
               <li key={i}>
                 <JmBadge variant="default" size="sm" shape="square">
@@ -973,7 +1023,7 @@ function StepRow({
         </div>
       )}
       {sideEffect && (
-        <div className="mt-2 rounded border border-[var(--jm-border-subtle)] bg-[var(--jm-surface-muted)] p-2 text-[12px] text-[var(--jm-text-muted)]">
+        <div className="mt-2 rounded border border-[var(--jm-border-subtle)] bg-[var(--jm-surface-muted)] p-2 text-jm-xs text-[var(--jm-text-muted)]">
           <p className="mb-1 font-medium text-[var(--jm-text-subtle)]">
             부수효과
           </p>
@@ -993,8 +1043,8 @@ function Pitfall({
 }) {
   return (
     <div className="mt-3 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3">
-      <p className="text-[13px] font-medium">{title}</p>
-      <p className="mt-1 text-[12px] text-[var(--jm-text-muted)]">{children}</p>
+      <p className="text-jm-sm font-medium">{title}</p>
+      <p className="mt-1 text-jm-xs text-[var(--jm-text-muted)]">{children}</p>
     </div>
   );
 }

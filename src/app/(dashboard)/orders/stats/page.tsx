@@ -233,7 +233,7 @@ export default function SalesStatsPage() {
       <div className="flex-1 overflow-y-auto p-5">
         {/* 기간 필터 */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex h-[30px] items-center gap-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-1 text-[13px]">
+          <div className="flex h-[30px] items-center gap-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-1 text-jm-sm">
             {RANGE_PRESETS.map((p) => (
               <button
                 key={p.value}
@@ -254,19 +254,19 @@ export default function SalesStatsPage() {
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-[30px] w-[140px] text-[13px]"
+                className="h-[30px] w-[140px] text-jm-sm"
               />
-              <span className="text-[12px] text-[var(--jm-text-muted)]">~</span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">~</span>
               <Input
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="h-[30px] w-[140px] text-[13px]"
+                className="h-[30px] w-[140px] text-jm-sm"
               />
             </div>
           )}
           {range.from && range.to && (
-            <span className="text-[11px] text-[var(--jm-text-muted)]">
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
               {range.from} ~ {range.to}
             </span>
           )}
@@ -527,17 +527,17 @@ export default function SalesStatsPage() {
                           className={`flex flex-col gap-1 rounded-xl border p-3 ${tone}`}
                         >
                           <div className="flex items-baseline justify-between">
-                            <span className="text-[12px] font-semibold">
+                            <span className="text-jm-xs font-semibold">
                               {label}
                             </span>
-                            <span className="text-[11px] tabular-nums opacity-70">
+                            <span className="text-jm-2xs tabular-nums opacity-70">
                               {pct.toFixed(1)}%
                             </span>
                           </div>
-                          <div className="text-[18px] font-bold tabular-nums">
+                          <div className="text-jm-xl font-bold tabular-nums">
                             ₩{g.total.toLocaleString("ko-KR")}
                           </div>
-                          <div className="text-[11px] tabular-nums opacity-70">
+                          <div className="text-jm-2xs tabular-nums opacity-70">
                             {g.count.toLocaleString("ko-KR")}건
                           </div>
                         </div>
@@ -664,7 +664,7 @@ function KpiCard({
       </CardHeader>
       <CardContent className="pb-3">
         <div className={`text-2xl font-bold tabular-nums ${toneClass}`}>{value}</div>
-        {hint && <div className="mt-0.5 text-[11px] text-[var(--jm-text-muted)]">{hint}</div>}
+        {hint && <div className="mt-0.5 text-jm-2xs text-[var(--jm-text-muted)]">{hint}</div>}
       </CardContent>
     </Card>
   );

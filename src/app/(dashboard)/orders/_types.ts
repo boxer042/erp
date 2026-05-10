@@ -6,6 +6,7 @@ export type OrderStatus =
   | "COMPLETED"
   | "RETURN_REQUESTED"
   | "RETURN_ACCEPTED"
+  | "RETURN_PICKING"
   | "RETURN_COLLECTED"
   | "RETURN_INSPECTED"
   | "CANCELLED"
@@ -66,9 +67,14 @@ export interface OrderListItem {
   commissionAmount: string;
   paymentMethod: string | null;
   paymentStatus: OrderPaymentStatus;
+  /** 배송비 결제 방식 — 워크보드 "배송비" 컬럼 / 상세 시트 표시용 */
+  shippingPaymentType: "PREPAID" | "COD" | "STORE_BURDEN";
+  shippingFee: string;
   /** 출고 회차 — partial_ship/ship 누적. ≥2 면 분할 발송 이력 (SHIPPED/COMPLETED 시 표시) */
   shipmentCount: number;
   claimType: OrderClaimType | null;
+  /** 클레임 사유 — 반품 처리 전용 뷰에서 표시 (워크보드는 미사용) */
+  claimReason?: OrderClaimReason | null;
   /** 이 주문이 다른 주문의 교환 새 주문인지 식별 (-EX 색·배지 분기용) */
   exchangedFromOrders?: Array<{ id: string }>;
   channel: { name: string; code: string } | null;
@@ -87,8 +93,19 @@ export interface OrderListItem {
     parentItemId: string | null;
     /** 주문 시점 옵션값 스냅샷 — { "메모리": "32GB" } */
     optionSnapshot: Record<string, string> | null;
-    product: { name: string; sku: string } | null;
+    product: {
+      id: string;
+      name: string;
+      sku: string;
+      /** 대표상품(변형 부모) — true 면 PENDING 단계에서 출고 SKU 선택 강제 */
+      isCanonical?: boolean;
+      /** "OPTION_PARENT" 면 SWAP 옵션값으로 실제 SKU 결정 강제 */
+      productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
+    } | null;
     serviceName: string | null;
+    /** 진입 경로 SKU — funnel 분석용. SWAP/cross-sell 발생 시 productId 와 다름. POS 결제는 null */
+    entryProductId: string | null;
+    entryProduct: { id: string; name: string; sku: string } | null;
   }>;
   _count: { items: number };
   /** 부분 출고/반품 진행 상태 — 항목 전체 합계 (분할 발송 이력 표시용 — 첫 행) */
@@ -116,25 +133,40 @@ export interface OrderItemRow {
   groupIndex: number;
 }
 
-/** item-level 처리 상태 — Order.status + item.shippedQty/returnedQty 로 derive */
+/**
+ * item-level 처리 상태 — Order.status + claimType + item.shippedQty/returnedQty 로 derive.
+ *
+ * 단계별 라벨 정책 (사용자 정의 컨벤션):
+ *   출고:  접수 → 출고대기 → 출고확정 → 배송중 → 배송완료
+ *           (출고대기까지 취소 가능)
+ *   반품:  반품요청 → 반품 회수대기 → 회수완료 → 검수완료 → 반품완료
+ *           (외상은 매출취소 SALES_CANCELLED)
+ *   교환:  교환요청 → 교환 회수대기 → 교환 회수완료 → 교환 검수완료 → 교환완료
+ *           (검수 후 교환완료 + 새 주문 -EX 자동 생성)
+ */
 export type ItemPhase =
-  | "WAITING_SHIP" // 발송 대기 (PREPARING/PREPARING_PACKED + shippedQty=0)
-  | "PARTIAL_SHIP" // 부분 발송 (출고 단계 + 0 < shippedQty < quantity)
-  | "FULLY_SHIPPED" // 발송 완료 (라인은 다 보냈지만 다른 라인 진행 중)
-  | "DELIVERED" // 배송 완료 (전체 COMPLETED)
-  | "RETURNING" // 반품 진행 중 (RETURN_REQUESTED~INSPECTED)
-  | "RETURNED_LINE" // 라인 반품 완료 (returnedQty == quantity)
-  | "PARTIAL_RETURN" // 부분 반품 (0 < returnedQty < quantity)
-  | "EXCHANGED_LINE" // 라인 교환 완료
-  | "CANCELLED_LINE" // 주문 취소
-  | "PENDING_LINE"; // PENDING — 출고 대기 진입 전
+  | "PENDING_LINE"             // 접수 — PENDING (재고 미차감, 결제 후 출고대기 진입 전)
+  | "WAITING_SHIP"             // 출고대기 — PREPARING (재고 차감, 발송 시작 전)
+  | "PACKED_LINE"              // 출고확정 — PREPARING_PACKED + 라인 미발송
+  | "PARTIAL_SHIP"             // 부분발송 — 0 < shippedQty < quantity
+  | "FULLY_SHIPPED"            // 배송중 — SHIPPED 또는 PREPARING_PACKED 라인 전량 발송
+  | "DELIVERED"                // 배송완료 — COMPLETED
+  | "RETURN_REQUESTED_LINE"    // 반품요청/교환요청 — RETURN_REQUESTED
+  | "RETURN_ACCEPTED_LINE"     // 반품 회수대기/교환 회수대기 — RETURN_ACCEPTED
+  | "RETURN_PICKING_LINE"      // 반품 회수중/교환 회수중 — RETURN_PICKING
+  | "RETURN_COLLECTED_LINE"    // 회수완료/교환 회수완료 — RETURN_COLLECTED
+  | "RETURN_INSPECTED_LINE"    // 검수완료/교환 검수완료 — RETURN_INSPECTED
+  | "RETURNED_LINE"            // 반품완료 — RETURNED + returnedQty = quantity
+  | "PARTIAL_RETURN"           // 부분반품 — COMPLETED + 0 < returnedQty < quantity
+  | "EXCHANGED_LINE"           // 교환완료 — EXCHANGED + returnedQty > 0
+  | "CANCELLED_LINE";          // 취소 — CANCELLED
 
 /**
- * order.status + 라인 수량으로 item-level 단계 산출.
+ * order.status + claimType + 라인 수량으로 item-level 단계 산출.
  *
- *  진행 단계의 의도:
- *   - 같은 주문이라도 라인마다 진행률이 달라 라인 단위 라벨 필요.
- *   - 예: PREPARING 인데 라인 A 는 100% 발송됨, B 는 0% → A=FULLY_SHIPPED, B=WAITING_SHIP
+ *  - 라인마다 진행률 다른 케이스 (네이버 스타일) 지원
+ *  - 반품/교환 단계는 claimType 으로 분기 (라벨만 다름, 같은 status 위에서)
+ *  - 예: PREPARING_PACKED 인데 라인 A 는 100% 발송됨, B 는 0% → A=FULLY_SHIPPED(배송중), B=PACKED_LINE(출고확정)
  */
 export function deriveItemPhase(
   status: OrderStatus,
@@ -145,33 +177,37 @@ export function deriveItemPhase(
   if (status === "CANCELLED") return "CANCELLED_LINE";
   if (status === "PENDING") return "PENDING_LINE";
 
-  // 출고 단계 — shippedQty 로 라인 단계 분기
-  if (
-    status === "PREPARING" ||
-    status === "PREPARING_PACKED" ||
-    status === "SHIPPED"
-  ) {
-    if (shippedQty <= 0) return "WAITING_SHIP";
-    if (shippedQty < quantity - 0.0001) return "PARTIAL_SHIP";
-    return "FULLY_SHIPPED";
+  if (status === "PREPARING") {
+    // PREPARING 단계 — 부분발송 가능, 전량 발송됐으면 PREPARING_PACKED 로 자동 전이됐을 것 — 안전망
+    if (shippedQty >= quantity - 0.0001 && shippedQty > 0) return "FULLY_SHIPPED";
+    if (shippedQty > 0) return "PARTIAL_SHIP";
+    return "WAITING_SHIP";
   }
 
-  // 배송 완료 + 부분 반품 — 라인 단계 분기
+  if (status === "PREPARING_PACKED") {
+    if (shippedQty >= quantity - 0.0001 && shippedQty > 0) return "FULLY_SHIPPED";
+    if (shippedQty > 0) return "PARTIAL_SHIP";
+    return "PACKED_LINE";
+  }
+
+  if (status === "SHIPPED") {
+    if (shippedQty >= quantity - 0.0001 && shippedQty > 0) return "FULLY_SHIPPED";
+    if (shippedQty > 0) return "PARTIAL_SHIP";
+    return "PACKED_LINE";
+  }
+
   if (status === "COMPLETED") {
     if (returnedQty <= 0) return "DELIVERED";
     if (returnedQty < quantity - 0.0001) return "PARTIAL_RETURN";
     return "RETURNED_LINE";
   }
 
-  // 반품 진행 단계 — 라인이 반품 대상인지(returnedQty>0이거나 시작 안 됨)
-  if (
-    status === "RETURN_REQUESTED" ||
-    status === "RETURN_ACCEPTED" ||
-    status === "RETURN_COLLECTED" ||
-    status === "RETURN_INSPECTED"
-  ) {
-    return "RETURNING";
-  }
+  // 반품/교환 단계 — claimType 으로 라벨 분기는 ItemPhaseBadge 에서 처리
+  if (status === "RETURN_REQUESTED") return "RETURN_REQUESTED_LINE";
+  if (status === "RETURN_ACCEPTED") return "RETURN_ACCEPTED_LINE";
+  if (status === "RETURN_PICKING") return "RETURN_PICKING_LINE";
+  if (status === "RETURN_COLLECTED") return "RETURN_COLLECTED_LINE";
+  if (status === "RETURN_INSPECTED") return "RETURN_INSPECTED_LINE";
 
   if (status === "RETURNED") {
     if (returnedQty <= 0) return "DELIVERED"; // 다른 라인만 반품된 경우
@@ -187,17 +223,36 @@ export function deriveItemPhase(
   return "WAITING_SHIP";
 }
 
+/** 기본 라벨 — 반품 흐름 기준. claimType=EXCHANGE_* 면 ItemPhaseBadge 가 교환 라벨로 swap */
 export const ITEM_PHASE_LABELS: Record<ItemPhase, string> = {
-  WAITING_SHIP: "발송대기",
+  PENDING_LINE: "접수",
+  WAITING_SHIP: "출고대기",
+  PACKED_LINE: "출고확정",
   PARTIAL_SHIP: "부분발송",
-  FULLY_SHIPPED: "발송완료",
+  FULLY_SHIPPED: "배송중",
   DELIVERED: "배송완료",
-  RETURNING: "반품진행",
+  RETURN_REQUESTED_LINE: "반품요청",
+  RETURN_ACCEPTED_LINE: "반품 회수대기",
+  RETURN_PICKING_LINE: "반품 회수중",
+  RETURN_COLLECTED_LINE: "회수완료",
+  RETURN_INSPECTED_LINE: "검수완료",
   RETURNED_LINE: "반품완료",
   PARTIAL_RETURN: "부분반품",
   EXCHANGED_LINE: "교환완료",
   CANCELLED_LINE: "취소",
-  PENDING_LINE: "접수",
+};
+
+/**
+ * 교환 흐름 (claimType=EXCHANGE_*) 의 라벨 — 같은 phase 위에서 라벨만 다름.
+ * ItemPhaseBadge 가 claimType 보고 이쪽 매핑 사용.
+ */
+export const ITEM_PHASE_LABELS_EXCHANGE: Partial<Record<ItemPhase, string>> = {
+  RETURN_REQUESTED_LINE: "교환요청",
+  RETURN_ACCEPTED_LINE: "교환 회수대기",
+  RETURN_PICKING_LINE: "교환 회수중",
+  RETURN_COLLECTED_LINE: "교환 회수완료",
+  RETURN_INSPECTED_LINE: "교환 검수완료",
+  PARTIAL_RETURN: "부분교환",
 };
 
 export interface ChannelOption {
@@ -229,6 +284,7 @@ const STATUS_LABEL_DEFAULTS: Record<OrderStatus, string> = {
   COMPLETED: "배송완료",
   RETURN_REQUESTED: "반품요청",
   RETURN_ACCEPTED: "반품 회수대기",
+  RETURN_PICKING: "반품 회수중",
   RETURN_COLLECTED: "회수완료",
   RETURN_INSPECTED: "검수완료",
   CANCELLED: "취소",
@@ -261,6 +317,7 @@ export function statusLabel(
   if (isExchangeClaim) {
     if (status === "RETURN_REQUESTED") return "교환요청";
     if (status === "RETURN_ACCEPTED") return "교환 회수대기";
+    if (status === "RETURN_PICKING") return "교환 회수중";
     if (status === "RETURN_COLLECTED") return "교환 회수완료";
     if (status === "RETURN_INSPECTED") return "교환 검수완료";
   }
@@ -437,6 +494,10 @@ export const STATUS_FLOW: Record<
   },
   RETURN_ACCEPTED: {
     meaning: "수락됨 — 회수 대기 (재고·환불 미진행)",
+    nextHint: "택배 회수 라벨 발급(회수 시작) 또는 매장 직접 회수 → 회수완료",
+  },
+  RETURN_PICKING: {
+    meaning: "회수중 — 택배 회수 라벨 발급됨, 손님→매장 운송 중",
     nextHint: "물품 도착 시 회수완료 처리",
   },
   RETURN_COLLECTED: {

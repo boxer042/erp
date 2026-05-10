@@ -79,7 +79,8 @@ import {
   type OrderStatus,
 } from "./_types";
 import { formatCurrency } from "./_helpers";
-import { PaymentStatusBadge, StatusBadge } from "./_parts";
+import { PaymentStatusBadge, ShippingPaymentBadge, StatusBadge } from "./_parts";
+import { VariantResolveDialog } from "./_variant-resolve-dialog";
 
 const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string }[] = [
   { value: "PICKUP", label: "매장 수령" },
@@ -101,6 +102,7 @@ type ReturnAction =
   | "accept_return"
   | "reject_return"
   | "cancel_return_request"
+  | "start_picking"
   | "collect_return"
   | "inspect_return"
   | "reject_inspection"
@@ -126,6 +128,7 @@ interface OrderDetail {
   subtotalAmount: string;
   discountAmount: string;
   shippingFee: string;
+  shippingPaymentType: "PREPAID" | "COD" | "STORE_BURDEN";
   taxAmount: string;
   totalAmount: string;
   commissionAmount: string;
@@ -170,8 +173,25 @@ interface OrderDetail {
     returnedQty: string;
     /** 부분 환불 금액 누적 (세전 공급가액 기준) */
     refundedAmount: string;
-    product: { id: string; name: string; sku: string } | null;
+    /** 라인 역할 — MAIN(기본) / OPTION_REF(옵션) / ADDON(추가구매) */
+    lineRole?: "MAIN" | "OPTION_REF" | "ADDON" | null;
+    /** 부모 라인 link (OPTION_REF/ADDON 일 때 메인 OrderItem.id) */
+    parentItemId?: string | null;
+    /** 주문 시점 옵션값 스냅샷 — { "메모리": "32GB" } */
+    optionSnapshot?: Record<string, string> | null;
+    product: {
+      id: string;
+      name: string;
+      sku: string;
+      /** 대표상품(변형 부모) — true 면 PENDING 단계에서 변형 선택 강제 */
+      isCanonical?: boolean;
+      /** "OPTION_PARENT" 면 SWAP 옵션값으로 실제 SKU 결정 강제 */
+      productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
+    } | null;
     serviceName: string | null;
+    /** 진입 경로 SKU — 자사몰/외부 채널 funnel */
+    entryProductId?: string | null;
+    entryProduct?: { id: string; name: string; sku: string } | null;
   }>;
   /** 분할 송장 회차별 발송 이력 (shipmentNo 순) */
   shipments: Array<{
@@ -259,6 +279,8 @@ export function OrderDetailSheet({
   // 부분 출고 — partial 모드면 항목별 shipQty 입력
   const [shipMode, setShipMode] = useState<"full" | "partial">("full");
   const [partialShips, setPartialShips] = useState<Record<string, string>>({});
+  // 변형/옵션 미확정 라인 해결 Dialog — 단일 라인 ID 만 담음 (1건만 처리)
+  const [resolveItemId, setResolveItemId] = useState<string | null>(null);
   // 반품 요청 Dialog (claimType + reason 입력)
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [claimType, setClaimType] = useState<OrderClaimType>("REFUND");
@@ -525,6 +547,7 @@ export function OrderDetailSheet({
         accept_return: "수락 — 회수 대기",
         reject_return: "요청 반려",
         cancel_return_request: "요청 취소",
+        start_picking: "회수 시작 — 택배 라벨 발급",
         collect_return: "회수완료 — 검수 진행",
         inspect_return: "검수완료 — 환불/교환 종결 대기",
         reject_inspection: "검수 반려 — 손님 반송, 배송완료로 복귀",
@@ -695,6 +718,8 @@ export function OrderDetailSheet({
         "요청을 반려하시겠습니까?\n주문은 배송완료 상태로 복귀합니다.",
       cancel_return_request:
         "요청을 취소하고 배송완료 상태로 되돌리시겠습니까?",
+      start_picking:
+        "택배 회수 라벨을 발급하고 손님에게 안내합니다.\n물품 도착 시 [회수완료] 누르면 검수 단계로 진입.",
       collect_return: "회수가 완료되었습니까? 검수 단계로 진입합니다.",
       inspect_return:
         "검수가 완료되었습니까?\n결제건 paymentStatus 가 환불진행(REFUND_PENDING)으로 표시됩니다.",
@@ -718,7 +743,7 @@ export function OrderDetailSheet({
       <JmDrawerContent side="bottom" size="xl" dragHandle>
         <JmDrawerHeader>
           <div className="flex flex-wrap items-center gap-2">
-            <JmDrawerTitle className="font-mono text-[15px]">
+            <JmDrawerTitle className="font-mono text-jm-md">
               {data?.orderNo ?? "—"}
             </JmDrawerTitle>
             {data && (
@@ -802,7 +827,7 @@ export function OrderDetailSheet({
               <DetailSkeleton />
             ) : detailQuery.isError || !data ? (
               <JmCard>
-                <JmCardContent className="text-center text-[13px] text-[var(--jm-danger-fg)]">
+                <JmCardContent className="text-center text-jm-sm text-[var(--jm-danger-fg)]">
                   주문을 불러오지 못했습니다
                 </JmCardContent>
               </JmCard>
@@ -820,7 +845,15 @@ export function OrderDetailSheet({
                 order={data}
               />
             ) : (
-              <ReadView order={data} highlightItemId={highlightItemId} />
+              <ReadView
+                order={data}
+                highlightItemId={highlightItemId}
+                onResolveItem={
+                  data.status === "PENDING"
+                    ? (id) => setResolveItemId(id)
+                    : undefined
+                }
+              />
             )}
           </div>
         </JmDrawerBody>
@@ -873,6 +906,36 @@ export function OrderDetailSheet({
         ) : null}
       </JmDrawerContent>
 
+      {/* 변형/옵션 미확정 라인 해결 Dialog — 라인별 [출고 SKU 선택] 클릭 진입 */}
+      {data && resolveItemId && (() => {
+        const it = data.items.find((x) => x.id === resolveItemId);
+        if (!it || !it.product) return null;
+        const kind: "canonical" | "option_parent" =
+          it.product.productType === "OPTION_PARENT"
+            ? "option_parent"
+            : "canonical";
+        return (
+          <VariantResolveDialog
+            open={!!resolveItemId}
+            onOpenChange={(v) => !v && setResolveItemId(null)}
+            orderId={data.id}
+            items={[
+              {
+                itemId: it.id,
+                productId: it.product.id,
+                productName: it.product.name,
+                kind,
+              },
+            ]}
+            onResolved={() => {
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.orders.detail(data.id),
+              });
+            }}
+          />
+        );
+      })()}
+
       {/* 송장 입력 Dialog — ship 또는 partial_ship */}
       <JmDialog open={shipDialogOpen} onOpenChange={setShipDialogOpen}>
         <JmDialogContent size="md">
@@ -880,7 +943,7 @@ export function OrderDetailSheet({
             <JmDialogTitle>
               발송 처리 — 이번 회차 송장
               {data && data.shipments && data.shipments.length > 0 && (
-                <span className="ml-2 text-[12px] font-normal text-[var(--jm-text-muted)]">
+                <span className="ml-2 text-jm-xs font-normal text-[var(--jm-text-muted)]">
                   ({data.shipments.length + 1}차)
                 </span>
               )}
@@ -892,34 +955,34 @@ export function OrderDetailSheet({
               <button
                 type="button"
                 onClick={() => setShipMode("full")}
-                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-jm-xs transition-colors ${
                   shipMode === "full"
                     ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                     : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                 }`}
               >
-                <div className="text-[13px] font-medium">전체 발송</div>
-                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                <div className="text-jm-sm font-medium">전체 발송</div>
+                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                   잔여 항목 모두 이번 회차로 발송
                 </div>
               </button>
               <button
                 type="button"
                 onClick={() => setShipMode("partial")}
-                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-jm-xs transition-colors ${
                   shipMode === "partial"
                     ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                     : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                 }`}
               >
-                <div className="text-[13px] font-medium">부분 발송</div>
-                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                <div className="text-jm-sm font-medium">부분 발송</div>
+                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                   일부 항목만 이번 회차로. 잔여는 다음 회차에 발송
                 </div>
               </button>
             </div>
 
-            <div className="rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-2.5 py-2 text-[11px] text-[var(--jm-info-fg)]">
+            <div className="rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-2.5 py-2 text-jm-2xs text-[var(--jm-info-fg)]">
               💡 이 송장은 <strong>이번 회차</strong> 에만 적용됩니다. 다음 회차
               발송 시 다른 송장번호 사용 가능 — 회차별로 따로 보관됩니다.
             </div>
@@ -944,7 +1007,7 @@ export function OrderDetailSheet({
 
             {shipMode === "partial" && data && (
               <div className="space-y-1.5 border-t border-[var(--jm-border)] pt-3">
-                <p className="text-[11px] text-[var(--jm-text-muted)]">
+                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
                   각 항목별 발송 수량 (잔여 = 주문수량 − 누적발송)
                 </p>
                 {data.items
@@ -958,11 +1021,11 @@ export function OrderDetailSheet({
                         key={it.id}
                         className="flex items-center gap-2 rounded border border-[var(--jm-border)] p-2"
                       >
-                        <div className="flex-1 text-[12px]">
+                        <div className="flex-1 text-jm-xs">
                           <div className="text-[var(--jm-text)]">
                             {it.product?.name ?? "—"}
                           </div>
-                          <div className="text-[11px] text-[var(--jm-text-muted)]">
+                          <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                             잔여{" "}
                             <span className="font-medium">
                               {remaining.toLocaleString("ko-KR")}
@@ -1060,7 +1123,7 @@ export function OrderDetailSheet({
                       key={t}
                       type="button"
                       onClick={() => setClaimType(t)}
-                      className={`h-11 rounded-xl border-2 text-[12px] font-medium transition-colors ${
+                      className={`h-11 rounded-xl border-2 text-jm-xs font-medium transition-colors ${
                         active
                           ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                           : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
@@ -1083,7 +1146,7 @@ export function OrderDetailSheet({
                         key={r}
                         type="button"
                         onClick={() => setClaimReason(active ? "" : r)}
-                        className={`h-10 rounded-lg border text-[12px] transition-colors ${
+                        className={`h-10 rounded-lg border text-jm-xs transition-colors ${
                           active
                             ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)] font-medium"
                             : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
@@ -1143,7 +1206,7 @@ export function OrderDetailSheet({
             <JmDialogTitle>교환 처리</JmDialogTitle>
           </JmDialogHeader>
           <div className="space-y-3 px-5 py-4">
-            <p className="text-[13px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-sm text-[var(--jm-text-muted)]">
               회수 완료 시 새 주문이 자동 생성됩니다. 차액·항목은 새 주문에서
               편집하세요.
             </p>
@@ -1154,7 +1217,7 @@ export function OrderDetailSheet({
                 const liability = CLAIM_REASON_LIABILITY[reason];
                 const note = liabilityShippingNote(reason);
                 return (
-                  <div className="flex items-start gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-2.5 text-[12px]">
+                  <div className="flex items-start gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-2.5 text-jm-xs">
                     <JmBadge
                       variant={liability === "shop" ? "warning" : "outline"}
                       size="sm"
@@ -1183,10 +1246,10 @@ export function OrderDetailSheet({
                         : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                     }`}
                   >
-                    <span className="text-[14px] font-medium text-[var(--jm-text)]">
+                    <span className="text-jm-base font-medium text-[var(--jm-text)]">
                       {CLAIM_TYPE_LABELS[k]}
                     </span>
-                    <span className="text-[11px] text-[var(--jm-text-muted)]">
+                    <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                       {k === "EXCHANGE_SAME"
                         ? "원래 주문 항목 그대로 새 주문에 복제 (차액 없음, 매출 0)"
                         : "새 주문은 빈 항목으로 생성 — 항목·차액 직접 등록"}
@@ -1201,28 +1264,28 @@ export function OrderDetailSheet({
               <button
                 type="button"
                 onClick={() => setExchangeMode("full")}
-                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-jm-xs transition-colors ${
                   exchangeMode === "full"
                     ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                     : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                 }`}
               >
-                <div className="text-[13px] font-medium">전체 교환</div>
-                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                <div className="text-jm-sm font-medium">전체 교환</div>
+                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                   주문 항목 모두 교환 (EXCHANGED 종결)
                 </div>
               </button>
               <button
                 type="button"
                 onClick={() => setExchangeMode("partial")}
-                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-[12px] transition-colors ${
+                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-jm-xs transition-colors ${
                   exchangeMode === "partial"
                     ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                     : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                 }`}
               >
-                <div className="text-[13px] font-medium">부분 교환</div>
-                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                <div className="text-jm-sm font-medium">부분 교환</div>
+                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                   일부 항목만. 원본은 배송완료 복귀
                 </div>
               </button>
@@ -1230,7 +1293,7 @@ export function OrderDetailSheet({
 
             {exchangeMode === "partial" && data && (
               <div className="space-y-1.5">
-                <p className="text-[11px] text-[var(--jm-text-muted)]">
+                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
                   각 항목별 교환 수량 입력 (잔여 = 주문수량 − 누적반품)
                 </p>
                 {data.items
@@ -1244,11 +1307,11 @@ export function OrderDetailSheet({
                         key={it.id}
                         className="flex items-center gap-2 rounded border border-[var(--jm-border)] p-2"
                       >
-                        <div className="flex-1 text-[12px]">
+                        <div className="flex-1 text-jm-xs">
                           <div className="text-[var(--jm-text)]">
                             {it.product?.name ?? "—"}
                           </div>
-                          <div className="text-[11px] text-[var(--jm-text-muted)]">
+                          <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                             잔여{" "}
                             <span className="font-medium">
                               {remaining.toLocaleString("ko-KR")}
@@ -1331,28 +1394,28 @@ export function OrderDetailSheet({
               <button
                 type="button"
                 onClick={() => setRefundMode("full")}
-                className={`flex-1 rounded-lg border-2 p-3 text-left text-[12px] transition-colors ${
+                className={`flex-1 rounded-lg border-2 p-3 text-left text-jm-xs transition-colors ${
                   refundMode === "full"
                     ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                     : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                 }`}
               >
-                <div className="text-[14px] font-medium">전체 반품</div>
-                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                <div className="text-jm-base font-medium">전체 반품</div>
+                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                   주문 항목 모두 환불 (RETURNED 종결)
                 </div>
               </button>
               <button
                 type="button"
                 onClick={() => setRefundMode("partial")}
-                className={`flex-1 rounded-lg border-2 p-3 text-left text-[12px] transition-colors ${
+                className={`flex-1 rounded-lg border-2 p-3 text-left text-jm-xs transition-colors ${
                   refundMode === "partial"
                     ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                     : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                 }`}
               >
-                <div className="text-[14px] font-medium">부분 반품</div>
-                <div className="text-[11px] text-[var(--jm-text-muted)]">
+                <div className="text-jm-base font-medium">부분 반품</div>
+                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                   일부 항목만. 주문은 배송완료 복귀 + paymentStatus 부분환불
                 </div>
               </button>
@@ -1360,7 +1423,7 @@ export function OrderDetailSheet({
 
             {refundMode === "partial" && data && (
               <div className="space-y-2">
-                <p className="text-[11px] text-[var(--jm-text-muted)]">
+                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
                   각 항목별 반품 수량 입력. 0 은 반품 안 함. 잔여 수량
                   (주문수량 − 누적반품) 까지 가능.
                 </p>
@@ -1376,11 +1439,11 @@ export function OrderDetailSheet({
                           key={it.id}
                           className="flex items-center gap-2 rounded border border-[var(--jm-border)] p-2"
                         >
-                          <div className="flex-1 text-[12px]">
+                          <div className="flex-1 text-jm-xs">
                             <div className="text-[var(--jm-text)]">
                               {it.product?.name ?? "—"}
                             </div>
-                            <div className="text-[11px] text-[var(--jm-text-muted)]">
+                            <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                               주문 {ordered.toLocaleString("ko-KR")} · 누적반품{" "}
                               {already.toLocaleString("ko-KR")} · 잔여{" "}
                               <span className="font-medium">
@@ -1470,9 +1533,12 @@ export function OrderDetailSheet({
 function ReadView({
   order,
   highlightItemId,
+  onResolveItem,
 }: {
   order: OrderDetail;
   highlightItemId?: string | null;
+  /** PENDING 상태일 때만 전달 — canonical/OPTION_PARENT 라인의 [출고 SKU 선택] 클릭 핸들러 */
+  onResolveItem?: (itemId: string) => void;
 }) {
   return (
     <>
@@ -1538,7 +1604,7 @@ function ReadView({
           <div className="flex items-center gap-2">
             <Package className="size-4 text-[var(--jm-text-muted)]" />
             <JmCardTitle>주문 항목</JmCardTitle>
-            <span className="text-[12px] text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs text-[var(--jm-text-muted)]">
               {order.items.length}건
             </span>
           </div>
@@ -1561,6 +1627,10 @@ function ReadView({
               const hasPartialShip = shipped > 0 && shipped < ordered;
               const hasPartialReturn = returned > 0;
               const isHighlighted = highlightItemId === item.id;
+              const needsResolve =
+                !!item.product &&
+                (item.product.isCanonical ||
+                  item.product.productType === "OPTION_PARENT");
               return (
                 <JmTableRow
                   key={item.id}
@@ -1572,24 +1642,82 @@ function ReadView({
                   }`}
                 >
                   <JmTableCell>
-                    <div className="flex flex-col">
-                      <span className="text-[13px] text-[var(--jm-text)]">
-                        {item.product?.name ?? item.serviceName ?? "—"}
-                      </span>
+                    <div
+                      className={`flex flex-col ${
+                        item.parentItemId ? "pl-4" : ""
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <span className="text-jm-sm text-[var(--jm-text)]">
+                          {item.lineRole === "OPTION_REF" && (
+                            <span className="mr-1 text-[var(--jm-text-muted)]">
+                              ↳ 옵션
+                            </span>
+                          )}
+                          {item.lineRole === "ADDON" && (
+                            <span className="mr-1 text-[var(--jm-text-muted)]">
+                              ↳ 추가구매
+                            </span>
+                          )}
+                          {item.product?.name ?? item.serviceName ?? "—"}
+                          {/* SWAP 결과 라인은 상품명에 옵션 이미 반영 — 부속 표시 안 함 */}
+                          {item.optionSnapshot &&
+                            Object.keys(item.optionSnapshot).length > 0 &&
+                            (!item.entryProductId ||
+                              item.entryProductId === item.product?.id) && (
+                              <span className="text-[var(--jm-text-muted)]">
+                                {" "}
+                                (
+                                {Object.values(
+                                  item.optionSnapshot as Record<string, string>,
+                                ).join(" · ")}
+                                )
+                              </span>
+                            )}
+                        </span>
+                        {/* SWAP chip — 상품명 옆 (자사몰/외부 채널 진입 SKU ≠ 결제 SKU) */}
+                        {item.entryProduct &&
+                          item.entryProductId !== item.product?.id && (
+                            <span
+                              className="inline-flex items-center rounded-md bg-[var(--jm-surface-muted)] px-1.5 py-px text-jm-3xs text-[var(--jm-text-muted)]"
+                              title={`손님이 진입한 카탈로그 SKU: ${item.entryProduct.sku}`}
+                            >
+                              ← 진입: {item.entryProduct.name}
+                            </span>
+                          )}
+                      </div>
                       {item.product?.sku && (
-                        <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                        <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                           {item.product.sku}
                         </span>
                       )}
+                      {needsResolve && (
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="rounded-md bg-[var(--jm-warning-bg)] px-1.5 py-px text-jm-3xs font-semibold text-[var(--jm-warning-fg)]">
+                            {item.product?.productType === "OPTION_PARENT"
+                              ? "옵션 미확정"
+                              : "변형 미확정"}
+                          </span>
+                          {onResolveItem && (
+                            <button
+                              type="button"
+                              onClick={() => onResolveItem(item.id)}
+                              className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text)] hover:border-[var(--jm-border-strong)]"
+                            >
+                              출고 SKU 선택
+                            </button>
+                          )}
+                        </div>
+                      )}
                       {hasPartialShip && (
-                        <span className="mt-0.5 text-[11px] text-[var(--jm-info-fg)]">
+                        <span className="mt-0.5 text-jm-2xs text-[var(--jm-info-fg)]">
                           발송 {shipped.toLocaleString("ko-KR")}/
                           {ordered.toLocaleString("ko-KR")} (잔여{" "}
                           {(ordered - shipped).toLocaleString("ko-KR")})
                         </span>
                       )}
                       {hasPartialReturn && (
-                        <span className="mt-0.5 text-[11px] text-[var(--jm-warning-fg)]">
+                        <span className="mt-0.5 text-jm-2xs text-[var(--jm-warning-fg)]">
                           반품 {returned.toLocaleString("ko-KR")}건 · 환불{" "}
                           {formatCurrency(refunded)}
                         </span>
@@ -1612,6 +1740,11 @@ function ReadView({
         </JmTable>
       </JmCard>
 
+      {/* 송장 사전 등록 — PREPARING 단계에서 미리 송장 발급 (출고확정 시 자동 prefill) */}
+      {order.status === "PREPARING" && order.fulfillmentType !== "PICKUP" && (
+        <PreShipmentTrackingCard order={order} />
+      )}
+
       {/* 분할 송장 — 회차별 발송 이력. 1건 이상 있으면 노출 */}
       {order.shipments.length > 0 && (
         <ShipmentHistoryCard order={order} />
@@ -1626,7 +1759,7 @@ function ReadView({
               <JmCardTitle>금액 요약</JmCardTitle>
             </div>
           </JmCardHeader>
-          <JmCardContent className="space-y-1.5 text-[13px]">
+          <JmCardContent className="space-y-1.5 text-jm-sm">
             <SumRow label="공급가액" value={Number(order.subtotalAmount)} />
             {Number(order.discountAmount) > 0 && (
               <SumRow
@@ -1637,6 +1770,13 @@ function ReadView({
             )}
             {Number(order.shippingFee) > 0 && (
               <SumRow label="배송비" value={Number(order.shippingFee)} muted />
+            )}
+            {/* 배송비 결제 방식 — 배송 주문일 때만 (PICKUP 은 배송 자체 무관) */}
+            {order.fulfillmentType !== "PICKUP" && (
+              <div className="flex items-center justify-between text-jm-xs text-[var(--jm-text-muted)]">
+                <span>배송비 결제</span>
+                <ShippingPaymentBadge type={order.shippingPaymentType} />
+              </div>
             )}
             <SumRow label="부가세" value={Number(order.taxAmount)} muted />
             {Number(order.commissionAmount) > 0 && (
@@ -1650,7 +1790,7 @@ function ReadView({
             )}
             <JmSeparator className="my-2" />
             <SumRow label="합계" value={Number(order.totalAmount)} bold />
-            <div className="flex flex-wrap items-center gap-2 pt-1.5 text-[11px] text-[var(--jm-text-muted)]">
+            <div className="flex flex-wrap items-center gap-2 pt-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
               {order.paymentMethod && (
                 <span>결제수단 · {paymentLabel(order.paymentMethod)}</span>
               )}
@@ -1665,7 +1805,7 @@ function ReadView({
               order.returnReason ||
               order.exchangeOrder ||
               order.exchangedFromOrders.length > 0) && (
-              <div className="mt-2 space-y-1 border-t border-[var(--jm-border)] pt-2 text-[11px] text-[var(--jm-text-muted)]">
+              <div className="mt-2 space-y-1 border-t border-[var(--jm-border)] pt-2 text-jm-2xs text-[var(--jm-text-muted)]">
                 {order.claimType && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span>처리 ·</span>
@@ -1757,7 +1897,7 @@ function ReadView({
                   order.recipientName !== order.customerName) ||
                   (order.recipientPhone &&
                     order.recipientPhone !== order.customerPhone)) && (
-                  <p className="col-span-2 text-[11px] text-[var(--jm-warning-fg)]">
+                  <p className="col-span-2 text-jm-2xs text-[var(--jm-warning-fg)]">
                     받는 사람이 등록 고객과 다릅니다 — 출고 정보 카드 확인
                   </p>
                 )}
@@ -1781,7 +1921,7 @@ function ReadView({
             </div>
           </JmCardHeader>
           <JmCardContent>
-            <p className="whitespace-pre-line text-[13px] text-[var(--jm-text)]">
+            <p className="whitespace-pre-line text-jm-sm text-[var(--jm-text)]">
               {order.memo}
             </p>
           </JmCardContent>
@@ -1824,7 +1964,7 @@ function EditView({
                     key={opt.value}
                     type="button"
                     onClick={() => set("fulfillmentType", opt.value)}
-                    className={`h-11 rounded-xl border-2 text-[14px] font-medium transition-colors ${
+                    className={`h-11 rounded-xl border-2 text-jm-base font-medium transition-colors ${
                       active
                         ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                         : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
@@ -1892,7 +2032,7 @@ function EditView({
         </JmCardContent>
       </JmCard>
 
-      <p className="text-center text-[11px] text-[var(--jm-text-muted)]">
+      <p className="text-center text-jm-2xs text-[var(--jm-text-muted)]">
         주문 번호 {order.orderNo} · 항목 편집은 헤더의 [항목 수정] 버튼 (PENDING
         한정)
       </p>
@@ -1992,10 +2132,10 @@ function ItemsEditView({
                       <JmTableRow key={idx} className="hover:bg-transparent">
                         <JmTableCell>
                           <div className="flex flex-col">
-                            <span className="text-[13px] text-[var(--jm-text)]">
+                            <span className="text-jm-sm text-[var(--jm-text)]">
                               {r.productName}
                             </span>
-                            <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                            <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                               {r.sku}
                             </span>
                           </div>
@@ -2047,25 +2187,25 @@ function ItemsEditView({
               </JmTable>
             </div>
           ) : (
-            <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-6 text-center text-[12px] text-[var(--jm-text-muted)]">
+            <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-6 text-center text-jm-xs text-[var(--jm-text-muted)]">
               항목이 없습니다. 위 검색에서 상품을 선택해 추가하세요.
             </div>
           )}
 
-          <div className="flex items-baseline justify-between border-t border-[var(--jm-border)] pt-2 text-[13px]">
+          <div className="flex items-baseline justify-between border-t border-[var(--jm-border)] pt-2 text-jm-sm">
             <span className="text-[var(--jm-text-muted)]">공급가액 합계</span>
             <span className="tabular-nums font-semibold">
               ₩{subtotal.toLocaleString("ko-KR")}
             </span>
           </div>
-          <p className="text-[11px] text-[var(--jm-text-muted)]">
+          <p className="text-jm-2xs text-[var(--jm-text-muted)]">
             ※ 부가세·총액·채널 수수료는 저장 시 자동 재계산됩니다. 할인·배송비는
             기존 값 유지.
           </p>
         </JmCardContent>
       </JmCard>
 
-      <p className="text-center text-[11px] text-[var(--jm-text-muted)]">
+      <p className="text-center text-jm-2xs text-[var(--jm-text-muted)]">
         주문 번호 {order.orderNo} · PENDING 상태에서만 편집 가능 — prepare 후엔
         재고 차감으로 잠금
       </p>
@@ -2206,6 +2346,22 @@ function ActionFooter({
       });
       break;
     case "RETURN_ACCEPTED":
+      // 택배 회수 라벨 발급 흐름이 있으면 [회수 시작], 매장 직접 회수 케이스는 바로 [회수완료]
+      buttons.push({
+        action: "start_picking",
+        label: "회수 시작",
+        icon: <Truck className="size-4" />,
+        tone: "outline",
+      });
+      buttons.push({
+        action: "collect_return",
+        label: "회수완료",
+        icon: <PackageOpen className="size-4" />,
+        tone: "primary",
+      });
+      break;
+    case "RETURN_PICKING":
+      // 택배 회수 중 — 도착 시 회수완료
       buttons.push({
         action: "collect_return",
         label: "회수완료",
@@ -2261,7 +2417,7 @@ function ActionFooter({
 
   if (buttons.length === 0) {
     return (
-      <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 py-4 text-center text-[12px] text-[var(--jm-text-muted)]">
+      <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 py-4 text-center text-jm-xs text-[var(--jm-text-muted)]">
         종결된 주문입니다
       </div>
     );
@@ -2322,13 +2478,13 @@ function Field({
 }) {
   return (
     <div className={`flex flex-col gap-0.5 ${className}`}>
-      <JmSectionLabel className="flex items-center gap-1 text-[10px]">
+      <JmSectionLabel className="flex items-center gap-1 text-jm-3xs">
         {icon && (
           <span className="text-[var(--jm-text-subtle)]">{icon}</span>
         )}
         {label}
       </JmSectionLabel>
-      <span className="text-[13px] text-[var(--jm-text)]">{children}</span>
+      <span className="text-jm-sm text-[var(--jm-text)]">{children}</span>
     </div>
   );
 }
@@ -2356,7 +2512,7 @@ function SumRow({
       <span
         className={`tabular-nums ${
           bold
-            ? "text-[16px] font-bold text-[var(--jm-text)]"
+            ? "text-jm-lg font-bold text-[var(--jm-text)]"
             : muted
               ? "text-[var(--jm-text-muted)]"
               : "text-[var(--jm-text)]"
@@ -2365,6 +2521,86 @@ function SumRow({
         {value < 0 ? "−" : ""}₩{Math.abs(value).toLocaleString("ko-KR")}
       </span>
     </div>
+  );
+}
+
+/**
+ * 송장 사전 등록 카드 — PREPARING 단계에서 송장 정보를 미리 입력해두는 경량 카드.
+ * 출고확정(pack→ship) 시점의 ship 다이얼로그가 같은 trackingCarrier/Number 를 prefill.
+ *
+ * 매장 운영 흐름:
+ *  1) 출고대기 진입 (재고 차감)
+ *  2) 포장 + 외부 시스템에서 송장번호 발급 (택배사 API / 라벨 프린터)
+ *  3) 이 카드에서 송장 정보 입력 → PATCH 로 Order 에 저장
+ *  4) 출고확정 클릭 → ship 다이얼로그가 자동 prefill, 사용자는 확인만 누름
+ */
+function PreShipmentTrackingCard({ order }: { order: OrderDetail }) {
+  const queryClient = useQueryClient();
+  const [carrier, setCarrier] = useState(order.trackingCarrier ?? "");
+  const [number, setNumber] = useState(order.trackingNumber ?? "");
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiMutate(`/api/orders/${order.id}`, "PATCH", {
+        trackingCarrier: carrier.trim() || null,
+        trackingNumber: number.trim() || null,
+      }),
+    onSuccess: () => {
+      toast.success("송장 정보가 저장되었습니다 — 출고확정 시 자동 prefill");
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+  });
+
+  const dirty =
+    (order.trackingCarrier ?? "") !== carrier.trim() ||
+    (order.trackingNumber ?? "") !== number.trim();
+
+  return (
+    <JmCard>
+      <JmCardHeader>
+        <div className="flex items-center gap-2">
+          <Truck className="size-4 text-[var(--jm-text-muted)]" />
+          <JmCardTitle>송장 사전 등록</JmCardTitle>
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">
+            출고확정 전 송장 미리 발급 (선택)
+          </span>
+        </div>
+      </JmCardHeader>
+      <JmCardContent>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[160px_1fr_auto]">
+          <JmFormField label="택배사">
+            <JmInput
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              placeholder="CJ대한통운"
+            />
+          </JmFormField>
+          <JmFormField label="송장번호">
+            <JmInput
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              placeholder="숫자만"
+            />
+          </JmFormField>
+          <div className="flex items-end">
+            <JmButton
+              variant="cta"
+              onClick={() => saveMutation.mutate()}
+              disabled={!dirty || saveMutation.isPending}
+            >
+              {saveMutation.isPending && <JmSpinner size="xs" tone="inverted" />}
+              저장
+            </JmButton>
+          </div>
+        </div>
+        <p className="mt-2 text-jm-2xs text-[var(--jm-text-subtle)]">
+          여기서 저장한 송장은 출고확정(ship) 다이얼로그의 입력란에 자동으로 채워집니다.
+          여러 회차 발송이 필요한 경우 회차별 송장은 발송 후 [발송 이력] 카드에서 따로 관리됩니다.
+        </p>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -2445,7 +2681,7 @@ function ShipmentHistoryCard({ order }: { order: OrderDetail }) {
           <div className="flex items-center gap-2">
             <Truck className="size-4 text-[var(--jm-text-muted)]" />
             <JmCardTitle>발송 이력</JmCardTitle>
-            <span className="text-[12px] text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs text-[var(--jm-text-muted)]">
               {order.shipments.length}회차
             </span>
           </div>
@@ -2464,18 +2700,18 @@ function ShipmentHistoryCard({ order }: { order: OrderDetail }) {
                   <JmBadge variant="info" size="sm" shape="square">
                     {s.shipmentNo}차 발송
                   </JmBadge>
-                  <span className="text-[12px] text-[var(--jm-text-muted)]">
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">
                     {new Date(s.shippedAt).toLocaleString("ko-KR", {
                       dateStyle: "medium",
                       timeStyle: "short",
                     })}
                   </span>
                   {tracking ? (
-                    <span className="font-mono text-[12px] text-[var(--jm-text)]">
+                    <span className="font-mono text-jm-xs text-[var(--jm-text)]">
                       {tracking}
                     </span>
                   ) : (
-                    <span className="text-[11px] text-[var(--jm-text-subtle)]">
+                    <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
                       송장정보 없음
                     </span>
                   )}
@@ -2505,7 +2741,7 @@ function ShipmentHistoryCard({ order }: { order: OrderDetail }) {
                     )}
                   </div>
                 </div>
-                <ul className="space-y-0.5 text-[12px]">
+                <ul className="space-y-0.5 text-jm-xs">
                   {s.items.map((si) => {
                     const it = itemById.get(si.orderItemId);
                     return (
@@ -2524,7 +2760,7 @@ function ShipmentHistoryCard({ order }: { order: OrderDetail }) {
                   })}
                 </ul>
                 {s.memo && (
-                  <p className="mt-2 text-[11px] text-[var(--jm-text-subtle)]">
+                  <p className="mt-2 text-jm-2xs text-[var(--jm-text-subtle)]">
                     {s.memo}
                   </p>
                 )}
@@ -2609,7 +2845,7 @@ function ShipmentHistoryCard({ order }: { order: OrderDetail }) {
           <JmDialogHeader>
             <JmDialogTitle>{cancelTarget}차 발송을 취소할까요?</JmDialogTitle>
           </JmDialogHeader>
-          <p className="px-1 text-[13px] text-[var(--jm-text-muted)]">
+          <p className="px-1 text-jm-sm text-[var(--jm-text-muted)]">
             이 회차의 발송 수량만큼 항목별 발송 수량(shippedQty) 이 차감되며,
             잔량이 발생하면 주문 상태가 출고확정으로 복귀합니다. 송장은 영구
             삭제됩니다.
@@ -2646,7 +2882,7 @@ function FieldEditRow({
 }) {
   return (
     <div className="grid grid-cols-[80px_1fr] items-center gap-3">
-      <span className="text-[12px] text-[var(--jm-text-muted)]">{label}</span>
+      <span className="text-jm-xs text-[var(--jm-text-muted)]">{label}</span>
       {children}
     </div>
   );
@@ -2699,7 +2935,7 @@ function ExchangeReplacementCard({ order }: { order: OrderDetail }) {
           </JmBadge>
         </div>
       </JmCardHeader>
-      <JmCardContent className="space-y-3 text-[13px]">
+      <JmCardContent className="space-y-3 text-jm-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[var(--jm-text-muted)]">원본 주문 ·</span>
           <a
@@ -2724,7 +2960,7 @@ function ExchangeReplacementCard({ order }: { order: OrderDetail }) {
         </div>
 
         <div
-          className={`rounded-lg border p-2.5 text-[12px] ${
+          className={`rounded-lg border p-2.5 text-jm-xs ${
             diffMessage.tone === "warning"
               ? "border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
               : "border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
@@ -2740,7 +2976,7 @@ function ExchangeReplacementCard({ order }: { order: OrderDetail }) {
         </div>
 
         {liability && liabilityNote && (
-          <div className="flex items-start gap-2 text-[11px] text-[var(--jm-text-muted)]">
+          <div className="flex items-start gap-2 text-jm-2xs text-[var(--jm-text-muted)]">
             <JmBadge
               variant={liability === "shop" ? "warning" : "outline"}
               size="sm"
@@ -2753,7 +2989,7 @@ function ExchangeReplacementCard({ order }: { order: OrderDetail }) {
         )}
 
         {!isSame && (
-          <p className="text-[11px] text-[var(--jm-text-muted)]">
+          <p className="text-jm-2xs text-[var(--jm-text-muted)]">
             ※ 항목과 차액 정산은 일반 주문 흐름으로 처리하세요. 추가 결제는 결제
             완료 후 paymentStatus 가 PAID 로 갱신됩니다.
           </p>

@@ -15,6 +15,7 @@ export type OrderStatusForBoard =
   | "COMPLETED"
   | "RETURN_REQUESTED"
   | "RETURN_ACCEPTED"
+  | "RETURN_PICKING"
   | "RETURN_COLLECTED"
   | "RETURN_INSPECTED"
   | "CANCELLED"
@@ -75,6 +76,7 @@ export function classifyBoardGroup(
   if (
     status === "RETURN_REQUESTED" ||
     status === "RETURN_ACCEPTED" ||
+    status === "RETURN_PICKING" ||
     status === "RETURN_COLLECTED" ||
     status === "RETURN_INSPECTED"
   ) {

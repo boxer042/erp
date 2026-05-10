@@ -26,6 +26,56 @@ function generateExchangeOrderNo(originalOrderNo: string): string {
   return `${originalOrderNo}-EX`;
 }
 
+/**
+ * claimReason 별 책임 매핑 — UI/api 양쪽이 일치해야 함 (단일 출처).
+ * shop=매장책임 / customer=손님책임 / shared=분담.
+ * 운임 청구 자동 제안: 새 -EX 주문의 shippingPaymentType + memo 에 반영.
+ */
+const CLAIM_LIABILITY_API: Record<string, "shop" | "customer" | "shared"> = {
+  DEFECTIVE: "shop",
+  DAMAGED_IN_TRANSIT: "shop",
+  WRONG_ITEM: "shop",
+  CHANGE_MIND: "customer",
+  SIZE_COLOR: "shared",
+  OTHER: "shared",
+};
+
+/**
+ * 교환 -EX 새 주문의 운임 정책 자동 제안.
+ * - shop: STORE_BURDEN (매장 부담) + 안내 메모
+ * - customer: COD (착불) + "운임 청구 검토" 메모
+ * - shared: PREPAID + 분담 안내 메모 (매장 직원이 직접 청구액 결정)
+ * - reason null: PREPAID 폴백
+ */
+function deriveExchangeShippingPolicy(reason: string | null): {
+  shippingPaymentType: "PREPAID" | "COD" | "STORE_BURDEN";
+  liabilityNote: string;
+} {
+  const liability = reason ? CLAIM_LIABILITY_API[reason] : null;
+  if (liability === "shop") {
+    return {
+      shippingPaymentType: "STORE_BURDEN",
+      liabilityNote: "매장 책임 사유 — 회수·재발송 운임 매장 부담 자동 적용",
+    };
+  }
+  if (liability === "customer") {
+    return {
+      shippingPaymentType: "COD",
+      liabilityNote: "손님 책임 사유 — 착불 자동 설정. 운임 청구액 직접 입력 후 발송",
+    };
+  }
+  if (liability === "shared") {
+    return {
+      shippingPaymentType: "PREPAID",
+      liabilityNote: "협의 사유 — 운임 매장·손님 분담 검토. shippingFee 직접 입력",
+    };
+  }
+  return {
+    shippingPaymentType: "PREPAID",
+    liabilityNote: "claimReason 미설정 — 운임 정책 직접 결정",
+  };
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -64,17 +114,20 @@ export async function GET(
             select: {
               id: true, name: true, sku: true, isSet: true,
               isCanonical: true, canonicalProductId: true,
+              productType: true, sellingPrice: true,
               setComponents: {
                 include: { component: { select: { id: true, name: true } } },
               },
               variants: {
                 select: {
-                  id: true, name: true, sku: true,
+                  id: true, name: true, sku: true, sellingPrice: true,
                   inventory: { select: { quantity: true } },
                 },
               },
             },
           },
+          // 진입 경로 SKU — 자사몰/외부 채널 funnel. 상세 시트의 라인별 명시용
+          entryProduct: { select: { id: true, name: true, sku: true } },
         },
       },
       // 분할 송장 — 회차별 발송 이력 (shipmentNo 순). 라인별 발송 수량 함께
@@ -118,6 +171,7 @@ export async function PUT(
           product: {
             select: {
               id: true, name: true, isSet: true, isCanonical: true,
+              productType: true,
               setComponents: {
                 select: {
                   componentId: true, quantity: true,
@@ -135,17 +189,22 @@ export async function PUT(
     return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  // 주문 확정(prepare) 가드: 대표 상품(canonical)이 그대로 있으면 차단 — 변형 확정 후 재시도
+  // 주문 확정(prepare) 가드:
+  //   1) 대표 상품(canonical) 그대로면 차단 — 변형 확정 후 재시도
+  //   2) OPTION_PARENT 그대로면 차단 — 자체 재고 없는 placeholder 라 SWAP 옵션값으로 실제 SKU 결정 필요
+  // 양쪽 모두 항목 단위 productId 교체로 해결 — POS 의 canonical 결제 가드와 동일한 흐름.
   if (action === "prepare") {
     const unresolved = order.items.filter(
-      (i) => i.product && i.product.isCanonical,
+      (i) =>
+        i.product &&
+        (i.product.isCanonical || i.product.productType === "OPTION_PARENT"),
     );
     if (unresolved.length > 0) {
+      const names = unresolved.map((i) => i.product?.name ?? "").join(", ");
       return NextResponse.json(
         {
-          error: `다음 항목의 변형이 확정되지 않았습니다: ${unresolved
-            .map((i) => i.product?.name ?? "")
-            .join(", ")}. 출고 준비 단계에서 변형을 선택해주세요.`,
+          error: `다음 항목의 변형/옵션이 확정되지 않았습니다: ${names}. 출고 준비 단계에서 실제 출고 SKU 를 선택해주세요.`,
+          unresolvedItemIds: unresolved.map((i) => i.id),
         },
         { status: 400 },
       );
@@ -194,8 +253,14 @@ export async function PUT(
     accept_return: { from: "RETURN_REQUESTED", to: "RETURN_ACCEPTED" },
     reject_return: { from: "RETURN_REQUESTED", to: "COMPLETED" },
     cancel_return_request: { from: "RETURN_REQUESTED", to: "COMPLETED" },
-    collect_return: {
+    /** 회수 시작 — 택배 회수 라벨 발급. RETURN_ACCEPTED → RETURN_PICKING. 매장 → 손님 통보. */
+    start_picking: {
       from: "RETURN_ACCEPTED",
+      to: "RETURN_PICKING",
+    },
+    collect_return: {
+      // RETURN_ACCEPTED 직접 가능(라벨 없이 매장 직접 수거) + RETURN_PICKING(라벨 발급 후 도착)
+      from: ["RETURN_ACCEPTED", "RETURN_PICKING"],
       to: "RETURN_COLLECTED",
     },
     inspect_return: {
@@ -210,7 +275,12 @@ export async function PUT(
       to: "COMPLETED",
     },
     refund: {
-      from: ["RETURN_INSPECTED", "RETURN_COLLECTED", "RETURN_ACCEPTED"],
+      from: [
+        "RETURN_INSPECTED",
+        "RETURN_COLLECTED",
+        "RETURN_PICKING",
+        "RETURN_ACCEPTED",
+      ],
       to: "RETURNED",
     },
     return: {
@@ -219,13 +289,19 @@ export async function PUT(
         "COMPLETED",
         "RETURN_REQUESTED",
         "RETURN_ACCEPTED",
+        "RETURN_PICKING",
         "RETURN_COLLECTED",
         "RETURN_INSPECTED",
       ],
       to: "RETURNED",
     },
     exchange: {
-      from: ["RETURN_ACCEPTED", "RETURN_COLLECTED", "RETURN_INSPECTED"],
+      from: [
+        "RETURN_ACCEPTED",
+        "RETURN_PICKING",
+        "RETURN_COLLECTED",
+        "RETURN_INSPECTED",
+      ],
       to: "EXCHANGED",
     },
   };
@@ -1014,6 +1090,10 @@ export async function PUT(
         ? cloneItems.reduce((s, i) => s + Number(i.totalPrice), 0)
         : 0;
 
+      // 운임 정책 자동 제안 — claimReason 책임 매핑 기반 (매장 책임/손님 책임/분담)
+      const shippingPolicy = deriveExchangeShippingPolicy(
+        (order.claimReason as string | null) ?? null,
+      );
       const newOrder = await tx.order.create({
         data: {
           orderNo: newOrderNo,
@@ -1032,10 +1112,11 @@ export async function PUT(
           subtotalAmount: subtotal,
           discountAmount: 0,
           shippingFee: 0,
+          shippingPaymentType: shippingPolicy.shippingPaymentType,
           taxAmount: 0,
           totalAmount: subtotal,
           commissionAmount: 0,
-          memo: `부분 교환 발송 — 원본 ${order.orderNo}${exchangeSame ? " (같은 상품 일부)" : " (다른 상품 — 항목·차액 직접 편집)"}`,
+          memo: `부분 교환 발송 — 원본 ${order.orderNo}${exchangeSame ? " (같은 상품 일부)" : " (다른 상품 — 항목·차액 직접 편집)"}\n[운임] ${shippingPolicy.liabilityNote}`,
           createdById: auditUser?.id ?? order.createdById,
           items:
             cloneItems.length > 0
@@ -1090,6 +1171,26 @@ export async function PUT(
     );
     if (productIdsToPush.length > 0) {
       await dispatchPushStock(prisma, productIdsToPush);
+    }
+
+    // 알림 — 부분 교환 시 차액 결제 안내 (best-effort)
+    if (exchangeNewOrderId) {
+      const phone = order.customerPhone;
+      if (phone) {
+        const isDiff = exchangeClaimType === "EXCHANGE_DIFFERENT";
+        await notify(
+          { phone, name: order.customerName ?? undefined },
+          {
+            kind: "EXCHANGE_DIFFERENT_PAYMENT",
+            subject: `[부분 교환] ${order.orderNo}`,
+            body: isDiff
+              ? `주문 ${order.orderNo} 부분 교환이 접수되었습니다. 차액 결제 안내는 매장에서 별도 연락드리겠습니다.`
+              : `주문 ${order.orderNo} 부분 교환이 접수되었습니다. 새 발송 정보는 곧 안내드리겠습니다.`,
+            meta: { exchangeNewOrderId, claimType: exchangeClaimType },
+          },
+          "sms",
+        );
+      }
     }
 
     const updated = await prisma.order.findUnique({ where: { id } });
@@ -1386,6 +1487,10 @@ export async function PUT(
               }))
           : [];
 
+        // 운임 정책 자동 제안 — claimReason 책임 매핑 기반
+        const shippingPolicyFull = deriveExchangeShippingPolicy(
+          (order.claimReason as string | null) ?? null,
+        );
         const newOrder = await tx.order.create({
           data: {
             orderNo: newOrderNo,
@@ -1408,10 +1513,11 @@ export async function PUT(
               ? Number(order.discountAmount)
               : 0,
             shippingFee: 0,
+            shippingPaymentType: shippingPolicyFull.shippingPaymentType,
             taxAmount: exchangeSame ? Number(order.taxAmount) : 0,
             totalAmount: exchangeSame ? Number(order.totalAmount) : 0,
             commissionAmount: 0,
-            memo: `교환 발송 — 원본 ${order.orderNo}${exchangeSame ? " (같은 상품)" : " (다른 상품 — 항목·차액 직접 편집)"}`,
+            memo: `교환 발송 — 원본 ${order.orderNo}${exchangeSame ? " (같은 상품)" : " (다른 상품 — 항목·차액 직접 편집)"}\n[운임] ${shippingPolicyFull.liabilityNote}`,
             createdById: auditUser?.id ?? order.createdById,
             items:
               cloneItems.length > 0
@@ -1572,6 +1678,28 @@ export async function PUT(
         await dispatchPaymentCancel(prisma, ctx);
       } else {
         await dispatchRefund(prisma, ctx, false);
+      }
+    }
+
+    // 알림 — 교환 시 차액 결제 안내 (best-effort)
+    // EXCHANGE_DIFFERENT: 새 주문(-EX) 의 빈 항목에 차액이 잡힐 수 있음. 사용자가 새 항목 등록 후 손님 결제 안내.
+    // EXCHANGE_SAME: 차액 0 이지만 교환 진행됐음을 통지.
+    if (isExchange && exchangeNewOrderId) {
+      const phone = order.customerPhone;
+      if (phone) {
+        const isDiff = exchangeClaimType === "EXCHANGE_DIFFERENT";
+        await notify(
+          { phone, name: order.customerName ?? undefined },
+          {
+            kind: "EXCHANGE_DIFFERENT_PAYMENT",
+            subject: `[교환 진행] ${order.orderNo}`,
+            body: isDiff
+              ? `주문 ${order.orderNo} 교환이 접수되었습니다. 차액 결제 안내는 매장에서 별도 연락드리겠습니다.`
+              : `주문 ${order.orderNo} 교환이 접수되었습니다. 새 발송 정보는 곧 안내드리겠습니다.`,
+            meta: { exchangeNewOrderId, claimType: exchangeClaimType },
+          },
+          "sms",
+        );
       }
     }
 

@@ -61,8 +61,13 @@ export type SalesHistoryRow = {
   claimReason: OrderClaimReason | null;
   fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING" | null;
   amount: number;
-  /** 순매출 기여분 — 환불/매출취소면 0, 그 외엔 amount */
+  /** 순매출 기여분 — 환불/매출취소면 0, PARTIAL_REFUND 면 amount - partialRefundAmount, 그 외엔 amount */
   netAmount: number;
+  /**
+   * PARTIAL_REFUND 부분 환불 누적 금액 (세전). 0 이면 부분 환불 없음.
+   * UI 의 strike + 차감 표시에 사용.
+   */
+  partialRefundAmount: number;
   /** 교환 새 주문 (-EX) 인지 — 마진 리포트는 항상 제외, 이 페이지는 토글로만 노출 */
   isExchangeReplacement: boolean;
   /** 연결된 원천 — 판매:Order id, 수리:ticket id (orphan), 임대:rental id (orphan) */
@@ -206,6 +211,9 @@ export async function GET(request: NextRequest) {
       repairTicket: { select: { ticketNo: true } },
       rental: { select: { rentalNo: true } },
       exchangedFromOrders: { select: { id: true } },
+      // PARTIAL_REFUND 매출 보정용 — 항목별 누적 환불 금액 (세전).
+      // refundedAmount 합계가 totalAmount 와 같으면 사실상 전액 환불 → REFUNDED 와 동일 처리.
+      items: { select: { refundedAmount: true } },
     },
     orderBy: { orderDate: "desc" },
     take: FETCH_CAP,
@@ -330,10 +338,20 @@ export async function GET(request: NextRequest) {
         ? "rental"
         : "product";
     const amount = Number(o.totalAmount);
+    // 누적 부분 환불 금액 (세전 공급가액 기준) — PARTIAL_REFUND 일 때 의미 있음
+    const partialRefundAmount = (o.items ?? []).reduce(
+      (s, it) => s + Number(it.refundedAmount ?? 0),
+      0,
+    );
     const isReversed =
       o.status === "RETURNED" ||
       o.paymentStatus === "REFUNDED" ||
       o.paymentStatus === "SALES_CANCELLED";
+    // PARTIAL_REFUND — 부분 환불액만큼 차감해 순매출 계산. 음수 가드.
+    const isPartial = o.paymentStatus === "PARTIAL_REFUND";
+    const partialNet = isPartial
+      ? Math.max(0, amount - partialRefundAmount)
+      : amount;
     return {
       id: `order-${o.id}`,
       type: t,
@@ -357,7 +375,8 @@ export async function GET(request: NextRequest) {
       claimReason: o.claimReason,
       fulfillmentType: o.fulfillmentType,
       amount,
-      netAmount: isReversed ? 0 : amount,
+      netAmount: isReversed ? 0 : partialNet,
+      partialRefundAmount: isPartial ? partialRefundAmount : 0,
       isExchangeReplacement: (o.exchangedFromOrders?.length ?? 0) > 0,
       sourceId: o.id,
       isOrphan: false,
@@ -387,6 +406,7 @@ export async function GET(request: NextRequest) {
       fulfillmentType: null,
       amount,
       netAmount: amount,
+      partialRefundAmount: 0,
       isExchangeReplacement: false,
       sourceId: t.id,
       isOrphan: true,
@@ -415,6 +435,7 @@ export async function GET(request: NextRequest) {
       fulfillmentType: null,
       amount,
       netAmount: amount,
+      partialRefundAmount: 0,
       isExchangeReplacement: false,
       sourceId: r.id,
       isOrphan: true,
@@ -479,6 +500,9 @@ export async function GET(request: NextRequest) {
       r.paymentStatus === "SALES_CANCELLED"
     ) {
       refundedAmount += r.amount;
+    } else if (r.partialRefundAmount > 0) {
+      // PARTIAL_REFUND — 부분 환불액만 환불 합계에 가산
+      refundedAmount += r.partialRefundAmount;
     }
     if (r.paymentStatus === "UNPAID") unpaidAmount += r.amount;
     if (claimInProgressStatuses.has(r.status)) claimInProgressCount += 1;
