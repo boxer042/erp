@@ -445,7 +445,7 @@ export default function OrdersBoardPage() {
               />
             </JmTableToolbarSearch>
             <JmTableToolbarFilters>
-              {/* 전체 — 빈 Set 일 때 활성. 클릭 시 모든 그룹 선택 해제 */}
+              {/* 전체 — 모든 그룹 선택 해제 */}
               <JmPill
                 size="sm"
                 active={groupFilters.size === 0}
@@ -454,21 +454,20 @@ export default function OrdersBoardPage() {
                 전체
                 <span className="ml-1 tabular-nums">{counts.all}</span>
               </JmPill>
-              {(Object.keys(GROUP_LABELS) as GroupFilter[])
-                .filter((g): g is BoardGroupKey => g !== "all")
-                .map((g) => (
-                  <JmPill
-                    key={g}
-                    size="sm"
-                    active={groupFilters.has(g)}
-                    onClick={() => toggleGroupFilter(g)}
-                  >
-                    {GROUP_LABELS[g]}
-                    {counts[g] > 0 && (
-                      <span className="ml-1 tabular-nums">{counts[g]}</span>
-                    )}
-                  </JmPill>
-                ))}
+              {/* KPI 카드와 안 겹치는 시점 그룹만 칩으로 — KPI 5개(지연/오늘/발송중/예정일미정/반품) 는 카드 클릭으로 토글 */}
+              {(["thisWeek", "future"] as const).map((g) => (
+                <JmPill
+                  key={g}
+                  size="sm"
+                  active={groupFilters.has(g)}
+                  onClick={() => toggleGroupFilter(g)}
+                >
+                  {GROUP_LABELS[g]}
+                  {counts[g] > 0 && (
+                    <span className="ml-1 tabular-nums">{counts[g]}</span>
+                  )}
+                </JmPill>
+              ))}
               <JmTableToolbarMore
                 count={
                   (groupFilters.size > 0 ? 1 : 0) +
