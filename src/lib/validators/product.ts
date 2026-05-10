@@ -9,7 +9,9 @@ export const productSchema = z.object({
   sku: z.string().min(1, "SKU를 입력해주세요"),
   description: z.string().nullable().optional(),
   unitOfMeasure: z.string().default("EA"),
-  productType: z.enum(["FINISHED", "PARTS", "SET", "ASSEMBLED"]).default("FINISHED"),
+  productType: z
+    .enum(["FINISHED", "PARTS", "SET", "ASSEMBLED", "OPTION_PARENT"])
+    .default("FINISHED"),
   taxType: z.enum(["TAXABLE", "TAX_FREE"]).default("TAXABLE"),
   zeroRateEligible: z.boolean().default(false),
   taxRate: z
@@ -54,6 +56,8 @@ export const productSchema = z.object({
   // 시리얼 라벨 (개별추적)
   trackable: z.boolean().default(false),
   warrantyMonths: z.coerce.number().int().min(0).nullable().optional(),
+  // 카탈로그 비노출 — 옵션 swap 대상 SKU(예: 가습기-블랙)를 단독 노출 안 시키려는 운영자 토글
+  catalogHidden: z.boolean().default(false),
   // 상품정보 고시 (전자상거래법 표시 의무) — 전부 선택 입력
   countryOfOrigin: z.string().nullable().optional(),
   manufacturer: z.string().nullable().optional(),

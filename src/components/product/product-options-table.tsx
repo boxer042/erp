@@ -61,12 +61,24 @@ export function ProductOptionsTable({ options }: Props) {
               </TableCell>
               <TableCell className="px-3 py-2.5 text-xs">
                 {v.mappedProduct ? (
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex flex-wrap items-center gap-1">
                     <Badge
                       variant="outline"
                       className="text-[10px] border-blue-200 text-blue-700"
                     >
                       Product
+                    </Badge>
+                    {/* SWAP / ADDON mode chip — mappedProductId 있을 때만 의미 */}
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px]"
+                      title={
+                        v.mappedMode === "SWAP"
+                          ? "옵션 선택 시 메인 라인의 productId 가 매핑된 SKU 로 교체됨 (색상·사이즈)"
+                          : "옵션 선택 시 자식 OrderItem 자동 추가 (메인 + 부속). 일반 추가구매는 BundleProduct 권장"
+                      }
+                    >
+                      {v.mappedMode}
                     </Badge>
                     <span className="font-mono">{v.mappedProduct.sku}</span>
                   </span>

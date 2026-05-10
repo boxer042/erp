@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Plus, Trash2, ChevronDown } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-import { ApiError, apiMutate } from "@/lib/api-client";
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 import type { ProductDetail, ProductOptionItem } from "../types";
 
 interface Props {
@@ -42,6 +43,8 @@ interface ValueDraft {
   addPrice: string;
   mappedProductId: string | null;
   mappedVariantId: string | null;
+  /** SWAP: 메인 라인 productId 교체 (색상/사이즈 같은 변형) / ADDON: 자식 OrderItem 추가 */
+  mappedMode: "SWAP" | "ADDON";
 }
 
 const tmpId = () => Math.random().toString(36).slice(2);
@@ -59,6 +62,7 @@ function fromOption(opt: ProductOptionItem): OptionDraft {
       addPrice: String(v.addPrice ?? "0"),
       mappedProductId: v.mappedProductId,
       mappedVariantId: v.mappedVariantId,
+      mappedMode: v.mappedMode ?? "SWAP",
     })),
   };
 }
@@ -75,6 +79,7 @@ function emptyOption(): OptionDraft {
         addPrice: "0",
         mappedProductId: null,
         mappedVariantId: null,
+        mappedMode: "SWAP",
       },
     ],
   };
@@ -94,6 +99,26 @@ function Body({ product, onOpenChange }: Props) {
     (product.productOptions ?? []).map(fromOption),
   );
 
+  // 옵션값 매핑 candidates fetch — 자기 자신 / OPTION_PARENT 제외
+  const productsQuery = useQuery<ProductOption[]>({
+    queryKey: ["option-mapping-products"],
+    queryFn: () =>
+      apiGet<ProductOption[]>(
+        "/api/products?excludeVariants=true&includeHidden=1",
+      ),
+  });
+  const productCandidates = useMemo(() => {
+    const all = productsQuery.data ?? [];
+    return all.filter(
+      (p) => p.id !== product.id && p.productType !== "OPTION_PARENT",
+    );
+  }, [productsQuery.data, product.id]);
+  // variant candidates — canonicalProductId 가 있는 상품 (변형) 만. 거의 안 쓰이지만 모드 B 폴백
+  const variantCandidates = useMemo(() => {
+    const all = productsQuery.data ?? [];
+    return all.filter((p) => !!p.canonicalProductId);
+  }, [productsQuery.data]);
+
   const createMutation = useMutation({
     mutationFn: (draft: OptionDraft) =>
       apiMutate(`/api/products/${product.id}/options`, "POST", {
@@ -108,6 +133,7 @@ function Body({ product, onOpenChange }: Props) {
           isActive: true,
           mappedProductId: v.mappedProductId,
           mappedVariantId: v.mappedVariantId,
+          mappedMode: v.mappedMode,
         })),
       }),
   });
@@ -125,6 +151,7 @@ function Body({ product, onOpenChange }: Props) {
           isActive: true,
           mappedProductId: v.mappedProductId,
           mappedVariantId: v.mappedVariantId,
+          mappedMode: v.mappedMode,
         })),
       }),
   });
@@ -162,6 +189,7 @@ function Body({ product, onOpenChange }: Props) {
                   addPrice: "0",
                   mappedProductId: null,
                   mappedVariantId: null,
+                  mappedMode: "SWAP" as const,
                 },
               ],
             }
@@ -356,6 +384,9 @@ function Body({ product, onOpenChange }: Props) {
                     onChange={(patch) =>
                       updateValue(draft.rowId, v.rowId, patch)
                     }
+                    productCandidates={productCandidates}
+                    variantCandidates={variantCandidates}
+                    productsLoading={productsQuery.isPending}
                   />
                   <Button
                     type="button"
@@ -403,14 +434,21 @@ function Body({ product, onOpenChange }: Props) {
 
 /**
  * 매핑 picker — 단순 텍스트 / Product 매핑 / Variant 매핑 토글.
- * MVP 로 매핑 ID 직접 입력 (후속 PR 에서 Combobox 로 교체).
+ * Product 매핑 시 SWAP(메인 라인 교체, 색상/사이즈) / ADDON(자식 라인 추가) 모드 토글.
+ * Combobox 로 상품 검색 (이름·SKU). 자기 자신 + OPTION_PARENT 제외 (호출측 candidates 필터).
  */
 function MappingPicker({
   value,
   onChange,
+  productCandidates,
+  variantCandidates,
+  productsLoading,
 }: {
   value: ValueDraft;
   onChange: (patch: Partial<ValueDraft>) => void;
+  productCandidates: ProductOption[];
+  variantCandidates: ProductOption[];
+  productsLoading: boolean;
 }) {
   const mode: "text" | "product" | "variant" = value.mappedProductId
     ? "product"
@@ -420,7 +458,7 @@ function MappingPicker({
 
   const cycleMode = () => {
     if (mode === "text") {
-      onChange({ mappedProductId: "", mappedVariantId: null });
+      onChange({ mappedProductId: "", mappedVariantId: null, mappedMode: "SWAP" });
     } else if (mode === "product") {
       onChange({ mappedProductId: null, mappedVariantId: "" });
     } else {
@@ -428,32 +466,64 @@ function MappingPicker({
     }
   };
 
+  const toggleMappedMode = () =>
+    onChange({ mappedMode: value.mappedMode === "SWAP" ? "ADDON" : "SWAP" });
+
   return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        className="text-[10px] px-1.5 py-0.5 rounded border bg-secondary hover:bg-secondary/80 inline-flex items-center gap-0.5"
-        onClick={cycleMode}
-        title="매핑 모드 전환 (텍스트 / Product / Variant)"
-      >
-        {mode === "text" ? "텍스트" : mode === "product" ? "Product" : "Variant"}
-        <ChevronDown className="h-2.5 w-2.5" />
-      </button>
-      {mode !== "text" && (
-        <Input
-          value={
-            mode === "product"
-              ? (value.mappedProductId ?? "")
-              : (value.mappedVariantId ?? "")
+    <div className="flex flex-col items-stretch gap-1 min-w-[220px]">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className="text-[10px] px-1.5 py-0.5 rounded border bg-secondary hover:bg-secondary/80 inline-flex items-center gap-0.5 shrink-0"
+          onClick={cycleMode}
+          title="매핑 모드 전환 (텍스트 / Product / Variant)"
+        >
+          {mode === "text" ? "텍스트" : mode === "product" ? "Product" : "Variant"}
+          <ChevronDown className="h-2.5 w-2.5" />
+        </button>
+        {mode === "product" && (
+          <div className="flex-1 min-w-0">
+            <ProductCombobox
+              products={productCandidates}
+              value={value.mappedProductId ?? ""}
+              onChange={(p) => onChange({ mappedProductId: p.id })}
+              placeholder={productsLoading ? "로딩…" : "상품 선택"}
+              clearable={false}
+            />
+          </div>
+        )}
+        {mode === "variant" && (
+          <div className="flex-1 min-w-0">
+            <ProductCombobox
+              products={variantCandidates}
+              value={value.mappedVariantId ?? ""}
+              onChange={(p) => onChange({ mappedVariantId: p.id })}
+              placeholder={
+                productsLoading
+                  ? "로딩…"
+                  : variantCandidates.length === 0
+                    ? "변형 없음"
+                    : "변형 선택"
+              }
+              clearable={false}
+            />
+          </div>
+        )}
+      </div>
+      {/* SWAP / ADDON 토글 — Product 매핑일 때만 의미 */}
+      {mode === "product" && (
+        <button
+          type="button"
+          onClick={toggleMappedMode}
+          title={
+            value.mappedMode === "SWAP"
+              ? "SWAP — 옵션 선택 시 메인 라인 productId 가 매핑된 SKU 로 교체됨 (색상·사이즈 변형)"
+              : "ADDON — 옵션 선택 시 자식 OrderItem 자동 추가됨 (메인 + 부속 결제). 일반 추가구매는 BundleProduct 도메인 권장"
           }
-          onChange={(e) =>
-            mode === "product"
-              ? onChange({ mappedProductId: e.target.value || null })
-              : onChange({ mappedVariantId: e.target.value || null })
-          }
-          placeholder="ID"
-          className="h-7 text-[10px] font-mono w-[80px]"
-        />
+          className="text-[10px] px-1.5 py-0.5 rounded border inline-flex items-center justify-center gap-0.5 bg-background hover:bg-secondary/40 self-start"
+        >
+          모드: <span className="font-semibold">{value.mappedMode}</span>
+        </button>
       )}
     </div>
   );

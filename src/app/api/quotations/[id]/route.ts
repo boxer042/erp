@@ -11,7 +11,29 @@ export async function GET(
   const quotation = await prisma.quotation.findUnique({
     where: { id },
     include: {
-      items: { orderBy: { sortOrder: "asc" } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              taxType: true,
+              zeroRateEligible: true,
+              isBulk: true,
+              unitOfMeasure: true,
+              productType: true,
+              media: {
+                where: { kind: "THUMBNAIL", type: "IMAGE" },
+                orderBy: { sortOrder: "asc" },
+                select: { url: true },
+                take: 1,
+              },
+            },
+          },
+        },
+      },
       customer: true,
       supplier: true,
       createdBy: { select: { name: true } },

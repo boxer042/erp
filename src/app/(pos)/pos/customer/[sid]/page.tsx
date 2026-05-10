@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Package, Wrench, CalendarClock, Menu, ShoppingCart } from "lucide-react";
@@ -21,6 +21,8 @@ import { GlobalSearchSheet } from "../../_global-search-sheet";
 import { LinkCustomerSheet } from "../../_link-customer-sheet";
 import { QuickCustomerSheet } from "../../_quick-customer-sheet";
 import { CustomerActionSheet } from "../../_customer-action-sheet";
+import { CartSheet } from "../../_cart-sheet";
+import { PaymentSheet } from "../../_payment-sheet";
 import { useRepairSync } from "../../_use-repair-sync";
 import { ProductDetailView, type LandingResponse } from "../../_product-detail-view";
 import { RepairDetail } from "@/app/(pos)/pos/repairs/[id]/page";
@@ -104,7 +106,7 @@ export default function PosV2CustomerPage({
   };
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
   const [customerActionOpen, setCustomerActionOpen] = useState(false);
   const [quickRegister, setQuickRegister] = useState<{ defaultText: string } | null>(null);
@@ -113,8 +115,22 @@ export default function PosV2CustomerPage({
   // 카트에서 미리 출력하는 케이스는 false (세션 유지, 손님 페이지 머물러야 함).
   const [labelRedirectAfter, setLabelRedirectAfter] = useState(false);
   const [detail, setDetail] = useState<Detail>(null);
-  // 카트 시트 외부 트리거 — BottomTabBar 의 장바구니 탭 클릭 시 increment → ProductsMode 가 useEffect 로 cartOpen
-  const [cartOpenSignal, setCartOpenSignal] = useState(0);
+  // 카트/결제 시트 — 모드 무관 페이지 레벨에서 mount (수리 모드에서도 카트 열 수 있어야 함)
+  const [cartOpen, setCartOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+
+  // URL 의 ?openCart=1 — 외부 진입 (예: 수리관리 "결제로 이동") 시 도착 후 자동 카트 오픈.
+  // 한 번 처리 후 URL 에서 파라미터 제거 → 새로고침 시 재오픈 방지.
+  useEffect(() => {
+    if (searchParams.get("openCart") !== "1") return;
+    setCartOpen(true);
+    const sp = new URLSearchParams(Array.from(searchParams.entries()));
+    sp.delete("openCart");
+    const qs = sp.toString();
+    router.replace(`/pos/customer/${sid}${qs ? `?${qs}` : ""}`, { scroll: false });
+    // searchParams/router 는 stable 하지 않을 수 있어 의존성에 sid 만 — mount 1회 처리.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sid]);
 
   const session = hydrated ? getSession(sid) : undefined;
   // 모드 무관 — repair count + ticketIds 항상 동기화 (RepairMode 미마운트 상태에서도)
@@ -211,16 +227,9 @@ export default function PosV2CustomerPage({
                       </div>
                     )}
                     <div className="flex min-w-0 max-w-[140px] flex-col">
-                      <div className="flex items-center gap-1">
-                        {session.customerType === "BUSINESS" && (
-                          <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
-                            기업
-                          </span>
-                        )}
-                        <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
-                          {session.customerName}
-                        </span>
-                      </div>
+                      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                        {session.customerName}
+                      </span>
                       {session.customerType === "BUSINESS" &&
                       session.customerBusinessNumber ? (
                         <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
@@ -266,17 +275,42 @@ export default function PosV2CustomerPage({
                 </span>
               </div>
               {mode === "product" ? (
-                <button
-                  type="button"
-                  onClick={() => setProductSearchOpen(true)}
-                  className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--jm-surface-muted)] px-4 text-left text-[13px] text-[var(--jm-text-muted)] hover:bg-[var(--jm-border)] active:bg-[var(--jm-border)]"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+                <div className="relative flex h-10 min-w-0 flex-1 items-center">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    className="pointer-events-none absolute left-4 text-[var(--jm-text-muted)]"
+                  >
                     <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
-                  <span className="truncate">상품명 · SKU 검색</span>
-                </button>
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="상품명 · SKU 검색"
+                    className="h-10 w-full min-w-0 rounded-full bg-[var(--jm-surface-muted)] pl-10 pr-9 text-[13px] text-[var(--jm-text)] placeholder:text-[var(--jm-text-muted)] focus:bg-[var(--jm-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--jm-action)]"
+                  />
+                  {productSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setProductSearch("")}
+                      aria-label="검색어 지우기"
+                      className="absolute right-2 flex h-7 w-7 items-center justify-center rounded-full text-[var(--jm-text-muted)] hover:bg-[var(--jm-border)] active:bg-[var(--jm-border)]"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path
+                          d="M3 3l8 8M11 3l-8 8"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div className="min-w-0 flex-1" />
               )}
@@ -306,16 +340,9 @@ export default function PosV2CustomerPage({
                       </div>
                     )}
                     <div className="flex min-w-0 max-w-[140px] flex-col">
-                      <div className="flex items-center gap-1">
-                        {session.customerType === "BUSINESS" && (
-                          <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
-                            기업
-                          </span>
-                        )}
-                        <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
-                          {session.customerName}
-                        </span>
-                      </div>
+                      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                        {session.customerName}
+                      </span>
                       {session.customerType === "BUSINESS" &&
                       session.customerBusinessNumber ? (
                         <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
@@ -454,15 +481,10 @@ export default function PosV2CustomerPage({
         ) : mode === "product" ? (
           <ProductsMode
             session={session}
-            onPrintLabels={(codes, options) => {
-              setLabelCodes(codes);
-              setLabelRedirectAfter(!!options?.afterPayment);
-            }}
             onProductDetail={(id) => setDetail({ type: "product", id })}
-            openCartTrigger={cartOpenSignal}
-            searchOpen={productSearchOpen}
-            onSearchOpenChange={setProductSearchOpen}
-            onCustomerClick={() => setCustomerActionOpen(true)}
+            searchQuery={productSearch}
+            onOpenCart={() => setCartOpen(true)}
+            onOpenPayment={() => setPaymentOpen(true)}
           />
         ) : mode === "repair" ? (
           <RepairMode
@@ -501,6 +523,34 @@ export default function PosV2CustomerPage({
         </div>
       )}
 
+      {/* 카트 / 결제 시트 — 모드 무관 페이지 레벨에서 mount.
+          수리·임대 모드에서도 BottomTabBar 의 장바구니 버튼 또는
+          외부 진입(?openCart=1)으로 열 수 있게 하기 위함. */}
+      <CartSheet
+        open={cartOpen}
+        onOpenChange={setCartOpen}
+        session={session}
+        onCheckout={() => setPaymentOpen(true)}
+        onPrintLabels={(codes, options) => {
+          setLabelCodes(codes);
+          setLabelRedirectAfter(!!options?.afterPayment);
+        }}
+      />
+      <PaymentSheet
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
+        session={session}
+        onPrintLabels={(codes, options) => {
+          setLabelCodes(codes);
+          setLabelRedirectAfter(!!options?.afterPayment);
+        }}
+        onCustomerClick={() => setCustomerActionOpen(true)}
+        onBack={() => {
+          setPaymentOpen(false);
+          setCartOpen(true);
+        }}
+      />
+
       {/* 하단 탭 바 — 좌측 ☰메뉴 + 우측 🛒장바구니 항상 노출 */}
       <BottomTabBar<Mode>
         active={mode}
@@ -515,9 +565,10 @@ export default function PosV2CustomerPage({
           icon: <ShoppingCart className="size-5" />,
           badge: session.items.length,
           onClick: () => {
+            // 카트는 모드 무관 페이지 레벨 모달 — 모드 전환 없이 바로 오픈.
+            // detail 만 닫아 카트가 detail 위에 가려지지 않게.
             setDetail(null);
-            if (mode !== "product") setMode("product");
-            setCartOpenSignal((n) => n + 1);
+            setCartOpen(true);
           },
         }}
         tabs={[

@@ -21,6 +21,8 @@ export interface CheckoutPayloadOptions {
   /** 출고 방식 — 미지정/PICKUP 시 즉시 종결, DELIVERY/SHIPPING 은 ERP 워크보드 진입 */
   fulfillmentType?: FulfillmentType;
   shipping?: ShippingInfo;
+  /** 배송비 결제 방식 — PICKUP 은 무관. DELIVERY/SHIPPING 만 의미 */
+  shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
 }
 
 export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayloadOptions) {
@@ -83,20 +85,49 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
     paymentMethod: opts.action === "order" ? opts.paymentMethod ?? null : null,
     taxInvoiceRequested: opts.action === "order" ? !!opts.taxInvoiceRequested : false,
     memo: opts.memo ?? null,
-    items: session.items.map((i) => ({
-      productId: i.productId,
-      name: i.name,
-      sku: i.sku,
-      quantity: i.quantity,
-      unitPrice: i.unitPrice,
-      discountPerUnit: calcDiscountPerUnit(i.unitPrice, i.discount),
-      taxType: i.taxType,
-      isZeroRate: i.isZeroRate ?? false,
-    })),
+    items: session.items.map((i) => {
+      // ADDON 자식 라인은 옵션 가산 무관 (단독 상품). 메인 라인만 base 환산.
+      if (i.isAddon) {
+        return {
+          productId: i.productId,
+          name: i.name,
+          sku: i.sku,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          discountPerUnit: calcDiscountPerUnit(i.unitPrice, i.discount),
+          taxType: i.taxType,
+          isZeroRate: i.isZeroRate ?? false,
+          optionValueIds: [],
+          // ADDON 메타 — 서버가 lineRole=ADDON + parentItemId 매핑
+          cartItemId: i.cartItemId,
+          parentCartItemId: i.parentCartItemId,
+          isAddon: true,
+        };
+      }
+      // 옵션 addPrice 는 메인 단가 외 별도 라인(OPTION_REF) 또는 메인 라인 가산으로 서버에서 처리됨.
+      // → 카트의 unitPrice 는 (base + addPriceSum) 인데, 서버는 base 만 받아서 addPrice 를 다시 계산.
+      // 이중 합산을 막으려고 base 환산 후 전달.
+      const addPriceSum = i.optionAddPriceSum ?? 0;
+      const baseUnitPrice = Math.max(0, i.unitPrice - addPriceSum);
+      return {
+        productId: i.productId,
+        name: i.name,
+        sku: i.sku,
+        quantity: i.quantity,
+        unitPrice: baseUnitPrice,
+        discountPerUnit: calcDiscountPerUnit(baseUnitPrice, i.discount),
+        taxType: i.taxType,
+        isZeroRate: i.isZeroRate ?? false,
+        optionValueIds: i.optionValueIds ?? [],
+        // 메인 라인 cartItemId — ADDON 자식의 parentCartItemId 매칭용
+        cartItemId: i.cartItemId,
+      };
+    }),
     repairTicketData,
     repairTicketId: linkedRepairTicketId,
     rentalRecords,
     fulfillmentType,
+    shippingPaymentType: opts.shippingPaymentType ?? "PREPAID",
     shippingRecipientName: shipping?.recipientName ?? null,
     shippingRecipientPhone: shipping?.recipientPhone ?? null,
     shippingAddress: shipping?.address ?? null,

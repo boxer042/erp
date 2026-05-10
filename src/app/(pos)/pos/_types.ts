@@ -19,4 +19,13 @@ export interface ProductLite {
   unitOfMeasure?: string;
   isCanonical?: boolean;
   autoMapped?: boolean;
+  /** 상품에 활성 ProductOption 슬롯이 등록돼 있는지 — 카트 라인의 "옵션 선택" 트리거 노출용 */
+  hasProductOptions?: boolean;
+  /** Product.productType — OPTION_PARENT 면 자체 재고 X, SWAP 옵션 선택 강제 */
+  productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
+  /**
+   * OPTION_PARENT 상품의 옵션 SWAP 값들 중 최저가(세전).
+   * 카탈로그 노출 시 "₩50,000~" 형식 표시. 일반 FINISHED 상품은 null.
+   */
+  minOptionPrice?: number | null;
 }

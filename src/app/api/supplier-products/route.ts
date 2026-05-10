@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const supplierId = searchParams.get("supplierId");
   const search = searchParams.get("search") || "";
+  const includeInactive = searchParams.get("includeInactive") === "1";
 
   const products = await prisma.supplierProduct.findMany({
     where: {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
             ],
           }
         : {}),
-      isActive: true,
+      ...(includeInactive ? {} : { isActive: true }),
     },
     include: {
       supplier: { select: { name: true } },

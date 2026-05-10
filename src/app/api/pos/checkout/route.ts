@@ -8,12 +8,30 @@ type Action = "order" | "quotation" | "statement";
 interface CheckoutItem {
   productId?: string;      // 상품 항목만 있음, 서비스 항목(수리/임대)은 없음
   quantity: number;
-  unitPrice: number;       // 할인 전 단가(세전)
+  unitPrice: number;       // 할인 전 단가(세전) — 메인 base 가격, optionValueIds addPrice 미포함
   discountPerUnit: number; // 개당 할인액 (세전)
   name: string;
   sku?: string;
   taxType?: string;
   isZeroRate?: boolean;
+  /**
+   * 고객이 선택한 ProductOptionValue ID들. mappedProductId 가 있는 옵션값은 OPTION_REF 자식 라인으로 자동 분리.
+   * 그 외 (단순 텍스트 / mappedVariantId) 는 메인 라인 unitPrice 에 addPrice 가산 + optionSnapshot 보존.
+   * mappedVariantId 는 Phase 3 (자동 Assembly) — 현재는 단순 텍스트 와 동일하게 처리.
+   */
+  optionValueIds?: string[];
+  /**
+   * 진입 경로 SKU — 자사몰/외부 채널만 사용. POS 는 직원 입력이라 null 권장.
+   * SWAP 옵션 적용으로 productId 가 swap 된 후에도 손님이 본 카탈로그 SKU 보존용.
+   * checkout API 가 받으면 OrderItem.entryProductId 에 그대로 저장.
+   */
+  entryProductId?: string | null;
+  /** 카트 라인 ID (cartItemId) — ADDON 자식의 parentCartItemId 매칭용. 서버는 stagedItem index 매핑에만 사용 */
+  cartItemId?: string;
+  /** ADDON 자식 라인 — true 면 lineRole=ADDON, parentItemId=메인 으로 OrderItem 생성 (BundleProduct 추천 결과) */
+  isAddon?: boolean;
+  /** 메인 카트 라인의 cartItemId — ADDON 만 의미 있음. 서버가 stagedItem index 매핑 */
+  parentCartItemId?: string;
 }
 
 interface RepairTicketData {
@@ -62,6 +80,11 @@ interface CheckoutBody {
   shippingAddress?: string | null;
   /** 출고 예정일 (YYYY-MM-DD). 미지정 시 주문일 + 1 영업일 자동 계산 */
   expectedShipDate?: string | null;
+  /**
+   * 배송비 결제 방식 — PREPAID(선불)/COD(착불)/STORE_BURDEN(매장 부담).
+   * PICKUP fulfillmentType 은 의미 없음 (default PREPAID 두되 무시).
+   */
+  shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
 }
 
 function genNo(prefix: string) {
@@ -86,17 +109,178 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "action과 items는 필수입니다" }, { status: 400 });
   }
 
-  const items = body.items.map((it) => {
-    const net = Math.max(0, it.unitPrice - (it.discountPerUnit ?? 0));
-    return {
-      ...it,
-      netUnitPrice: net,
-      lineSubtotal: net * it.quantity,
-    };
-  });
+  // 옵션값 일괄 조회 — 처리 모드별 분기:
+  //   mappedMode=SWAP: 메인 라인의 productId/이름/단가를 mappedProduct 로 교체. 옵션 1개당 1회만 적용 가능.
+  //   mappedMode=ADDON: OPTION_REF 자식 라인 추가 (메인 + 별도 OrderItem)
+  //   mappedProductId 없음: 단순 텍스트 — 메인 라인 unitPrice 에 addPrice 가산 + optionSnapshot 보존
+  const allOptionValueIds = Array.from(
+    new Set(body.items.flatMap((i) => i.optionValueIds ?? [])),
+  );
+  const optionValues = allOptionValueIds.length
+    ? await prisma.productOptionValue.findMany({
+        where: { id: { in: allOptionValueIds } },
+        include: {
+          option: { select: { name: true } },
+          mappedProduct: {
+            select: { id: true, name: true, sku: true, taxType: true, sellingPrice: true },
+          },
+        },
+      })
+    : [];
+  const optionValueMap = new Map(optionValues.map((v) => [v.id, v]));
 
-  const subtotal = items.reduce((s, i) => s + i.lineSubtotal, 0);
-  const taxableSubtotal = items
+  // 메인 + OPTION_REF + ADDON 자식 라인 평탄화. parentItemIndex 로 부모 link.
+  type StagedItem = {
+    productId: string | null;
+    name: string;
+    sku?: string;
+    quantity: number;
+    unitPrice: number;
+    discountPerUnit: number;
+    netUnitPrice: number;
+    lineSubtotal: number;
+    taxType?: string;
+    isZeroRate: boolean;
+    lineRole: "MAIN" | "OPTION_REF" | "ADDON";
+    parentItemIndex: number | null;
+    optionSnapshot: Record<string, string> | null;
+    entryProductId: string | null;
+  };
+
+  const stagedItems: StagedItem[] = [];
+  // 메인 라인의 cartItemId → stagedItems index 매핑 (ADDON 자식의 parentItemIndex 결정용)
+  const cartItemIdToMainStagedIdx = new Map<string, number>();
+  for (const it of body.items) {
+    // ADDON 자식 라인 — 단독 상품, 옵션 처리 없음. parentItemIndex 로 메인 link.
+    if (it.isAddon) {
+      const parentIdx = it.parentCartItemId
+        ? cartItemIdToMainStagedIdx.get(it.parentCartItemId)
+        : undefined;
+      const addonNet = Math.max(0, it.unitPrice - (it.discountPerUnit ?? 0));
+      stagedItems.push({
+        productId: it.productId ?? null,
+        name: it.name,
+        sku: it.sku,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        discountPerUnit: it.discountPerUnit ?? 0,
+        netUnitPrice: addonNet,
+        lineSubtotal: addonNet * it.quantity,
+        taxType: it.taxType,
+        isZeroRate: it.isZeroRate ?? false,
+        lineRole: "ADDON",
+        parentItemIndex: parentIdx ?? null,
+        optionSnapshot: null,
+        entryProductId: null, // ADDON 도 funnel 분석 대상 아님 (메인의 부산물)
+      });
+      continue;
+    }
+
+    let nonMappedAdd = 0;
+    const snapshot: Record<string, string> = {};
+    const refs: Array<{
+      productId: string;
+      name: string;
+      sku?: string;
+      taxType?: string;
+      addPrice: number;
+    }> = [];
+    // SWAP 적용 — 한 라인에 SWAP 옵션값 여러 개면 마지막이 우선 (보통 슬롯 1개당 1선택이라 1회만)
+    let swap: {
+      productId: string;
+      name: string;
+      sku?: string;
+      taxType?: string;
+      sellingPrice: number;
+    } | null = null;
+    for (const optId of it.optionValueIds ?? []) {
+      const ov = optionValueMap.get(optId);
+      if (!ov) continue;
+      snapshot[ov.option.name] = ov.label;
+      if (ov.mappedProductId && ov.mappedProduct) {
+        if (ov.mappedMode === "SWAP") {
+          swap = {
+            productId: ov.mappedProduct.id,
+            name: ov.mappedProduct.name,
+            sku: ov.mappedProduct.sku,
+            taxType: ov.mappedProduct.taxType ?? "TAXABLE",
+            sellingPrice: Number(ov.mappedProduct.sellingPrice ?? 0),
+          };
+        } else {
+          // ADDON — 별도 자식 라인
+          const refUnit =
+            Number(ov.addPrice) > 0
+              ? Number(ov.addPrice)
+              : Number(ov.mappedProduct.sellingPrice ?? 0);
+          refs.push({
+            productId: ov.mappedProduct.id,
+            name: ov.mappedProduct.name,
+            sku: ov.mappedProduct.sku,
+            taxType: ov.mappedProduct.taxType ?? "TAXABLE",
+            addPrice: refUnit,
+          });
+        }
+      } else {
+        // 단순 텍스트 / mappedVariantId — 메인 라인 가산
+        nonMappedAdd += Number(ov.addPrice) || 0;
+      }
+    }
+
+    // SWAP 적용 시 메인 productId/이름/sku/세금/단가 모두 swap 된 SKU 기준
+    // base 단가 결정: swap 됐으면 swap 의 sellingPrice (클라이언트 unitPrice 무시 — placeholder 일 수 있음).
+    //   단, 클라이언트가 sellingPrice 아닌 다른 가격(할인 등)을 명시했으면 그대로 존중하기 위해
+    //   클라이언트 unitPrice 가 0 이거나 swap 의 sellingPrice 와 다르지 않으면 swap 가격 채택.
+    const mainProductId = swap ? swap.productId : (it.productId ?? null);
+    const mainName = swap ? swap.name : it.name;
+    const mainSku = swap ? swap.sku : it.sku;
+    const mainTaxType = swap ? swap.taxType : it.taxType;
+    const baseUnit = swap
+      ? (it.unitPrice > 0 ? it.unitPrice : swap.sellingPrice)
+      : it.unitPrice;
+    const mainBase = baseUnit + nonMappedAdd;
+    const mainNet = Math.max(0, mainBase - (it.discountPerUnit ?? 0));
+    const mainIdx = stagedItems.length;
+    // ADDON 자식이 이 메인을 parentCartItemId 로 가리킬 수 있게 매핑 보존
+    if (it.cartItemId) cartItemIdToMainStagedIdx.set(it.cartItemId, mainIdx);
+    stagedItems.push({
+      productId: mainProductId,
+      name: mainName,
+      sku: mainSku,
+      quantity: it.quantity,
+      unitPrice: mainBase,
+      discountPerUnit: it.discountPerUnit ?? 0,
+      netUnitPrice: mainNet,
+      lineSubtotal: mainNet * it.quantity,
+      taxType: mainTaxType,
+      isZeroRate: it.isZeroRate ?? false,
+      lineRole: "MAIN",
+      parentItemIndex: null,
+      optionSnapshot: Object.keys(snapshot).length > 0 ? snapshot : null,
+      // POS 결제는 직원 입력이라 entryProductId 항상 null. 자사몰/채널 import 시에만 채움.
+      entryProductId: it.entryProductId ?? null,
+    });
+    for (const ref of refs) {
+      stagedItems.push({
+        productId: ref.productId,
+        name: ref.name,
+        sku: ref.sku,
+        quantity: it.quantity,
+        unitPrice: ref.addPrice,
+        discountPerUnit: 0,
+        netUnitPrice: ref.addPrice,
+        lineSubtotal: ref.addPrice * it.quantity,
+        taxType: ref.taxType,
+        isZeroRate: false,
+        lineRole: "OPTION_REF",
+        parentItemIndex: mainIdx,
+        optionSnapshot: null,
+        entryProductId: null, // OPTION_REF 자식 라인은 funnel 분석 대상 아님
+      });
+    }
+  }
+
+  const subtotal = stagedItems.reduce((s, i) => s + i.lineSubtotal, 0);
+  const taxableSubtotal = stagedItems
     .filter((i) => !(i.isZeroRate || i.taxType === "TAX_FREE"))
     .reduce((s, i) => s + i.lineSubtotal, 0);
   const taxAmount = Math.round(taxableSubtotal * 0.1);
@@ -116,12 +300,12 @@ export async function POST(request: NextRequest) {
         memo: body.memo || null,
         createdById: user.id,
         items: {
-          create: items.map((it, idx) => ({
+          create: stagedItems.map((it, idx) => ({
             productId: it.productId,
             name: it.name,
             quantity: it.quantity,
             listPrice: it.unitPrice,
-            discountAmount: it.discountPerUnit ?? 0,
+            discountAmount: it.discountPerUnit,
             unitPrice: it.netUnitPrice,
             totalPrice: it.lineSubtotal,
             sortOrder: idx,
@@ -152,12 +336,12 @@ export async function POST(request: NextRequest) {
         memo: body.memo || null,
         createdById: user.id,
         items: {
-          create: items.map((it, idx) => ({
+          create: stagedItems.map((it, idx) => ({
             productId: it.productId,
             name: it.name,
             quantity: it.quantity,
             listPrice: it.unitPrice,
-            discountAmount: it.discountPerUnit ?? 0,
+            discountAmount: it.discountPerUnit,
             unitPrice: it.netUnitPrice,
             totalPrice: it.lineSubtotal,
             sortOrder: idx,
@@ -169,7 +353,10 @@ export async function POST(request: NextRequest) {
   }
 
   // action === "order" — 주문 확정 + FIFO 소진 (오프라인 매출이라 channelId 는 null)
-  const productIds = items.map((i) => i.productId).filter((id): id is string => !!id);
+  // OPTION_REF 자식 라인의 productId 도 productMap 에 포함시켜야 FIFO 소진 가능.
+  const productIds = Array.from(
+    new Set(stagedItems.map((i) => i.productId).filter((id): id is string => !!id)),
+  );
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
     include: {
@@ -241,7 +428,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const order = await tx.order.create({
+      const orderHeader = await tx.order.create({
         data: {
           orderNo: genNo("ORD"),
           channelId: null,
@@ -266,6 +453,7 @@ export async function POST(request: NextRequest) {
           subtotalAmount: subtotal,
           discountAmount: 0,
           shippingFee: 0,
+          shippingPaymentType: body.shippingPaymentType ?? "PREPAID",
           taxAmount,
           totalAmount,
           commissionAmount: 0,
@@ -280,18 +468,44 @@ export async function POST(request: NextRequest) {
           repairTicketId: body.repairTicketId || null,
           rentalId: body.rentalId || null,
           createdById: user.id,
-          items: {
-            create: items.map((it) => ({
-              productId: it.productId ?? null,
-              serviceName: it.productId ? null : it.name,
-              quantity: it.quantity,
-              unitPrice: it.netUnitPrice,
-              totalPrice: it.lineSubtotal,
-            })),
-          },
         },
-        include: { items: true },
       });
+
+      // OrderItem 순차 생성 — parentItemIndex → parentItemId 매핑 보장 (옵션 OPTION_REF 트리)
+      const createdIds: string[] = [];
+      const createdItems: Array<{
+        id: string;
+        productId: string | null;
+        quantity: number;
+        lineRole: "MAIN" | "OPTION_REF" | "ADDON";
+      }> = [];
+      for (const stage of stagedItems) {
+        const parentId =
+          stage.parentItemIndex !== null ? createdIds[stage.parentItemIndex] : null;
+        const oi = await tx.orderItem.create({
+          data: {
+            orderId: orderHeader.id,
+            productId: stage.productId,
+            serviceName: stage.productId ? null : stage.name,
+            quantity: stage.quantity,
+            unitPrice: stage.netUnitPrice,
+            totalPrice: stage.lineSubtotal,
+            lineRole: stage.lineRole as never,
+            parentItemId: parentId,
+            optionSnapshot: stage.optionSnapshot ?? undefined,
+            entryProductId: stage.entryProductId,
+          },
+        });
+        createdIds.push(oi.id);
+        createdItems.push({
+          id: oi.id,
+          productId: oi.productId,
+          quantity: Number(oi.quantity),
+          lineRole: stage.lineRole,
+        });
+      }
+      // 이후 로직(FIFO/labelCodes 매칭/RepairTicket 등)이 사용하는 order 객체 — 기존 구조 유지
+      const order = { ...orderHeader, items: createdItems };
 
       const fifoConsume = async (productId: string, orderItemId: string, qty: number, name: string) => {
         await ensureBulkStock(tx, productId, qty, name);

@@ -26,9 +26,26 @@ export default function PosV2HomePage() {
     sessions,
     addSession,
     removeSession,
+    restoreSession,
     setCustomer,
     hydrated,
   } = useSessions();
+
+  /** 닫은 손님 카드 — 5초 안에 토스트의 [되돌리기] 누르면 복원 */
+  const closeWithUndo = (s: CartSession) => {
+    const snapshot = { ...s };
+    removeSession(s.id);
+    toast("손님 카드를 닫았습니다", {
+      description: snapshot.customerName ?? "미등록 손님",
+      action: {
+        label: "되돌리기",
+        onClick: () => {
+          restoreSession(snapshot);
+        },
+      },
+      duration: 5000,
+    });
+  };
   const [linkOpen, setLinkOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -259,7 +276,7 @@ export default function PosV2HomePage() {
                             ? undefined
                             : () => {
                                 if (!hasItems) {
-                                  removeSession(s.id);
+                                  closeWithUndo(s);
                                   return;
                                 }
                                 setCloseTarget(s);
@@ -381,7 +398,7 @@ export default function PosV2HomePage() {
         target={closeTarget}
         onClose={() => setCloseTarget(null)}
         onConfirmDiscard={(s) => {
-          removeSession(s.id);
+          closeWithUndo(s);
           setCloseTarget(null);
         }}
       />

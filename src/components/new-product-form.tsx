@@ -130,6 +130,8 @@ export function NewProductForm({
     categoryId: "",
     trackable: false,
     warrantyMonths: "",
+    /** 카탈로그 비노출 — 옵션 swap 대상 SKU 단독 노출 차단 (P006 가습기-블랙 같은 케이스) */
+    catalogHidden: false,
   });
 
   // 변형(variant) 연결 — URL `?canonicalProductId=<id>` 로 진입 시 자동 채움
@@ -291,13 +293,21 @@ export function NewProductForm({
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const suppressScrollUpdateRef = useRef(false);
 
-  const stepItems = useMemo(() => [
-    { id: 1, anchor: "np-step-1", label: "거래처 매핑" },
-    { id: 2, anchor: "np-step-2", label: "상품 정보" },
-    { id: 3, anchor: "np-step-3", label: "비용" },
-    { id: 4, anchor: "np-step-4", label: "가격 설정" },
-    ...(channels.length > 0 ? [{ id: 5, anchor: "np-step-5", label: "채널별 가격" }] : []),
-  ], [channels.length]);
+  const stepItems = useMemo(() => {
+    const items = [
+      { id: 1, anchor: "np-step-1", label: "거래처 매핑" },
+      { id: 2, anchor: "np-step-2", label: "상품 정보" },
+      { id: 3, anchor: "np-step-3", label: "비용" },
+    ];
+    // OPTION_PARENT 는 자체 가격/매핑 없으므로 가격/채널 STEP 제외
+    if (productType !== "OPTION_PARENT") {
+      items.push({ id: 4, anchor: "np-step-4", label: "가격 설정" });
+      if (channels.length > 0) {
+        items.push({ id: 5, anchor: "np-step-5", label: "채널별 가격" });
+      }
+    }
+    return items;
+  }, [channels.length, productType]);
 
   const getViewport = useCallback((): HTMLElement | null => {
     return scrollAreaRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null;
@@ -419,6 +429,7 @@ export function NewProductForm({
       categoryId: "",
       trackable: false,
       warrantyMonths: "",
+      catalogHidden: false,
     });
     setMapping({ supplierId: "", supplierProductId: "", conversionRate: "1", isProvisional: false, syncName: false });
     setSupplierProducts([]);
@@ -885,6 +896,11 @@ export function NewProductForm({
         }
         seen.add(id);
       }
+    }
+
+    // OPTION_PARENT — 자체 가격/매핑/세트 검증 skip. 옵션 슬롯은 등록 후 별도 추가 안내 (필수 아님)
+    if (productType === "OPTION_PARENT") {
+      // 가격/매핑은 무관 — 서버에서 sellingPrice=0 강제 처리
     }
 
     // 변형이 있으면 묶음(canonical+variants) 모드 — 2026-04 부터 deprecated, variants 는 항상 빈 배열
@@ -2073,6 +2089,34 @@ export function NewProductForm({
                       </div>
                     </Field>
 
+                    <Field label="카탈로그">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              catalogHidden: !prev.catalogHidden,
+                            }))
+                          }
+                          className={cn(
+                            "px-2 h-6 rounded text-[11px] border transition-colors",
+                            form.catalogHidden
+                              ? "bg-amber-100 border-amber-300 text-amber-900 dark:bg-amber-500/15 dark:border-amber-500/40 dark:text-amber-300"
+                              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                          )}
+                          title="ON: 자사몰/POS 카탈로그에서 단독 노출 안 됨. 다른 상품의 옵션 SWAP 으로만 도달 가능 (가습기-블랙 같은 케이스)"
+                        >
+                          {form.catalogHidden ? "노출 차단" : "정상 노출"}
+                        </button>
+                        {form.catalogHidden && (
+                          <span className="text-[10px] text-muted-foreground">
+                            옵션 SWAP 대상 SKU 운영 시 사용
+                          </span>
+                        )}
+                      </div>
+                    </Field>
+
                     <Field label="메모">
                       <Textarea
                         placeholder="메모 (선택)"
@@ -2680,16 +2724,34 @@ export function NewProductForm({
                     </Card>
                   </section>
 
-                  <GroupHeader step="STEP 4" title="가격 설정" id="np-step-4" />
-
-                  {/* 가격 계산기 */}
-                  {PricePanel()}
-
-                  {channels.length > 0 && (
+                  {productType !== "OPTION_PARENT" && (
                     <>
-                      <GroupHeader step="STEP 5" title="채널별 가격" id="np-step-5" />
-                      {ChannelPricingPanel()}
+                      <GroupHeader step="STEP 4" title="가격 설정" id="np-step-4" />
+
+                      {/* 가격 계산기 */}
+                      {PricePanel()}
+
+                      {channels.length > 0 && (
+                        <>
+                          <GroupHeader step="STEP 5" title="채널별 가격" id="np-step-5" />
+                          {ChannelPricingPanel()}
+                        </>
+                      )}
                     </>
+                  )}
+
+                  {/* OPTION_PARENT 안내 — 자체 가격/재고 없이 옵션 SWAP 으로 동작 */}
+                  {productType === "OPTION_PARENT" && (
+                    <div className="rounded-md border border-purple-500/30 bg-purple-500/5 px-4 py-3 text-[13px] space-y-1.5">
+                      <div className="font-semibold text-foreground">
+                        옵션 대표 상품으로 등록됩니다
+                      </div>
+                      <ul className="list-disc list-inside text-muted-foreground space-y-0.5 text-[12px]">
+                        <li>자체 재고/가격 없음 — 카탈로그 노출용 placeholder</li>
+                        <li>등록 후 [고객 옵션] 섹션에서 색상/사이즈 슬롯 + 매핑 SKU 들 추가 (mode=SWAP)</li>
+                        <li>POS/자사몰에서 이 상품 선택 시 옵션 모달이 강제 노출되어 실제 SKU 결정</li>
+                      </ul>
+                    </div>
                   )}
                 </div>
 

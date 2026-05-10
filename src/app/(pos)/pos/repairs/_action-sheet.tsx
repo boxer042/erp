@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, UserCircle2, Wrench, CreditCard } from "lucide-react";
 import { toast } from "sonner";
-import { apiMutate, ApiError } from "@/lib/api-client";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { useSessions } from "@/components/pos/sessions-context";
 import { BottomSheet } from "../_components/bottom-sheet";
-import { STATUS_META, type RepairTicketRow } from "./_types";
+import { STATUS_META, type RepairTicketRow, type RepairTicketDetail } from "./_types";
+import { calcFinal } from "./_helpers";
 
 interface ResurrectResponse {
   sessionId: string;
@@ -21,7 +22,7 @@ interface ResurrectResponse {
  * 수리 행 클릭 시 열리는 액션 드로우.
  * - 이 손님 카드 열기 — 부활 API → 그리드 합류 → 손님 페이지 이동
  * - 수리 상세        — /pos/repairs/[id] 이동
- * - 결제로 이동       — READY 일 때만. 손님 카드 열기 + repair 라인 카트 추가는 후속 (현재는 손님 카드만)
+ * - 결제로 이동       — READY 일 때만. 부활(resurrect) → 합계 계산 → 카트 repair 라인 추가 → 손님 페이지 이동
  */
 export function RepairActionSheet({
   ticket,
@@ -42,7 +43,7 @@ function Body({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { forceSync } = useSessions();
+  const { forceSync, add, getSession } = useSessions();
   const [pending, setPending] = useState<"open" | "detail" | "checkout" | null>(
     null,
   );
@@ -62,9 +63,67 @@ function Body({
           : { posSessionId: ticket.id }, // 미등록 — RepairTicket.posSessionId 와 PosSession.id 매칭
       );
     },
-    onSuccess: async (data) => {
+    onSuccess: async (data, kind) => {
+      // "결제로 이동" — READY 티켓 의 합계를 계산해 카트에 repair 라인 추가
+      if (kind === "checkout") {
+        // 부활된 세션에 같은 repairTicketId 라인이 이미 있으면 재추가 스킵 (sync race 대비)
+        await forceSync();
+        const resurrected = getSession(data.sessionId);
+        const alreadyInCart = resurrected?.items.some(
+          (it) => it.repairMeta?.repairTicketId === ticket.id,
+        );
+        try {
+          const detail = await apiGet<RepairTicketDetail>(
+            `/api/repair-tickets/${ticket.id}`,
+          );
+          const finalAmount = calcFinal(detail);
+          if (alreadyInCart) {
+            toast.info(`이미 카트에 있습니다 — ${detail.ticketNo}`);
+          } else if (finalAmount > 0) {
+            const deviceModel =
+              detail.serialItem?.product?.name ??
+              detail.serialItem?.displayName ??
+              detail.repairProduct?.name ??
+              detail.repairProductText ??
+              undefined;
+            add(
+              {
+                itemType: "repair",
+                name: `수리 ${detail.ticketNo}`,
+                imageUrl: null,
+                unitPrice: finalAmount,
+                taxType: "TAXABLE",
+                repairMeta: {
+                  repairTicketId: detail.id,
+                  deviceModel,
+                  issueDescription: detail.symptom ?? undefined,
+                },
+              },
+              { sessionId: data.sessionId },
+            );
+            toast.success(`카트에 추가됨 — ${detail.ticketNo}`);
+          } else {
+            toast.info(
+              "청구할 금액이 없어 카트 추가는 건너뜁니다 — 부속/공임을 먼저 등록해주세요",
+            );
+          }
+        } catch (err) {
+          // 카트 추가 실패해도 사용자가 수동 추가할 수 있게 페이지는 그대로 진입
+          toast.error(
+            err instanceof ApiError
+              ? err.message
+              : "수리 합계를 불러오지 못했습니다 — 수동으로 카트에 추가해주세요",
+          );
+        }
+      }
       await forceSync();
-      router.push(`/pos/customer/${data.sessionId}`);
+      // 두 케이스 모두 수리 컨텍스트에서 왔으니 수리 탭으로 진입.
+      // "결제로 이동" 은 추가로 ?openCart=1 → 도착 후 카트 시트 자동 오픈.
+      const target =
+        kind === "checkout"
+          ? `/pos/customer/${data.sessionId}?mode=repair&openCart=1`
+          : `/pos/customer/${data.sessionId}?mode=repair`;
+      router.push(target);
       onClose();
     },
     onError: (err) => {
@@ -116,7 +175,7 @@ function Body({
             <ActionButton
               icon={<CreditCard className="size-5" />}
               label="결제로 이동"
-              hint="손님 카드 열기 + 카트로"
+              hint="수리 합계를 카트에 추가하고 손님 페이지로"
               variant="cta"
               onClick={() => resurrectMutation.mutate("checkout")}
               pending={pending === "checkout"}

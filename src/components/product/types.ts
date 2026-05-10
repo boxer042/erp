@@ -126,12 +126,21 @@ export interface ProductOptionValueItem {
   addPrice: string;
   sortOrder: number;
   isActive: boolean;
-  /** 다른 Product 매핑 (메모리·SSD 같은 단독 판매 가능 상품) — OrderItem OPTION_REF */
+  /** 다른 Product 매핑 — SWAP(메인 SKU 교체) 또는 ADDON(자식 라인 추가) */
   mappedProductId: string | null;
-  mappedProduct: { id: string; name: string; sku: string } | null;
+  mappedProduct: {
+    id: string;
+    name: string;
+    sku: string;
+    sellingPrice?: string;
+    listPrice?: string;
+    taxType?: string;
+  } | null;
   /** 매장 variant 매핑 (쿨러 → 수냉쿨러 variant) */
   mappedVariantId: string | null;
   mappedVariant: { id: string; name: string; sku: string } | null;
+  /** mappedProductId 처리 모드 — SWAP(기본) / ADDON. mappedProductId 없으면 무시 */
+  mappedMode: "SWAP" | "ADDON";
 }
 
 export interface ProductOptionItem {
@@ -141,6 +150,27 @@ export interface ProductOptionItem {
   sortOrder: number;
   isActive: boolean;
   values: ProductOptionValueItem[];
+}
+
+/** 추가구매 추천 (BundleProduct) — 메인 상품과 함께 사면 좋은 별도 카탈로그 상품 */
+export interface BundleProductItem {
+  id: string;
+  bundleProductId: string;
+  defaultQuantity: string;
+  discountAmount: string | null;
+  recommendMessage: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  bundleProduct: {
+    id: string;
+    name: string;
+    sku: string;
+    sellingPrice: string;
+    listPrice?: string;
+    imageUrl: string | null;
+    taxType: string;
+    productType?: string;
+  };
 }
 
 // 상세 페이지 전체 응답 (GET /api/products/[id])
@@ -198,6 +228,7 @@ export interface ProductDetail {
   inventoryLots?: InventoryLotItem[];
   specValues?: ProductSpecValueItem[];
   productOptions?: ProductOptionItem[];
+  bundles?: BundleProductItem[];
   estimatedUnitCost?: number | null;
   estimatedMargin?: number | null;
   estimatedMarginRate?: number | null;

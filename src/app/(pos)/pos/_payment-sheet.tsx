@@ -257,6 +257,10 @@ function Body({
   const [shippingRecipientName, setShippingRecipientName] = useState("");
   const [shippingRecipientPhone, setShippingRecipientPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
+  // 배송비 결제 방식 — DELIVERY/SHIPPING 일 때만 의미. 기본 선불 (자사몰/일반 POS 흐름).
+  const [shippingPaymentType, setShippingPaymentType] = useState<
+    "PREPAID" | "COD" | "STORE_BURDEN"
+  >("PREPAID");
 
   // 결제 대상 = 상품 + 임대 + 수리(미연결: repairTicketId 없는 즉석 수리). 수리는 자체 픽업 흐름이 별도라
   // RepairTicket 픽업은 RepairDetail 의 PickupSheet 에서 처리. 여기선 카트 라인만.
@@ -276,9 +280,9 @@ function Body({
   const requiresCustomer = hasRentalOrRepair && needsCustomer;
   const requiresCustomerForUnpaid =
     method === "UNPAID" && !session.customerId && !skipCustomerLink;
-  // 변형 미확정 라인 — canonical 그대로 결제 불가 (사용자 정책)
+  // 변형/옵션 미확정 라인 — canonical(변형 미선택) 또는 OPTION_PARENT(SWAP 미선택) 그대로 결제 불가
   const unresolvedVariants = session.items.filter(
-    (i) => i.isCanonical && i.productId,
+    (i) => (i.isCanonical || i.isOptionParent) && i.productId,
   );
   const hasUnresolvedVariant = unresolvedVariants.length > 0;
 
@@ -342,6 +346,7 @@ function Body({
         paymentMethod: method,
         taxInvoiceRequested,
         fulfillmentType: effectiveFulfillment,
+        shippingPaymentType: needsShippingInfo ? shippingPaymentType : undefined,
         shipping: needsShippingInfo
           ? {
               recipientName: shippingRecipientName.trim() || session.customerName,
@@ -652,6 +657,42 @@ function Body({
                   rows={2}
                   className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
                 />
+                {/* 배송비 결제 방식 — 선불 / 착불 / 매장 부담 */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                    배송비
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        { value: "PREPAID" as const, label: "선불", sub: "결제 시 함께" },
+                        { value: "COD" as const, label: "착불", sub: "받는 사람 부담" },
+                        { value: "STORE_BURDEN" as const, label: "무료", sub: "매장 부담 (회계 비용)" },
+                      ]
+                    ).map((opt) => {
+                      const active = shippingPaymentType === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setShippingPaymentType(opt.value)}
+                          className={`flex flex-col items-start gap-0.5 rounded-xl border px-2.5 py-2 text-left transition-colors ${
+                            active
+                              ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                              : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                          }`}
+                        >
+                          <span className="text-[12px] font-semibold text-[var(--jm-text)]">
+                            {opt.label}
+                          </span>
+                          <span className="text-[10px] text-[var(--jm-text-muted)]">
+                            {opt.sub}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <span className="text-[11px] text-[var(--jm-text-muted)]">
                   결제 후 ERP <strong>출고 워크보드</strong>로 자동 진입합니다
                 </span>

@@ -54,9 +54,53 @@ export async function GET(request: NextRequest) {
       unitOfMeasure: true,
       isCanonical: true,
       autoMapped: true,
+      productType: true,
+      catalogHidden: true,
+      _count: { select: { productOptions: { where: { isActive: true } } } },
     },
   });
-  const byId = new Map(products.map((p) => [p.id, p]));
+
+  // OPTION_PARENT 의 최저 SWAP 가격 derive (products list 와 동일 정책)
+  const optionParentIds = products
+    .filter((p) => p.productType === "OPTION_PARENT")
+    .map((p) => p.id);
+  const minOptionPriceById = new Map<string, number>();
+  if (optionParentIds.length > 0) {
+    const optionValues = await prisma.productOptionValue.findMany({
+      where: {
+        isActive: true,
+        mappedMode: "SWAP",
+        mappedProductId: { not: null },
+        option: { isActive: true, productId: { in: optionParentIds } },
+      },
+      select: {
+        option: { select: { productId: true } },
+        mappedProduct: { select: { sellingPrice: true } },
+      },
+    });
+    for (const ov of optionValues) {
+      const price = Number(ov.mappedProduct?.sellingPrice ?? 0);
+      if (price <= 0) continue;
+      const cur = minOptionPriceById.get(ov.option.productId);
+      if (cur === undefined || price < cur) {
+        minOptionPriceById.set(ov.option.productId, price);
+      }
+    }
+  }
+
+  const byId = new Map(
+    products.map((p) => {
+      const { _count, ...rest } = p;
+      return [
+        p.id,
+        {
+          ...rest,
+          hasProductOptions: (_count?.productOptions ?? 0) > 0,
+          minOptionPrice: minOptionPriceById.get(p.id) ?? null,
+        },
+      ];
+    }),
+  );
 
   // 빈도 순서 보존
   const ordered = grouped

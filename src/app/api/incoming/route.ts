@@ -114,9 +114,9 @@ export async function POST(request: NextRequest) {
       });
       if (!po) throw new Error("발주서를 찾을 수 없습니다");
       if (po.supplierId !== data.supplierId) throw new Error("발주서의 거래처와 일치하지 않습니다");
-      const terminalStatuses = ["CANCELLED", "CLOSED", "RECEIVED", "PARTIAL_COMPLETED"];
-      if (terminalStatuses.includes(po.status)) {
-        throw new Error("종료된 발주서로는 입고할 수 없습니다");
+      const incomingAllowedStatuses = ["CONFIRMED", "PARTIAL", "PARTIAL_REACCEPTED"];
+      if (!incomingAllowedStatuses.includes(po.status)) {
+        throw new Error("거래처 수락(또는 수동 수락) 후에 입고할 수 있습니다");
       }
     }
 

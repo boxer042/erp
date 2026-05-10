@@ -27,6 +27,15 @@ export function calcCartTotals(session: CartSession): CartTotals {
     const isExempt = i.taxType === "TAX_FREE" || i.isZeroRate;
     if (isExempt) exemptNet += lineNet;
     else taxableNet += lineNet;
+
+    // 매핑 옵션 자식 라인 — 별도 상품 구매분. 자체 과세/면세 + 메인 수량 동일.
+    // 결제 시 서버가 OPTION_REF OrderItem 으로 분리. 카트 합계도 분리 합산.
+    for (const ref of i.optionRefs ?? []) {
+      const refLineNet = ref.addPrice * i.quantity;
+      const refExempt = ref.taxType === "TAX_FREE" || ref.isZeroRate;
+      if (refExempt) exemptNet += refLineNet;
+      else taxableNet += refLineNet;
+    }
   }
 
   const subtotalNet = taxableNet + exemptNet;

@@ -3,7 +3,7 @@
 import { useId, useMemo, useState, isValidElement, cloneElement, type ReactElement } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, ChevronRight, Package, Wrench, Layers, Cpu } from "lucide-react";
+import { Plus, X, ChevronRight, Package, Wrench, Layers, Cpu, Palette } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
 import { TYPE_ACCENT, emptyCostRow, type CostRow, type ProductType } from "./types";
 
@@ -503,6 +503,12 @@ export const PRODUCT_TYPE_CARDS = [
     label: "조립상품",
     Icon: Cpu,
     desc: "기존 상품을 조립·가공하여 만든 상품. 조립 비용 추가 가능",
+  },
+  {
+    type: "OPTION_PARENT" as ProductType,
+    label: "옵션 대표 상품",
+    Icon: Palette,
+    desc: "자체 재고 X — 카탈로그 노출용 placeholder. 색상/사이즈 옵션의 SWAP 으로 실제 SKU 결정 (자사몰 단일 페이지 운영)",
   },
 ] as const;
 

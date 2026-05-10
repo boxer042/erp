@@ -4,9 +4,10 @@ import { z } from "zod";
  * ProductOption 입력 검증 스키마.
  *
  * 옵션값 처리 모드 (셋 중 최대 하나, 셋 다 null 허용):
- *  - mappedProductId: 다른 Product 매핑 (메모리 32GB → OrderItem OPTION_REF 별도 라인)
- *  - mappedVariantId: 매장 variant 매핑 (쿨러 → 수냉쿨러 variant 결정)
- *  - 둘 다 null: 단순 텍스트 옵션 (색상 화이트 → variant 자동 생성 후속)
+ *  - mappedProductId + mappedMode=SWAP: 메인 라인 productId 교체 (색상 → 가습기-블랙)
+ *  - mappedProductId + mappedMode=ADDON: OPTION_REF 자식 OrderItem 추가 (드물게 — 보통 BundleProduct)
+ *  - mappedVariantId: 매장 variant 매핑 (쿨러 → 수냉쿨러 variant, Phase 3 자동 Assembly)
+ *  - 둘 다 null: 단순 텍스트 옵션 (라벨 + addPrice 만)
  */
 
 export const productOptionValueSchema = z.object({
@@ -17,6 +18,7 @@ export const productOptionValueSchema = z.object({
   isActive: z.boolean().default(true),
   mappedProductId: z.string().nullable().optional(),
   mappedVariantId: z.string().nullable().optional(),
+  mappedMode: z.enum(["SWAP", "ADDON"]).default("SWAP"),
 });
 
 export const productOptionCreateSchema = z.object({

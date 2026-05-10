@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { CartLineRow } from "./_cart-line-row";
 import { issueQuotation, openPrintTab, calcCartFingerprint } from "./_issue-document";
 import { PriceInputDialog } from "./_components/price-input-dialog";
 import { DiscountInputDialog } from "./_components/discount-input-dialog";
+import { QuotationLoadSheet } from "./_quotation-load-sheet";
 
 interface Props {
   open: boolean;
@@ -44,6 +45,35 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   const { setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, forceSync } =
     useSessions();
   const items = session.items;
+  // 메인-자식 트리 — 메인 라인 후 그 자식 ADDON 라인들 순서로 평탄화 (orphan ADDON 은 마지막에)
+  const orderedItems = useMemo(() => {
+    const addonsByParent = new Map<string, typeof items>();
+    for (const it of items) {
+      if (it.isAddon && it.parentCartItemId) {
+        const arr = addonsByParent.get(it.parentCartItemId) ?? [];
+        arr.push(it);
+        addonsByParent.set(it.parentCartItemId, arr);
+      }
+    }
+    const out: typeof items = [];
+    const known = new Set(items.map((it) => it.cartItemId));
+    for (const it of items) {
+      if (it.isAddon) continue;
+      out.push(it);
+      const children = addonsByParent.get(it.cartItemId) ?? [];
+      for (const c of children) out.push(c);
+    }
+    // 부모 없는 orphan ADDON
+    for (const it of items) {
+      if (
+        it.isAddon &&
+        (!it.parentCartItemId || !known.has(it.parentCartItemId))
+      ) {
+        out.push(it);
+      }
+    }
+    return out;
+  }, [items]);
   const totals = calcCartTotals(session);
   const canIssue = !!session.customerId && items.length > 0;
 
@@ -58,6 +88,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   const [issuingKind, setIssuingKind] = useState<"quotation" | "serial" | "park" | null>(null);
   const [discountOpen, setDiscountOpen] = useState(false);
   const [shippingOpen, setShippingOpen] = useState(false);
+  const [quotationLoadOpen, setQuotationLoadOpen] = useState(false);
 
   const parkMutation = useMutation({
     mutationFn: () =>
@@ -160,15 +191,27 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
       >
         <div className="-mx-5 flex flex-col">
           {items.length === 0 ? (
-            <div className="px-5 py-12 text-center text-[13px] text-[var(--jm-text-subtle)]">
-              카트가 비어 있습니다
+            <div className="flex flex-col items-center gap-3 px-5 py-12 text-center">
+              <span className="text-[13px] text-[var(--jm-text-subtle)]">
+                카트가 비어 있습니다
+              </span>
+              {session.customerId && (
+                <button
+                  type="button"
+                  onClick={() => setQuotationLoadOpen(true)}
+                  className="rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[12px] font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)] active:bg-[var(--jm-bg)]"
+                >
+                  이전 견적서에서 불러오기
+                </button>
+              )}
             </div>
           ) : (
-            items.map((it) => (
+            orderedItems.map((it) => (
               <CartLineRow key={it.cartItemId} item={it} sessionId={session.id} />
             ))
           )}
         </div>
+
 
         {items.length > 0 && (
           <div className="mt-4 flex flex-col gap-2.5 rounded-2xl bg-[var(--jm-bg)] p-4">
@@ -197,9 +240,9 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
           </div>
         )}
 
-        {/* 액션 — [할인][배송비][시리얼출력][장바구니저장][견적서] */}
+        {/* 액션 — 2×3 그리드: [할인][배송비][시리얼출력] / [장바구니저장][견적서][불러오기] */}
         {items.length > 0 && (
-          <div className="mt-3 grid grid-cols-5 gap-1.5">
+          <div className="mt-3 grid grid-cols-3 gap-1.5">
             <ActionButton
               label="할인"
               sub={
@@ -271,8 +314,14 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               }}
               pending={issuingKind === "quotation"}
             />
+            <ActionButton
+              label="불러오기"
+              sub={session.customerId ? "이전 견적서" : "고객 연결"}
+              disabled={!session.customerId || issuingKind !== null}
+              onClick={() => setQuotationLoadOpen(true)}
+            />
             {cartChangedSinceQuotation && (
-              <p className="col-span-5 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
+              <p className="col-span-3 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
                 ⚠ 카트가 발행 후 변경됨 — 견적서 버튼 다시 눌러 재발행
               </p>
             )}
@@ -304,6 +353,17 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
         taxType="TAXABLE"
         onSubmit={(net) => setSessionShipping(String(net), session.id)}
       />
+
+      {/* 견적서 → 카트 로드 — 고객 연결됐을 때만 진입 가능 */}
+      {session.customerId && (
+        <QuotationLoadSheet
+          open={quotationLoadOpen}
+          onOpenChange={setQuotationLoadOpen}
+          sessionId={session.id}
+          customerId={session.customerId}
+          cartItemCount={items.length}
+        />
+      )}
 
     </>
   );

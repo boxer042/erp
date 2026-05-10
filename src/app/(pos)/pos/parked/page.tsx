@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, Loader2, Menu, ShoppingBag, Trash2 } from "lucide-react";
+import { ChevronLeft, FileText, Loader2, Menu, ShoppingBag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -41,8 +41,12 @@ export default function ParkedSessionsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [pendingKind, setPendingKind] = useState<"resurrect" | "delete" | null>(
-    null,
+  const [pendingKind, setPendingKind] = useState<
+    "resurrect" | "delete" | "quotation" | null
+  >(null);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"recent" | "oldest" | "items" | "name">(
+    "recent",
   );
 
   const parkedQuery = useQuery<ParkedSession[]>({
@@ -72,6 +76,30 @@ export default function ParkedSessionsPage() {
     },
   });
 
+  const issueQuotationMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiMutate<{ id: string; quotationNo: string }>(
+        `/api/pos/sessions/${id}/issue-quotation`,
+        "POST",
+      ),
+    onMutate: (id) => {
+      setPendingId(id);
+      setPendingKind("quotation");
+    },
+    onSuccess: (q) => {
+      toast.success(`견적서 발행 — ${q.quotationNo}`);
+      window.open(`/quotations/${q.id}/print?auto=1`, "_blank");
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError ? err.message : "견적서 발행에 실패했습니다",
+      ),
+    onSettled: () => {
+      setPendingId(null);
+      setPendingKind(null);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
       apiMutate<{ ok: true }>(`/api/pos/sessions/parked?id=${id}`, "DELETE"),
@@ -91,7 +119,37 @@ export default function ParkedSessionsPage() {
     },
   });
 
-  const items = parkedQuery.data ?? [];
+  const allItems = parkedQuery.data ?? [];
+
+  // 검색 + 정렬 — 양 늘어났을 때 손님명/전화/사업자번호로 빠르게 찾기
+  const items = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = !q
+      ? allItems.slice()
+      : allItems.filter((s) => {
+          const hay = [
+            s.customerName ?? "",
+            s.customerPhone ?? "",
+            s.label ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          return hay.includes(q);
+        });
+    list = list.sort((a, b) => {
+      if (sort === "recent" || sort === "oldest") {
+        const at = a.parkedAt ? new Date(a.parkedAt).getTime() : 0;
+        const bt = b.parkedAt ? new Date(b.parkedAt).getTime() : 0;
+        return sort === "recent" ? bt - at : at - bt;
+      }
+      if (sort === "items") return b.itemCount - a.itemCount;
+      // name — 미등록은 뒤로
+      if (!a.customerName && b.customerName) return 1;
+      if (a.customerName && !b.customerName) return -1;
+      return (a.customerName ?? "").localeCompare(b.customerName ?? "", "ko");
+    });
+    return list;
+  }, [allItems, search, sort]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--jm-bg)]">
@@ -126,10 +184,60 @@ export default function ParkedSessionsPage() {
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-4 py-4 sm:px-6">
+          {/* 검색 + 정렬 — 5건 넘으면 노출 */}
+          {allItems.length > 5 && (
+            <div className="mb-3 flex flex-col gap-2">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="이름·전화로 검색"
+                className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-base outline-none focus:border-[var(--jm-border-strong)]"
+              />
+              <div className="flex gap-1.5 overflow-x-auto">
+                {(
+                  [
+                    { v: "recent", label: "최근 저장" },
+                    { v: "oldest", label: "오래된 순" },
+                    { v: "items", label: "라인 많은 순" },
+                    { v: "name", label: "이름순" },
+                  ] as const
+                ).map((opt) => {
+                  const active = sort === opt.v;
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setSort(opt.v)}
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-jm-xs font-medium transition-colors ${
+                        active
+                          ? "bg-[var(--jm-action)] text-white"
+                          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {items.length !== allItems.length && (
+                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+                  {items.length} / {allItems.length} 표시
+                </p>
+              )}
+            </div>
+          )}
+
           {parkedQuery.isPending ? (
             <RowsSkeleton />
           ) : items.length === 0 ? (
-            <EmptyState />
+            allItems.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <div className="py-12 text-center text-jm-sm text-[var(--jm-text-muted)]">
+                조건에 맞는 상담이 없습니다
+              </div>
+            )
           ) : (
             <div className="flex flex-col gap-2">
               {items.map((s) => (
@@ -137,6 +245,7 @@ export default function ParkedSessionsPage() {
                   key={s.id}
                   session={s}
                   onResurrect={() => resurrectMutation.mutate(s.id)}
+                  onIssueQuotation={() => issueQuotationMutation.mutate(s.id)}
                   onDelete={() => {
                     const ok = window.confirm(
                       "이 저장된 상담을 영구 삭제할까요? 되돌릴 수 없습니다.",
@@ -146,6 +255,9 @@ export default function ParkedSessionsPage() {
                   }}
                   pendingResurrect={
                     pendingId === s.id && pendingKind === "resurrect"
+                  }
+                  pendingQuotation={
+                    pendingId === s.id && pendingKind === "quotation"
                   }
                   pendingDelete={pendingId === s.id && pendingKind === "delete"}
                 />
@@ -171,14 +283,18 @@ export default function ParkedSessionsPage() {
 function SessionRow({
   session,
   onResurrect,
+  onIssueQuotation,
   onDelete,
   pendingResurrect,
+  pendingQuotation,
   pendingDelete,
 }: {
   session: ParkedSession;
   onResurrect: () => void;
+  onIssueQuotation: () => void;
   onDelete: () => void;
   pendingResurrect: boolean;
+  pendingQuotation: boolean;
   pendingDelete: boolean;
 }) {
   const customerName =
@@ -222,7 +338,7 @@ function SessionRow({
         <button
           type="button"
           onClick={onDelete}
-          disabled={pendingResurrect || pendingDelete}
+          disabled={pendingResurrect || pendingDelete || pendingQuotation}
           className="flex size-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] ring-1 ring-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
           aria-label="삭제"
         >
@@ -234,9 +350,36 @@ function SessionRow({
         </button>
         <button
           type="button"
+          onClick={onIssueQuotation}
+          disabled={
+            pendingResurrect ||
+            pendingDelete ||
+            pendingQuotation ||
+            !session.customerId ||
+            session.itemCount === 0
+          }
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--jm-surface)] px-3 text-jm-xs font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
+          aria-label="견적서 발행"
+          title={
+            !session.customerId
+              ? "고객 연결 후 발행 가능 (먼저 가져오기)"
+              : session.itemCount === 0
+                ? "빈 카트"
+                : "견적서 발행 + 새 탭 인쇄"
+          }
+        >
+          {pendingQuotation ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <FileText className="size-4" />
+          )}
+          견적서
+        </button>
+        <button
+          type="button"
           onClick={onResurrect}
-          disabled={pendingResurrect || pendingDelete}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--jm-action)] px-3 text-[12px] font-semibold text-white transition-transform active:scale-95 disabled:opacity-50"
+          disabled={pendingResurrect || pendingDelete || pendingQuotation}
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--jm-action)] px-3 text-jm-xs font-semibold text-white transition-transform active:scale-95 disabled:opacity-50"
         >
           {pendingResurrect ? (
             <Loader2 className="size-4 animate-spin" />

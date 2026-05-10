@@ -82,13 +82,19 @@ export interface ParentProductRow {
   quantity: string;
 }
 
-export type ProductType = "FINISHED" | "PARTS" | "SET" | "ASSEMBLED";
+export type ProductType =
+  | "FINISHED"
+  | "PARTS"
+  | "SET"
+  | "ASSEMBLED"
+  | "OPTION_PARENT";
 
 export const TYPE_ACCENT: Record<ProductType, string> = {
   FINISHED: "#3ECF8E",
   PARTS: "#60a5fa",
   SET: "#fbbf24",
   ASSEMBLED: "#f97316",
+  OPTION_PARENT: "#a855f7", // purple — 옵션 swap placeholder
 };
 
 export function generateSku() {

@@ -39,6 +39,51 @@ export interface CartItem {
   isBulk?: boolean;          // 벌크 SKU 여부 (소수점 수량 입력 허용)
   unitOfMeasure?: string;    // "EA", "mL", "g" 등 — UI 표시용
   isCanonical?: boolean;     // 대표 상품 여부 — true 면 결제 직전 변형 확정 필요
+  /**
+   * OPTION_PARENT 상품 여부 — 자체 재고 없는 옵션 placeholder.
+   * 결제 전 SWAP 옵션값 선택으로 productId 가 실제 SKU 로 교체돼야 함.
+   * applySelections.swap 적용 시 이 플래그 자동 해제 (productId 가 실제 SKU 로 swap 됐으니).
+   */
+  isOptionParent?: boolean;
+  /** 상품에 ProductOption 슬롯이 등록돼 있는지 — 카트에서 "옵션 선택" 트리거 노출용 */
+  hasProductOptions?: boolean;
+  /**
+   * 선택한 옵션값 ID들. mappedProductId 가 있는 옵션값은 결제 시 OPTION_REF 자식 라인으로 분리됨.
+   * 서버에 그대로 전달하면 /api/pos/checkout 이 optionSnapshot + OPTION_REF 자동 생성.
+   */
+  optionValueIds?: string[];
+  /** 화면 표시용 옵션 라벨 매핑 — 상품명 옆 부속 텍스트 (예: "(화이트 · L)"). 비매핑 옵션값만 포함 */
+  optionSnapshot?: Record<string, string>;
+  /**
+   * 비매핑 옵션값(단순 텍스트 / mappedVariantId)의 addPrice 합계 — 메인 unitPrice 안에 포함된 금액.
+   * 서버 전달 시 unitPrice - optionAddPriceSum 으로 base 환산해 server 가 다시 addPrice 적용 시 이중 합산 방지.
+   * mappedProduct 옵션값의 addPrice 는 optionRefs 자식 라인의 addPrice 로 별도 보관 (메인 unitPrice 무관).
+   */
+  optionAddPriceSum?: number;
+  /**
+   * mappedProductId 옵션값 — 카트에서 별도 자식 행으로 표시 + 결제 시 서버가 OPTION_REF OrderItem 생성.
+   * 서버 전달은 optionValueIds 로 그대로 (서버가 mappedProductId 보고 자식 라인 자동 생성).
+   * 카트 라인 전용 표시 데이터.
+   */
+  optionRefs?: Array<{
+    optionValueId: string;
+    productId: string;
+    name: string;
+    sku?: string;
+    /** 자식 라인의 단가 (세전) = optionValue.addPrice 또는 mappedProduct.sellingPrice */
+    addPrice: number;
+    taxType?: "TAXABLE" | "TAX_FREE";
+    isZeroRate?: boolean;
+  }>;
+  /**
+   * 추가구매 자식 라인 — 메인 라인의 parentCartItemId 가 이 라인의 cartItemId 가리킴 (cascade 삭제용).
+   * 카트 표시는 메인 라인 아래 들여쓰기. 결제 시 OrderItem.lineRole=ADDON, parentItemId=메인.id 로 생성.
+   */
+  parentCartItemId?: string;
+  /** ADDON 자식 라인이면 true — 메인 카트 추가 후 BundleProduct 모달 또는 직접 추천에서 추가됨 */
+  isAddon?: boolean;
+  /** 추가구매 BundleProduct.id — 메인-자식 관계 추적용 (서버에 안 보내고 카트 내부 관리) */
+  bundleId?: string;
   repairMeta?: RepairMeta;
   rentalMeta?: RentalMeta;
 }
@@ -81,14 +126,60 @@ interface SessionsContextValue {
   hydrated: boolean;
   addSession: () => string; // 생성된 새 세션 id 반환
   removeSession: (id: string) => void;
+  /** 닫은 세션 그대로 복원 — undo 토스트용. removedIds 도 함께 정리해 server 삭제 cancel */
+  restoreSession: (session: CartSession) => void;
   switchSession: (id: string) => void;
-  add: (item: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number }, opts?: AddOptions) => void;
+  add: (item: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number; cartItemId?: string }, opts?: AddOptions) => void;
+  /**
+   * 카트 라인 일괄 교체 — 견적서 불러오기 같은 흐름에 사용. 세션 단위 할인/배송비/customer 는 보존.
+   * 견적서 ref(quotationId/Fingerprint) 는 새 카트 상태와 더 이상 연동되지 않으므로 함께 리셋.
+   */
+  replaceItems: (items: CartItem[], sessionId?: string) => void;
   remove: (cartItemId: string, sessionId?: string) => void;
   updateQty: (cartItemId: string, qty: number, sessionId?: string) => void;
   updateUnitPrice: (cartItemId: string, unitPrice: number, sessionId?: string) => void;
   updateDiscount: (cartItemId: string, discount: string, sessionId?: string) => void;
   updateRentalDates: (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number, sessionId?: string) => void;
   assignVariant: (cartItemId: string, variant: { productId: string; name: string; sku?: string; unitPrice: number }, sessionId?: string) => void;
+  /**
+   * variant 선택 + 고객 옵션값 선택을 한 번에 적용 — VariantSelectSheet 의 confirm 액션.
+   * 옵션 처리 모드별 동작:
+   *  - SWAP 옵션값(swap 인자): 카트 라인의 productId/name/sku/단가를 mapped SKU 로 교체 (OPTION_PARENT → 실제 SKU)
+   *  - ADDON 옵션값(optionRefs): 카트 별도 자식 행 + 결제 시 OPTION_REF OrderItem 생성
+   *  - 비매핑 옵션값(nonMappedAddPriceSum): 메인 라인 unitPrice 에 addPrice 가산
+   * 우선순위: variant 있음 > swap 있음 > 그 외 (기존 base 유지). 옵션은 항상 갱신.
+   */
+  applySelections: (
+    cartItemId: string,
+    payload: {
+      variant?: { productId: string; name: string; sku?: string; unitPrice: number };
+      /** SWAP 옵션값 — 메인 라인 SKU 교체 (OPTION_PARENT 결제 강제용 등) */
+      swap?: {
+        optionValueId: string;
+        productId: string;
+        name: string;
+        sku?: string;
+        sellingPrice: number;
+        listPrice?: number;
+        taxType?: "TAXABLE" | "TAX_FREE";
+      };
+      optionValueIds: string[];
+      optionSnapshot: Record<string, string>;
+      /** 비매핑 옵션 addPrice 합계 — 메인 unitPrice 에 가산 */
+      nonMappedAddPriceSum: number;
+      /** ADDON 매핑 옵션값들 — 카트 별도 자식 행 */
+      optionRefs: Array<{
+        optionValueId: string;
+        productId: string;
+        name: string;
+        sku?: string;
+        addPrice: number;
+        taxType?: "TAXABLE" | "TAX_FREE";
+        isZeroRate?: boolean;
+      }>;
+    },
+    sessionId?: string,
+  ) => void;
   toggleZeroRate: (cartItemId: string, sessionId?: string) => void;
   setCustomer: (
     id: string,
@@ -341,27 +432,49 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  /**
+   * 닫은 손님 카드를 그대로 복원 — undo 토스트용.
+   * 서버 sync 에 deletedIds 로 보내기 전(debounce 800ms) 에 호출하면 server 삭제 자체가 cancel.
+   * 그 이후에 호출되면 server 측에선 새 row 로 다시 생성됨 (id 보존).
+   */
+  const restoreSession = useCallback((session: CartSession) => {
+    removedIdsRef.current.delete(session.id);
+    mutateSessions((prev) => {
+      // 이미 같은 id 가 sync 로 돌아왔으면 중복 추가 방지
+      if (prev.some((s) => s.id === session.id)) return prev;
+      setActiveId(session.id);
+      return [...prev, session];
+    });
+  }, []);
+
   const switchSession = useCallback((id: string) => setActiveId(id), []);
 
   const add = useCallback(
     (
-      it: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number },
+      it: Omit<CartItem, "cartItemId" | "quantity" | "discount"> & { quantity?: number; cartItemId?: string },
       opts?: AddOptions
     ) => {
       const targetId = opts?.sessionId ?? activeId;
+      const optKey = (it.optionValueIds ?? []).slice().sort().join(",");
       mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => {
-          if (it.productId && it.itemType === "product") {
-            const existing = s.items.find((p) => p.productId === it.productId);
+          // ADDON 자식 라인은 항상 새 라인 (메인-자식 트리 보존, 같은 productId merge 안 함)
+          if (!it.isAddon && it.productId && it.itemType === "product") {
+            // 같은 productId + 같은 옵션 조합이면 수량만 +1 (옵션 다르면 별도 라인)
+            const existing = s.items.find((p) => {
+              if (p.productId !== it.productId) return false;
+              if (p.isAddon) return false; // 메인-자식 트리 충돌 회피
+              const pKey = (p.optionValueIds ?? []).slice().sort().join(",");
+              return pKey === optKey;
+            });
             if (existing) {
               return {
                 ...s,
                 items: s.items.map((p) =>
-                  p.productId === it.productId
+                  p === existing
                     ? {
                         ...p,
                         quantity: p.quantity + (it.quantity ?? 1),
-                        // backfill — 구버전 라인은 listPrice 가 없을 수 있음. 새 데이터 들어오면 채움.
                         listPrice: p.listPrice ?? it.listPrice,
                       }
                     : p
@@ -374,7 +487,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
             items: [
               ...s.items,
               {
-                cartItemId: genClientId(),
+                cartItemId: it.cartItemId ?? genClientId(),
                 productId: it.productId,
                 itemType: it.itemType,
                 name: it.name,
@@ -389,6 +502,17 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
                 isBulk: it.isBulk,
                 unitOfMeasure: it.unitOfMeasure,
                 isCanonical: it.isCanonical,
+                isOptionParent: it.isOptionParent,
+                hasProductOptions: it.hasProductOptions,
+                // 옵션 정보 — 카탈로그 추가 시점에 미리 선택했으면 그대로 보존 (cart-line-row 에서 변경 가능)
+                optionValueIds: it.optionValueIds,
+                optionSnapshot: it.optionSnapshot,
+                optionAddPriceSum: it.optionAddPriceSum,
+                optionRefs: it.optionRefs,
+                // 추가구매 자식 라인 — parentCartItemId 로 메인 라인과 트리 연결 + cascade 삭제용
+                parentCartItemId: it.parentCartItemId,
+                isAddon: it.isAddon,
+                bundleId: it.bundleId,
                 repairMeta: it.repairMeta,
                 rentalMeta: it.rentalMeta,
               },
@@ -400,13 +524,31 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     [activeId]
   );
 
+  const replaceItems = useCallback(
+    (items: CartItem[], sessionId?: string) => {
+      const targetId = sessionId ?? activeId;
+      mutateSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          items,
+          quotationId: undefined,
+          quotationFingerprint: undefined,
+        })),
+      );
+    },
+    [activeId],
+  );
+
   const remove = useCallback(
     (cartItemId: string, sessionId?: string) => {
       const targetId = sessionId ?? activeId;
       mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
-          items: s.items.filter((p) => p.cartItemId !== cartItemId),
+          // 메인 라인 삭제 시 그 자식 ADDON 라인도 cascade — 추가구매는 메인의 부산물
+          items: s.items.filter(
+            (p) => p.cartItemId !== cartItemId && p.parentCartItemId !== cartItemId,
+          ),
         }))
       );
     },
@@ -518,6 +660,94 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
                 }
               : p,
           ),
+        })),
+      );
+    },
+    [activeId],
+  );
+
+  const applySelections = useCallback(
+    (
+      cartItemId: string,
+      payload: {
+        variant?: { productId: string; name: string; sku?: string; unitPrice: number };
+        swap?: {
+          optionValueId: string;
+          productId: string;
+          name: string;
+          sku?: string;
+          sellingPrice: number;
+          listPrice?: number;
+          taxType?: "TAXABLE" | "TAX_FREE";
+        };
+        optionValueIds: string[];
+        optionSnapshot: Record<string, string>;
+        nonMappedAddPriceSum: number;
+        optionRefs: Array<{
+          optionValueId: string;
+          productId: string;
+          name: string;
+          sku?: string;
+          addPrice: number;
+          taxType?: "TAXABLE" | "TAX_FREE";
+          isZeroRate?: boolean;
+        }>;
+      },
+      sessionId?: string,
+    ) => {
+      const targetId = sessionId ?? activeId;
+      mutateSessions((prev) =>
+        updateSession(prev, targetId, (s) => ({
+          ...s,
+          items: s.items.map((p) => {
+            if (p.cartItemId !== cartItemId) return p;
+            // base 단가 결정: variant > swap > 기존 unitPrice 에서 비매핑 addPrice 빼서 환산
+            const base = payload.variant
+              ? payload.variant.unitPrice
+              : payload.swap
+                ? payload.swap.sellingPrice
+                : Math.max(0, p.unitPrice - (p.optionAddPriceSum ?? 0));
+            const finalUnit = base + payload.nonMappedAddPriceSum;
+            // 메인 라인 SKU/이름/정가/세금: variant > swap > 기존
+            const newProductMeta = payload.variant
+              ? {
+                  productId: payload.variant.productId,
+                  name: payload.variant.name,
+                  sku: payload.variant.sku,
+                  isCanonical: false,
+                }
+              : payload.swap
+                ? {
+                    productId: payload.swap.productId,
+                    name: payload.swap.name,
+                    sku: payload.swap.sku,
+                    // SWAP 적용 → OPTION_PARENT 해제 (실제 SKU 로 swap 된 상태라 결제 차단 풀림)
+                    isOptionParent: false,
+                    // listPrice 도 swap 된 SKU 기준으로 갱신 — 단가 비교 표시 (정가/할인) 일치
+                    ...(payload.swap.listPrice !== undefined
+                      ? { listPrice: payload.swap.listPrice }
+                      : {}),
+                    // taxType 갱신 — swap 된 SKU 의 과세/면세 적용
+                    ...(payload.swap.taxType
+                      ? { taxType: payload.swap.taxType }
+                      : {}),
+                  }
+                : {};
+            return {
+              ...p,
+              ...newProductMeta,
+              optionValueIds:
+                payload.optionValueIds.length > 0 ? payload.optionValueIds : undefined,
+              optionSnapshot:
+                Object.keys(payload.optionSnapshot).length > 0
+                  ? payload.optionSnapshot
+                  : undefined,
+              optionAddPriceSum:
+                payload.nonMappedAddPriceSum > 0 ? payload.nonMappedAddPriceSum : undefined,
+              optionRefs: payload.optionRefs.length > 0 ? payload.optionRefs : undefined,
+              unitPrice: Math.round(finalUnit),
+            };
+          }),
         })),
       );
     },
@@ -716,14 +946,17 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       addSession,
       removeSession,
+      restoreSession,
       switchSession,
       add,
+      replaceItems,
       remove,
       updateQty,
       updateUnitPrice,
       updateDiscount,
       updateRentalDates,
       assignVariant,
+      applySelections,
       toggleZeroRate,
       setCustomer,
       clearCustomer,
@@ -739,7 +972,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       getSession,
       forceSync,
     }),
-    [sessions, activeId, active, hydrated, addSession, removeSession, switchSession, add, remove, updateQty, updateUnitPrice, updateDiscount, updateRentalDates, assignVariant, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionRepairTicketIds, setSessionOpenRepairCount, clear, totalItemCount, getSession, forceSync]
+    [sessions, activeId, active, hydrated, addSession, removeSession, restoreSession, switchSession, add, replaceItems, remove, updateQty, updateUnitPrice, updateDiscount, updateRentalDates, assignVariant, applySelections, toggleZeroRate, setCustomer, clearCustomer, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, addSessionRepairTicket, setSessionRepairTicketIds, setSessionOpenRepairCount, clear, totalItemCount, getSession, forceSync]
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

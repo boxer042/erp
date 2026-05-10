@@ -29,6 +29,10 @@ export interface ProductOption {
   canonicalProductId?: string | null;
   taxType?: string;
   zeroRateEligible?: boolean;
+  /** 활성 ProductOption 슬롯 보유 여부 — POS 카트가 "옵션 선택" 트리거 노출용 */
+  hasProductOptions?: boolean;
+  /** Product.productType — OPTION_PARENT 등 필터링용 */
+  productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
 }
 
 interface ProductComboboxProps {

@@ -116,6 +116,25 @@ export async function GET(
         include: { slot: true },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
       },
+      // 추가구매 추천 (BundleProduct) — 메인 상품과 함께 사면 좋은 단독 카탈로그 상품들
+      bundles: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+        include: {
+          bundleProduct: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              sellingPrice: true,
+              listPrice: true,
+              imageUrl: true,
+              taxType: true,
+              productType: true,
+            },
+          },
+        },
+      },
       // 고객 옵션 도메인 (variant 와 분리됨) — 옵션 슬롯 + 값 + 매핑
       productOptions: {
         where: { isActive: true },
@@ -125,7 +144,8 @@ export async function GET(
             where: { isActive: true },
             orderBy: { sortOrder: "asc" },
             include: {
-              mappedProduct: { select: { id: true, name: true, sku: true } },
+              // sellingPrice/listPrice 포함 — SWAP 시 카트 라인 단가/정가 갱신 위해 필수
+              mappedProduct: { select: { id: true, name: true, sku: true, sellingPrice: true, listPrice: true, taxType: true } },
               mappedVariant: { select: { id: true, name: true, sku: true } },
             },
           },
@@ -825,7 +845,8 @@ export async function PUT(
   const data = parsed.data;
 
   const isSet = data.productType === "SET" || data.productType === "ASSEMBLED";
-  const newSellingPrice = parseFloat(data.sellingPrice);
+  const isOptionParent = data.productType === "OPTION_PARENT";
+  const newSellingPrice = isOptionParent ? 0 : parseFloat(data.sellingPrice);
 
   const product = await prisma.$transaction(async (tx) => {
     const updated = await tx.product.update({
@@ -843,7 +864,7 @@ export async function PUT(
         productType: data.productType,
         taxType: data.taxType,
         taxRate: parseFloat(data.taxRate),
-        listPrice: parseFloat(data.listPrice ?? data.sellingPrice),
+        listPrice: isOptionParent ? 0 : parseFloat(data.listPrice ?? data.sellingPrice),
         sellingPrice: newSellingPrice,
         isSet,
         isBulk: data.isBulk ?? false,
@@ -851,10 +872,11 @@ export async function PUT(
         imageUrl: data.imageUrl ?? null,
         memo: data.memo || null,
         categoryId: data.categoryId || null,
-        assemblyTemplateId: data.assemblyTemplateId || null,
+        assemblyTemplateId: isOptionParent ? null : data.assemblyTemplateId || null,
         zeroRateEligible: data.zeroRateEligible ?? false,
         trackable: data.trackable ?? false,
         warrantyMonths: data.warrantyMonths ?? null,
+        catalogHidden: data.catalogHidden ?? false,
         countryOfOrigin: data.countryOfOrigin ?? null,
         manufacturer: data.manufacturer ?? null,
         importer: data.importer ?? null,

@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
   const categoryId = searchParams.get("categoryId");
   const excludeVariants = searchParams.get("excludeVariants") === "true"; // POS 등에서 변형 상품 가리기
   const autoMapped = searchParams.get("autoMapped") === "1";
+  // 카탈로그 비노출(catalogHidden=true) 상품을 응답에 포함시킬지. 기본은 제외 (소비자/POS 그리드 노출 안 함).
+  // ERP 대시보드에서 모든 상품 관리할 땐 includeHidden=1 명시.
+  const includeHidden = searchParams.get("includeHidden") === "1";
 
   const products = await prisma.product.findMany({
     where: {
@@ -36,6 +39,7 @@ export async function GET(request: NextRequest) {
       ...(categoryId ? { categoryId } : {}),
       ...(excludeVariants ? { canonicalProductId: null } : {}),
       ...(autoMapped ? { autoMapped: true } : {}),
+      ...(includeHidden ? {} : { catalogHidden: false }),
     },
     include: {
       inventory: { select: { quantity: true, safetyStock: true } },
@@ -52,6 +56,8 @@ export async function GET(request: NextRequest) {
         },
       },
       canonicalProduct: { select: { id: true, name: true, sku: true } },
+      // 활성 ProductOption 수만 카운트 — POS 카트가 "옵션 선택" 트리거 노출 여부 판단용
+      _count: { select: { productOptions: { where: { isActive: true } } } },
       productMappings: {
         include: {
           supplierProduct: {
@@ -202,7 +208,7 @@ export async function GET(request: NextRequest) {
       return { ...m, supplierProduct: spRest };
     });
 
-    const { salesContainers: _sc, ...rest } = p;
+    const { salesContainers: _sc, _count, ...rest } = p;
     return {
       ...rest,
       productMappings: sanitizedMappings,
@@ -210,10 +216,48 @@ export async function GET(request: NextRequest) {
       supplierUnitPrice,
       shippingPerUnit,
       incomingCostPerUnit,
+      hasProductOptions: (_count?.productOptions ?? 0) > 0,
     };
   });
 
-  return NextResponse.json(productsWithUnitCost);
+  // OPTION_PARENT 상품의 최저 SWAP 가격 derive — 카탈로그 노출 시 "₩50,000~" 표시용.
+  // OPTION_PARENT 자체 sellingPrice 는 0 placeholder 라 옵션값이 매핑한 SKU 들의 sellingPrice 중 최소.
+  const optionParentIds = productsWithUnitCost
+    .filter((p) => p.productType === "OPTION_PARENT")
+    .map((p) => p.id);
+  const minOptionPriceById = new Map<string, number>();
+  if (optionParentIds.length > 0) {
+    const optionValues = await prisma.productOptionValue.findMany({
+      where: {
+        isActive: true,
+        mappedMode: "SWAP",
+        mappedProductId: { not: null },
+        option: {
+          isActive: true,
+          productId: { in: optionParentIds },
+        },
+      },
+      select: {
+        option: { select: { productId: true } },
+        mappedProduct: { select: { sellingPrice: true } },
+      },
+    });
+    for (const ov of optionValues) {
+      const parentId = ov.option.productId;
+      const price = Number(ov.mappedProduct?.sellingPrice ?? 0);
+      if (price <= 0) continue;
+      const cur = minOptionPriceById.get(parentId);
+      if (cur === undefined || price < cur) {
+        minOptionPriceById.set(parentId, price);
+      }
+    }
+  }
+  const enrichedProducts = productsWithUnitCost.map((p) => ({
+    ...p,
+    minOptionPrice: minOptionPriceById.get(p.id) ?? null,
+  }));
+
+  return NextResponse.json(enrichedProducts);
 }
 
 export async function POST(request: NextRequest) {
@@ -272,6 +316,8 @@ export async function POST(request: NextRequest) {
 
     // 2. 판매 SKU 생성
     const containerSize = data.containerSize ? parseFloat(data.containerSize) : null;
+    // OPTION_PARENT — 자체 재고/가격 없음. sellingPrice/listPrice 강제 0, inventory 안 만듦.
+    const isOptionParent = data.productType === "OPTION_PARENT";
     return tx.product.create({
       data: {
         name: data.name,
@@ -285,8 +331,8 @@ export async function POST(request: NextRequest) {
         productType: data.productType,
         taxType: data.taxType,
         taxRate: parseFloat(data.taxRate),
-        listPrice: parseFloat(data.listPrice ?? data.sellingPrice),
-        sellingPrice: parseFloat(data.sellingPrice),
+        listPrice: isOptionParent ? 0 : parseFloat(data.listPrice ?? data.sellingPrice),
+        sellingPrice: isOptionParent ? 0 : parseFloat(data.sellingPrice),
         isSet,
         isCanonical: data.isCanonical ?? false,
         canonicalProductId: data.canonicalProductId || null,
@@ -294,12 +340,13 @@ export async function POST(request: NextRequest) {
         bulkProductId: resolvedBulkProductId,
         memo: data.memo || null,
         categoryId: data.categoryId || null,
-        assemblyTemplateId: data.assemblyTemplateId || null,
+        assemblyTemplateId: isOptionParent ? null : data.assemblyTemplateId || null,
         zeroRateEligible: data.zeroRateEligible ?? false,
         trackable: data.trackable ?? false,
         warrantyMonths: data.warrantyMonths ?? null,
-        inventory: data.isCanonical
-          ? undefined  // canonical은 자체 재고를 갖지 않음
+        catalogHidden: data.catalogHidden ?? false,
+        inventory: data.isCanonical || isOptionParent
+          ? undefined // canonical / OPTION_PARENT 는 자체 재고 없음
           : { create: { quantity: 0, safetyStock: 1 } },
       },
     });

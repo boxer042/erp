@@ -13,12 +13,14 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type");
   const status = searchParams.get("status");
   const search = searchParams.get("search") || "";
+  const customerId = searchParams.get("customerId");
 
   const where: Prisma.QuotationWhereInput = {
     ...(type ? { type: type as "SALES" | "PURCHASE" } : {}),
     ...(status
       ? { status: status as "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CONVERTED" }
       : {}),
+    ...(customerId ? { customerId } : {}),
     ...(search
       ? {
           OR: [

@@ -104,6 +104,7 @@ export async function PATCH(
               isActive: v.isActive,
               mappedProductId: v.mappedProductId ?? null,
               mappedVariantId: v.mappedVariantId ?? null,
+              mappedMode: v.mappedMode,
             },
           });
         } else {
@@ -116,6 +117,7 @@ export async function PATCH(
               isActive: v.isActive,
               mappedProductId: v.mappedProductId ?? null,
               mappedVariantId: v.mappedVariantId ?? null,
+              mappedMode: v.mappedMode,
             },
           });
         }
@@ -144,7 +146,7 @@ export async function PATCH(
         where: { isActive: true },
         orderBy: { sortOrder: "asc" },
         include: {
-          mappedProduct: { select: { id: true, name: true, sku: true } },
+          mappedProduct: { select: { id: true, name: true, sku: true, sellingPrice: true, listPrice: true, taxType: true } },
           mappedVariant: { select: { id: true, name: true, sku: true } },
         },
       },

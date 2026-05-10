@@ -21,9 +21,13 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
   const taxFree = product.taxType === "TAX_FREE";
   const autoNoPrice =
     product.autoMapped && (parseFloat(product.sellingPrice) || 0) === 0;
+  const isOptionParent = product.productType === "OPTION_PARENT";
 
   // 카탈로그 표시는 VAT 포함 (POS 사장님이 손님에게 청구할 금액 기준).
-  const sellingNet = parseFloat(product.sellingPrice) || 0;
+  // OPTION_PARENT 는 자체 sellingPrice 가 0 placeholder 라 옵션 SWAP 최저가 사용.
+  const sellingNet = isOptionParent
+    ? Number(product.minOptionPrice ?? 0)
+    : parseFloat(product.sellingPrice) || 0;
   const displayPrice = taxFree ? sellingNet : Math.round(sellingNet * 1.1);
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -117,6 +121,9 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
           ) : (
             <>
               ₩{displayPrice.toLocaleString("ko-KR")}
+              {isOptionParent && (
+                <span className="ml-0.5 text-[var(--jm-text-muted)]">~</span>
+              )}
               {!taxFree && (
                 <span className="ml-1 text-[10px] font-normal text-[var(--jm-text-subtle)]">
                   VAT 포함
