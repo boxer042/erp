@@ -38,6 +38,9 @@ export type OrderClaimReason =
 
 export type FulfillmentType = "PICKUP" | "DELIVERY" | "SHIPPING";
 
+/** OrderItem 라인 역할 — 메인/옵션/추가구매 분기 */
+export type OrderItemLineRole = "MAIN" | "OPTION_REF" | "ADDON";
+
 export type BoardGroupKey =
   | "overdue"
   | "today"
@@ -63,6 +66,8 @@ export interface OrderListItem {
   commissionAmount: string;
   paymentMethod: string | null;
   paymentStatus: OrderPaymentStatus;
+  /** 출고 회차 — partial_ship/ship 누적. ≥2 면 분할 발송 이력 (SHIPPED/COMPLETED 시 표시) */
+  shipmentCount: number;
   claimType: OrderClaimType | null;
   /** 이 주문이 다른 주문의 교환 새 주문인지 식별 (-EX 색·배지 분기용) */
   exchangedFromOrders?: Array<{ id: string }>;
@@ -72,11 +77,128 @@ export interface OrderListItem {
   items: Array<{
     id: string;
     quantity: string;
-    product: { name: string } | null;
+    shippedQty: string;
+    returnedQty: string;
+    unitPrice: string;
+    totalPrice: string;
+    /** 라인 역할 — MAIN(기본) / OPTION_REF(메인의 옵션) / ADDON(추가구매) */
+    lineRole: OrderItemLineRole;
+    /** 부모 라인 link (OPTION_REF/ADDON 일 때 메인 OrderItem.id 가리킴) */
+    parentItemId: string | null;
+    /** 주문 시점 옵션값 스냅샷 — { "메모리": "32GB" } */
+    optionSnapshot: Record<string, string> | null;
+    product: { name: string; sku: string } | null;
     serviceName: string | null;
   }>;
   _count: { items: number };
+  /** 부분 출고/반품 진행 상태 — 항목 전체 합계 (분할 발송 이력 표시용 — 첫 행) */
+  partialState: {
+    totalQty: number;
+    shippedQty: number;
+    returnedQty: number;
+  };
 }
+
+/**
+ * 품목별 행 워크보드의 1 row 단위.
+ * Order 의 items 를 평탄화 + 그룹 메타 부착.
+ *
+ *  - isFirstInGroup: 같은 order 의 첫 번째 행 (주문번호·고객·채널 등 표시 위치)
+ *  - groupSize: 같은 order 안의 총 item 행 수 (첫 행 강조용)
+ *  - groupIndex: 0-based 위치 — 좌측 indent border 그라데이션 등에 활용 가능
+ */
+export interface OrderItemRow {
+  rowKey: string; // `${orderId}:${itemId}`
+  order: OrderListItem;
+  item: OrderListItem["items"][number];
+  isFirstInGroup: boolean;
+  groupSize: number;
+  groupIndex: number;
+}
+
+/** item-level 처리 상태 — Order.status + item.shippedQty/returnedQty 로 derive */
+export type ItemPhase =
+  | "WAITING_SHIP" // 발송 대기 (PREPARING/PREPARING_PACKED + shippedQty=0)
+  | "PARTIAL_SHIP" // 부분 발송 (출고 단계 + 0 < shippedQty < quantity)
+  | "FULLY_SHIPPED" // 발송 완료 (라인은 다 보냈지만 다른 라인 진행 중)
+  | "DELIVERED" // 배송 완료 (전체 COMPLETED)
+  | "RETURNING" // 반품 진행 중 (RETURN_REQUESTED~INSPECTED)
+  | "RETURNED_LINE" // 라인 반품 완료 (returnedQty == quantity)
+  | "PARTIAL_RETURN" // 부분 반품 (0 < returnedQty < quantity)
+  | "EXCHANGED_LINE" // 라인 교환 완료
+  | "CANCELLED_LINE" // 주문 취소
+  | "PENDING_LINE"; // PENDING — 출고 대기 진입 전
+
+/**
+ * order.status + 라인 수량으로 item-level 단계 산출.
+ *
+ *  진행 단계의 의도:
+ *   - 같은 주문이라도 라인마다 진행률이 달라 라인 단위 라벨 필요.
+ *   - 예: PREPARING 인데 라인 A 는 100% 발송됨, B 는 0% → A=FULLY_SHIPPED, B=WAITING_SHIP
+ */
+export function deriveItemPhase(
+  status: OrderStatus,
+  quantity: number,
+  shippedQty: number,
+  returnedQty: number,
+): ItemPhase {
+  if (status === "CANCELLED") return "CANCELLED_LINE";
+  if (status === "PENDING") return "PENDING_LINE";
+
+  // 출고 단계 — shippedQty 로 라인 단계 분기
+  if (
+    status === "PREPARING" ||
+    status === "PREPARING_PACKED" ||
+    status === "SHIPPED"
+  ) {
+    if (shippedQty <= 0) return "WAITING_SHIP";
+    if (shippedQty < quantity - 0.0001) return "PARTIAL_SHIP";
+    return "FULLY_SHIPPED";
+  }
+
+  // 배송 완료 + 부분 반품 — 라인 단계 분기
+  if (status === "COMPLETED") {
+    if (returnedQty <= 0) return "DELIVERED";
+    if (returnedQty < quantity - 0.0001) return "PARTIAL_RETURN";
+    return "RETURNED_LINE";
+  }
+
+  // 반품 진행 단계 — 라인이 반품 대상인지(returnedQty>0이거나 시작 안 됨)
+  if (
+    status === "RETURN_REQUESTED" ||
+    status === "RETURN_ACCEPTED" ||
+    status === "RETURN_COLLECTED" ||
+    status === "RETURN_INSPECTED"
+  ) {
+    return "RETURNING";
+  }
+
+  if (status === "RETURNED") {
+    if (returnedQty <= 0) return "DELIVERED"; // 다른 라인만 반품된 경우
+    if (returnedQty < quantity - 0.0001) return "PARTIAL_RETURN";
+    return "RETURNED_LINE";
+  }
+
+  if (status === "EXCHANGED") {
+    if (returnedQty <= 0) return "DELIVERED";
+    return "EXCHANGED_LINE";
+  }
+
+  return "WAITING_SHIP";
+}
+
+export const ITEM_PHASE_LABELS: Record<ItemPhase, string> = {
+  WAITING_SHIP: "발송대기",
+  PARTIAL_SHIP: "부분발송",
+  FULLY_SHIPPED: "발송완료",
+  DELIVERED: "배송완료",
+  RETURNING: "반품진행",
+  RETURNED_LINE: "반품완료",
+  PARTIAL_RETURN: "부분반품",
+  EXCHANGED_LINE: "교환완료",
+  CANCELLED_LINE: "취소",
+  PENDING_LINE: "접수",
+};
 
 export interface ChannelOption {
   id: string;

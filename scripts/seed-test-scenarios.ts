@@ -33,6 +33,7 @@ async function main() {
 
   if (RESET) {
     console.log("  → 기존 SEED- 데이터 삭제");
+    // Shipment / ShipmentItem 은 Order CASCADE 로 자동 삭제됨 — 별도 처리 불필요
     await prisma.orderItem.deleteMany({
       where: { order: { orderNo: { startsWith: PREFIX } } },
     });
@@ -47,6 +48,13 @@ async function main() {
     });
     await prisma.channelProductMapping.deleteMany({
       where: { channelSku: { startsWith: PREFIX } },
+    });
+    // 인벤토리·로트는 product 보다 먼저 삭제 (FK 제약)
+    await prisma.inventory.deleteMany({
+      where: { product: { sku: { startsWith: PREFIX } } },
+    });
+    await prisma.inventoryLot.deleteMany({
+      where: { product: { sku: { startsWith: PREFIX } } },
     });
     await prisma.product.deleteMany({
       where: { sku: { startsWith: PREFIX } },
@@ -164,6 +172,50 @@ async function main() {
   });
   console.log(`  ✓ 매핑 2개 (단일 + 다중)`);
 
+  // 4-b) 고객 옵션 (ProductOption) — 가습기에 색상 + 필터(Product 매핑) 옵션 등록
+  // 기존 옵션 cleanup (cascade 안 되는 별도 모델)
+  await prisma.productOption.deleteMany({
+    where: { productId: products[0].id },
+  });
+  await prisma.productOption.create({
+    data: {
+      productId: products[0].id,
+      name: "색상",
+      required: true,
+      sortOrder: 0,
+      isActive: true,
+      values: {
+        create: [
+          { label: "화이트", addPrice: 0, sortOrder: 0, isActive: true },
+          { label: "블랙", addPrice: 1000, sortOrder: 1, isActive: true },
+        ],
+      },
+    },
+  });
+  await prisma.productOption.create({
+    data: {
+      productId: products[0].id,
+      name: "필터 추가",
+      required: false,
+      sortOrder: 1,
+      isActive: true,
+      values: {
+        create: [
+          { label: "없음", addPrice: 0, sortOrder: 0, isActive: true },
+          // 다른 Product 매핑 — 결제 시 OPTION_REF 자식 라인 자동 생성
+          {
+            label: "교체용 필터 추가",
+            addPrice: 0, // mappedProduct.sellingPrice 기준
+            mappedProductId: products[1].id,
+            sortOrder: 1,
+            isActive: true,
+          },
+        ],
+      },
+    },
+  });
+  console.log(`  ✓ 가습기 옵션 2종 (색상 단순 / 필터 Product 매핑)`);
+
   // 5) 고객 2명 (개인·기업)
   const customerIndiv = await prisma.customer.upsert({
     where: { id: `${PREFIX}-CUST-INDIV` }, // 가짜 id 검색 — 없으면 create
@@ -222,6 +274,12 @@ async function main() {
     shippedQty?: number;
     returnedQty?: number;
     refundedAmount?: number;
+    /** 라인 역할 — 기본 MAIN. OPTION_REF 는 메인의 옵션 매핑, ADDON 은 추가구매 */
+    lineRole?: "MAIN" | "OPTION_REF" | "ADDON";
+    /** 부모 라인의 인덱스 (같은 spec.items 안에서) — 0=첫 라인 */
+    parentItemIndex?: number;
+    /** 주문 시점 옵션값 스냅샷 — { "메모리": "32GB" } */
+    optionSnapshot?: Record<string, string>;
   };
   async function createOrder(spec: {
     label: string;
@@ -244,6 +302,7 @@ async function main() {
     returnRejectedAt?: Date | null;
     exchangedAt?: Date | null;
     exchangeOrderId?: string | null;
+    shipmentCount?: number;
     memo?: string;
   }) {
     const subtotal = spec.items.reduce(
@@ -309,21 +368,39 @@ async function main() {
         returnRejectedAt: spec.returnRejectedAt ?? null,
         exchangedAt: spec.exchangedAt ?? null,
         exchangeOrderId: spec.exchangeOrderId ?? null,
+        shipmentCount: spec.shipmentCount ?? 0,
         memo: spec.memo ?? `[${spec.label}]`,
         createdById: admin.id,
-        items: {
-          create: spec.items.map((it) => ({
-            productId: it.productId,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            totalPrice: it.quantity * it.unitPrice,
-            shippedQty: it.shippedQty ?? 0,
-            returnedQty: it.returnedQty ?? 0,
-            refundedAmount: it.refundedAmount ?? 0,
-          })),
-        },
+        // items 는 아래에서 순차 생성 (parentItemId 매핑 보장 위해)
       },
     });
+
+    // OrderItem 순차 생성 — index 기반 parentItemId 매핑
+    const createdItemIds: string[] = [];
+    for (let i = 0; i < spec.items.length; i++) {
+      const it = spec.items[i];
+      const parentId =
+        typeof it.parentItemIndex === "number"
+          ? createdItemIds[it.parentItemIndex] ?? null
+          : null;
+      const created = await prisma.orderItem.create({
+        data: {
+          orderId: o.id,
+          productId: it.productId,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.quantity * it.unitPrice,
+          shippedQty: it.shippedQty ?? 0,
+          returnedQty: it.returnedQty ?? 0,
+          refundedAmount: it.refundedAmount ?? 0,
+          lineRole: (it.lineRole ?? "MAIN") as never,
+          parentItemId: parentId,
+          optionSnapshot: it.optionSnapshot ?? null,
+        },
+      });
+      createdItemIds.push(created.id);
+    }
+
     console.log(`    + ${orderNo} ${spec.label}`);
     return o;
   }
@@ -366,7 +443,7 @@ async function main() {
   });
 
   // 시나리오 4: PREPARING_PACKED 출고확정 + 부분 발송
-  // shippedQty=1, quantity=3 → 잔여 2개
+  // shippedQty=1, quantity=3 → 잔여 2개. 1회차 partial_ship 완료 상태 → shipmentCount=1
   await createOrder({
     label: "PREPARING_PACKED 출고확정 + 부분 발송 (1/3)",
     status: "PREPARING_PACKED",
@@ -376,6 +453,7 @@ async function main() {
     expectedShipDate: dayOffset(-1), // 지연
     trackingCarrier: "CJ대한통운",
     trackingNumber: "1234567890",
+    shipmentCount: 1,
     items: [
       {
         productId: products[3].id,
@@ -386,7 +464,7 @@ async function main() {
     ],
   });
 
-  // 시나리오 5: SHIPPED 배송중
+  // 시나리오 5: SHIPPED 배송중 (단일 발송 — 분할 표시 없음)
   await createOrder({
     label: "SHIPPED 배송중",
     status: "SHIPPED",
@@ -396,6 +474,7 @@ async function main() {
     expectedShipDate: dayOffset(-2),
     trackingCarrier: "CJ대한통운",
     trackingNumber: "9999000011",
+    shipmentCount: 1,
     items: [
       {
         productId: products[0].id,
@@ -405,6 +484,55 @@ async function main() {
       },
     ],
   });
+
+  // 시나리오 5b: SHIPPED 배송중 — 분할 발송 (1차 송장 + 2차 송장 따로). 4개 중 2+2 분할
+  const seed5b = await createOrder({
+    label: "SHIPPED 배송중 (분할 2회 — 송장 따로)",
+    status: "SHIPPED",
+    paymentStatus: "PAID",
+    paymentMethod: "CARD",
+    customerId: customerIndiv.id,
+    expectedShipDate: dayOffset(-1),
+    trackingCarrier: "한진택배", // 마지막(2차) 송장 캐시
+    trackingNumber: "5566778899",
+    shipmentCount: 2,
+    items: [
+      {
+        productId: products[1].id,
+        quantity: 4,
+        unitPrice: 12000,
+        shippedQty: 4,
+      },
+    ],
+  });
+  // 1차·2차 Shipment 레코드 생성 — 각 회차마다 다른 송장번호로
+  const seed5bItem = await prisma.orderItem.findFirst({
+    where: { orderId: seed5b.id },
+  });
+  if (seed5bItem) {
+    await prisma.shipment.create({
+      data: {
+        orderId: seed5b.id,
+        shipmentNo: 1,
+        trackingCarrier: "CJ대한통운",
+        trackingNumber: "1111222233",
+        shippedAt: dayOffset(-3),
+        memo: "재고 있던 2개 먼저 발송",
+        items: { create: [{ orderItemId: seed5bItem.id, quantity: 2 }] },
+      },
+    });
+    await prisma.shipment.create({
+      data: {
+        orderId: seed5b.id,
+        shipmentNo: 2,
+        trackingCarrier: "한진택배",
+        trackingNumber: "5566778899",
+        shippedAt: dayOffset(-1),
+        memo: "재입고 후 잔여 2개 발송",
+        items: { create: [{ orderItemId: seed5bItem.id, quantity: 2 }] },
+      },
+    });
+  }
 
   // 시나리오 6: COMPLETED 배송완료
   await createOrder({
@@ -602,6 +730,93 @@ async function main() {
     paymentMethod: "CARD",
     customerId: customerIndiv.id,
     items: [{ productId: products[1].id, quantity: 2, unitPrice: 12000 }],
+  });
+
+  // 시나리오 14: 다중 품목 카트 — 라인마다 진행률이 다른 케이스 (네이버 스타일 검증)
+  // PREPARING_PACKED 상태에서 A 라인 100% 발송 + B 라인 0% + C 라인 50%
+  await createOrder({
+    label: "PREPARING_PACKED 다중 품목 (A:full / B:wait / C:half)",
+    status: "PREPARING_PACKED",
+    paymentStatus: "PAID",
+    paymentMethod: "CARD",
+    customerId: customerCorp.id,
+    expectedShipDate: today,
+    trackingCarrier: "롯데택배",
+    trackingNumber: "AB-1234-5678",
+    shipmentCount: 2,
+    items: [
+      {
+        productId: products[0].id,
+        quantity: 1,
+        unitPrice: 50000,
+        shippedQty: 1, // A 라인 — 전량 발송됨
+      },
+      {
+        productId: products[2].id,
+        quantity: 3,
+        unitPrice: 18000,
+        shippedQty: 0, // B 라인 — 발송 대기
+      },
+      {
+        productId: products[3].id,
+        quantity: 4,
+        unitPrice: 25000,
+        shippedQty: 2, // C 라인 — 부분 발송
+      },
+    ],
+  });
+
+  // 시나리오 15: 다중 품목 + 부분 반품 — COMPLETED 후 일부 라인만 반품
+  await createOrder({
+    label: "COMPLETED 다중 품목 + B 라인만 부분반품 (1/2)",
+    status: "COMPLETED",
+    paymentStatus: "PARTIAL_REFUND",
+    paymentMethod: "CARD",
+    customerId: customerIndiv.id,
+    items: [
+      {
+        productId: products[1].id,
+        quantity: 5,
+        unitPrice: 12000,
+        shippedQty: 5, // A — 정상
+      },
+      {
+        productId: products[3].id,
+        quantity: 2,
+        unitPrice: 25000,
+        shippedQty: 2,
+        returnedQty: 1, // B — 1개 반품
+        refundedAmount: 25000,
+      },
+    ],
+  });
+
+  // 시나리오 17: 옵션 OPTION_REF — 메인 + 옵션값이 다른 Product 매핑
+  // (예: 가습기 + 메모리 옵션 32GB / 추가 부속)
+  // optionSnapshot 으로 옵션값 보존, lineRole=OPTION_REF, parentItemIndex=0 (메인 link)
+  await createOrder({
+    label: "옵션 매핑 — 메인 + OPTION_REF (메모리 32GB)",
+    status: "PREPARING",
+    paymentStatus: "PAID",
+    paymentMethod: "CARD",
+    customerId: customerCorp.id,
+    expectedShipDate: dayOffset(1),
+    items: [
+      {
+        productId: products[0].id, // 메인 (테스트 가습기)
+        quantity: 1,
+        unitPrice: 50000,
+        lineRole: "MAIN",
+        optionSnapshot: { 색상: "화이트" },
+      },
+      {
+        productId: products[1].id, // 옵션 매핑 (메모리·필터 같은 부속)
+        quantity: 1,
+        unitPrice: 12000,
+        lineRole: "OPTION_REF",
+        parentItemIndex: 0, // 위 메인 라인 link
+      },
+    ],
   });
 
   // 7) 보류 큐 1건 — 매핑 안 된 SKU

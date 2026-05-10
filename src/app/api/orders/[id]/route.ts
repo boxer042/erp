@@ -77,6 +77,19 @@ export async function GET(
           },
         },
       },
+      // 분할 송장 — 회차별 발송 이력 (shipmentNo 순). 라인별 발송 수량 함께
+      shipments: {
+        orderBy: { shipmentNo: "asc" },
+        include: {
+          items: {
+            select: {
+              id: true,
+              orderItemId: true,
+              quantity: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -321,8 +334,39 @@ export async function PUT(
       const newStatus = allFullyShipped ? "SHIPPED" : order.status;
       const u = await tx.order.update({
         where: { id },
-        data: { status: newStatus, ...trackingPatch },
+        data: {
+          status: newStatus,
+          ...trackingPatch,
+          shipmentCount: { increment: 1 },
+        },
       });
+
+      // Shipment 회차 생성 — 이 회차에 발송한 ShipmentItem 도 함께. shipmentNo = 기존+1
+      const nextShipmentNo = (order.shipmentCount ?? 0) + 1;
+      const carrierForShipment =
+        typeof body.trackingCarrier === "string"
+          ? body.trackingCarrier || null
+          : (order.trackingCarrier ?? null);
+      const trackingForShipment =
+        typeof body.trackingNumber === "string"
+          ? body.trackingNumber || null
+          : (order.trackingNumber ?? null);
+      await tx.shipment.create({
+        data: {
+          orderId: id,
+          shipmentNo: nextShipmentNo,
+          trackingCarrier: carrierForShipment,
+          trackingNumber: trackingForShipment,
+          shippedAt: new Date(),
+          items: {
+            create: ships.map((s) => ({
+              orderItemId: s.orderItemId,
+              quantity: s.shipQty,
+            })),
+          },
+        },
+      });
+
       await recordAudit(tx, {
         userId: auditUserShip?.id ?? null,
         entity: "Order",
@@ -334,6 +378,7 @@ export async function PUT(
           action: "partial_ship",
           orderNo: order.orderNo,
           ships,
+          shipmentNo: nextShipmentNo,
           fullyShipped: allFullyShipped,
         },
       });
@@ -1550,7 +1595,11 @@ export async function PUT(
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.order.update({
       where: { id },
-      data: { status: transition.to as never, ...trackingPatch },
+      data: {
+        status: transition.to as never,
+        ...trackingPatch,
+        ...(action === "ship" ? { shipmentCount: { increment: 1 } } : {}),
+      },
     });
     // ship 액션 (전체 발송) — 모든 OrderItem.shippedQty = quantity 로 set.
     // 부분 출고 후에도 ship 호출하면 잔여까지 모두 발송 처리.
@@ -1563,6 +1612,42 @@ export async function PUT(
           }),
         ),
       );
+
+      // Shipment 회차 생성 — 잔여 수량 (quantity - shippedQty) 만 ShipmentItem 으로
+      const nextShipmentNo = (order.shipmentCount ?? 0) + 1;
+      const remaining = order.items
+        .map((it) => ({
+          orderItemId: it.id,
+          remainingQty: Number(it.quantity) - Number(it.shippedQty),
+        }))
+        .filter((r) => r.remainingQty > 0.0001);
+
+      // 잔여가 0 이어도 (이미 모두 발송됨에도 ship 호출) Shipment 비어있는 회차로 생성하지 않음
+      if (remaining.length > 0) {
+        const carrierForShipment =
+          typeof body.trackingCarrier === "string"
+            ? body.trackingCarrier || null
+            : (order.trackingCarrier ?? null);
+        const trackingForShipment =
+          typeof body.trackingNumber === "string"
+            ? body.trackingNumber || null
+            : (order.trackingNumber ?? null);
+        await tx.shipment.create({
+          data: {
+            orderId: id,
+            shipmentNo: nextShipmentNo,
+            trackingCarrier: carrierForShipment,
+            trackingNumber: trackingForShipment,
+            shippedAt: new Date(),
+            items: {
+              create: remaining.map((r) => ({
+                orderItemId: r.orderItemId,
+                quantity: r.remainingQty,
+              })),
+            },
+          },
+        });
+      }
     }
     await recordAudit(tx, {
       userId: auditUserShip?.id ?? null,

@@ -4,7 +4,12 @@ import { ArrowLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { JmBadge, JmCard, JmCardContent, JmCardHeader, JmCardTitle } from "@/jm";
-import { StatusBadge, StatusFlowGuide } from "../_parts";
+import {
+  PartialProgress,
+  ShipmentSummaryChip,
+  StatusBadge,
+  StatusFlowGuide,
+} from "../_parts";
 import type { OrderClaimType } from "../_types";
 
 /**
@@ -36,6 +41,8 @@ export default function OrderHelpPage() {
         <Toc />
         <SectionOverview />
         <SectionShipping />
+        <SectionPartial />
+        <SectionOptions />
         <SectionRefund />
         <SectionExchange />
         <SectionPayment />
@@ -52,11 +59,13 @@ function Toc() {
   const items = [
     { href: "#overview", label: "1. 개요 — 3축 모델" },
     { href: "#shipping", label: "2. 출고 흐름 (5단계)" },
-    { href: "#refund", label: "3. 반품 흐름 (5단계)" },
-    { href: "#exchange", label: "4. 교환 흐름 + 새 주문" },
-    { href: "#payment", label: "5. 결제 상태 (paymentStatus)" },
-    { href: "#cancel", label: "6. 취소 흐름" },
-    { href: "#pitfalls", label: "7. 자주 헷갈리는 포인트" },
+    { href: "#partial", label: "3. 부분 처리 / 분할 발송 정책" },
+    { href: "#options", label: "4. 옵션 도메인 — 변형상품과 분리" },
+    { href: "#refund", label: "5. 반품 흐름 (5단계)" },
+    { href: "#exchange", label: "6. 교환 흐름 + 새 주문" },
+    { href: "#payment", label: "7. 결제 상태 (paymentStatus)" },
+    { href: "#cancel", label: "8. 취소 흐름" },
+    { href: "#pitfalls", label: "9. 자주 헷갈리는 포인트" },
   ];
   return (
     <JmCard>
@@ -248,11 +257,298 @@ function SectionShipping() {
   );
 }
 
-// ─────────── 3. 반품 흐름
+// ─────────── 3. 부분 처리 / 분할 발송 정책
+
+function SectionPartial() {
+  return (
+    <Section id="partial" title="3. 부분 처리 / 분할 발송 정책">
+      <p>
+        한 주문에 여러 품목·수량이 있을 때 매장은{" "}
+        <strong>일부만 먼저 처리</strong>할 수 있습니다. 출고·반품·교환 모두 부분
+        처리가 가능하며, 워크보드에 진행 상황이 progress bar 로 표시됩니다.
+      </p>
+
+      <div className="mt-3 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+        <p className="mb-2 text-[12px] font-medium text-[var(--jm-text-subtle)]">
+          진행 중 progress bar — 고객/항목 셀에 표시
+        </p>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-3 text-[12px]">
+            <span className="w-[110px] text-[var(--jm-text-muted)]">출고 진행</span>
+            <PartialProgress
+              status="PREPARING"
+              totalQty={3}
+              shippedQty={1}
+              returnedQty={0}
+            />
+          </div>
+          <div className="flex items-center gap-3 text-[12px]">
+            <span className="w-[110px] text-[var(--jm-text-muted)]">반품 진행</span>
+            <PartialProgress
+              status="COMPLETED"
+              totalQty={5}
+              shippedQty={5}
+              returnedQty={1}
+            />
+          </div>
+          <div className="flex items-center gap-3 text-[12px]">
+            <span className="w-[110px] text-[var(--jm-text-muted)]">분할 발송 이력</span>
+            <ShipmentSummaryChip shipmentCount={2} status="SHIPPED" />
+          </div>
+        </div>
+      </div>
+
+      <h3 className="mt-5 text-[13px] font-semibold">
+        ⚠️ 시스템이 의미하는 "분할 발송"
+      </h3>
+      <p>
+        리스트의 <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">완료 N/N · 분할 N회</code>{" "}
+        표시는 <strong>주문이 몇 회차에 나눠 발송되었는지</strong>를 의미합니다.{" "}
+        다음 두 케이스를 모두 포함합니다:
+      </p>
+      <table className="mt-3 w-full table-fixed text-[13px]">
+        <thead>
+          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+            <th className="w-[120px] py-2">유형</th>
+            <th className="py-2">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 align-top font-medium">수량 분할</td>
+            <td className="py-2 align-top">
+              한 품목의 일부 수량 먼저 발송 → 잔여 추후 발송. 예: A품목 10개
+              주문 → 8개 먼저 + 2개 나중. 재고 입고 대기 등 매장 사정으로 흔히 발생
+            </td>
+          </tr>
+          <tr>
+            <td className="py-2 align-top font-medium">라인 분할</td>
+            <td className="py-2 align-top">
+              카트의 다른 품목을 별도 회차로 발송. 예: 카트{" "}
+              <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">[A:3, B:2]</code>{" "}
+              에서 A 먼저 + B 나중. 각 라인은 한 번에 다 보냈더라도 회차가 분리됨
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="mt-3 rounded-md border border-[var(--jm-warning-border)] bg-[var(--jm-warning-bg)] p-3 text-[12px] text-[var(--jm-warning-fg)]">
+        💡 <strong>왜 둘 다 "분할" 로 묶었나?</strong> 손님 입장에선 두 케이스 모두
+        "여러 박스가 따로 도착" 한 사실이 동일하고, 매장 입장에서도 "여러 번 송장
+        발급" 운영 부담이 같습니다. 따라서 <strong>주문 단위로 몇 번 발송했는가</strong>{" "}
+        를 단일 지표(<code>shipmentCount</code>) 로 추적합니다. 단일 회차(1회) 는
+        일반 발송으로 간주하고 노이즈를 줄이려 표시 생략.
+      </p>
+
+      <h3 className="mt-5 text-[13px] font-semibold">진행 중 표시 규칙</h3>
+      <ul className="space-y-1.5 text-[13px]">
+        <li>
+          <strong>출고 진행</strong> (info, 파랑) — 출고대기/출고확정/배송중에서 일부만
+          발송된 경우. <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">발송 N/M</code>{" "}
+          (M = 카트 내 모든 품목 quantity 합계)
+        </li>
+        <li>
+          <strong>반품 진행</strong> (warning, 노랑) — 배송완료에서 일부 품목만 반품
+          진행 중. <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">반품 N/M</code>
+        </li>
+        <li>
+          <strong>부분 종결</strong> (muted, 회색) — 반품완료/교환완료지만 일부만 처리되고
+          잔량은 정상 종결된 경우. 운영 메모용 표시
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-[13px] font-semibold">워크보드 행 단위 = 품목 (item)</h3>
+      <p>
+        같은 주문이라도 카트에 여러 품목이 있으면 <strong>품목마다 행이 분리</strong>되어
+        표시됩니다 (네이버 스마트스토어·쿠팡 WING 패턴). 같은 주문번호가 그룹화되어 첫
+        행에만 주문번호·고객·채널·결제 등 주문 단위 정보가 표시되고, 나머지 행은 좌측
+        세로 라인으로 그룹임을 표시합니다.
+      </p>
+      <ul className="mt-2 space-y-1.5 text-[13px]">
+        <li>
+          행 클릭 시 상세 시트가 열리며 클릭한 <strong>품목이 자동 강조 + 해당 위치로
+          스크롤</strong>됩니다
+        </li>
+        <li>
+          진행률 progress bar 는 이제 <strong>라인별</strong> (이 품목 내 quantity vs
+          shippedQty/returnedQty) — 같은 주문이라도 라인마다 다른 진행률 표시
+        </li>
+        <li>
+          상태 배지는 라인 단위 라벨 — 예: PREPARING 주문에서 A 라인 100% 발송 → "발송완료"
+          (success), B 라인 0% → "발송대기" (info)
+        </li>
+        <li>
+          분할 N회 칩 / 다음 액션 버튼은 order 단위 정보이므로 <strong>그룹 첫 행</strong>에만 표시
+        </li>
+        <li>
+          <strong>KPI 숫자 / 그룹 카운트는 주문 단위 유지</strong> — 행이 늘어났다고
+          카운트가 부풀지 않음
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-[13px] font-semibold">상세 시트에서의 부분 처리</h3>
+      <p>
+        상세 시트(행 클릭) 의 항목 카드에서{" "}
+        <strong>라인별 진행 상황</strong>을 확인하고, [부분 발송] / [부분 반품] /
+        [부분 교환] dialog 로 라인마다 처리할 수량을 입력합니다.
+      </p>
+
+      <h3 className="mt-5 text-[13px] font-semibold">
+        분할 송장 — 회차별 송장번호 보관
+      </h3>
+      <p>
+        한 주문이 <strong>여러 박스로 따로 발송</strong>될 때 (재고 입고 대기로 일부만
+        먼저 보낼 때, 다른 창고에서 발송할 때 등) 회차마다 다른 송장번호를 보관합니다.
+        한국 오픈마켓 (네이버·쿠팡·11번가·G마켓) 모두 같은 패턴.
+      </p>
+      <ul className="mt-2 space-y-1.5 text-[13px]">
+        <li>
+          [발송] 또는 [부분 발송] 액션 시 <strong>1차·2차·3차 회차 Shipment</strong> 가
+          자동 생성됨
+        </li>
+        <li>
+          각 회차마다 송장사·송장번호·발송시각·해당 라인+수량 보관
+        </li>
+        <li>
+          상세 시트의 <strong>"발송 이력" 카드</strong>에 회차별로 노출 — 1차 송장이
+          어떤 라인을 보냈는지, 2차는 어떤 라인을 보냈는지 추적 가능
+        </li>
+        <li>
+          외부 채널 자동 push 는 마지막(최신) 회차 송장 기준 (Phase 2 후 회차별 push 가능)
+        </li>
+      </ul>
+    </Section>
+  );
+}
+
+// ─────────── 4. 옵션 도메인
+
+function SectionOptions() {
+  return (
+    <Section id="options" title="4. 옵션 도메인 — 변형상품과 분리">
+      <p>
+        고객이 직접 선택하는 옵션 (색상·용량·메모리 등) 은{" "}
+        <strong>변형상품(매장 분기) 과 별도 도메인</strong>으로 모델링됩니다.
+      </p>
+
+      <h3 className="mt-4 text-[13px] font-semibold">개념 분리</h3>
+      <table className="mt-2 w-full table-fixed text-[13px]">
+        <thead>
+          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+            <th className="w-[100px] py-2"></th>
+            <th className="py-2">변형상품 (variant)</th>
+            <th className="py-2">고객 옵션 (ProductOption)</th>
+          </tr>
+        </thead>
+        <tbody className="text-[12px]">
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-medium">결정 주체</td>
+            <td className="py-2">매장 (출고 시점)</td>
+            <td className="py-2">고객 (카탈로그·POS)</td>
+          </tr>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-medium">노출</td>
+            <td className="py-2">canonical 만, variant 숨김</td>
+            <td className="py-2">옵션 슬롯·값 노출, 고객 선택 UI</td>
+          </tr>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-medium">실현 방식</td>
+            <td className="py-2">SetComponent + Assembly (조립 부속)</td>
+            <td className="py-2">옵션값마다 다른 처리 (3가지)</td>
+          </tr>
+          <tr>
+            <td className="py-2 font-medium">데이터 모델</td>
+            <td className="py-2">Product.canonicalProductId + variants</td>
+            <td className="py-2">ProductOption + ProductOptionValue</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 className="mt-5 text-[13px] font-semibold">옵션값 처리 방식 (3가지 모드)</h3>
+      <ul className="space-y-2 text-[13px]">
+        <li>
+          <strong>(A) 단순 텍스트</strong> — 색상·사이즈 같은 attribute. ProductOptionValue 가
+          단순 라벨만 가짐. 옵션 등록 시 시스템이 variant Product 자동 생성 (variant 자체
+          inventory 보유)
+        </li>
+        <li>
+          <strong>(B) 매장 variant 매핑</strong> (
+          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">
+            mappedVariantId
+          </code>
+          ) — 쿨러 교체 같은 부속 차이. 옵션값이 매장 variant 를 가리킴. SetComponent +
+          Assembly 인프라 그대로 활용
+        </li>
+        <li>
+          <strong>(C) 다른 Product 매핑</strong> (
+          <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5">
+            mappedProductId
+          </code>
+          ) — 메모리·SSD 같이 단독 판매도 되는 상품. 옵션값이 그 Product 를 가리킴 →
+          OrderItem 별도 라인 (lineRole=OPTION_REF, parentItemId=메인) 생성
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-[13px] font-semibold">OrderItem 라인 역할</h3>
+      <table className="mt-2 w-full table-fixed text-[13px]">
+        <thead>
+          <tr className="border-b border-[var(--jm-border)] text-left text-[12px] text-[var(--jm-text-muted)]">
+            <th className="w-[120px] py-2">lineRole</th>
+            <th className="py-2">의미</th>
+          </tr>
+        </thead>
+        <tbody className="text-[12px]">
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-mono">MAIN</td>
+            <td className="py-2">기본 라인. 일반 상품·variant 모두 여기. optionSnapshot 으로 옵션값 보존</td>
+          </tr>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-mono">OPTION_REF</td>
+            <td className="py-2">메인의 옵션이 다른 Product 매핑 (모드 C). parentItemId 가 메인 OrderItem 가리킴</td>
+          </tr>
+          <tr>
+            <td className="py-2 font-mono">ADDON</td>
+            <td className="py-2">추가구매 — 별도 추천 상품 (후속 도메인)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 className="mt-5 text-[13px] font-semibold">워크보드 시각 (D 안)</h3>
+      <ul className="space-y-1.5 text-[13px]">
+        <li>
+          <strong>옵션값</strong> — 상품명 옆에 부속 텍스트로 노출 (예: "가습기
+          (화이트 · L)"). 별도 배지 없음
+        </li>
+        <li>
+          <strong>OPTION_REF 라인</strong> — outline info 배지{" "}
+          <span className="inline-flex items-center rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-1 py-px text-[9px] font-medium text-[var(--jm-info-fg)]">
+            옵션
+          </span>
+        </li>
+        <li>
+          <strong>ADDON 라인</strong> — outline accent 배지{" "}
+          <span className="inline-flex items-center rounded-md border border-[var(--jm-accent-border)] bg-[var(--jm-accent-bg)] px-1 py-px text-[9px] font-medium text-[var(--jm-accent-fg)]">
+            추가구매
+          </span>{" "}
+          (후속)
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-[13px] font-semibold">재고 정합성</h3>
+      <p>
+        옵션값이 다른 Product 를 매핑(C 모드) 하면 그 Product 의 inventory 가 직접 차감되어
+        <strong> 단독 판매와 옵션 판매가 같은 재고 source</strong> 를 공유합니다 (이중 등록
+        방지). 매장 variant 매핑(B 모드) 은 기존 Assembly·SetComponent 인프라가 그대로
+        부속 재고를 추적합니다.
+      </p>
+    </Section>
+  );
+}
+
+// ─────────── 5. 반품 흐름
 
 function SectionRefund() {
   return (
-    <Section id="refund" title="3. 반품 흐름 (5단계)">
+    <Section id="refund" title="5. 반품 흐름 (5단계)">
       <p>
         손님이 반품 요청 → 매장 결정 → 회수 → 검수 → 종결. 색은{" "}
         <strong>노랑</strong> (warning) 톤으로 통일.
@@ -360,7 +656,7 @@ function SectionRefund() {
 
 function SectionExchange() {
   return (
-    <Section id="exchange" title="4. 교환 흐름 + 새 주문 (5단계 + 새 출고)">
+    <Section id="exchange" title="6. 교환 흐름 + 새 주문 (5단계 + 새 출고)">
       <p>
         반품 흐름과 단계는 같지만 종결이 다릅니다 — 환불 대신 <strong>새 주문 자동 생성</strong>.
         색은 <strong>보라</strong> (accent) 톤으로 통일되어 반품과 시각 분리.
@@ -450,7 +746,7 @@ function SectionExchange() {
 
 function SectionPayment() {
   return (
-    <Section id="payment" title="5. 결제 상태 (paymentStatus)">
+    <Section id="payment" title="7. 결제 상태 (paymentStatus)">
       <p>
         출고 축과 별개로 추적되는 <strong>결제 축</strong>. 외상 출고, 환불 진행,
         매출 취소 등을 표현.
@@ -519,7 +815,7 @@ function SectionPayment() {
 
 function SectionCancel() {
   return (
-    <Section id="cancel" title="6. 취소 흐름">
+    <Section id="cancel" title="8. 취소 흐름">
       <p>
         취소는 <strong>출고대기까지만</strong> 가능합니다. 출고확정(송장 발급) 이후엔
         취소 대신 <strong>반품 흐름</strong>으로 처리해야 합니다.
@@ -568,7 +864,7 @@ function SectionCancel() {
 
 function SectionPitfalls() {
   return (
-    <Section id="pitfalls" title="7. 자주 헷갈리는 포인트">
+    <Section id="pitfalls" title="9. 자주 헷갈리는 포인트">
       <Pitfall title='"출고대기" vs "출고확정" 차이'>
         출고대기 = 재고 차감만 됨 (포장 시작 가능). 출고확정 = 포장·송장 입력
         완료 (발송 직전). 매장이 두 번 클릭하는 건 운영 정확도 — 누가 언제 포장

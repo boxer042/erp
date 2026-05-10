@@ -37,6 +37,19 @@ export async function GET(request: NextRequest) {
             { orderNo: { contains: search, mode: "insensitive" } },
             { channelOrderNo: { contains: search, mode: "insensitive" } },
             { customerName: { contains: search, mode: "insensitive" } },
+            // 품목 단위 행에 맞춰 상품명/서비스명 검색도 포함
+            {
+              items: {
+                some: {
+                  product: { name: { contains: search, mode: "insensitive" } },
+                },
+              },
+            },
+            {
+              items: {
+                some: { serviceName: { contains: search, mode: "insensitive" } },
+              },
+            },
           ],
         }
       : {}),
@@ -77,10 +90,18 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           quantity: true,
-          product: { select: { name: true } },
+          shippedQty: true,
+          returnedQty: true,
+          unitPrice: true,
+          totalPrice: true,
+          lineRole: true,
+          parentItemId: true,
+          optionSnapshot: true,
+          product: { select: { name: true, sku: true } },
           serviceName: true,
         },
-        take: 3,
+        // 품목별 행 워크보드 — 모든 OrderItem 노출 (take 제거)
+        // MAIN 먼저, OPTION_REF/ADDON 자식 라인은 parentItemId 따라 정렬됨 (클라이언트 평탄화에서 처리)
       },
       _count: { select: { items: true } },
     },
@@ -94,22 +115,50 @@ export async function GET(request: NextRequest) {
         : { createdAt: "desc" },
   });
 
+  // 부분 출고/반품 표시용 — 항목 전체 합계 (items.take:3 한계 우회)
+  const orderIds = orders.map((o) => o.id);
+  const itemAggregates = orderIds.length
+    ? await prisma.orderItem.groupBy({
+        by: ["orderId"],
+        where: { orderId: { in: orderIds } },
+        _sum: { quantity: true, shippedQty: true, returnedQty: true },
+      })
+    : [];
+  const aggMap = new Map(
+    itemAggregates.map((a) => [
+      a.orderId,
+      {
+        totalQty: Number(a._sum.quantity ?? 0),
+        shippedQty: Number(a._sum.shippedQty ?? 0),
+        returnedQty: Number(a._sum.returnedQty ?? 0),
+      },
+    ]),
+  );
+  const ordersWithAgg = orders.map((o) => ({
+    ...o,
+    partialState: aggMap.get(o.id) ?? {
+      totalQty: 0,
+      shippedQty: 0,
+      returnedQty: 0,
+    },
+  }));
+
   if (view !== "board") {
-    return NextResponse.json(orders);
+    return NextResponse.json(ordersWithAgg);
   }
 
   // board view: 그룹화 + daysOverdue 계산. KST 기준 오늘 UTC 자정 Date 사용
   const today = getKrToday();
   const grouped = {
-    overdue: [] as typeof orders,
-    today: [] as typeof orders,
-    unscheduled: [] as typeof orders,
-    shipped: [] as typeof orders,
-    thisWeek: [] as typeof orders,
-    future: [] as typeof orders,
-    returnPending: [] as typeof orders,
+    overdue: [] as typeof ordersWithAgg,
+    today: [] as typeof ordersWithAgg,
+    unscheduled: [] as typeof ordersWithAgg,
+    shipped: [] as typeof ordersWithAgg,
+    thisWeek: [] as typeof ordersWithAgg,
+    future: [] as typeof ordersWithAgg,
+    returnPending: [] as typeof ordersWithAgg,
   };
-  for (const o of orders) {
+  for (const o of ordersWithAgg) {
     const group = classifyBoardGroup(o.status, o.expectedShipDate, today);
     if (!group) continue;
     grouped[group].push(o);
@@ -161,20 +210,91 @@ export async function POST(request: NextRequest) {
     : [];
   const taxTypeById = new Map(products.map((p) => [p.id, p.taxType]));
 
-  const items = data.items.map((item) => {
+  // 옵션 처리 — 모든 items 의 optionValueIds 일괄 조회
+  const allOptionValueIds = Array.from(
+    new Set(data.items.flatMap((i) => i.optionValueIds ?? [])),
+  );
+  const optionValues = allOptionValueIds.length
+    ? await prisma.productOptionValue.findMany({
+        where: { id: { in: allOptionValueIds } },
+        include: {
+          option: { select: { name: true } },
+          mappedProduct: { select: { id: true, taxType: true, sellingPrice: true, name: true } },
+        },
+      })
+    : [];
+  const optionValueMap = new Map(optionValues.map((v) => [v.id, v]));
+
+  // 메인 라인 + OPTION_REF 자식 라인 모두 평탄화. parentItemIndex 로 부모 link 표시.
+  type StagedItem = {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    lineRole: "MAIN" | "OPTION_REF";
+    parentItemIndex: number | null;
+    optionSnapshot: Record<string, string> | null;
+    _taxable: boolean;
+  };
+
+  const stagedItems: StagedItem[] = [];
+  for (const item of data.items) {
     const qty = parseFloat(item.quantity);
     const price = parseFloat(item.unitPrice);
-    return {
+
+    // 옵션값 처리 — 추가가 합산 + snapshot + OPTION_REF 자식 라인 후보
+    let unitAddPrice = 0;
+    const snapshot: Record<string, string> = {};
+    const addonRefs: typeof optionValues = [];
+    for (const optId of item.optionValueIds ?? []) {
+      const ov = optionValueMap.get(optId);
+      if (!ov) continue;
+      snapshot[ov.option.name] = ov.label;
+      unitAddPrice += Number(ov.addPrice);
+      // mappedProductId 가 있으면 OPTION_REF 자식 라인으로 분리 (메모리 케이스)
+      if (ov.mappedProductId && ov.mappedProduct) {
+        addonRefs.push(ov);
+      }
+    }
+
+    const finalUnitPrice = price + unitAddPrice;
+    const mainIdx = stagedItems.length;
+    stagedItems.push({
       productId: item.productId,
       quantity: qty,
-      unitPrice: price,
-      totalPrice: qty * price,
+      unitPrice: finalUnitPrice,
+      totalPrice: qty * finalUnitPrice,
+      lineRole: "MAIN",
+      parentItemIndex: null,
+      optionSnapshot: Object.keys(snapshot).length > 0 ? snapshot : null,
       _taxable: (taxTypeById.get(item.productId) ?? "TAXABLE") === "TAXABLE",
-    };
-  });
+    });
 
-  const subtotalAmount = items.reduce((sum, i) => sum + i.totalPrice, 0);
-  const taxableSubtotal = items
+    // OPTION_REF 자식 라인들 — mappedProduct 별도 OrderItem
+    for (const ref of addonRefs) {
+      const mp = ref.mappedProduct!;
+      const refUnit = Number(ref.addPrice) > 0
+        ? Number(ref.addPrice)
+        : Number(mp.sellingPrice ?? 0);
+      stagedItems.push({
+        productId: mp.id,
+        quantity: qty, // 메인 수량과 동일 (1 PC 사면 1 메모리)
+        unitPrice: refUnit,
+        totalPrice: qty * refUnit,
+        lineRole: "OPTION_REF",
+        parentItemIndex: mainIdx,
+        optionSnapshot: null,
+        _taxable: (mp.taxType ?? "TAXABLE") === "TAXABLE",
+      });
+      // OPTION_REF 의 unitPrice 가 메인 라인 unitPrice 에 이미 포함되지 않게 조정 —
+      // 정책: addPrice 는 메인 라인에서 빼고 별도 라인으로 옮김
+      stagedItems[mainIdx].unitPrice -= refUnit;
+      stagedItems[mainIdx].totalPrice = qty * stagedItems[mainIdx].unitPrice;
+    }
+  }
+
+  const subtotalAmount = stagedItems.reduce((sum, i) => sum + i.totalPrice, 0);
+  const taxableSubtotal = stagedItems
     .filter((i) => i._taxable)
     .reduce((sum, i) => sum + i.totalPrice, 0);
   const discountAmount = parseFloat(data.discountAmount || "0");
@@ -191,47 +311,74 @@ export async function POST(request: NextRequest) {
   // ERP 수동 등록은 PENDING 으로 시작 (재고 미차감 — prepare 액션에서 차감)
   const isPickup = data.fulfillmentType === "PICKUP";
   // paymentStatus 산출 — paymentMethod=UNPAID 또는 미입력은 외상, 그 외는 결제 완료.
-  // 결제 상태는 출고 상태와 별개의 축. 추후 부분환불/환불 액션에서 갱신.
   const paymentStatus =
     !data.paymentMethod || data.paymentMethod === "UNPAID" ? "UNPAID" : "PAID";
-  const order = await prisma.order.create({
-    data: {
-      orderNo: generateOrderNo(),
-      channelId: data.channelId || null,
-      channelOrderNo: data.channelOrderNo || null,
-      customerId: data.customerId || null,
-      customerName: data.customerName || null,
-      customerPhone: data.customerPhone || null,
-      recipientName: isPickup ? null : data.recipientName || null,
-      recipientPhone: isPickup ? null : data.recipientPhone || null,
-      shippingAddress: isPickup ? null : data.shippingAddress || null,
-      orderDate: new Date(data.orderDate),
-      fulfillmentType: data.fulfillmentType,
-      expectedShipDate:
-        isPickup || !data.expectedShipDate
-          ? null
-          : new Date(data.expectedShipDate),
-      paymentMethod: data.paymentMethod ?? null,
-      paymentStatus,
-      subtotalAmount,
-      discountAmount,
-      shippingFee,
-      taxAmount,
-      totalAmount,
-      commissionAmount,
-      memo: data.memo || null,
-      createdById: user.id,
-      items: {
-        create: items.map(({ _taxable, ...it }) => it),
+
+  // OrderItem 순차 생성 — parentItemIndex → parentItemId 매핑 보장
+  const order = await prisma.$transaction(async (tx) => {
+    const o = await tx.order.create({
+      data: {
+        orderNo: generateOrderNo(),
+        channelId: data.channelId || null,
+        channelOrderNo: data.channelOrderNo || null,
+        customerId: data.customerId || null,
+        customerName: data.customerName || null,
+        customerPhone: data.customerPhone || null,
+        recipientName: isPickup ? null : data.recipientName || null,
+        recipientPhone: isPickup ? null : data.recipientPhone || null,
+        shippingAddress: isPickup ? null : data.shippingAddress || null,
+        orderDate: new Date(data.orderDate),
+        fulfillmentType: data.fulfillmentType,
+        expectedShipDate:
+          isPickup || !data.expectedShipDate
+            ? null
+            : new Date(data.expectedShipDate),
+        paymentMethod: data.paymentMethod ?? null,
+        paymentStatus,
+        subtotalAmount,
+        discountAmount,
+        shippingFee,
+        taxAmount,
+        totalAmount,
+        commissionAmount,
+        memo: data.memo || null,
+        createdById: user.id,
       },
-    },
-    include: {
-      channel: { select: { name: true } },
-      items: {
-        include: { product: { select: { name: true, sku: true } } },
+    });
+
+    const createdIds: string[] = [];
+    for (const it of stagedItems) {
+      const parentId =
+        it.parentItemIndex !== null ? createdIds[it.parentItemIndex] ?? null : null;
+      const created = await tx.orderItem.create({
+        data: {
+          orderId: o.id,
+          productId: it.productId,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.totalPrice,
+          lineRole: it.lineRole as never,
+          parentItemId: parentId,
+          optionSnapshot: it.optionSnapshot ?? undefined,
+        },
+      });
+      createdIds.push(created.id);
+    }
+
+    return tx.order.findUnique({
+      where: { id: o.id },
+      include: {
+        channel: { select: { name: true } },
+        items: {
+          include: { product: { select: { name: true, sku: true } } },
+        },
       },
-    },
+    });
   });
+
+  if (!order) {
+    return NextResponse.json({ error: "주문 생성 실패" }, { status: 500 });
+  }
 
   // UNPAID 면 customerLedger SALE 기록 (POS checkout 과 동일 정책)
   if (data.paymentMethod === "UNPAID" && data.customerId) {
@@ -262,7 +409,7 @@ export async function POST(request: NextRequest) {
     meta: {
       orderNo: order.orderNo,
       totalAmount,
-      itemCount: items.length,
+      itemCount: stagedItems.length,
       paymentMethod: data.paymentMethod,
       channelId: data.channelId,
     },

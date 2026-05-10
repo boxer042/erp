@@ -3,6 +3,7 @@
 import { JmBadge, JmSkeleton } from "@/jm";
 import {
   ArrowLeftRight,
+  Check,
   ChevronRight,
   Clock,
   Globe,
@@ -17,9 +18,11 @@ import {
 } from "lucide-react";
 import {
   FULFILLMENT_LABELS,
+  ITEM_PHASE_LABELS,
   PAYMENT_STATUS_LABELS,
   statusLabel,
   type FulfillmentType,
+  type ItemPhase,
   type OrderClaimType,
   type OrderPaymentStatus,
   type OrderStatus,
@@ -100,6 +103,63 @@ export function resolveStatusVisual(
 }
 
 /**
+ * Item-level phase 별 시각 톤. order.status + line 수량으로 derive 한 ItemPhase 를
+ * 받아 색·아이콘 분기. 흐름별 색 정책은 StatusBadge 와 동일하게 통일.
+ */
+const ITEM_PHASE_VISUAL: Record<
+  ItemPhase,
+  {
+    variant: BadgeVariant;
+    icon: React.ComponentType<{ className?: string }> | null;
+  }
+> = {
+  PENDING_LINE: { variant: "info", icon: Clock },
+  WAITING_SHIP: { variant: "info", icon: Package },
+  PARTIAL_SHIP: { variant: "info", icon: Truck },
+  FULLY_SHIPPED: { variant: "success", icon: Check },
+  DELIVERED: { variant: "success", icon: PackageCheck },
+  RETURNING: { variant: "warning", icon: PackageOpen },
+  PARTIAL_RETURN: { variant: "warning", icon: RotateCcw },
+  RETURNED_LINE: { variant: "outline", icon: RotateCcw },
+  EXCHANGED_LINE: { variant: "outline", icon: ArrowLeftRight },
+  CANCELLED_LINE: { variant: "outline", icon: XCircle },
+};
+
+/**
+ * 라인 단계 배지 — 같은 주문이라도 라인마다 진행률이 다르면 다른 라벨이 노출됨.
+ *
+ * 예: 카트 [A:3, B:2] 가 PREPARING 상태인데
+ *   - A 라인 3개 다 발송 → "발송완료" (success)
+ *   - B 라인 0/2 → "발송대기" (info)
+ * → 사용자는 한눈에 "어떤 품목은 끝났고 어떤 품목은 진행중" 인지 인식 가능.
+ *
+ * claimType 이 EXCHANGE_* 인 반품 단계 라인은 색을 accent(보라) 로 분기.
+ */
+export function ItemPhaseBadge({
+  phase,
+  claimType,
+}: {
+  phase: ItemPhase;
+  claimType?: OrderClaimType | null;
+}) {
+  const base = ITEM_PHASE_VISUAL[phase];
+  const isExchange =
+    claimType === "EXCHANGE_SAME" || claimType === "EXCHANGE_DIFFERENT";
+  // 반품 진행 중 라벨이 교환 흐름이면 보라색으로 분기 (StatusBadge 정책과 동일)
+  const variant: BadgeVariant =
+    isExchange && (phase === "RETURNING" || phase === "PARTIAL_RETURN")
+      ? "accent"
+      : base.variant;
+  const Icon = base.icon;
+  return (
+    <JmBadge variant={variant} size="md" shape="square">
+      {Icon && <Icon className="size-3" />}
+      {ITEM_PHASE_LABELS[phase]}
+    </JmBadge>
+  );
+}
+
+/**
  * 출고 상태 배지 — 동적 색·라벨.
  * 행에 ChannelId, ClaimType, 교환 여부 컨텍스트 받아 색·라벨 분기.
  */
@@ -123,6 +183,138 @@ export function StatusBadge({
       {Icon && <Icon className="size-3" />}
       {statusLabel(status, { channelId, claimType })}
     </JmBadge>
+  );
+}
+
+/**
+ * 부분 진행 인디케이터 — 라인 단위 진행률을 mini progress bar 로 시각화.
+ *
+ * 품목별 행 워크보드에선 각 라인의 cell 안에 노출 (한 OrderItem 의 quantity vs shippedQty/returnedQty).
+ *
+ *  진행 중:
+ *    - PREPARING/PREPARING_PACKED/SHIPPED + 0 < shipped < total → 발송 N/M (info)
+ *    - COMPLETED + 0 < returned < total: 반품 N/M (warning)
+ *    - RETURNED/EXCHANGED + returned < total: 부분 반품/교환 N/M (muted · 잔량은 정상 종결)
+ *
+ * 분할 발송 이력 (`shipmentCount ≥ 2`) 은 order-level 정보이므로 별도의
+ * `ShipmentSummaryChip` 컴포넌트가 그룹 첫 행에만 표시. 이 컴포넌트엔 포함 안 됨.
+ *
+ *  해당 없으면 null. 부모는 이를 받아 라인 셀 안에 렌더.
+ */
+export function PartialProgress({
+  status,
+  totalQty,
+  shippedQty,
+  returnedQty,
+}: {
+  status: OrderStatus;
+  totalQty: number;
+  shippedQty: number;
+  returnedQty: number;
+}) {
+  if (totalQty <= 0) return null;
+
+  type Tone = "info" | "warning" | "muted";
+  let label: string | null = null;
+  let value = 0;
+  let tone: Tone = "info";
+
+  const isShippingPhase =
+    status === "PREPARING" ||
+    status === "PREPARING_PACKED" ||
+    status === "SHIPPED";
+  if (isShippingPhase && shippedQty > 0 && shippedQty < totalQty) {
+    label = "발송";
+    value = shippedQty;
+    tone = "info";
+  } else if (
+    status === "COMPLETED" &&
+    returnedQty > 0 &&
+    returnedQty < totalQty
+  ) {
+    label = "반품";
+    value = returnedQty;
+    tone = "warning";
+  } else if (
+    (status === "RETURNED" || status === "EXCHANGED") &&
+    returnedQty > 0 &&
+    returnedQty < totalQty
+  ) {
+    label = status === "EXCHANGED" ? "교환" : "반품";
+    value = returnedQty;
+    tone = "muted";
+  }
+
+  if (!label) return null;
+
+  const pct = Math.min(100, Math.round((value / totalQty) * 100));
+  const palette: Record<Tone, { bar: string; track: string; text: string }> = {
+    info: {
+      bar: "bg-[var(--jm-info-fg)]",
+      track: "bg-[var(--jm-info-bg)]",
+      text: "text-[var(--jm-info-fg)]",
+    },
+    warning: {
+      bar: "bg-[var(--jm-warning-fg)]",
+      track: "bg-[var(--jm-warning-bg)]",
+      text: "text-[var(--jm-warning-fg)]",
+    },
+    muted: {
+      bar: "bg-[var(--jm-text-subtle)]",
+      track: "bg-[var(--jm-surface-muted)]",
+      text: "text-[var(--jm-text-muted)]",
+    },
+  };
+  const c = palette[tone];
+
+  return (
+    <span
+      className={`mt-1 inline-flex items-center gap-1.5 text-[11px] tabular-nums ${c.text}`}
+    >
+      <span className={`relative h-1 w-16 overflow-hidden rounded-full ${c.track}`}>
+        <span
+          className={`absolute inset-y-0 left-0 ${c.bar}`}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+      <span className="font-medium">
+        {label} {value}/{totalQty}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * 분할 발송 이력 칩 — order 단위 정보. 그룹 첫 행에만 표시.
+ *
+ *  ── 분할 발송 정책 ──────────────────────────────────────────────────
+ *  shipmentCount 는 partial_ship/ship 액션이 실행된 **총 회차 수** 를 의미.
+ *  shipmentCount ≥ 2 가 "분할" 로 표시되며, 두 케이스 모두 포함:
+ *    1) 수량 분할 — 한 OrderItem 의 10개 중 8개 + 2개 따로 발송
+ *    2) 라인 분할 — 카트의 A품목 / B품목 을 별도 회차로 발송
+ *  단일 회차 (=1) 는 일반 발송으로 간주, 표시 안 함.
+ *  ────────────────────────────────────────────────────────────────────
+ */
+export function ShipmentSummaryChip({
+  shipmentCount,
+  status,
+}: {
+  shipmentCount: number;
+  status: OrderStatus;
+}) {
+  if (shipmentCount < 2) return null;
+  // 의미 있는 단계에서만 노출 — SHIPPED/COMPLETED/RETURN_*/RETURNED/EXCHANGED
+  if (status === "PENDING" || status === "PREPARING" || status === "PREPARING_PACKED") {
+    // 진행 중 행에선 행 셀의 PartialProgress 가 진행률을 보여줌. 이력 칩은 발송 종료 후 의미.
+    return null;
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-1.5 py-px text-[10px] font-medium text-[var(--jm-info-fg)] tabular-nums"
+      title={`${shipmentCount}회에 걸쳐 발송됨 — 한 품목을 여러 회차로 나누거나(수량 분할), 카트의 다른 품목을 별도 회차로 보낸 경우(라인 분할) 모두 포함`}
+    >
+      분할 {shipmentCount}회 발송
+    </span>
   );
 }
 

@@ -44,23 +44,26 @@ import {
 import { OrderCreateSheet } from "./_create-sheet";
 import { OrderDetailSheet } from "./_detail-sheet";
 import {
-  AmountCell,
   ChannelBadge,
   FulfillmentBadge,
+  ItemPhaseBadge,
+  PartialProgress,
   PaymentStatusBadge,
   ShipDateCell,
-  StatusBadge,
+  ShipmentSummaryChip,
   StatusFlowGuide,
   TableRowSkeleton,
 } from "./_parts";
 import {
+  deriveItemPhase,
   type BoardGroupKey,
   type BoardResponse,
   type ChannelFilter,
+  type OrderItemRow,
   type OrderListItem,
   nextActionFor,
 } from "./_types";
-import { daysUntilShip, summarizeItems } from "./_helpers";
+import { daysUntilShip } from "./_helpers";
 
 /** 그룹 필터 — KPI 카드 클릭 / pill 토글 */
 type GroupFilter = "all" | BoardGroupKey;
@@ -87,6 +90,7 @@ export default function OrdersBoardPage() {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const detailId = searchParams.get("id");
+  const detailItemId = searchParams.get("itemId");
 
   const boardQuery = useQuery({
     queryKey: queryKeys.orders.board({
@@ -150,19 +154,22 @@ export default function OrdersBoardPage() {
 
   const today = boardQuery.data ? new Date(boardQuery.data.today) : new Date();
 
-  const openDetail = (id: string) => {
+  const openDetail = (id: string, itemId?: string) => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.set("id", id);
+    if (itemId) sp.set("itemId", itemId);
+    else sp.delete("itemId");
     router.push(`/orders?${sp.toString()}`);
   };
   const closeDetail = () => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.delete("id");
+    sp.delete("itemId");
     const q = sp.toString();
     router.push(`/orders${q ? `?${q}` : ""}`);
   };
 
-  /** 그룹별 카운트 + 그룹 필터 적용한 행 */
+  /** KPI 카운트는 order 단위, rows 는 OrderItemRow 평탄화 + 그룹 메타 */
   const { counts, rows } = useMemo(() => {
     const empty: Record<BoardGroupKey, OrderListItem[]> = {
       overdue: [],
@@ -174,6 +181,7 @@ export default function OrdersBoardPage() {
       returnPending: [],
     };
     const groups = boardQuery.data?.groups ?? empty;
+    // KPI 카운트 — 주문 단위 유지 (행이 늘어났다고 카운트 부풀리지 않음)
     const counts: Record<GroupFilter, number> = {
       all: 0,
       overdue: groups.overdue.length,
@@ -193,7 +201,6 @@ export default function OrdersBoardPage() {
       counts.future +
       counts.returnPending;
 
-    // 그룹 필터 적용 — 정렬 우선순위: 반품 처리 → 지연 → 오늘 → 미정 → 발송 중 → 이번 주 → 이후
     const order: BoardGroupKey[] = [
       "returnPending",
       "overdue",
@@ -203,14 +210,31 @@ export default function OrdersBoardPage() {
       "thisWeek",
       "future",
     ];
-    const all = order.flatMap((k) =>
+    const orders = order.flatMap((k) =>
       groups[k].map((o) => ({ ...o, _group: k })),
     );
-    const filtered =
+    const filteredOrders =
       groupFilter === "all"
-        ? all
-        : all.filter((r) => r._group === groupFilter);
-    return { counts, rows: filtered };
+        ? orders
+        : orders.filter((o) => o._group === groupFilter);
+
+    // OrderItemRow 평탄화 — 같은 order 의 items 는 인접 배치, 그룹 메타 부착
+    const itemRows: OrderItemRow[] = [];
+    for (const o of filteredOrders) {
+      const groupSize = o.items.length;
+      if (groupSize === 0) continue;
+      o.items.forEach((it, idx) => {
+        itemRows.push({
+          rowKey: `${o.id}:${it.id}`,
+          order: o,
+          item: it,
+          isFirstInGroup: idx === 0,
+          groupSize,
+          groupIndex: idx,
+        });
+      });
+    }
+    return { counts, rows: itemRows };
   }, [boardQuery.data, groupFilter]);
 
   const isPending = boardQuery.isPending;
@@ -361,16 +385,16 @@ export default function OrdersBoardPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <JmTable className="min-w-[1200px]">
+            <JmTable className="min-w-[1280px]">
               <JmTableHeader>
                 <JmTableRow>
-                  <JmTableHead className="w-[140px]">주문번호</JmTableHead>
-                  <JmTableHead className="w-[100px]">상태</JmTableHead>
-                  <JmTableHead className="w-[110px]">출고</JmTableHead>
-                  <JmTableHead className="w-[140px]">채널</JmTableHead>
-                  <JmTableHead>고객 / 항목</JmTableHead>
+                  <JmTableHead className="w-[160px]">주문번호 / 채널</JmTableHead>
+                  <JmTableHead className="w-[140px]">고객 / 출고</JmTableHead>
+                  <JmTableHead>품목</JmTableHead>
+                  <JmTableHead className="w-[110px]">상태</JmTableHead>
+                  <JmTableHead className="w-[140px]">수량 · 진행</JmTableHead>
                   <JmTableHead className="w-[110px]">출고예정</JmTableHead>
-                  <JmTableHead className="w-[100px] text-right">합계</JmTableHead>
+                  <JmTableHead className="w-[110px] text-right">금액</JmTableHead>
                   <JmTableHead className="w-[100px]">결제</JmTableHead>
                   <JmTableHead className="w-[120px]" />
                 </JmTableRow>
@@ -408,82 +432,189 @@ export default function OrdersBoardPage() {
                     </JmTableCell>
                   </JmTableRow>
                 ) : (
-                  rows.map((order) => {
+                  rows.map((row) => {
+                    const { order, item, isFirstInGroup, groupSize } = row;
                     const days = daysUntilShip(order.expectedShipDate, today);
-                    const next = nextActionFor(order.status, order.claimType);
-                    const isExchangeReplacement =
-                      (order.exchangedFromOrders?.length ?? 0) > 0 ||
-                      order.orderNo.endsWith("-EX");
+                    const next = isFirstInGroup
+                      ? nextActionFor(order.status, order.claimType)
+                      : null;
                     const rowPending =
                       transitionMutation.isPending &&
                       transitionMutation.variables?.id === order.id;
+                    const phase = deriveItemPhase(
+                      order.status,
+                      Number(item.quantity),
+                      Number(item.shippedQty),
+                      Number(item.returnedQty),
+                    );
+
+                    // 그룹 시각 — 자식 행은 상단 보더 제거 (테이블 기본 row 보더가 안 그려지도록)
+                    // + 첫 셀 좌측 padding 만 살짝 추가해 들여쓰기 표현. 굵은 보더 X.
+                    const childRowClass = !isFirstInGroup
+                      ? "[&>td]:border-t-0"
+                      : "";
+
                     return (
                       <JmTableRow
-                        key={order.id}
-                        className="cursor-pointer"
-                        onClick={() => openDetail(order.id)}
+                        key={row.rowKey}
+                        className={`cursor-pointer ${childRowClass}`}
+                        onClick={() => openDetail(order.id, item.id)}
                       >
+                        {/* 주문번호 / 채널 — 첫 행에만 */}
                         <JmTableCell>
-                          <div className="flex flex-col gap-0">
-                            <span
-                              className="block truncate font-mono text-[13px] font-medium text-[var(--jm-text)]"
-                              title={order.orderNo}
-                            >
-                              {order.orderNo}
-                            </span>
-                            {order.channelOrderNo && (
+                          {isFirstInGroup ? (
+                            <div className="flex flex-col gap-1">
                               <span
-                                className="block truncate font-mono text-[10px] text-[var(--jm-text-subtle)]"
-                                title={order.channelOrderNo}
+                                className="block truncate font-mono text-[13px] font-medium text-[var(--jm-text)]"
+                                title={order.orderNo}
                               >
-                                {order.channelOrderNo}
+                                {order.orderNo}
+                              </span>
+                              {order.channelOrderNo && (
+                                <span
+                                  className="block truncate font-mono text-[10px] text-[var(--jm-text-subtle)]"
+                                  title={order.channelOrderNo}
+                                >
+                                  {order.channelOrderNo}
+                                </span>
+                              )}
+                              <div className="flex flex-wrap items-center gap-1">
+                                <ChannelBadge channel={order.channel} />
+                                {groupSize > 1 && (
+                                  <span className="text-[10px] tabular-nums text-[var(--jm-text-subtle)]">
+                                    · {groupSize}품목
+                                  </span>
+                                )}
+                              </div>
+                              <ShipmentSummaryChip
+                                shipmentCount={order.shipmentCount}
+                                status={order.status}
+                              />
+                            </div>
+                          ) : null}
+                        </JmTableCell>
+
+                        {/* 고객 / 출고 방식 — 첫 행에만 */}
+                        <JmTableCell>
+                          {isFirstInGroup ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[13px] text-[var(--jm-text)]">
+                                {order.customerName ?? "—"}
+                              </span>
+                              <FulfillmentBadge type={order.fulfillmentType} />
+                            </div>
+                          ) : null}
+                        </JmTableCell>
+
+                        {/* 품목 — 모든 행. 자식 행은 살짝 들여쓰기. 옵션값 부속 + 라인 역할 배지 */}
+                        <JmTableCell>
+                          <div
+                            className={`flex flex-col gap-0.5 ${
+                              !isFirstInGroup ? "pl-3" : ""
+                            }`}
+                          >
+                            <span
+                              className="line-clamp-2 text-[13px] text-[var(--jm-text)]"
+                              title={item.product?.name ?? item.serviceName ?? ""}
+                            >
+                              {item.product?.name ??
+                                item.serviceName ??
+                                "—"}
+                              {/* 옵션값 부속 텍스트 — D 안 시각: "가습기 (화이트 · L)" */}
+                              {item.optionSnapshot &&
+                                Object.keys(item.optionSnapshot).length > 0 && (
+                                  <span className="text-[var(--jm-text-muted)]">
+                                    {" "}
+                                    (
+                                    {Object.values(item.optionSnapshot).join(
+                                      " · ",
+                                    )}
+                                    )
+                                  </span>
+                                )}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1">
+                              {item.product?.sku && (
+                                <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">
+                                  {item.product.sku}
+                                </span>
+                              )}
+                              {/* 라인 역할 배지 — D 안: 추가구매만 명시, 옵션·메인은 배지 없음 */}
+                              {item.lineRole === "ADDON" && (
+                                <span className="inline-flex items-center rounded-md border border-[var(--jm-accent-border)] bg-[var(--jm-accent-bg)] px-1 py-px text-[9px] font-medium text-[var(--jm-accent-fg)]">
+                                  추가구매
+                                </span>
+                              )}
+                              {item.lineRole === "OPTION_REF" && (
+                                <span className="inline-flex items-center rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-1 py-px text-[9px] font-medium text-[var(--jm-info-fg)]">
+                                  옵션
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </JmTableCell>
+
+                        {/* 상태 — item-level phase */}
+                        <JmTableCell>
+                          <ItemPhaseBadge
+                            phase={phase}
+                            claimType={order.claimType}
+                          />
+                        </JmTableCell>
+
+                        {/* 수량 · 진행 — 라인 단위 progress bar */}
+                        <JmTableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[12px] tabular-nums text-[var(--jm-text-muted)]">
+                              {Number(item.quantity).toLocaleString("ko-KR")}개
+                            </span>
+                            <PartialProgress
+                              status={order.status}
+                              totalQty={Number(item.quantity)}
+                              shippedQty={Number(item.shippedQty)}
+                              returnedQty={Number(item.returnedQty)}
+                            />
+                          </div>
+                        </JmTableCell>
+
+                        {/* 출고예정 — 첫 행에만 (order-level) */}
+                        <JmTableCell>
+                          {isFirstInGroup ? (
+                            <ShipDateCell
+                              status={order.status}
+                              expectedShipDate={order.expectedShipDate}
+                              daysUntil={days}
+                            />
+                          ) : null}
+                        </JmTableCell>
+
+                        {/* 금액 — 라인마다 동등한 톤. 다중 품목이면 첫 행에 주문 총합 부속 */}
+                        <JmTableCell className="text-right">
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-[13px] font-medium tabular-nums text-[var(--jm-text)]">
+                              ₩
+                              {Number(item.totalPrice).toLocaleString("ko-KR")}
+                            </span>
+                            {isFirstInGroup && groupSize > 1 && (
+                              <span className="text-[10px] tabular-nums text-[var(--jm-text-subtle)]">
+                                총 ₩
+                                {Number(order.totalAmount).toLocaleString("ko-KR")}
                               </span>
                             )}
                           </div>
                         </JmTableCell>
+
+                        {/* 결제 — 첫 행에만 */}
                         <JmTableCell>
-                          <StatusBadge
-                            status={order.status}
-                            channelId={order.channel ? "ext" : null}
-                            claimType={order.claimType}
-                            isExchangeReplacement={isExchangeReplacement}
-                          />
+                          {isFirstInGroup ? (
+                            <PaymentStatusBadge
+                              status={order.paymentStatus}
+                              showPaid
+                            />
+                          ) : null}
                         </JmTableCell>
-                        <JmTableCell>
-                          <FulfillmentBadge type={order.fulfillmentType} />
-                        </JmTableCell>
-                        <JmTableCell>
-                          <ChannelBadge channel={order.channel} />
-                        </JmTableCell>
-                        <JmTableCell>
-                          <div className="flex flex-col">
-                            <span className="text-[13px] text-[var(--jm-text)]">
-                              {order.customerName ?? "—"}
-                            </span>
-                            <span className="line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">
-                              {summarizeItems(order)}
-                            </span>
-                          </div>
-                        </JmTableCell>
-                        <JmTableCell>
-                          <ShipDateCell
-                            status={order.status}
-                            expectedShipDate={order.expectedShipDate}
-                            daysUntil={days}
-                          />
-                        </JmTableCell>
-                        <JmTableCell className="text-right">
-                          <AmountCell
-                            totalAmount={order.totalAmount}
-                            paymentStatus={order.paymentStatus}
-                          />
-                        </JmTableCell>
-                        <JmTableCell>
-                          <PaymentStatusBadge
-                            status={order.paymentStatus}
-                            showPaid
-                          />
-                        </JmTableCell>
+
+                        {/* 액션 — 첫 행에만 (order 단위) */}
                         <JmTableCell>
                           <div className="flex items-center justify-end gap-1">
                             {next && (
@@ -504,7 +635,9 @@ export default function OrdersBoardPage() {
                                 {next.label}
                               </JmButton>
                             )}
-                            <ChevronRight className="size-4 shrink-0 text-[var(--jm-text-subtle)]" />
+                            {isFirstInGroup && (
+                              <ChevronRight className="size-4 shrink-0 text-[var(--jm-text-subtle)]" />
+                            )}
                           </div>
                         </JmTableCell>
                       </JmTableRow>
@@ -525,6 +658,7 @@ export default function OrdersBoardPage() {
 
       <OrderDetailSheet
         orderId={detailId}
+        highlightItemId={detailItemId}
         open={!!detailId}
         onOpenChange={(o) => !o && closeDetail()}
       />

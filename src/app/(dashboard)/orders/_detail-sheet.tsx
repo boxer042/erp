@@ -173,10 +173,26 @@ interface OrderDetail {
     product: { id: string; name: string; sku: string } | null;
     serviceName: string | null;
   }>;
+  /** 분할 송장 회차별 발송 이력 (shipmentNo 순) */
+  shipments: Array<{
+    id: string;
+    shipmentNo: number;
+    trackingCarrier: string | null;
+    trackingNumber: string | null;
+    shippedAt: string;
+    memo: string | null;
+    items: Array<{
+      id: string;
+      orderItemId: string;
+      quantity: string;
+    }>;
+  }>;
 }
 
 interface Props {
   orderId: string | null;
+  /** 워크보드의 품목별 행에서 진입 시 — 해당 OrderItem 카드 highlight + scroll */
+  highlightItemId?: string | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
@@ -218,7 +234,12 @@ function toEditForm(o: OrderDetail): EditForm {
   };
 }
 
-export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
+export function OrderDetailSheet({
+  orderId,
+  highlightItemId,
+  open,
+  onOpenChange,
+}: Props) {
   const queryClient = useQueryClient();
   const detailQuery = useQuery<OrderDetail>({
     queryKey: queryKeys.orders.detail(orderId ?? ""),
@@ -259,7 +280,11 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     Record<string, string>
   >({});
 
-  useEffect(() => {
+  // orderId/open 변경 시 모든 다이얼로그·편집 state 초기화 — 렌더 중 비교 패턴 (effect 회피)
+  const resetKey = `${orderId ?? ""}|${open ? "1" : "0"}`;
+  const [lastResetKey, setLastResetKey] = useState(resetKey);
+  if (lastResetKey !== resetKey) {
+    setLastResetKey(resetKey);
     setEditing(false);
     setEditForm(null);
     setEditingItems(false);
@@ -281,7 +306,18 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     setRefundDialogOpen(false);
     setRefundMode("full");
     setPartialReturns({});
-  }, [orderId, open]);
+  }
+
+  // highlightItemId 가 있고 데이터 로드 후 — 해당 라인으로 스크롤
+  useEffect(() => {
+    if (!open || !highlightItemId || !detailQuery.data) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-item-id="${highlightItemId}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [open, highlightItemId, detailQuery.data]);
 
   // 항목 편집 모드 진입 시에만 상품 목록 fetch
   const productsQuery = useQuery({
@@ -312,6 +348,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("저장되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       setEditing(false);
       setEditForm(null);
     },
@@ -332,6 +369,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("주문 항목이 갱신되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       setEditingItems(false);
       setItemsForm([]);
     },
@@ -344,6 +382,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("주문이 삭제되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       onOpenChange(false);
     },
     onError: (err) =>
@@ -366,6 +405,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("부분 출고 처리 — 일부 항목 발송 완료");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       setShipDialogOpen(false);
       setShipMode("full");
       setPartialShips({});
@@ -385,6 +425,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("발송 처리되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       setShipDialogOpen(false);
       onOpenChange(false);
     },
@@ -408,6 +449,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("반품 요청 접수 — 매장 결정 대기");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       setClaimDialogOpen(false);
       onOpenChange(false);
     },
@@ -427,6 +469,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
     onSuccess: () => {
       toast.success("부분 반품 처리 완료 — 재고 복원·환불 일부 진행");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       setRefundDialogOpen(false);
       setPartialReturns({});
       onOpenChange(false);
@@ -453,6 +496,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
         "교환 처리 완료 — 새 주문이 생성되었습니다. 차액·항목은 새 주문에서 편집하세요.",
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       setExchangeDialogOpen(false);
       setExchangeMode("full");
       setExchangePartialReturns({});
@@ -490,6 +534,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       };
       toast.success(labels[action]);
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       onOpenChange(false);
     },
     onError: (err) =>
@@ -775,7 +820,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
                 order={data}
               />
             ) : (
-              <ReadView order={data} />
+              <ReadView order={data} highlightItemId={highlightItemId} />
             )}
           </div>
         </JmDrawerBody>
@@ -832,7 +877,14 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
       <JmDialog open={shipDialogOpen} onOpenChange={setShipDialogOpen}>
         <JmDialogContent size="md">
           <JmDialogHeader>
-            <JmDialogTitle>발송 처리 — 송장 정보</JmDialogTitle>
+            <JmDialogTitle>
+              발송 처리 — 이번 회차 송장
+              {data && data.shipments && data.shipments.length > 0 && (
+                <span className="ml-2 text-[12px] font-normal text-[var(--jm-text-muted)]">
+                  ({data.shipments.length + 1}차)
+                </span>
+              )}
+            </JmDialogTitle>
           </JmDialogHeader>
           <div className="space-y-3 px-5 py-4">
             {/* 전체/부분 토글 */}
@@ -848,7 +900,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
               >
                 <div className="text-[13px] font-medium">전체 발송</div>
                 <div className="text-[11px] text-[var(--jm-text-muted)]">
-                  모든 항목 발송, 배송중 상태로
+                  잔여 항목 모두 이번 회차로 발송
                 </div>
               </button>
               <button
@@ -862,9 +914,14 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
               >
                 <div className="text-[13px] font-medium">부분 발송</div>
                 <div className="text-[11px] text-[var(--jm-text-muted)]">
-                  일부 항목만. 잔여는 출고확정 상태 유지
+                  일부 항목만 이번 회차로. 잔여는 다음 회차에 발송
                 </div>
               </button>
+            </div>
+
+            <div className="rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-2.5 py-2 text-[11px] text-[var(--jm-info-fg)]">
+              💡 이 송장은 <strong>이번 회차</strong> 에만 적용됩니다. 다음 회차
+              발송 시 다른 송장번호 사용 가능 — 회차별로 따로 보관됩니다.
             </div>
 
             <JmFormField label="택배사">
@@ -876,7 +933,7 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
             </JmFormField>
             <JmFormField
               label="송장번호"
-              hint="빈 채로 진행 시 발송만 처리되고 송장은 추후 수정에서 채울 수 있습니다."
+              hint="빈 채로 진행 시 발송만 처리되고 송장은 발송 이력 카드에서 추후 수정 가능합니다."
             >
               <JmInput
                 value={trackingNumber}
@@ -1410,7 +1467,13 @@ export function OrderDetailSheet({ orderId, open, onOpenChange }: Props) {
 
 /* ------------------------------ READ VIEW ------------------------------ */
 
-function ReadView({ order }: { order: OrderDetail }) {
+function ReadView({
+  order,
+  highlightItemId,
+}: {
+  order: OrderDetail;
+  highlightItemId?: string | null;
+}) {
   return (
     <>
       {/* 출고 정보 */}
@@ -1497,8 +1560,17 @@ function ReadView({ order }: { order: OrderDetail }) {
               const refunded = Number(item.refundedAmount ?? 0);
               const hasPartialShip = shipped > 0 && shipped < ordered;
               const hasPartialReturn = returned > 0;
+              const isHighlighted = highlightItemId === item.id;
               return (
-                <JmTableRow key={item.id} className="hover:bg-transparent">
+                <JmTableRow
+                  key={item.id}
+                  data-item-id={item.id}
+                  className={`hover:bg-transparent ${
+                    isHighlighted
+                      ? "bg-[var(--jm-info-bg)]/40 ring-1 ring-inset ring-[var(--jm-info-border)]"
+                      : ""
+                  }`}
+                >
                   <JmTableCell>
                     <div className="flex flex-col">
                       <span className="text-[13px] text-[var(--jm-text)]">
@@ -1539,6 +1611,11 @@ function ReadView({ order }: { order: OrderDetail }) {
           </JmTableBody>
         </JmTable>
       </JmCard>
+
+      {/* 분할 송장 — 회차별 발송 이력. 1건 이상 있으면 노출 */}
+      {order.shipments.length > 0 && (
+        <ShipmentHistoryCard order={order} />
+      )}
 
       {/* 금액 + 고객 — 좌우 분할 (모바일은 stack) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2298,6 +2375,283 @@ function SumRow({
  * - claimReason 기반 운임 책임 안내
  * - 매출 중복 방지 안내 (마진 리포트에서 제외됨)
  */
+/**
+ * 분할 송장 회차 이력 카드.
+ * - 회차별로 송장정보 + 어느 라인을 얼마만큼 발송했는지 표시.
+ * - 1건이라도 있으면 부모가 렌더 (단일 발송도 1차 회차로 표시)
+ *
+ * 한국 오픈마켓 (네이버·쿠팡) 패턴 — 한 주문 안 여러 송장번호를 회차별로 보관.
+ */
+function ShipmentHistoryCard({ order }: { order: OrderDetail }) {
+  const queryClient = useQueryClient();
+  const itemById = new Map(order.items.map((it) => [it.id, it]));
+  // 회차 단위 수정 dialog 상태
+  const [editing, setEditing] = useState<{
+    shipmentNo: number;
+    trackingCarrier: string;
+    trackingNumber: string;
+    memo: string;
+  } | null>(null);
+  // 회차 취소 확인 dialog
+  const [cancelTarget, setCancelTarget] = useState<number | null>(null);
+
+  const cancelable =
+    order.status === "PREPARING" ||
+    order.status === "PREPARING_PACKED" ||
+    order.status === "SHIPPED";
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      shipmentNo,
+      data,
+    }: {
+      shipmentNo: number;
+      data: {
+        trackingCarrier?: string | null;
+        trackingNumber?: string | null;
+        memo?: string | null;
+      };
+    }) =>
+      apiMutate(
+        `/api/orders/${order.id}/shipments/${shipmentNo}`,
+        "PATCH",
+        data,
+      ),
+    onSuccess: () => {
+      toast.success("송장 정보가 갱신되었습니다");
+      setEditing(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "수정 실패"),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (shipmentNo: number) =>
+      apiMutate(`/api/orders/${order.id}/shipments/${shipmentNo}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("회차 취소 완료 — 발송 수량 복원");
+      setCancelTarget(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "취소 실패"),
+  });
+
+  return (
+    <>
+      <JmCard className="overflow-hidden p-0">
+        <JmCardHeader>
+          <div className="flex items-center gap-2">
+            <Truck className="size-4 text-[var(--jm-text-muted)]" />
+            <JmCardTitle>발송 이력</JmCardTitle>
+            <span className="text-[12px] text-[var(--jm-text-muted)]">
+              {order.shipments.length}회차
+            </span>
+          </div>
+        </JmCardHeader>
+        <JmCardContent className="space-y-3">
+          {order.shipments.map((s) => {
+            const tracking = [s.trackingCarrier, s.trackingNumber]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <div
+                key={s.id}
+                className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3"
+              >
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <JmBadge variant="info" size="sm" shape="square">
+                    {s.shipmentNo}차 발송
+                  </JmBadge>
+                  <span className="text-[12px] text-[var(--jm-text-muted)]">
+                    {new Date(s.shippedAt).toLocaleString("ko-KR", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                  {tracking ? (
+                    <span className="font-mono text-[12px] text-[var(--jm-text)]">
+                      {tracking}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-[var(--jm-text-subtle)]">
+                      송장정보 없음
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-1">
+                    <JmButton
+                      size="xs"
+                      variant="ghost"
+                      onClick={() =>
+                        setEditing({
+                          shipmentNo: s.shipmentNo,
+                          trackingCarrier: s.trackingCarrier ?? "",
+                          trackingNumber: s.trackingNumber ?? "",
+                          memo: s.memo ?? "",
+                        })
+                      }
+                    >
+                      수정
+                    </JmButton>
+                    {cancelable && (
+                      <JmButton
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => setCancelTarget(s.shipmentNo)}
+                      >
+                        취소
+                      </JmButton>
+                    )}
+                  </div>
+                </div>
+                <ul className="space-y-0.5 text-[12px]">
+                  {s.items.map((si) => {
+                    const it = itemById.get(si.orderItemId);
+                    return (
+                      <li
+                        key={si.id}
+                        className="flex items-center gap-2 text-[var(--jm-text)]"
+                      >
+                        <span className="line-clamp-1 flex-1">
+                          {it?.product?.name ?? it?.serviceName ?? "—"}
+                        </span>
+                        <span className="tabular-nums text-[var(--jm-text-muted)]">
+                          {Number(si.quantity).toLocaleString("ko-KR")}개
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {s.memo && (
+                  <p className="mt-2 text-[11px] text-[var(--jm-text-subtle)]">
+                    {s.memo}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </JmCardContent>
+      </JmCard>
+
+      {/* 회차 송장 수정 dialog */}
+      <JmDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>
+              {editing?.shipmentNo}차 발송 송장 수정
+            </JmDialogTitle>
+          </JmDialogHeader>
+          {editing && (
+            <div className="space-y-3 px-1">
+              <FieldEditRow label="택배사">
+                <JmInput
+                  value={editing.trackingCarrier}
+                  onChange={(e) =>
+                    setEditing({ ...editing, trackingCarrier: e.target.value })
+                  }
+                  placeholder="CJ대한통운"
+                />
+              </FieldEditRow>
+              <FieldEditRow label="송장번호">
+                <JmInput
+                  value={editing.trackingNumber}
+                  onChange={(e) =>
+                    setEditing({ ...editing, trackingNumber: e.target.value })
+                  }
+                  placeholder="1234567890"
+                />
+              </FieldEditRow>
+              <FieldEditRow label="메모">
+                <JmInput
+                  value={editing.memo}
+                  onChange={(e) =>
+                    setEditing({ ...editing, memo: e.target.value })
+                  }
+                  placeholder="(선택)"
+                />
+              </FieldEditRow>
+            </div>
+          )}
+          <JmDialogFooter>
+            <JmButton variant="ghost" onClick={() => setEditing(null)}>
+              취소
+            </JmButton>
+            <JmButton
+              onClick={() =>
+                editing &&
+                updateMutation.mutate({
+                  shipmentNo: editing.shipmentNo,
+                  data: {
+                    trackingCarrier: editing.trackingCarrier || null,
+                    trackingNumber: editing.trackingNumber || null,
+                    memo: editing.memo || null,
+                  },
+                })
+              }
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending && (
+                <JmSpinner size="xs" tone="inverted" />
+              )}
+              저장
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+
+      {/* 회차 취소 확인 dialog */}
+      <JmDialog
+        open={cancelTarget !== null}
+        onOpenChange={(o) => !o && setCancelTarget(null)}
+      >
+        <JmDialogContent size="sm">
+          <JmDialogHeader>
+            <JmDialogTitle>{cancelTarget}차 발송을 취소할까요?</JmDialogTitle>
+          </JmDialogHeader>
+          <p className="px-1 text-[13px] text-[var(--jm-text-muted)]">
+            이 회차의 발송 수량만큼 항목별 발송 수량(shippedQty) 이 차감되며,
+            잔량이 발생하면 주문 상태가 출고확정으로 복귀합니다. 송장은 영구
+            삭제됩니다.
+          </p>
+          <JmDialogFooter>
+            <JmButton variant="ghost" onClick={() => setCancelTarget(null)}>
+              아니오
+            </JmButton>
+            <JmButton
+              variant="danger"
+              onClick={() =>
+                cancelTarget !== null && cancelMutation.mutate(cancelTarget)
+              }
+              disabled={cancelMutation.isPending}
+            >
+              {cancelMutation.isPending && (
+                <JmSpinner size="xs" tone="inverted" />
+              )}
+              회차 취소
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+    </>
+  );
+}
+
+function FieldEditRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[80px_1fr] items-center gap-3">
+      <span className="text-[12px] text-[var(--jm-text-muted)]">{label}</span>
+      {children}
+    </div>
+  );
+}
+
 function ExchangeReplacementCard({ order }: { order: OrderDetail }) {
   const origin = order.exchangedFromOrders[0];
   if (!origin) return null;

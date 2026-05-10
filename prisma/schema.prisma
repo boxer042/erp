@@ -389,6 +389,9 @@ model Product {
   productMappings    ProductMapping[]
   channelMappings    ChannelProductMapping[]
   channelMappingComponents ChannelProductMappingComponent[]
+  productOptions     ProductOption[]
+  optionValueMappedAs ProductOptionValue[] @relation("OptionValueProduct")
+  optionValueVariantAs ProductOptionValue[] @relation("OptionValueVariant")
   channelPricings    ChannelPricing[]
   repairPackageParts RepairPackagePart[]
   inventory          Inventory?
@@ -450,6 +453,65 @@ model ProductSpecValue {
   @@unique([productId, slotId])
   @@index([productId])
   @@map("product_spec_values")
+}
+
+// ============================================================
+// 고객 옵션 (Product Option) — 변형상품(매장 분기) 과 분리된 별도 도메인
+// ============================================================
+//
+// 정책:
+//   - 변형상품(매장 variant): 매장이 출고 시점에 결정, 고객 노출 X — 기존 인프라 그대로
+//   - 고객 옵션 (이 모델): 고객이 카탈로그·POS 에서 직접 선택, 옵션값마다 별도 처리
+//
+// 옵션값이 가리킬 수 있는 대상 (셋 중 최대 하나, 셋 다 null 도 가능):
+//   - mappedProductId: 다른 Product 매핑 (예: 메모리 32GB) → OrderItem OPTION_REF 별도 라인
+//   - mappedVariantId: 매장 variant 매핑 (예: 수냉쿨러 variant) → variant 자동 결정
+//   - 둘 다 null: 단순 텍스트 옵션 (예: 색상 화이트) → variant 자동 생성 후속 PR
+//
+// OrderItem 측에선 lineRole/parentItemId/optionSnapshot 으로 표현됨.
+
+model ProductOption {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /** 옵션 슬롯명 — "메모리", "색상", "쿨러" 등 */
+  name      String
+  /** 필수 선택 여부 — false 면 미선택도 허용 */
+  required  Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  values ProductOptionValue[]
+
+  @@index([productId, sortOrder])
+  @@map("product_options")
+}
+
+model ProductOptionValue {
+  id       String        @id @default(uuid())
+  optionId String        @map("option_id")
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  /** 옵션값 라벨 — "32GB", "수냉쿨러", "화이트" */
+  label    String
+  /** 추가가 (canonical 기본가에 더해지는 차액). variant.sellingPrice 계산용 */
+  addPrice Decimal       @default(0) @map("add_price") @db.Decimal(15, 2)
+  sortOrder Int          @default(0) @map("sort_order")
+  isActive Boolean       @default(true) @map("is_active")
+
+  /** 옵션값이 다른 Product 를 매핑 — 메모리 32GB 같은 케이스 */
+  mappedProductId String?  @map("mapped_product_id")
+  mappedProduct   Product? @relation("OptionValueProduct", fields: [mappedProductId], references: [id], onDelete: SetNull)
+  /** 옵션값이 매장 variant 를 결정 — 쿨러 → 수냉쿨러 variant */
+  mappedVariantId String?  @map("mapped_variant_id")
+  mappedVariant   Product? @relation("OptionValueVariant", fields: [mappedVariantId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([optionId, sortOrder])
+  @@map("product_option_values")
 }
 
 model Brand {
@@ -987,10 +1049,14 @@ model Order {
   recipientName       String?             @map("recipient_name")
   recipientPhone      String?             @map("recipient_phone")
   shippingAddress     String?             @map("shipping_address")
-  /** 택배사 (SHIPPED 후 입력) */
+  /**
+   * 최신 송장 캐시 (deprecated 예정) — 단일 송장 호환용 보존.
+   * 실제 송장 정보는 `Shipment` 모델에 회차별로 저장. 마지막 회차의 송장이 여기 캐시됨.
+   */
   trackingCarrier     String?             @map("tracking_carrier")
-  /** 송장번호 (SHIPPED 후 입력) */
   trackingNumber      String?             @map("tracking_number")
+  /** 출고 회차 — partial_ship/ship 액션마다 +1. 1=일반 발송, ≥2=분할 발송. 분할 이력 표시용 */
+  shipmentCount       Int                 @default(0) @map("shipment_count")
   orderDate           DateTime            @map("order_date")
   quotationId         String?             @map("quotation_id")
   quotation           Quotation?          @relation(fields: [quotationId], references: [id])
@@ -1032,6 +1098,7 @@ model Order {
   updatedAt           DateTime            @updatedAt @map("updated_at")
 
   items      OrderItem[]
+  shipments  Shipment[]
   statements Statement[]
 
   @@index([channelId, orderDate])
@@ -1076,12 +1143,80 @@ model OrderItem {
   shippedQty                    Decimal  @default(0) @map("shipped_qty") @db.Decimal(15, 4)
   returnedQty                   Decimal  @default(0) @map("returned_qty") @db.Decimal(15, 4)
   refundedAmount                Decimal  @default(0) @map("refunded_amount") @db.Decimal(15, 2)
+  /**
+   * 라인 역할 — MAIN(기본·variant 라인), OPTION_REF(메인의 옵션으로 매핑된 별도 Product), ADDON(추가상품, 후속).
+   * parentItemId 와 함께 사용 — 메인-옵션/추가구매 트리 표현.
+   */
+  lineRole                      OrderItemLineRole @default(MAIN) @map("line_role")
+  parentItemId                  String?  @map("parent_item_id")
+  parentItem                    OrderItem? @relation("OrderItemParent", fields: [parentItemId], references: [id], onDelete: SetNull)
+  childItems                    OrderItem[] @relation("OrderItemParent")
+  /**
+   * 주문 시점 옵션값 스냅샷 — Product.option/value 가 미래에 변경되어도 보존.
+   * 형식: { "메모리": "32GB", "색상": "화이트" }
+   * MAIN 라인의 경우 그 라인이 가진 옵션 조합. OPTION_REF 라인은 보통 비어있음 (parentItemId 가 메인 가리킴).
+   */
+  optionSnapshot                Json?    @map("option_snapshot")
   memo                          String?
 
   lotConsumptions LotConsumption[]
   serialItems     SerialItem[]
+  shipmentItems   ShipmentItem[]
 
+  @@index([parentItemId])
   @@map("order_items")
+}
+
+enum OrderItemLineRole {
+  MAIN
+  OPTION_REF
+  ADDON
+}
+
+// ============================================================
+// 분할 송장 — 한 주문이 여러 회차에 걸쳐 발송될 때 회차별 송장 보관
+// ============================================================
+//
+// 한국 오픈마켓 (네이버·쿠팡·11번가·G마켓) 의 표준 패턴. 한 주문의 여러 OrderItem 을
+// 하나의 송장으로 묶거나, 한 OrderItem 을 여러 송장으로 쪼개 보낼 수도 있음.
+//
+// 정책:
+//   - Order.trackingCarrier/Number 는 "최신 송장 캐시" 로 보존 (deprecated 진행 중).
+//     여러 회차 중 가장 최근 Shipment 의 송장이 cache 에 채워짐.
+//   - shipmentNo 는 같은 order 안에서 1부터 증가. 첫 발송=1, 두 번째=2.
+//   - ship/partial_ship 액션 시 Shipment 1건 + 발송된 OrderItem 의 quantity 만큼 ShipmentItem 생성
+//   - 한 OrderItem 의 (Σ ShipmentItem.quantity) ≤ OrderItem.quantity 강제 (애플리케이션 레벨)
+
+model Shipment {
+  id              String         @id @default(uuid())
+  orderId         String         @map("order_id")
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /** 같은 주문 안에서 1부터 증가 (1차·2차·3차 발송) */
+  shipmentNo      Int            @map("shipment_no")
+  trackingCarrier String?        @map("tracking_carrier")
+  trackingNumber  String?        @map("tracking_number")
+  shippedAt       DateTime       @map("shipped_at")
+  memo            String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  items           ShipmentItem[]
+
+  @@unique([orderId, shipmentNo])
+  @@index([orderId, shippedAt])
+  @@map("shipments")
+}
+
+model ShipmentItem {
+  id          String    @id @default(uuid())
+  shipmentId  String    @map("shipment_id")
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderItemId String    @map("order_item_id")
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  /** 이 회차에 발송한 수량 (라인의 일부 수량 가능) */
+  quantity    Decimal   @db.Decimal(15, 4)
+
+  @@index([orderItemId])
+  @@map("shipment_items")
 }
 
 // ============================================================
