@@ -288,6 +288,13 @@ export default function ChannelsPage() {
               {editingChannel ? "채널 수정" : "새 채널 추가"}
             </DialogTitle>
           </DialogHeader>
+          {!editingChannel && (
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
+              <strong className="text-foreground">외부 판매채널 전용</strong> —
+              쿠팡·네이버 등. 오프라인·POS·매장 판매는 등록 불필요 (channelId=null
+              로 자동 처리). 코드 OFFLINE/POS/STORE/MANUAL/INTERNAL/EXTERNAL 은 예약어로 거부됩니다.
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>로고</Label>
