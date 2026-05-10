@@ -212,7 +212,7 @@ export default function ParkedSessionsPage() {
                       className={`shrink-0 rounded-full px-3 py-1.5 text-jm-xs font-medium transition-colors ${
                         active
                           ? "bg-[var(--jm-action)] text-white"
-                          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)]"
+                          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] border border-[var(--jm-border)]"
                       }`}
                     >
                       {opt.label}
@@ -302,7 +302,7 @@ function SessionRow({
   const parked = session.parkedAt ? new Date(session.parkedAt) : null;
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]">
+    <div className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]">
       <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[14px] font-bold text-[var(--jm-text)]">
         {customerName.charAt(0)}
       </div>
@@ -339,7 +339,7 @@ function SessionRow({
           type="button"
           onClick={onDelete}
           disabled={pendingResurrect || pendingDelete || pendingQuotation}
-          className="flex size-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] ring-1 ring-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
+          className="flex size-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
           aria-label="삭제"
         >
           {pendingDelete ? (
@@ -358,7 +358,7 @@ function SessionRow({
             !session.customerId ||
             session.itemCount === 0
           }
-          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--jm-surface)] px-3 text-jm-xs font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--jm-surface)] px-3 text-jm-xs font-semibold text-[var(--jm-text)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
           aria-label="견적서 발행"
           title={
             !session.customerId
@@ -417,7 +417,7 @@ function RowsSkeleton() {
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]"
+          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]"
         >
           <div className="h-10 w-10 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
           <div className="flex flex-1 flex-col gap-1.5">

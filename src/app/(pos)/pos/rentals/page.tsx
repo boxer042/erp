@@ -357,7 +357,7 @@ function SectionHeader({
 
 function EmptyHint({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl bg-[var(--jm-surface)] px-4 py-5 text-center text-[13px] text-[var(--jm-text-subtle)] ring-1 ring-[var(--jm-border)]">
+    <div className="rounded-2xl bg-[var(--jm-surface)] px-4 py-5 text-center text-[13px] text-[var(--jm-text-subtle)] border border-[var(--jm-border)]">
       {text}
     </div>
   );
@@ -369,7 +369,7 @@ function RowsSkeleton() {
       {Array.from({ length: 2 }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]"
+          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]"
         >
           <div className="h-9 w-9 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />
           <div className="flex flex-1 flex-col gap-1.5">
@@ -389,7 +389,7 @@ function GridSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]"
+          className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]"
         >
           <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
           <div className="h-4 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
@@ -505,7 +505,7 @@ function AssetCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-stretch gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 text-left ring-1 ring-[var(--jm-border)] transition-all active:scale-[0.99] sm:hover:ring-[var(--jm-border-strong)] sm:hover:shadow-sm"
+      className="flex w-full items-stretch gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 text-left border border-[var(--jm-border)] transition-all active:scale-[0.99] sm:hover:ring-[var(--jm-border-strong)] sm:hover:shadow-sm"
     >
       <AssetThumb asset={asset} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -575,12 +575,12 @@ function AssetThumb({ asset }: { asset: { name: string; imageUrl: string | null 
       <img
         src={asset.imageUrl}
         alt={asset.name}
-        className="size-14 shrink-0 rounded-xl object-cover ring-1 ring-[var(--jm-border)]"
+        className="size-14 shrink-0 rounded-xl object-cover border border-[var(--jm-border)]"
       />
     );
   }
   return (
-    <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[16px] font-bold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)]">
+    <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[16px] font-bold text-[var(--jm-text)] border border-[var(--jm-border)]">
       {asset.name.charAt(0)}
     </div>
   );
@@ -615,7 +615,7 @@ function FilterChipButton({
       className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition-colors ${
         active
           ? "bg-[var(--jm-action)] text-white"
-          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-bg)]"
+          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] border border-[var(--jm-border)] hover:bg-[var(--jm-bg)]"
       }`}
     >
       <span className={`size-1.5 rounded-full ${dotColor}`} />

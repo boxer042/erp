@@ -76,7 +76,7 @@ function Chip({
     >
       <div
         className={`flex size-14 items-center justify-center overflow-hidden rounded-2xl bg-[var(--jm-bg)] transition-colors ${
-          active ? "ring-[1.5px] ring-[var(--jm-action)]" : "ring-1 ring-[var(--jm-border)]"
+          active ? "ring-[1.5px] ring-[var(--jm-action)]" : "border border-[var(--jm-border)]"
         }`}
       >
         {isAll ? (

@@ -207,7 +207,7 @@ function ChannelChip({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors tabular-nums ${
         active
-          ? "bg-[var(--jm-surface)] text-[var(--jm-text)] ring-1 ring-[var(--jm-border-strong)]"
+          ? "bg-[var(--jm-surface)] text-[var(--jm-text)] border border-[var(--jm-border-strong)]"
           : "text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface)] hover:text-[var(--jm-text)]"
       }`}
     >

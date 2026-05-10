@@ -198,7 +198,7 @@ export default function PosV2HomePage() {
                           className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
                             active
                               ? "bg-[var(--jm-action)] text-white"
-                              : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-bg)]"
+                              : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] border border-[var(--jm-border)] hover:bg-[var(--jm-bg)]"
                           }`}
                         >
                           {opt.label}
@@ -299,7 +299,7 @@ export default function PosV2HomePage() {
           <button
             type="button"
             onClick={startWithCustomerLink}
-            className="flex h-12 items-center gap-2 rounded-full bg-[var(--jm-surface)] px-5 text-[var(--jm-text)] shadow-lg shadow-[var(--jm-shadow-md)] ring-1 ring-[var(--jm-border)] transition-transform active:scale-95"
+            className="flex h-12 items-center gap-2 rounded-full bg-[var(--jm-surface)] px-5 text-[var(--jm-text)] shadow-lg shadow-[var(--jm-shadow-md)] border border-[var(--jm-border)] transition-transform active:scale-95"
           >
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
               <circle
@@ -492,7 +492,7 @@ function CloseSessionSheet({
           type="button"
           onClick={() => onConfirmDiscard(target)}
           disabled={pending !== null}
-          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] px-4 py-3.5 text-left text-[var(--jm-danger-fg)] ring-1 ring-[var(--jm-border)] transition-all active:scale-[0.99] disabled:opacity-50"
+          className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] px-4 py-3.5 text-left text-[var(--jm-danger-fg)] border border-[var(--jm-border)] transition-all active:scale-[0.99] disabled:opacity-50"
         >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -516,7 +516,7 @@ function CloseSessionSheet({
           type="button"
           onClick={onClose}
           disabled={pending !== null}
-          className="rounded-2xl px-4 py-3 text-[13px] font-semibold text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
+          className="rounded-2xl px-4 py-3 text-[13px] font-semibold text-[var(--jm-text-muted)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
         >
           취소
         </button>
@@ -578,7 +578,7 @@ function EmptyState({
         <button
           type="button"
           onClick={onSearch}
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-surface)] text-[15px] font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)]"
+          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-surface)] text-[15px] font-semibold text-[var(--jm-text)] border border-[var(--jm-border)]"
         >
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
             <circle
@@ -620,7 +620,7 @@ function Skeleton() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="flex h-32 flex-col gap-3 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]"
+                className="flex h-32 flex-col gap-3 rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]"
               >
                 <div className="flex items-center gap-3">
                   <div className="size-12 animate-pulse rounded-full bg-[var(--jm-surface-muted)]" />

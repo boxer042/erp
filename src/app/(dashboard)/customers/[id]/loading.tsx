@@ -28,7 +28,7 @@ export default function CustomerDetailLoading() {
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-[var(--jm-surface)] p-5 ring-1 ring-[var(--jm-border)]"
+                className="rounded-2xl bg-[var(--jm-surface)] p-5 border border-[var(--jm-border)]"
               >
                 <JmSkeleton className="mb-3 h-3 w-16" />
                 <JmSkeleton className="h-7 w-24" />
@@ -45,7 +45,7 @@ export default function CustomerDetailLoading() {
             {Array.from({ length: 2 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-[var(--jm-surface)] p-5 ring-1 ring-[var(--jm-border)]"
+                className="rounded-2xl bg-[var(--jm-surface)] p-5 border border-[var(--jm-border)]"
               >
                 <JmSkeleton className="mb-4 h-4 w-24" />
                 <div className="space-y-3">

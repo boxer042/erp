@@ -194,7 +194,7 @@ function Body({
           type="button"
           onClick={() => onOpenChange(false)}
           disabled={pickingId !== null}
-          className="h-12 w-full rounded-2xl bg-[var(--jm-surface)] text-[14px] font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
+          className="h-12 w-full rounded-2xl bg-[var(--jm-surface)] text-[14px] font-semibold text-[var(--jm-text)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
         >
           닫기
         </button>

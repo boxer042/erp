@@ -13,7 +13,7 @@ export default function Loading() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-5 ring-1 ring-[var(--jm-border)]"
+              className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-5 border border-[var(--jm-border)]"
             >
               <JmSkeleton className="h-3 w-16" />
               <JmSkeleton className="h-7 w-32" />

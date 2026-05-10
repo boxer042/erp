@@ -43,7 +43,7 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
       tabIndex={0}
       onClick={onClick}
       onKeyDown={onKey}
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-[var(--jm-surface)] text-left ring-1 ring-[var(--jm-border)] transition-all active:scale-[0.98] sm:hover:ring-[var(--jm-border-strong)]"
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-[var(--jm-surface)] text-left border border-[var(--jm-border)] transition-all active:scale-[0.98] sm:hover:ring-[var(--jm-border-strong)]"
     >
       {/* ℹ️ 상세 버튼 — 우상단 */}
       {onDetail && (
@@ -53,7 +53,7 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
             e.stopPropagation();
             onDetail();
           }}
-          className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--jm-surface)]/95 text-[var(--jm-text)] shadow ring-1 ring-[var(--jm-border)] backdrop-blur active:scale-95 sm:hover:bg-[var(--jm-surface)]"
+          className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--jm-surface)]/95 text-[var(--jm-text)] shadow border border-[var(--jm-border)] backdrop-blur active:scale-95 sm:hover:bg-[var(--jm-surface)]"
           aria-label="상세 보기"
         >
           <svg width="13" height="13" viewBox="0 0 14 14" fill="none">

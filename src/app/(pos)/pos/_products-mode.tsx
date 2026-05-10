@@ -363,7 +363,7 @@ function GridSkeleton() {
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col overflow-hidden rounded-2xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]"
+          className="flex flex-col overflow-hidden rounded-2xl bg-[var(--jm-surface)] border border-[var(--jm-border)]"
         >
           <div className="aspect-square w-full animate-pulse bg-[var(--jm-surface-muted)]" />
           <div className="flex flex-col gap-1.5 p-2.5">

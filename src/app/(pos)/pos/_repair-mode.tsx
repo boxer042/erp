@@ -266,7 +266,7 @@ function ListSkeleton() {
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]"
+            className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="h-3 w-20 animate-pulse rounded bg-[var(--jm-surface-muted)]" />

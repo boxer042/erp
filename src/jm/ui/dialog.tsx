@@ -48,7 +48,7 @@ export function JmDialogContent({
       <DialogPrimitive.Popup
         data-jm-scope
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[var(--jm-surface)] text-[var(--jm-text)] font-[family-name:var(--jm-font-sans)] shadow-[var(--jm-shadow-lg)] ring-1 ring-[var(--jm-border)] outline-none flex flex-col max-h-[90vh]",
+          "fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[var(--jm-surface)] text-[var(--jm-text)] font-[family-name:var(--jm-font-sans)] shadow-[var(--jm-shadow-lg)] border border-[var(--jm-border)] outline-none flex flex-col max-h-[90vh]",
           "transition-[opacity,transform] duration-200 ease-out",
           "data-starting-style:opacity-0 data-starting-style:scale-95",
           "data-ending-style:opacity-0 data-ending-style:scale-95",

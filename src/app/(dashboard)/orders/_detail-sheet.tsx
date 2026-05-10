@@ -1637,7 +1637,7 @@ function ReadView({
                   data-item-id={item.id}
                   className={`hover:bg-transparent ${
                     isHighlighted
-                      ? "bg-[var(--jm-info-bg)]/40 ring-1 ring-inset ring-[var(--jm-info-border)]"
+                      ? "bg-[var(--jm-info-bg)]/40 border border-[var(--jm-info-border)]"
                       : ""
                   }`}
                 >

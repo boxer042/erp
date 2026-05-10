@@ -70,7 +70,7 @@ export const JmStat = React.forwardRef<HTMLDivElement, JmStatProps>(
       <div
         ref={ref}
         className={cn(
-          "flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] p-5",
+          "flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] border border-[var(--jm-border)] p-5",
           className,
         )}
         {...props}

@@ -8,7 +8,7 @@ export const JmCard = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]",
+      "rounded-2xl bg-[var(--jm-surface)] border border-[var(--jm-border)]",
       className,
     )}
     {...props}

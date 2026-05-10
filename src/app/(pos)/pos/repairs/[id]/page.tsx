@@ -660,7 +660,7 @@ function ProductLinkCard({
                         ? "bg-[var(--jm-action)] text-white"
                         : disabled
                           ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text-disabled)]"
-                          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
+                          : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] border border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
                     }`}
                   >
                     {b.label}
@@ -791,7 +791,7 @@ function CategoryModeForm({
               type="button"
               onClick={() => save.mutate(p.id)}
               disabled={save.isPending}
-              className="flex items-center gap-2 rounded-lg bg-[var(--jm-surface)] px-3 py-2.5 text-left ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)] disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-[var(--jm-surface)] px-3 py-2.5 text-left border border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)] disabled:opacity-50"
             >
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
@@ -828,7 +828,7 @@ function CategoryModeForm({
                 type="button"
                 onClick={() => save.mutate(p.id)}
                 disabled={save.isPending}
-                className="flex items-center gap-2 rounded-lg bg-[var(--jm-surface)] px-3 py-2.5 text-left ring-1 ring-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)] disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-[var(--jm-surface)] px-3 py-2.5 text-left border border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)] disabled:opacity-50"
               >
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
@@ -1063,7 +1063,7 @@ function SearchModeForm({
         className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
       />
       {query.trim().length > 0 && (
-        <div className="flex max-h-60 flex-col gap-1 overflow-y-auto rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]">
+        <div className="flex max-h-60 flex-col gap-1 overflow-y-auto rounded-xl bg-[var(--jm-surface)] border border-[var(--jm-border)]">
           {productsQuery.isPending ? (
             <div className="px-3 py-3 text-[13px] text-[var(--jm-text-subtle)]">검색 중…</div>
           ) : (productsQuery.data ?? []).length === 0 ? (
@@ -1758,7 +1758,7 @@ function DetailSkeleton({
       <main className="flex-1 overflow-y-auto">
         <div className="flex flex-col gap-3 p-4 sm:p-6">
           {/* SummaryCard 골격 — 합계 영역 */}
-          <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]">
+          <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]">
             <div className="flex items-center justify-between">
               <div className="h-3 w-12 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
               <div className="h-4 w-20 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
@@ -1773,7 +1773,7 @@ function DetailSkeleton({
             </div>
           </div>
           {/* 손님/기기 카드 */}
-          <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]">
+          <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]">
             <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             <div className="h-3 w-1/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
@@ -1782,7 +1782,7 @@ function DetailSkeleton({
           {Array.from({ length: 2 }).map((_, i) => (
             <div
               key={i}
-              className="flex flex-col gap-3 rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]"
+              className="flex flex-col gap-3 rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]"
             >
               <div className="flex items-center justify-between">
                 <div className="h-4 w-12 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
@@ -1860,7 +1860,7 @@ function HardDeleteButton({
             type="button"
             onClick={() => setConfirming(false)}
             disabled={del.isPending}
-            className="rounded-full bg-[var(--jm-surface)] px-3 py-1.5 text-[12px] font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)]"
+            className="rounded-full bg-[var(--jm-surface)] px-3 py-1.5 text-[12px] font-semibold text-[var(--jm-text)] border border-[var(--jm-border)]"
           >
             취소
           </button>

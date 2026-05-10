@@ -47,6 +47,7 @@ export default function OrderHelpPage() {
         <SectionExchange />
         <SectionPayment />
         <SectionCancel />
+        <SectionFulfillmentTools />
         <SectionPitfalls />
       </div>
     </div>
@@ -62,11 +63,12 @@ function Toc() {
     { href: "#partial", label: "3. 부분 처리 / 분할 발송 정책" },
     { href: "#options", label: "4. 옵션 도메인 — SWAP / ADDON / OPTION_PARENT" },
     { href: "#addon", label: "4-3. ADDON 도메인 — 추가구매 추천 (BundleProduct)" },
-    { href: "#refund", label: "5. 반품 흐름 (5단계)" },
+    { href: "#refund", label: "5. 반품 흐름 (6단계)" },
     { href: "#exchange", label: "6. 교환 흐름 + 새 주문" },
     { href: "#payment", label: "7. 결제 상태 (paymentStatus)" },
     { href: "#cancel", label: "8. 취소 흐름" },
-    { href: "#pitfalls", label: "9. 자주 헷갈리는 포인트" },
+    { href: "#fulfillment-tools", label: "9. 출고 보조 도구 — 변형 SKU·송장·운임" },
+    { href: "#pitfalls", label: "10. 자주 헷갈리는 포인트" },
   ];
   return (
     <JmCard>
@@ -598,10 +600,15 @@ function SectionAddon() {
 
 function SectionRefund() {
   return (
-    <Section id="refund" title="5. 반품 흐름 (5단계)">
+    <Section id="refund" title="5. 반품 흐름 (6단계)">
       <p>
-        손님이 반품 요청 → 매장 결정 → 회수 → 검수 → 종결. 색은{" "}
-        <strong>노랑</strong> (warning) 톤으로 통일.
+        손님이 반품 요청 → 매장 결정 → 회수 (라벨 발급/도착) → 검수 → 종결. 색은{" "}
+        <strong>노랑</strong> (warning) 톤으로 통일. 워크보드 외{" "}
+        <strong>전용 batch 처리 페이지</strong>{" "}
+        <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+          /orders/claims
+        </code>{" "}
+        에서 단계별 그룹 KPI + 액션 inline 으로 빠르게 처리 가능.
       </p>
 
       <StepRow
@@ -625,9 +632,10 @@ function SectionRefund() {
           <StatusBadge status="RETURN_ACCEPTED" claimType={REFUND_CTX} />
         }
         title="반품 회수대기"
-        what="매장 수락. 손님 반송 또는 매장 회수 라벨 발급 후 물품 도착 대기."
+        what="매장 수락. 택배 회수 라벨 발급 또는 매장 직접 회수 분기 결정 단계."
         actions={[
-          { who: "매장", what: "물품 도착 시 [회수완료]" },
+          { who: "매장", what: "[회수 시작] — 택배 회수 라벨 발급 후 운송 시작" },
+          { who: "매장", what: "[회수완료] — 매장 직접 회수해 즉시 검수로" },
           {
             who: "자동",
             what: "외부 채널이면 채널 시스템에 acceptReturn 자동 통보",
@@ -637,19 +645,26 @@ function SectionRefund() {
       <StepRow
         no={3}
         badge={
+          <StatusBadge status="RETURN_PICKING" claimType={REFUND_CTX} />
+        }
+        title="반품 회수중"
+        what="택배 회수 라벨 발급됨. 손님 → 매장 운송 중. 매장 직접 회수 케이스에서는 이 단계 생략."
+        actions={[{ who: "매장", what: "물품 도착 시 [회수완료]" }]}
+      />
+      <StepRow
+        no={4}
+        badge={
           <StatusBadge status="RETURN_COLLECTED" claimType={REFUND_CTX} />
         }
         title="회수완료"
         what="물품 매장 도착. 검수 대기."
-        actions={[{ who: "매장", what: "포장 상태·기능·외관 검수 후 [검수완료]" }]}
-        sideEffect={
-          <>
-            검수 결과 불량(포장 손상·사용 흔적 등) 시 별도 분기 처리 가능 — <em>현재는 검수 반려 분기 미구현</em>, 후속 작업 예정.
-          </>
-        }
+        actions={[
+          { who: "매장", what: "포장 상태·기능·외관 검수 후 [검수완료]" },
+          { who: "매장", what: "[검수 반려] — 불량 발견 시 손님 반송, COMPLETED 복귀" },
+        ]}
       />
       <StepRow
-        no={4}
+        no={5}
         badge={
           <StatusBadge status="RETURN_INSPECTED" claimType={REFUND_CTX} />
         }
@@ -673,7 +688,7 @@ function SectionRefund() {
         }
       />
       <StepRow
-        no={5}
+        no={6}
         badge={<StatusBadge status="RETURNED" claimType={REFUND_CTX} />}
         title="반품완료"
         what="재고 복원 + 환불 종결. 종결 상태이므로 워크보드에서 빠짐."
@@ -910,11 +925,131 @@ function SectionCancel() {
   );
 }
 
-// ─────────── 7. 자주 헷갈리는 포인트
+// ─────────── 9. 출고 보조 도구 — 변형 SKU·송장·운임 (2026-05-10 추가)
+
+function SectionFulfillmentTools() {
+  return (
+    <Section
+      id="fulfillment-tools"
+      title="9. 출고 보조 도구 — 변형 SKU·송장·운임 정책"
+    >
+      <p>
+        2026-05-10 추가된 출고·반품 운영 보조 기능들. 워크보드/상세 시트에서 자주
+        보게 되는 요소들.
+      </p>
+
+      <h3 className="mt-4 text-jm-md font-semibold">변형/옵션 출고 SKU 선택</h3>
+      <p>
+        외부 채널이 <strong>대표상품(canonical)</strong> 또는{" "}
+        <strong>OPTION_PARENT(옵션 placeholder)</strong> SKU 로 주문을 보내면, 매장이
+        출고대기 진입 시 실제 출고할 변형/SWAP 옵션을 직접 선택해야 한다 (POS
+        흐름과 동일).
+      </p>
+      <ul className="ml-5 list-disc space-y-1 text-jm-sm">
+        <li>
+          워크보드 행에 <strong>"변형 미확정"</strong> /{" "}
+          <strong>"옵션 미확정"</strong> 노란 배지 — PENDING + canonical/OPTION_PARENT 일 때만 노출
+        </li>
+        <li>
+          <strong>[출고대기]</strong> 클릭 시 가드 에러 → 자동으로 변형 선택 다이얼로그 오픈
+          → 일괄 해결 → prepare 자동 재시도
+        </li>
+        <li>
+          상세 시트에서도 라인 옆 <strong>[출고 SKU 선택]</strong> 버튼으로 단건 처리
+          가능 (PENDING 한정)
+        </li>
+        <li>
+          API 가드: <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+            isCanonical || productType === "OPTION_PARENT"
+          </code>{" "}
+          모두 차단. 응답에 <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+            unresolvedItemIds
+          </code>{" "}
+          포함
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-jm-md font-semibold">반품 처리 전용 뷰 — /orders/claims</h3>
+      <p>
+        워크보드는 출고+반품을 모두 다루므로 클레임 batch 처리 시 어수선함. 4
+        단계 (요청 접수 / 회수 대기 / 회수 중 / 회수 완료 / 검수 완료) 별 KPI +
+        액션 inline 으로 빠르게 처리.
+      </p>
+      <ul className="ml-5 list-disc space-y-1 text-jm-sm">
+        <li>RETURN_REQUESTED → 수락 / 반려</li>
+        <li>RETURN_ACCEPTED → 회수 시작 / 회수완료</li>
+        <li>RETURN_PICKING → 회수완료</li>
+        <li>RETURN_COLLECTED → 검수완료</li>
+        <li>RETURN_INSPECTED → 반품완료 / 교환완료</li>
+      </ul>
+
+      <h3 className="mt-5 text-jm-md font-semibold">송장 사전 등록</h3>
+      <p>
+        PREPARING 단계에서 미리 송장 정보 입력 → 출고확정(ship) 시 자동 prefill.
+        포장하면서 외부 시스템에서 발급한 송장번호를 즉시 ERP 에 저장해두면 발송
+        클릭 시 따로 다시 입력 안 해도 됨.
+      </p>
+
+      <h3 className="mt-5 text-jm-md font-semibold">운임 자동 정책 (교환 -EX)</h3>
+      <p>
+        교환 -EX 새 주문 생성 시{" "}
+        <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+          claimReason
+        </code>{" "}
+        의 책임 매핑 (shop / customer / shared) 기반으로{" "}
+        <strong>shippingPaymentType</strong> 자동 설정 + memo 안내 부여.
+      </p>
+      <ul className="ml-5 list-disc space-y-1 text-jm-sm">
+        <li>
+          shop (DEFECTIVE/DAMAGED_IN_TRANSIT/WRONG_ITEM) → STORE_BURDEN 자동
+        </li>
+        <li>customer (CHANGE_MIND) → COD 자동 (착불)</li>
+        <li>shared (SIZE_COLOR/OTHER) → PREPAID — 매장 직원이 직접 결정</li>
+      </ul>
+
+      <h3 className="mt-5 text-jm-md font-semibold">PARTIAL_REFUND 매출 계산</h3>
+      <p>
+        통합 판매내역 (<code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+          /sales/history
+        </code>
+        ) 의 부분 환불 처리 — 항목별{" "}
+        <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+          refundedAmount
+        </code>{" "}
+        합계로 순매출 자동 차감.{" "}
+        <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+          partialRefundAmount
+        </code>{" "}
+        필드가 row 응답에 포함되어 UI 가 strike + 차감 표시 가능.
+      </p>
+
+      <h3 className="mt-5 text-jm-md font-semibold">자동 알림 (Solapi)</h3>
+      <p>
+        환경변수 (<code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+          SOLAPI_API_KEY
+        </code>{" "}
+        등) 설정 시 SMS 자동 발송. 카카오 알림톡은{" "}
+        <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+          SOLAPI_KAKAO_TPL_*
+        </code>{" "}
+        템플릿 ID 환경변수로 활성화.
+      </p>
+      <ul className="ml-5 list-disc space-y-1 text-jm-sm">
+        <li>complete (배송완료) → 손님 ORDER_DELIVERED</li>
+        <li>accept_return / reject_return → 손님 통지</li>
+        <li>exchange (전체+부분) → 차액 결제 안내 EXCHANGE_DIFFERENT_PAYMENT</li>
+        <li>채널 보류 큐 임계값 초과 → 매장 ADMIN PENDING_QUEUE_THRESHOLD</li>
+        <li>진단 대기 N일 (cron noshow-policy) → ADMIN 이메일</li>
+      </ul>
+    </Section>
+  );
+}
+
+// ─────────── 10. 자주 헷갈리는 포인트
 
 function SectionPitfalls() {
   return (
-    <Section id="pitfalls" title="9. 자주 헷갈리는 포인트">
+    <Section id="pitfalls" title="10. 자주 헷갈리는 포인트">
       <Pitfall title='"출고대기" vs "출고확정" 차이'>
         출고대기 = 재고 차감만 됨 (포장 시작 가능). 출고확정 = 포장·송장 입력
         완료 (발송 직전). 매장이 두 번 클릭하는 건 운영 정확도 — 누가 언제 포장

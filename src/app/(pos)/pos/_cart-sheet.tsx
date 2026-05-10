@@ -199,7 +199,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
                 <button
                   type="button"
                   onClick={() => setQuotationLoadOpen(true)}
-                  className="rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[12px] font-semibold text-[var(--jm-text)] ring-1 ring-[var(--jm-border)] active:bg-[var(--jm-bg)]"
+                  className="rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[12px] font-semibold text-[var(--jm-text)] border border-[var(--jm-border)] active:bg-[var(--jm-bg)]"
                 >
                   이전 견적서에서 불러오기
                 </button>
@@ -392,7 +392,7 @@ function ActionButton({
       className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-center transition-colors ${
         active
           ? "bg-[var(--jm-success-bg)] ring-1 ring-emerald-300"
-          : "bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] active:bg-[var(--jm-bg)]"
+          : "bg-[var(--jm-surface)] border border-[var(--jm-border)] active:bg-[var(--jm-bg)]"
       } disabled:opacity-40`}
     >
       <span

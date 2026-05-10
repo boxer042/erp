@@ -383,7 +383,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl bg-[var(--jm-surface)] p-4 ring-1 ring-[var(--jm-border)]">
+    <section className="rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]">
       <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {title}
       </h3>
@@ -427,7 +427,7 @@ function StatCard({
   amount: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]">
+    <div className="flex flex-col gap-0.5 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]">
       <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
@@ -514,7 +514,7 @@ function ProfileSkeleton() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-32 animate-pulse rounded-2xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)]"
+              className="h-32 animate-pulse rounded-2xl bg-[var(--jm-surface)] border border-[var(--jm-border)]"
             />
           ))}
         </div>

@@ -137,7 +137,7 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
             )}
             <div className="mt-0.5 flex flex-wrap items-center gap-1">
               {item.isAddon && (
-                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)] ring-1 ring-[var(--jm-border)]">
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)] border border-[var(--jm-border)]">
                   추가구매
                 </span>
               )}

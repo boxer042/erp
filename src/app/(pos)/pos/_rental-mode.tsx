@@ -148,7 +148,7 @@ function AssetCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-surface)] p-3 text-left ring-1 ring-[var(--jm-border)] transition-all active:scale-[0.98] sm:hover:ring-[var(--jm-border-strong)] sm:hover:shadow-sm"
+      className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-surface)] p-3 text-left border border-[var(--jm-border)] transition-all active:scale-[0.98] sm:hover:ring-[var(--jm-border-strong)] sm:hover:shadow-sm"
     >
       <span className="line-clamp-2 min-h-[2.4em] text-[13px] font-semibold leading-tight text-[var(--jm-text)]">
         {asset.name}
@@ -168,7 +168,7 @@ function GridSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)]"
+          className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]"
         >
           <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
           <div className="h-4 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
