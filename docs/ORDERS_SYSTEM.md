@@ -178,6 +178,27 @@ exchangedFromOrders  Order[]  @relation("OrderExchange")  // reverse
 - **출고예정**: 출고 흐름이면 D+N / 오늘 / 지연. 반품 처리 단계면 단계 텍스트 ("결정 대기" / "회수 대기" / "검수 대기" / "종결 대기")
 - **결제**: PaymentStatusBadge `showPaid=true` — 모든 행에 dot (외상=빨강, 결제완료=초록, 환불진행=노랑)
 - **합계**: 단순 금액. REFUNDED·SALES_CANCELLED·PARTIAL_REFUND 만 line-through
+- **고객/항목**: 고객명 + 항목 요약 + (있을 때) **부분 처리/분할 progress bar** — `<PartialProgress>` 컴포넌트가 mini bar + N/M 텍스트로 진행률 표시
+
+### 부분 처리 / 분할 발송 표시 정책 ⚠️
+
+워크보드 "고객/항목" 셀에 표시되는 진행률 의미:
+
+| 케이스 | 조건 | 표시 |
+|---|---|---|
+| 출고 진행 중 | PREPARING/PREPARING_PACKED/SHIPPED + `0 < shipped < total` | `발송 N/M` (info 파랑 progress bar) |
+| 반품 진행 중 | COMPLETED + `0 < returned < total` | `반품 N/M` (warning 노랑) |
+| 부분 종결 | RETURNED/EXCHANGED + `returned < total` | `반품 N/M` 또는 `교환 N/M` (muted 회색 — 잔량 정상 종결) |
+| 분할 발송 이력 | SHIPPED/COMPLETED + `shipmentCount ≥ 2` | `완료 N/N · 분할 N회` (full bar info) |
+
+`total`/`N` 은 카트 내 **모든 OrderItem.quantity 합계** 기준 (units 합).
+
+**"분할 발송" 의 정의** — `Order.shipmentCount` 는 `partial_ship` / `ship` 액션 호출 회차를 누적. `≥ 2` 면 분할로 표시되며 두 케이스 모두 포함:
+
+1. **수량 분할** — 한 OrderItem 의 일부 수량 먼저 발송 + 잔여 추후 (예: A품목 10개 중 8개 + 2개)
+2. **라인 분할** — 카트의 다른 품목을 별도 회차로 발송 (각 라인은 한 번에 다 보냈더라도 회차 분리, 예: `[A:3, B:2]` 에서 A 먼저 + B 나중)
+
+광의 정의 채택 이유: 손님 입장에선 두 케이스 모두 "여러 박스 따로 도착" 으로 동일하고, 매장 입장에서도 "여러 번 송장 발급" 운영 부담이 같음. 단일 회차(1회) 는 일반 발송으로 간주하고 표시 생략 (노이즈 감소). 사용자 가이드는 [/orders/help](../src/app/(dashboard)/orders/help/page.tsx) `#partial` 섹션 참고.
 
 ### 액션 footer (상세 시트)
 
@@ -311,6 +332,17 @@ model Order {
 
 ### 우선순위 높음 (도메인 정합성)
 
+#### 0. 분할 송장 (Shipment / ShipmentItem) — 진행 중
+- 현재 `Order.trackingCarrier`/`trackingNumber` 단일 필드 — 라인별 다른 송장번호 등록 불가
+- 한 주문 안 여러 회차 발송할 때 마지막 송장이 이전 송장 덮어쓰기 → 운영 사고 위험
+- 모델 설계:
+  ```prisma
+  Shipment        — orderId, shipmentNo(주문 안 unique), trackingCarrier, trackingNumber, shippedAt, memo
+  ShipmentItem    — shipmentId, orderItemId, quantity
+  ```
+- 기존 `Order.trackingCarrier/Number` 는 "최신 송장 캐시" 로 deprecated 보존
+- 네이버·쿠팡·11번가·G마켓 모두 라인 단위 송장 + 분할 송장이 표준
+
 #### 1. 차액 결제 자동 청구·환불
 - EXCHANGE_DIFFERENT 차액은 표시만. 실제 결제·환불은 매장 수동
 - 알림 시스템 인터페이스 도입됨 → Phase 2 후 실 SaaS 어댑터 등록 시 차액 안내 자동화 가능
@@ -324,6 +356,30 @@ model Order {
 #### 3. 다중·variant 매핑 — 후속 PR
 - 한 채널 SKU 가 ERP 세트 상품 또는 variant 여러 개로 매핑
 - 큰 작업: ChannelProductMapping 1:1 → 1:N + import.ts 풀어내기 알고리즘 + UI
+
+#### 4. 옵션 / 추가상품 도메인 모델 — 후속 (분할 송장 후 재논의)
+한국 오픈마켓(네이버·쿠팡·11번가·G마켓) 모두 옵션 SKU·추가상품을 **별도 OrderItem 라인** 으로 처리. 현재 우리는 라인 분리는 OK 지만 **메인-옵션·메인-추가상품 관계가 모델에 없음**.
+
+**필요한 모델 변경**:
+- `OrderItem.lineRole` enum: `MAIN` / `OPTION` / `ADDON` — 라인 종류 식별
+- `OrderItem.parentItemId` — 같은 주문 내 메인 라인 link. 추가구매는 어느 메인에 attach 됐는지 추적 (분석·반품 cascade 용)
+- `OrderItem.optionSnapshot` (JSON) — 주문 시점 옵션값 보존 (`{"색상": "화이트", "사이즈": "L"}`). Product 옵션 변경에도 안전
+- (선택) `Product.parentProductId` 또는 `ProductOption` 모델 — catalog-level 메인-옵션 관계. POS 자동 추천·매출 분석 페이지 만들 때 추가
+
+**비즈니스 가치**:
+- 옵션별 판매·재고 회전율
+- 추가구매 attach rate (메인 산 손님 중 N% 가 추가도 같이 삼)
+- 메인+추가구매 조합 마진율
+- 추천 시스템 input — co-purchase 로그
+
+**시각 표시 안 (D 안 채택 예정)**:
+- 메인: 표시 없음
+- 옵션: 상품명에 옵션값 부속 텍스트 (`가습기 (화이트 · L)`)
+- 추가구매: accent variant `[추가구매]` 작은 배지 — 메인 흐름과 시각 분리
+
+**정책 결정 필요**:
+- 메인 반품/취소 시 추가구매: A) cascade B) 매장 별도 결정 C) 분리 유지 — 일반적으로 A
+- 메인 부분 반품 시 추가구매: 일반적으로 통째로 영향 (수량 무관)
 
 ### 우선순위 중간 (확장 기능)
 
