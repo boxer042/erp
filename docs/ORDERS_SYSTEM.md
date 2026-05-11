@@ -330,99 +330,49 @@ model Order {
 
 ## 8. 한계와 후속 작업
 
-### 우선순위 높음 (도메인 정합성)
+> 2026-05-11 정리 — 도메인 정합성·UX 항목은 모두 완료. 남은 건 외부 가입·승인 대기성 항목과 의도적 미구현뿐.
 
-#### 0. 분할 송장 (Shipment / ShipmentItem) — ✓ 완료 (2026-05)
-- `Shipment`/`ShipmentItem` 모델 + 회차별 발송 이력 UI 도입. `Order.trackingCarrier/Number` 는 "최신 송장 캐시" 로 deprecated 보존.
+### 외부 가입·승인 대기 (블로커)
 
-#### 1. 차액 결제 자동 청구·환불
-- EXCHANGE_DIFFERENT 차액은 표시만. 실제 결제·환불은 매장 수동
-- 알림 시스템 인터페이스 도입됨 → Phase 2 후 실 SaaS 어댑터 등록 시 차액 안내 자동화 가능
+#### Phase 2 — 실 채널 어댑터 endpoint
+- 쿠팡/네이버 어댑터 framework + HMAC/OAuth 인증 준비됨 ([`lib/channels/coupang.ts`](../src/lib/channels/coupang.ts), [`naver.ts`](../src/lib/channels/naver.ts))
+- 셀러 가입 후 환경변수 (`COUPANG_VENDOR_ID/ACCESS_KEY/SECRET_KEY`, `NAVER_CLIENT_ID/SECRET`) 설정 → registry 자동 등록 → 메서드별 TODO endpoint 채우면 활성
+- 한 단계 뒤 자동 활성화 항목: 재고 sync push, 송장 자동 push, retry 큐, 옵션 매핑
 
-#### 2. 부분 처리 (부분 출고/반품/환불) — ✓ 완료 (2026-05)
-- `OrderItem.shippedQty`/`returnedQty`/`refundedAmount` + partial_ship 액션 + 항목별 잔여 prefill UI 도입
-- PARTIAL_REFUND 실사용 가능 — LotConsumption 부분 복원 알고리즘 동작 중
-- 잔여 후속: 통합 판매내역 `/sales/history` 의 PARTIAL_REFUND 매출 계산이 아직 전액 매출로 잡음 — `returnedQty`/`refundedAmount` 기반 보강 필요
+#### Phase 5 — Inbound webhook 핸들러 본체 ⏸ Phase 2 의존
+- [`/api/webhooks/channels/[code]`](../src/app/api/webhooks/channels/[code]/route.ts) 라우트 + 이벤트 dispatch framework 완성
+- 어댑터의 `verifyWebhookSignature` / `parseWebhookEvent` 채우면 자동 동작
 
-#### 3. 다중·옵션·variant 매핑 — 부분 완료 (2026-05)
-- ✓ 단일 매핑 (`productId`) / ✓ 세트 매핑 (`components[]` 1:N) / ✓ 옵션값 매핑 (`productOptionValueId` SWAP 모드 — 채널의 색상·사이즈 SKU → ERP 옵션값)
-- 미구현: 한 채널 SKU 가 메인 + 옵션 + 추가구매 조합을 동시에 결정 (현재는 셋 중 하나만 활성). 한국 오픈마켓 일부 패턴
-- variant(변형상품) 자동 매핑은 의도적으로 미구현 — 매장 운영 흐름상 출고대기 진입 시 직원이 직접 선택 (POS 와 동일). [_variant-resolve-dialog.tsx](../src/app/(dashboard)/orders/_variant-resolve-dialog.tsx) 가 그 UI
+#### Solapi 카카오 알림톡 템플릿
+- Solapi 어댑터는 SMS 까지 작동 ([`lib/notifications/solapi.ts`](../src/lib/notifications/solapi.ts))
+- 카카오 비즈 채널 PFID + 템플릿 사전 승인 후 환경변수 (`SOLAPI_KAKAO_TPL_*`) 설정 → `KAKAO_TEMPLATE_BY_KIND` 가 kind 별 templateId 자동 lookup
+- 미설정 kind 는 SMS 폴백
 
-#### 3-bis. 변형/옵션 출고 SKU 선택 UI — ✓ 완료 (2026-05-10)
-외부 채널이 canonical(대표상품) 또는 OPTION_PARENT SKU 로 주문을 보냈을 때, 매장이 출고대기 진입 시 실제 출고 SKU(변형 또는 SWAP 옵션 mappedProduct) 를 선택하는 흐름:
-- API: `prepare` 가드가 `isCanonical || productType === "OPTION_PARENT"` 모두 차단. 응답에 `unresolvedItemIds` 포함
-- API: `PUT /api/orders/[id]/items/[itemId]` 가 canonical→variant / OPTION_PARENT→SWAP 양쪽 통합 처리
-- UI: 워크보드 행 "변형 미확정"/"옵션 미확정" 노란 배지 + [출고대기] 가드 에러 시 자동 다이얼로그 → 일괄 해결 → prepare 자동 재시도
-- UI: 상세 시트 라인 옆 [출고 SKU 선택] 버튼 (단일 라인 처리)
-- 검증: [scripts/seed-variant-test-order.ts](../scripts/seed-variant-test-order.ts)
+#### EXCHANGE_DIFFERENT 차액 자동 결제·환불 (PG 등록 대기)
+- 현재는 차액을 `ExchangeReplacementCard` 에 표시만, 실 결제·환불은 매장 수동
+- [`lib/payments/dispatch.ts`](../src/lib/payments/dispatch.ts) Mock PG dispatcher 작동 — Toss/PortOne 어댑터 등록만 추가하면 자동 활성
 
-#### 4. 옵션 / 추가상품 도메인 모델 — ✓ 완료 (2026-05)
-한국 오픈마켓(네이버·쿠팡·11번가·G마켓) 모두 옵션 SKU·추가상품을 **별도 OrderItem 라인** 으로 처리. 현재 우리는 라인 분리는 OK 지만 **메인-옵션·메인-추가상품 관계가 모델에 없음**.
+### 의도적 미구현 / 정책 결정 대기
 
-**필요한 모델 변경**:
-- `OrderItem.lineRole` enum: `MAIN` / `OPTION` / `ADDON` — 라인 종류 식별
-- `OrderItem.parentItemId` — 같은 주문 내 메인 라인 link. 추가구매는 어느 메인에 attach 됐는지 추적 (분석·반품 cascade 용)
-- `OrderItem.optionSnapshot` (JSON) — 주문 시점 옵션값 보존 (`{"색상": "화이트", "사이즈": "L"}`). Product 옵션 변경에도 안전
-- (선택) `Product.parentProductId` 또는 `ProductOption` 모델 — catalog-level 메인-옵션 관계. POS 자동 추천·매출 분석 페이지 만들 때 추가
+#### variant 자동 매핑
+의도적 미구현. 매장 운영 흐름상 출고대기 진입 시 직원이 직접 변형 선택 (POS 와 동일). [_variant-resolve-dialog.tsx](../src/app/(dashboard)/orders/_variant-resolve-dialog.tsx) 가 그 UI.
 
-**비즈니스 가치**:
-- 옵션별 판매·재고 회전율
-- 추가구매 attach rate (메인 산 손님 중 N% 가 추가도 같이 삼)
-- 메인+추가구매 조합 마진율
-- 추천 시스템 input — co-purchase 로그
+#### 메인 반품/취소 시 추가구매 cascade
+현재 분리 유지 — 추가구매 라인은 메인과 별도로 처리됨 (`parentItemId` 추적은 되어 있어 cascade 정책 추가 시 즉시 구현 가능). 운영 데이터 쌓이면 정책 결정 (일반적으로 A: cascade).
 
-**시각 표시 안 (D 안 채택 예정)**:
-- 메인: 표시 없음
-- 옵션: 상품명에 옵션값 부속 텍스트 (`가습기 (화이트 · L)`)
-- 추가구매: accent variant `[추가구매]` 작은 배지 — 메인 흐름과 시각 분리
+### 완료된 주요 항목 (참고)
 
-**정책 결정 필요**:
-- 메인 반품/취소 시 추가구매: A) cascade B) 매장 별도 결정 C) 분리 유지 — 일반적으로 A
-- 메인 부분 반품 시 추가구매: 일반적으로 통째로 영향 (수량 무관)
-
-### 우선순위 중간 (확장 기능)
-
-#### 4. 외부 채널 자동화 — 단계별 로드맵
-
-**Phase 1 — 도메인 layer (완료, 2026-05-07)**
-- 어댑터 인터페이스 (`ChannelAdapter`), import 변환 로직, SKU 매핑 모델·UI, 보류 큐, Mock 어댑터
-- `(channelId, channelOrderNo)` unique 인덱스로 중복 방지
-- `/channels/imports` 페이지 (Import 트리거·보류 큐·SKU 매핑)
-
-**Phase 2 — 실 채널 어댑터 (가입·API 키 후)** ⏸ 가입 대기
-- `lib/channels/coupang.ts`, `naver.ts` 등 채널별 어댑터 구현
-- OAuth 인증·토큰 갱신
-- 채널 API 응답 → `RawChannelOrder` 매핑
-- webhook signature 검증
-
-**Phase 3 — 자동 트리거 인프라 (부분 완료, 2026-05-07)**
-- ✓ Cron 라우트 (`/api/cron/channel-poll`)
-- 남은 작업: webhook 라우트 scaffolding, retry 큐
-
-**Phase 4 — Outbound 동기화 (부분 완료, 2026-05-07)**
-- ✓ ERP 액션 직후 adapter.* 자동 호출 (best-effort)
-- 남은 작업: 자동 retry 큐 (ChannelOutboundJob)
-
-**Phase 5 — 채널 → ERP 역방향 자동화 (Inbound)** ⏸ Phase 2 의존
-- 채널의 반품·정산 자동 ERP 전이
-
-**Phase 6+ — 운영 효율화 (부분 완료, 2026-05-10)**
-- ✓ SKU 자동 매핑 추천
-- ✓ 운영 대시보드 위젯
-- ✓ 옵션값(SWAP) 매핑
-- 남은 작업: 재고 sync, 메인+옵션+추가구매 동시 매핑, 임계값 알림, 채널 설정 페이지
-
-### 우선순위 낮음 (UX 개선)
-
-#### 5. 알림(SMS/이메일) 훅
-주문 상태 변경 시 고객 통지. Solapi/Twilio 등 외부 SaaS 연동.
-
-#### 6. 송장 사전 등록
-PREPARING 단계에서 송장 미리 발급. 현재는 PREPARING_PACKED 진입 시 입력.
-
-#### 7. 반품 처리 전용 뷰
-RETURN_* 만 모은 클레임 처리 batch 페이지.
+세부는 §9 변경 이력. 큰 항목만:
+- 분할 송장 (Shipment/ShipmentItem) + 품목별 행 워크보드 (2026-05)
+- 부분 출고/반품/환불 (OrderItem.shippedQty/returnedQty/refundedAmount + LotConsumption 부분 복원) (2026-05)
+- 다중 매핑 (1:N) + 옵션값 매핑(SWAP) + 메인+옵션+추가구매 동시 매핑 (`lineRole`/`parentItemId`/`optionSnapshot`) (2026-05)
+- 변형/옵션 출고 SKU 선택 UI + 워크보드 가드 (2026-05-10)
+- 외부 채널 자동화 Phase 1/3/4/6+ — 어댑터 인터페이스, import, SKU 매핑 UI, Cron 라우트, Outbound hook, retry 큐 (ChannelOutboundJob), 운영 대시보드 위젯, 재고 sync, 임계값 알림, 채널 설정 다이얼로그 (2026-05-07 ~ 10)
+- 송장 사전 등록 (PREPARING 단계 미리 입력) (2026-05-10)
+- 반품 처리 전용 뷰 (`/orders/claims`) (2026-05-10)
+- 운임 자동 청구 정책 (claimReason → liability → -EX shippingPaymentType 자동) (2026-05-10)
+- 알림 시스템 (Solapi SMS · EXCHANGE_DIFFERENT_PAYMENT 자동 안내) (2026-05-10)
+- PARTIAL_REFUND 매출 계산 (sales/history) (2026-05-10)
 
 ---
 

@@ -266,23 +266,21 @@ POS 모든 화면은 **`Jm*` primitive** 와 `var(--jm-*)` 토큰만 사용. sha
 
 ## 9. 후속작업
 
-### 우선순위 높음
+> 2026-05-11 정리 — POS 도메인은 본 영역 작업 모두 완료. 남은 건 외부 채널 도메인(쿠팡/네이버 가입 대기)이 끝나면 워크보드로 자동 합류되는 부분뿐.
 
-- **견적서 → POS 카트 로드** — 발행된 Quotation 을 `/pos` 카트로 다시 불러와 결제하는 흐름. 메뉴/검색에 "견적서 검색" 탭 추가, 선택 시 새 PosSession 생성 + 라인 채움 + customer 자동 연결. 결제 완료 시 Quotation.status = CONVERTED 락
-- **결제로 이동 액션 완성** — 수리관리 [결제로 이동] 이 현재는 손님 카드 부활까지만. RepairTicket 의 RepairPart/RepairLabor 합계로 카트 라인 자동 생성 필요
+### 외부 의존 (블로커)
 
-### 우선순위 중간
+- **외부 채널 자동 import** — 쿠팡/네이버 가입 후 [주문 도메인 §8](ORDERS_SYSTEM.md#8-한계와-후속-작업) Phase 2 어댑터 endpoint 완성 시 자동 연결
 
-- **자동 만료 / 노쇼 처리** — 지난 RESERVED 임대 일괄 EXPIRED, 진단 대기 N일 이상 알림. 매장 정책 페이지로 임계값 설정
-- **저장된 상담 검색·정렬** — 양 늘어나면 손님 이름/저장일 검색 필요. 현재는 단순 리스트
-- **손님 카드 X undo 토스트** — "그냥 닫기" 5초 안에 되돌리기 버튼 (soft delete 라 server-side 복구 가능)
-- **외부 채널 자동 import** — 쿠팡/네이버 주문이 워크보드로 합류 (주문 도메인의 후속작업과 연결)
+### 완료된 주요 항목 (참고)
 
-### 우선순위 낮음
-
-- **저장된 상담 → 견적서 일괄 변환** — 1~2달 뒤 가져올 때 한 번에 견적서까지 발행
-- **POS_V1_V2_COMPARISON.md historical 정리** — v1 폐기 완료, 이 문서가 단일 출처가 된 시점에서 v1/v2 비교는 archive
-- **repair-v2 디렉토리명 정리 잔재** — 컴포넌트명 RepairDetail 등은 정리됨, queryKey/displayName 일관성 점검
+- 견적서 → POS 카트 로드 (빈 카트 CTA + `replaceItems` context helper) (2026-05-10)
+- 결제로 이동 액션 완성 (수리관리 → 손님 카드 부활 + repair 라인 자동 inject + 중복 가드) (2026-05-10)
+- 자동 만료/노쇼 cron (`/api/cron/noshow-policy` — RESERVED 임대 → CANCELLED + 진단 대기 N일 ADMIN 이메일) (2026-05-10)
+- 저장된 상담 검색·정렬 (이름·전화·라벨 / 최근·오래된·라인많은·이름순) (2026-05-10)
+- 손님 카드 X 그냥닫기 5초 undo 토스트 (`restoreSession`) (2026-05-10)
+- 저장된 상담 → 견적서 일괄 변환 (`/api/pos/sessions/[sid]/issue-quotation`) (2026-05-10)
+- POS_V1_V2_COMPARISON.md → `docs/archive/` 이동 (2026-05-10)
 
 ---
 

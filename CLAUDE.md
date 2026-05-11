@@ -1340,10 +1340,7 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 코드 진입점: [src/app/(dashboard)/sales/history/](src/app/(dashboard)/sales/history/) · [src/app/api/sales/history/](src/app/api/sales/history/)
 
 **우선순위 낮음**:
-- **사이드바 메뉴 위치 검토** — `/sales/history` 가 "통합 판매내역"이라는 트랜잭션 추적 정체성을 갖게 됨. 현재 sidebar 카테고리(`sales-history`)가 매출 분석/리포트와 같은 그룹에 있는지 — 정책 결정 후 위치 재배치 검토
-
-**검증되지 않은 부분**:
-- **모달 in 모달 z-index/포커스 트랩** — `JmTableToolbarMore` 의 모바일 드로어 안에서 `JmComboboxModal` 트리거 → 모달이 드로어 위에 정상 노출되는지 (브라우저 직접 확인 필요)
+- **사이드바 메뉴 위치 검토** — `/sales/history` 가 "통합 판매내역"이라는 트랜잭션 추적 정체성을 갖게 됨. 현재 sidebar 카테고리(`sales-history`)가 매출 분석/리포트와 같은 그룹에 있는지 — 정책 결정 후 위치 재배치 검토 (다음 사이드바 일괄 정리 batch 에 합류)
 
 > 참고 — 2026-04 견적서·거래명세표 도입 당시 MVP에서 제외했던 ① 견적서 → Order/Incoming/PurchaseOrder 전환, ② 견적서 → 거래명세표 전환 UI, ③ 회사 정보 DB 이전(`CompanyInfo` 싱글턴) 은 모두 구현 완료. `/api/quotations/[id]/convert` 와 `/quotations` 페이지 전환 다이얼로그, `/api/company-info` 가 그 결과.
 
