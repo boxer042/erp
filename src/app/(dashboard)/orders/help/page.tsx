@@ -41,6 +41,7 @@ export default function OrderHelpPage() {
         <Toc />
         <SectionOverview />
         <SectionShipping />
+        <SectionWorkboard />
         <SectionPartial />
         <SectionOptions />
         <SectionRefund />
@@ -60,6 +61,7 @@ function Toc() {
   const items = [
     { href: "#overview", label: "1. 개요 — 3축 모델" },
     { href: "#shipping", label: "2. 출고 흐름 (5단계)" },
+    { href: "#workboard", label: "2-2. 워크보드 필터·검색 사용법" },
     { href: "#partial", label: "3. 부분 처리 / 분할 발송 정책" },
     { href: "#options", label: "4. 옵션 도메인 — SWAP / ADDON / OPTION_PARENT" },
     { href: "#addon", label: "4-3. ADDON 도메인 — 추가구매 추천 (BundleProduct)" },
@@ -256,6 +258,71 @@ function SectionShipping() {
           { who: "매장", what: "[즉시 반품] 으로 매장 즉석 환불 가능 (단축 경로)" },
         ]}
       />
+    </Section>
+  );
+}
+
+// ─────────── 2-2. 워크보드 필터·검색 사용법
+
+function SectionWorkboard() {
+  return (
+    <Section id="workboard" title="2-2. 워크보드 필터·검색 사용법">
+      <p>
+        워크보드(<code className="text-jm-2xs">/orders</code>)는 매장이 매일 가장
+        많이 보는 화면. 화면이 좁아도 모든 필터에 접근 가능하도록 두 가지 진입
+        방식을 제공합니다.
+      </p>
+
+      <h4 className="mt-4 text-jm-base font-semibold">상단 KPI 카드 (5개)</h4>
+      <p>
+        지연 · 오늘 출고 · 발송 중 · 예정일 미정 · 반품 처리. 각 카드는 클릭
+        가능한 토글 필터. 카드 누르면 해당 그룹만 워크보드에 노출, 다시 누르면
+        해제. 여러 카드를 동시에 활성화 가능 (OR 조건).
+      </p>
+
+      <h4 className="mt-4 text-jm-base font-semibold">툴바 필터 4종</h4>
+      <ul className="ml-5 list-disc space-y-1">
+        <li>
+          <strong>검색 입력</strong> — 주문번호 · 손님 이름 · 채널 주문번호.
+          종결된 주문(COMPLETED/RETURNED/EXCHANGED/CANCELLED)도 검색 시 결과에
+          포함 (운영자 과거 조회용)
+        </li>
+        <li>
+          <strong>채널 필터</strong> — &ldquo;전체 / 오프라인 / 외부 / 채널별&rdquo;.
+          채널별로 좁혀서 보기
+        </li>
+        <li>
+          <strong>종결 포함 토글</strong> — 검색어 없이도 종결 주문을 일반 리스트에
+          포함시킬지
+        </li>
+        <li>
+          <strong>운영 빈도 단축 필터 (칩)</strong> — 자주 쓰는 그룹 빠르게.
+          KPI 카드와 같은 효과
+        </li>
+      </ul>
+
+      <h4 className="mt-4 text-jm-base font-semibold">신규 주문 등록</h4>
+      <p>
+        우측 상단 <code className="text-jm-2xs">[+ 신규 주문]</code> — B2B 수동 주문
+        등록용 (POS 결제·외부 채널 import·견적서 전환과 별도 진입점). 등록 시 status =
+        PENDING, 재고 차감 안 됨.
+      </p>
+
+      <h4 className="mt-4 text-jm-base font-semibold">상세 시트 진입</h4>
+      <ul className="ml-5 list-disc space-y-1">
+        <li>행 클릭 → 우측 시트 슬라이드 — 단건 처리 (액션 footer 의 버튼)</li>
+        <li>
+          품목 단위 행(분할 발송 / 부분 반품 시) 클릭 → 같은 시트 + 해당 라인
+          하이라이트
+        </li>
+      </ul>
+
+      <h4 className="mt-4 text-jm-base font-semibold">반품 처리 전용 뷰</h4>
+      <p>
+        <code className="text-jm-2xs">/orders/claims</code> — RETURN_*
+        흐름만 모은 batch 처리 페이지. 4 그룹 KPI (요청/회수대기/회수중/검수) +
+        행 inline 액션. 반품 건수가 많을 때 클레임 일괄 처리에 효율적.
+      </p>
     </Section>
   );
 }

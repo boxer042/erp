@@ -26,6 +26,7 @@ import {
   JmPill,
   JmSearchInput,
   JmSelect,
+  JmSkeleton,
   JmSpinner,
   JmStat,
   JmTable,
@@ -393,9 +394,21 @@ export default function OrdersBoardPage() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <JmStat
             label="지연"
-            value={isPending ? "—" : counts.overdue}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                counts.overdue
+              )
+            }
             icon={<AlertCircle className="size-4" />}
-            hint={isPending ? "" : `${counts.overdue}건 즉시 처리`}
+            hint={
+              isPending ? (
+                <JmSkeleton className="h-3 w-20" />
+              ) : (
+                `${counts.overdue}건 즉시 처리`
+              )
+            }
             positiveIsGood={false}
             size="sm"
             interactive
@@ -404,9 +417,13 @@ export default function OrdersBoardPage() {
           />
           <JmStat
             label="오늘 출고"
-            value={isPending ? "—" : counts.today}
+            value={
+              isPending ? <JmSkeleton className="h-7 w-12" /> : counts.today
+            }
             icon={<Truck className="size-4" />}
-            hint={isPending ? "" : "오늘 안에 발송"}
+            hint={
+              isPending ? <JmSkeleton className="h-3 w-20" /> : "오늘 안에 발송"
+            }
             size="sm"
             interactive
             active={groupFilters.has("today")}
@@ -414,9 +431,13 @@ export default function OrdersBoardPage() {
           />
           <JmStat
             label="발송 중"
-            value={isPending ? "—" : counts.shipped}
+            value={
+              isPending ? <JmSkeleton className="h-7 w-12" /> : counts.shipped
+            }
             icon={<CalendarClock className="size-4" />}
-            hint={isPending ? "" : "인도 대기"}
+            hint={
+              isPending ? <JmSkeleton className="h-3 w-16" /> : "인도 대기"
+            }
             size="sm"
             interactive
             active={groupFilters.has("shipped")}
@@ -424,9 +445,21 @@ export default function OrdersBoardPage() {
           />
           <JmStat
             label="예정일 미정"
-            value={isPending ? "—" : counts.unscheduled}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                counts.unscheduled
+              )
+            }
             icon={<CalendarRange className="size-4" />}
-            hint={isPending ? "" : "예정일 채워주세요"}
+            hint={
+              isPending ? (
+                <JmSkeleton className="h-3 w-24" />
+              ) : (
+                "예정일 채워주세요"
+              )
+            }
             positiveIsGood={false}
             size="sm"
             interactive
@@ -435,9 +468,17 @@ export default function OrdersBoardPage() {
           />
           <JmStat
             label="반품 처리"
-            value={isPending ? "—" : counts.returnPending}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                counts.returnPending
+              )
+            }
             icon={<RotateCcw className="size-4" />}
-            hint={isPending ? "" : "수락·회수 대기"}
+            hint={
+              isPending ? <JmSkeleton className="h-3 w-20" /> : "수락·회수 대기"
+            }
             positiveIsGood={false}
             size="sm"
             interactive
@@ -690,7 +731,7 @@ export default function OrdersBoardPage() {
             <JmTable className="min-w-[1320px]">
               <JmTableHeader>
                 <JmTableRow>
-                  <JmTableHead className="w-[140px]">주문번호</JmTableHead>
+                  <JmTableHead className="w-[140px] sticky left-0 z-[2] bg-[var(--jm-surface-muted)] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] sm:static sm:shadow-none">주문번호</JmTableHead>
                   <JmTableHead className="w-[100px]">채널</JmTableHead>
                   <JmTableHead className="w-[80px]">출고</JmTableHead>
                   <JmTableHead className="w-[110px]">고객</JmTableHead>
@@ -764,11 +805,11 @@ export default function OrdersBoardPage() {
                     return (
                       <JmTableRow
                         key={row.rowKey}
-                        className={`cursor-pointer ${childRowClass}`}
+                        className={`group cursor-pointer ${childRowClass}`}
                         onClick={() => openDetail(order.id, item.id)}
                       >
-                        {/* 1. 주문번호 — 첫 행에만 (order-level) */}
-                        <JmTableCell>
+                        {/* 1. 주문번호 — 첫 행에만 (order-level). 모바일에선 sticky left */}
+                        <JmTableCell className="sticky left-0 z-[1] bg-[var(--jm-surface)] group-hover:bg-[var(--jm-surface-muted)] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] sm:static sm:bg-transparent sm:shadow-none">
                           {isFirstInGroup ? (
                             <div className="flex flex-col gap-0.5">
                               <span
