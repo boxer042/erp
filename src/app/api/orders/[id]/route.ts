@@ -332,7 +332,9 @@ export async function PUT(
       to: "COMPLETED",
     },
     refund: {
+      // COMPLETED 도 허용 — 매장 즉석 반품(단축경로). `return` 액션과 같은 분기에서 처리되므로 안전.
       from: [
+        "COMPLETED",
         "RETURN_INSPECTED",
         "RETURN_COLLECTED",
         "RETURN_PICKING",
