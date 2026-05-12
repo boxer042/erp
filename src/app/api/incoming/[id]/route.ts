@@ -52,7 +52,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { action } = body as { action?: "confirm" | "cancel" | "update" | "update-shipping" };
+  const { action } = body as { action?: "confirm" | "cancel" | "update" | "update-shipping" | "unconfirm" };
 
   const incoming = await prisma.incoming.findUnique({
     where: { id },
@@ -266,6 +266,285 @@ export async function PUT(
       // 4. 경비 레코드 — 헤더 + 품목 직접 운임 합산 통합 헬퍼
       await recalcIncomingExpense(tx, incoming.id);
     });
+
+    const updated = await prisma.incoming.findUnique({
+      where: { id },
+      include: {
+        supplier: { select: { id: true, name: true, paymentMethod: true } },
+        createdBy: { select: { name: true } },
+        items: {
+          include: {
+            supplierProduct: {
+              select: {
+                id: true, name: true, supplierCode: true, unitOfMeasure: true, unitPrice: true,
+                productMappings: {
+                  select: {
+                    id: true,
+                    product: { select: { id: true, name: true, sku: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return NextResponse.json(updated);
+  }
+
+  // === 확인된 입고 되돌리기 (CONFIRMED → PENDING) ===
+  if (action === "unconfirm") {
+    if (incoming.status !== "CONFIRMED") {
+      return NextResponse.json({ error: "확인된 입고만 되돌릴 수 있습니다" }, { status: 400 });
+    }
+
+    const itemIds = incoming.items.map((i) => i.id);
+
+    // 가드 1: 이 입고가 만든 로트 — 소진/차감 흔적 없어야 함
+    const ownLots = await prisma.inventoryLot.findMany({
+      where: { incomingItemId: { in: itemIds } },
+      select: {
+        id: true,
+        productId: true,
+        supplierProductId: true,
+        receivedQty: true,
+        remainingQty: true,
+        unitCost: true,
+        _count: { select: { consumptions: true } },
+      },
+    });
+
+    for (const lot of ownLots) {
+      if (lot._count.consumptions > 0) {
+        return NextResponse.json(
+          { error: "이 입고의 재고가 이미 출고·수리에 사용되었습니다. 되돌릴 수 없습니다" },
+          { status: 400 }
+        );
+      }
+      if (Number(lot.remainingQty) !== Number(lot.receivedQty)) {
+        return NextResponse.json(
+          { error: "이 입고의 재고가 반품·실사로 변경되었습니다. 먼저 그 처리를 되돌려 주세요" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 가드 2: 자동 매핑 트리거 흔적 식별 — confirm 시점 ±2초 이내 생성된 ProductMapping
+    const confirmAudit = await prisma.auditLog.findFirst({
+      where: { entity: "Incoming", entityId: id, action: "CONFIRM" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    const confirmAt = confirmAudit?.createdAt ?? incoming.updatedAt;
+    const windowStart = new Date(confirmAt.getTime() - 2000);
+    const windowEnd = new Date(confirmAt.getTime() + 2000);
+    const supplierProductIds = Array.from(new Set(incoming.items.map((i) => i.supplierProductId)));
+    const autoMappings = await prisma.productMapping.findMany({
+      where: {
+        supplierProductId: { in: supplierProductIds },
+        createdAt: { gte: windowStart, lte: windowEnd },
+      },
+      select: {
+        id: true,
+        supplierProductId: true,
+        productId: true,
+        conversionRate: true,
+        product: { select: { id: true, name: true, sku: true, autoMapped: true } },
+      },
+    });
+
+    // 가드 3: 자동 매핑의 conversionRate 가 1 이 아니면 사용자가 손댄 흔적 → 거부
+    for (const m of autoMappings) {
+      if (Number(m.conversionRate) !== 1) {
+        return NextResponse.json(
+          {
+            error: `자동 생성된 매핑의 환산비율이 변경되었습니다 (${m.product.sku} ${m.product.name} · 현재 ${Number(m.conversionRate)}). 매핑을 수동 정리해 주세요`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 가드 4: 자동 매핑에 의해 흡수된 과거 오르판 lot 들 — 이 입고 외에 같은 productId 를 가진 lot
+    const autoProductIds = autoMappings.map((m) => m.productId);
+    const absorbedLots = autoProductIds.length === 0
+      ? []
+      : await prisma.inventoryLot.findMany({
+          where: {
+            productId: { in: autoProductIds },
+            id: { notIn: ownLots.map((l) => l.id) },
+          },
+          select: {
+            id: true,
+            productId: true,
+            supplierProductId: true,
+            receivedQty: true,
+            remainingQty: true,
+            unitCost: true,
+            _count: { select: { consumptions: true } },
+          },
+        });
+
+    for (const lot of absorbedLots) {
+      if (lot._count.consumptions > 0) {
+        return NextResponse.json(
+          {
+            error: "이 입고 확정 시 흡수된 과거 입고의 재고가 이미 출고·수리에 사용되었습니다. 되돌릴 수 없습니다",
+          },
+          { status: 400 }
+        );
+      }
+      if (Number(lot.remainingQty) !== Number(lot.receivedQty)) {
+        return NextResponse.json(
+          {
+            error: "이 입고 확정 시 흡수된 과거 입고의 재고가 반품·실사로 변경되었습니다. 먼저 그 처리를 되돌려 주세요",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // === 복원 트랜잭션 ===
+    const auditUser = await getCurrentUser();
+    await prisma.$transaction(async (tx) => {
+      // 1. 이 입고 lot productId 별 합산 (Inventory 감소량)
+      const ownDecByProductId = new Map<string, number>();
+      for (const lot of ownLots) {
+        if (!lot.productId) continue;
+        ownDecByProductId.set(
+          lot.productId,
+          (ownDecByProductId.get(lot.productId) ?? 0) + Number(lot.receivedQty)
+        );
+      }
+
+      // 2. 흡수된 오르판 lot productId 별 합산 (Inventory 감소량) — 이 입고 분과 별도로 모음
+      const absorbedDecByProductId = new Map<string, number>();
+      for (const lot of absorbedLots) {
+        if (!lot.productId) continue;
+        absorbedDecByProductId.set(
+          lot.productId,
+          (absorbedDecByProductId.get(lot.productId) ?? 0) + Number(lot.remainingQty)
+        );
+      }
+
+      // 3. 이 입고 lot 삭제
+      await tx.inventoryLot.deleteMany({ where: { incomingItemId: { in: itemIds } } });
+
+      // 4. 흡수된 오르판 lot 들 → productId=null 로 되돌림 (rate=1 보장됐으므로 qty/unitCost 그대로)
+      if (absorbedLots.length > 0) {
+        await tx.inventoryLot.updateMany({
+          where: { id: { in: absorbedLots.map((l) => l.id) } },
+          data: { productId: null },
+        });
+      }
+
+      // 5. Inventory 감소 + avgCost 재계산 (자동 Product 인지 일반 Product 인지 구분 없이 동일 처리)
+      const allDecByProductId = new Map<string, number>();
+      for (const [pid, dec] of ownDecByProductId) {
+        allDecByProductId.set(pid, (allDecByProductId.get(pid) ?? 0) + dec);
+      }
+      for (const [pid, dec] of absorbedDecByProductId) {
+        allDecByProductId.set(pid, (allDecByProductId.get(pid) ?? 0) + dec);
+      }
+
+      await Promise.all(
+        Array.from(allDecByProductId.entries()).map(async ([productId, decQty]) => {
+          const remainingLots = await tx.inventoryLot.findMany({
+            where: { productId, remainingQty: { gt: 0 } },
+            select: { remainingQty: true, unitCost: true },
+          });
+          let avgCost: number | null = null;
+          if (remainingLots.length > 0) {
+            let totalQty = 0;
+            let totalCost = 0;
+            for (const l of remainingLots) {
+              const q = Number(l.remainingQty);
+              totalQty += q;
+              totalCost += q * Number(l.unitCost);
+            }
+            avgCost = totalQty > 0 ? totalCost / totalQty : null;
+          }
+          await tx.inventory.update({
+            where: { productId },
+            data: {
+              quantity: { decrement: decQty },
+              avgCost: avgCost as never,
+              avgCostUpdatedAt: new Date(),
+            },
+          });
+        })
+      );
+
+      // 6. InventoryMovement 삭제 — 이 입고의 INCOMING + 자동 매핑의 MAPPING_BACKFILL
+      await tx.inventoryMovement.deleteMany({
+        where: { referenceId: incoming.id, referenceType: "INCOMING" },
+      });
+      if (autoMappings.length > 0) {
+        await tx.inventoryMovement.deleteMany({
+          where: {
+            referenceId: { in: autoMappings.map((m) => m.id) },
+            referenceType: "MAPPING_BACKFILL",
+          },
+        });
+      }
+
+      // 7. 자동 ProductMapping 삭제 (자동 Product 자체는 유지 — 사용자가 /products 에서 수동 정리)
+      if (autoMappings.length > 0) {
+        await tx.productMapping.deleteMany({
+          where: { id: { in: autoMappings.map((m) => m.id) } },
+        });
+      }
+
+      // 8. SupplierLedger 삭제 (PURCHASE + 배송비차감 ADJUSTMENT) + rebalance
+      await tx.supplierLedger.deleteMany({
+        where: { referenceId: incoming.id, referenceType: "INCOMING" },
+      });
+      if (incoming.supplier.paymentMethod === "CREDIT") {
+        await rebalanceSupplierLedger(tx, incoming.supplierId);
+      }
+
+      // 9. Expense(SHIPPING) 삭제
+      await tx.expense.deleteMany({
+        where: { referenceId: incoming.id, referenceType: "INCOMING" },
+      });
+
+      // 10. IncomingItem.unitCostSnapshot 리셋 (재확인 시 새로 계산됨)
+      await tx.incomingItem.updateMany({
+        where: { incomingId: id },
+        data: { unitCostSnapshot: 0 },
+      });
+
+      // 11. Incoming.status = PENDING
+      await tx.incoming.update({
+        where: { id },
+        data: { status: "PENDING" },
+      });
+
+      // 12. 발주 기반이면 진행률 재계산 (CONFIRMED 가 빠지므로 receivedQty 감소)
+      if (incoming.purchaseOrderId) {
+        await recalcPurchaseOrderProgress(tx, incoming.purchaseOrderId);
+      }
+
+      // 13. 감사 로그
+      await recordAudit(tx, {
+        userId: auditUser?.id ?? null,
+        entity: "Incoming",
+        entityId: id,
+        action: "UNCONFIRM",
+        meta: {
+          from: "CONFIRMED",
+          to: "PENDING",
+          incomingNo: incoming.incomingNo,
+          autoMappingsRemoved: autoMappings.map((m) => ({
+            mappingId: m.id,
+            productId: m.productId,
+            sku: m.product.sku,
+            name: m.product.name,
+          })),
+          absorbedLotsRestored: absorbedLots.length,
+        },
+      });
+    }, { timeout: 30000, maxWait: 10000 });
 
     const updated = await prisma.incoming.findUnique({
       where: { id },

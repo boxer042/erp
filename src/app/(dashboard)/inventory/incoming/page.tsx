@@ -140,6 +140,7 @@ function IncomingPageInner() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [unconfirmDialogOpen, setUnconfirmDialogOpen] = useState(false);
 
   // 택배비 후기입
   const [shippingEditOpen, setShippingEditOpen] = useState(false);
@@ -686,6 +687,18 @@ function IncomingPageInner() {
   const handleCancel = (id: string) => cancelMutation.mutate(id);
   const cancelling = cancelMutation.isPending;
 
+  const unconfirmMutation = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/incoming/${id}`, "PUT", { action: "unconfirm" }),
+    onSuccess: () => {
+      toast.success("입고가 대기 상태로 되돌아갔습니다. 이제 품목을 수정할 수 있습니다.");
+      setUnconfirmDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "확정 취소 실패"),
+  });
+  const handleUnconfirm = (id: string) => unconfirmMutation.mutate(id);
+  const unconfirming = unconfirmMutation.isPending;
+
   const shippingEditMutation = useMutation({
     mutationFn: (vars: {
       id: string;
@@ -1043,31 +1056,40 @@ function IncomingPageInner() {
               </div>
             )}
             {viewMode === "statements" && detail?.status === "CONFIRMED" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const sc = parseFloat(detail.shippingCost) || 0;
-                  const total = sc > 0 ? String(sc) : "";
-                  setShippingEditCost(total);
-                  setShippingEditSupply(shippingToSupply(total, detail.shippingIsTaxable));
-                  setShippingEditIsTaxable(detail.shippingIsTaxable);
-                  setShippingEditDeducted(detail.shippingDeducted);
-                  // 품목별 override 초기화
-                  const overrides: Record<string, { value: string; taxable: boolean }> = {};
-                  for (const it of detail.items) {
-                    const v = it.itemShippingCost != null && it.itemShippingCost !== ""
-                      ? String(parseFloat(it.itemShippingCost))
-                      : "";
-                    overrides[it.id] = { value: v, taxable: it.itemShippingIsTaxable ?? true };
-                  }
-                  setShippingEditItemOverrides(overrides);
-                  setShippingEditOpen(true);
-                }}
-              >
-                <Pencil />
-                <span>{parseFloat(detail.shippingCost) > 0 ? "택배비 수정" : "택배비 추가"}</span>
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const sc = parseFloat(detail.shippingCost) || 0;
+                    const total = sc > 0 ? String(sc) : "";
+                    setShippingEditCost(total);
+                    setShippingEditSupply(shippingToSupply(total, detail.shippingIsTaxable));
+                    setShippingEditIsTaxable(detail.shippingIsTaxable);
+                    setShippingEditDeducted(detail.shippingDeducted);
+                    // 품목별 override 초기화
+                    const overrides: Record<string, { value: string; taxable: boolean }> = {};
+                    for (const it of detail.items) {
+                      const v = it.itemShippingCost != null && it.itemShippingCost !== ""
+                        ? String(parseFloat(it.itemShippingCost))
+                        : "";
+                      overrides[it.id] = { value: v, taxable: it.itemShippingIsTaxable ?? true };
+                    }
+                    setShippingEditItemOverrides(overrides);
+                    setShippingEditOpen(true);
+                  }}
+                >
+                  <Pencil />
+                  <span>{parseFloat(detail.shippingCost) > 0 ? "택배비 수정" : "택배비 추가"}</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setUnconfirmDialogOpen(true)}
+                >
+                  <X /><span>확정 취소</span>
+                </Button>
+              </div>
             )}
           </div>
 
@@ -1535,6 +1557,26 @@ function IncomingPageInner() {
                     <Button variant="destructive" onClick={() => handleCancel(detail.id)} disabled={cancelling}>
                       {cancelling ? <Loader2 className="animate-spin" /> : <X />}
                       <span>{cancelling ? "처리 중..." : "입고 취소"}</span>
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={unconfirmDialogOpen} onOpenChange={setUnconfirmDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader><DialogTitle>입고 확정 취소</DialogTitle></DialogHeader>
+                  <div className="space-y-2 py-2 text-sm text-muted-foreground">
+                    <p>확정된 입고를 <span className="text-foreground font-medium">대기 상태</span>로 되돌립니다. 품목 수정·재확정이 가능해집니다.</p>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                      <li>증가했던 재고 · 로트 · 거래처 원장 · 택배비 경비가 모두 원복됩니다.</li>
+                      <li>확정 시 자동 생성된 상품 매핑이 있으면 매핑이 끊기고 흡수된 과거 입고 로트는 다시 미매핑(오르판) 상태로 돌아갑니다.</li>
+                      <li>이 입고 재고나 흡수된 과거 입고 재고가 이미 <span className="text-foreground">출고·수리·반품·실사</span>에 사용·차감되었으면 취소가 차단됩니다.</li>
+                    </ul>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setUnconfirmDialogOpen(false)} disabled={unconfirming}>닫기</Button>
+                    <Button variant="destructive" onClick={() => handleUnconfirm(detail.id)} disabled={unconfirming}>
+                      {unconfirming ? <Loader2 className="animate-spin" /> : <X />}
+                      <span>{unconfirming ? "처리 중..." : "확정 취소"}</span>
                     </Button>
                   </DialogFooter>
                 </DialogContent>

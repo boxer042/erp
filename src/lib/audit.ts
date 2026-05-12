@@ -46,6 +46,7 @@ export type AuditAction =
   | "UPDATE"
   | "DELETE"
   | "CONFIRM"
+  | "UNCONFIRM"
   | "CANCEL"
   | "STATUS_CHANGE"
   | "IMPORT";
