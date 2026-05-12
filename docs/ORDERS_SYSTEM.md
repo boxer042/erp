@@ -378,6 +378,15 @@ model Order {
 
 ## 9. 변경 이력
 
+- **2026-05-12**: 환불 도메인 정식화 + UX batch + POS 단축 진입.
+  - **CustomerRefund 모델 신규** — Prisma `CustomerRefund` + `CustomerRefundMethod` enum (CARD_CANCEL/CASH/BANK_TRANSFER/POINTS/OTHER). 지금까지 [반품완료] 가 paymentStatus 만 REFUNDED 로 바꾸고 실제 환불 금액·방법·일자 미기록 → 회계상 추적 불가능했음. refund API 가 `refundInput` payload 받아 CustomerRefund row 자동 생성 (PAID/REFUND_PENDING 만 — UNPAID 는 기존 ledger ADJUSTMENT 그대로, exchange 는 paymentStatus 유지라 제외).
+  - **RefundDialog 확장** — 환불 금액·방법·일자·메모 입력. 진입 + 모드 토글 시 자동 채움. UNPAID 면 "외상 매출 취소" 안내. COMPLETED 즉시반품(return)도 같은 다이얼로그.
+  - **customer/[id]/ledger 환불 노출** — API 응답에 `refunds` 배열, UI 가 가상 row 타입 `REFUND_LOG` 로 dateGroups 에 인터리브 (잔액 무관 표시).
+  - **_detail-sheet 분리 시작** — `_refund-dialog.tsx` 별도 파일 (self-contained, RefundDialog patterns 정착). 3052 → 2926 줄.
+  - **UI 4종** — KPI 카드 스켈레톤, 부분 발송 잔여 초과 검증 (빨강 border + submit 차단), 도움말 "워크보드 필터·검색 사용법" 섹션, 모바일 첫 열 sticky.
+  - **POS 반품·교환 단축 진입점** — `/api/customers/[id]/refundable-orders` + `_return-exchange-sheet.tsx`. CustomerActionSheet 의 등록 고객 액션에 "반품·교환" 추가. [반품] 은 RefundDialog 재사용, [교환] 은 SAME/DIFFERENT 미니 다이얼로그 → 새 -EX 주문 자동 생성. 매장 즉석 처리 단축 경로 (RETURN_REQUESTED → ACCEPTED → COLLECTED → INSPECTED 4단계 건너뜀).
+  - **StatusFlowGuide 제거** — 워크보드·claims 뷰에서 3축 흐름 chain 안내 제거 (도움말에 더 상세, 클릭 불가라 노이즈). 도움말 페이지에선 유지.
+  - **클레임 뷰 진입점** — `/orders/claims` 가 dead route 였음. 워크보드 우측 액션 영역에 [반품 처리] 버튼 추가.
 - **2026-05-08 (9차)**: 후속 자동화 4종 — 다중 매핑 재고 sync(component min 알고리즘) + 부분 교환(`exchange + partialItems`, 회수된 항목만 새 주문 -EX 에 복제) + 부분 출고 (`OrderItem.shippedQty` + `partial_ship` 액션, UI Dialog 후속) + PG 연동 인프라 (`lib/payments/{types,mock,dispatch}.ts` Adapter + dispatchRefund/dispatchPaymentCancel hook). cancel/refund/부분refund 시점에 PG 환불 자동 호출 (Mock 어댑터, 콘솔 로그). Phase 2 후 실 PG (Toss/PortOne) 어댑터 등록만 추가하면 즉시 활성.
 - **2026-05-08 (8차)**: 부분 반품/환불 (OrderItem 단위) + SKU 다중 매핑 (1:N) — 도메인 큰 두 작업.
   - **부분 반품**: `OrderItem.returnedQty/refundedAmount` 필드 신규. `refund` 액션 `body.partialItems`(orderItemId, returnQty 배열) 받으면 부분 처리. LotConsumption 부분 복원 알고리즘(createdAt DESC, 가장 최근 소진 lot 부터). 모두 fully returned 면 `RETURNED`, 일부면 `COMPLETED` 복귀 + paymentStatus `PARTIAL_REFUND`. 외상은 ledger ADJUSTMENT 부분 차감. UI: RefundDialog 에서 [전체 / 부분] 토글 + 항목별 잔여 수량 입력. 주문 항목 카드에 누적 반품 수량 + 환불 금액 표시.
