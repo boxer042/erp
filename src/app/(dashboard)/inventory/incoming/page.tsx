@@ -341,7 +341,7 @@ function IncomingPageInner() {
       const qty = parseFloat(item.quantity || "0");
       const up = parseFloat(item.unitPrice || "0");
 
-      if (field === "unitPrice" || field === "quantity") {
+      if (field === "unitPrice" || field === "quantity" || field === "discount") {
         const disc = calcDiscountPerUnit(up, item.discount);
         // VAT포함 입력 원본이 있으면 그 값 기준으로 공급가액 산출 (단가 반올림 round-trip 오차 방지)
         const rawStr = vatRawOverride !== undefined
@@ -1937,6 +1937,7 @@ function IncomingPageInner() {
                               inputMode={item.discount.trim().endsWith("%") ? "decimal" : "numeric"}
                               value={formatDiscountDisplay(item.discount)}
                               onChange={(e) => updateItem(idx, "discount", normalizeDiscountInput(e.target.value))}
+                              onBlur={() => recalcOnBlur(idx, "discount")}
                               onFocus={(e) => e.currentTarget.select()}
                               disabled={isEmptyRow || up === 0}
                               placeholder=""
