@@ -15,10 +15,10 @@ import { QuickCustomerSheet } from "./_quick-customer-sheet";
 import { GlobalSearchSheet } from "./_global-search-sheet";
 
 /**
- * POS v2 손님 그리드 — 진입 화면.
+ * POS v2 고객 그리드 — 진입 화면.
  * - 활성 카트 세션을 카드 그리드로 표시
- * - 클릭 시 그 손님의 작업 페이지로 이동
- * - 우하단 FAB: 새 손님(미등록 임시 + 색·코드 자동) / 기존 고객 검색
+ * - 클릭 시 그 고객의 작업 페이지로 이동
+ * - 우하단 FAB: 새 고객(미등록 임시 + 색·코드 자동) / 기존 고객 검색
  */
 export default function PosV2HomePage() {
   const router = useRouter();
@@ -31,12 +31,12 @@ export default function PosV2HomePage() {
     hydrated,
   } = useSessions();
 
-  /** 닫은 손님 카드 — 5초 안에 토스트의 [되돌리기] 누르면 복원 */
+  /** 닫은 고객 카드 — 5초 안에 토스트의 [되돌리기] 누르면 복원 */
   const closeWithUndo = (s: CartSession) => {
     const snapshot = { ...s };
     removeSession(s.id);
-    toast("손님 카드를 닫았습니다", {
-      description: snapshot.customerName ?? "미등록 손님",
+    toast("고객 카드를 닫았습니다", {
+      description: snapshot.customerName ?? "미등록 고객",
       action: {
         label: "되돌리기",
         onClick: () => {
@@ -59,7 +59,7 @@ export default function PosV2HomePage() {
     "recent",
   );
 
-  // 손님 세션 필터 — 검색어 + type
+  // 고객 세션 필터 — 검색어 + type
   const filteredSessions = sessions
     .filter((s) => {
       if (gridTypeFilter === "BUSINESS" && s.customerType !== "BUSINESS") return false;
@@ -148,7 +148,7 @@ export default function PosV2HomePage() {
         </div>
       </header>
 
-      {/* 본문 — 손님 카드 그리드 */}
+      {/* 본문 — 고객 카드 그리드 */}
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-4 py-4 sm:px-6">
           {sessions.length === 0 ? (
@@ -253,7 +253,7 @@ export default function PosV2HomePage() {
 
               {filteredSessions.length === 0 ? (
                 <div className="py-12 text-center text-[13px] text-[var(--jm-text-muted)]">
-                  조건에 맞는 손님이 없습니다
+                  조건에 맞는 고객이 없습니다
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -331,7 +331,7 @@ export default function PosV2HomePage() {
                 strokeLinecap="round"
               />
             </svg>
-            <span className="text-[15px] font-semibold">새 손님</span>
+            <span className="text-[15px] font-semibold">새 고객</span>
           </button>
         </div>
       )}
@@ -381,7 +381,7 @@ export default function PosV2HomePage() {
         onOpenChange={(o) => !o && setQuickRegister(null)}
         defaultText={quickRegister?.defaultText ?? ""}
         onCreated={(c) => {
-          // 등록 후 즉시 새 세션 + 고객 연결 + 손님 페이지 이동
+          // 등록 후 즉시 새 세션 + 고객 연결 + 고객 페이지 이동
           const sid = addSession();
           if (!sid) return;
           setCustomer(c.id, c.name, c.phone, sid, {
@@ -434,13 +434,13 @@ function CloseSessionSheet({
   const hasOpenRepair = (target.openRepairCount ?? 0) > 0;
   const isRegistered = !!target.customerId;
   const customerLabel =
-    target.customerName ?? `미등록 손님 #${target.id.slice(0, 6)}`;
+    target.customerName ?? `미등록 고객 #${target.id.slice(0, 6)}`;
 
   return (
     <BottomSheet
       open
       onOpenChange={(v) => !v && onClose()}
-      title="이 손님 카드 닫기"
+      title="이 고객 카드 닫기"
     >
       <div className="flex flex-col gap-3 pb-2">
         <div className="rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
@@ -452,10 +452,10 @@ function CloseSessionSheet({
           </div>
           {hasOpenRepair && (
             <div className="mt-2 rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-[11px] text-[var(--jm-warning-fg)]">
-              이 손님의 진행중 수리 {target.openRepairCount}건은 그대로 진행되며
+              이 고객의 진행중 수리 {target.openRepairCount}건은 그대로 진행되며
               수리관리에서 추적됩니다
               {!isRegistered &&
-                " (단, 미등록 손님이라 다음에 찾을 때 헷갈릴 수 있어요)"}
+                " (단, 미등록 고객이라 다음에 찾을 때 헷갈릴 수 있어요)"}
             </div>
           )}
         </div>
@@ -553,10 +553,10 @@ function EmptyState({
       </div>
       <div className="flex flex-col gap-1.5">
         <h2 className="text-[18px] font-bold text-[var(--jm-text)]">
-          진행중인 손님이 없습니다
+          진행중인 고객이 없습니다
         </h2>
         <p className="text-[13px] text-[var(--jm-text-muted)]">
-          손님이 매장에 들어오면 시작해주세요
+          고객이 매장에 들어오면 시작해주세요
         </p>
       </div>
       <div className="flex w-full max-w-xs flex-col gap-2">
@@ -573,7 +573,7 @@ function EmptyState({
               strokeLinecap="round"
             />
           </svg>
-          새 손님 (미등록)
+          새 고객 (미등록)
         </button>
         <button
           type="button"
@@ -613,7 +613,7 @@ function Skeleton() {
           <div className="ml-auto h-3 w-14 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
         </div>
       </header>
-      {/* 본문 — 손님 카드 그리드 */}
+      {/* 본문 — 고객 카드 그리드 */}
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-4 py-4 sm:px-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

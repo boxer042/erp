@@ -251,9 +251,9 @@ export const JmSidebar = React.forwardRef<HTMLElement, JmSidebarProps>(
           {...props}
         >
           {/* INNER — 실제 표시. 데스크톱에선 absolute (overflow 가능, expand-on-hover 핵심).
-              모바일에선 fixed overlay. */}
+              모바일에선 fixed overlay.
+              ⚠️ 자체 data-jm-scope 부여하지 말 것 — 외부 <JmScope theme="dark"> cascade 가 여기서 light 로 reset 됨. 외부 JmScope 안에서 사용하는 것이 컨벤션. */}
           <div
-            data-jm-scope
             style={
               {
                 "--jm-sidebar-w-inner": innerWidthDesktop,
@@ -397,6 +397,13 @@ JmSidebarSeparator.displayName = "JmSidebarSeparator";
 
 // ─── Item ─────────────────────────────────────────────────────────────────
 
+export interface JmSidebarItemRenderProps {
+  className: string;
+  title: string | undefined;
+  "aria-current": "page" | undefined;
+  children: React.ReactNode;
+}
+
 interface JmSidebarItemBaseProps {
   icon?: React.ReactNode;
   active?: boolean;
@@ -404,6 +411,13 @@ interface JmSidebarItemBaseProps {
   trailing?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
+  /**
+   * 기본 anchor/button 대신 임의 element 로 렌더. Next.js Link 등과 합성할 때 사용.
+   * 주어지면 `href` / button props 는 무시되고 사용자 element 가 root 가 됨.
+   *
+   * 예: `render={(props) => <Link href="/foo" {...props} />}`
+   */
+  render?: (props: JmSidebarItemRenderProps) => React.ReactElement;
 }
 
 type JmSidebarItemAsAnchor = JmSidebarItemBaseProps &
@@ -439,7 +453,7 @@ export const JmSidebarItem = React.forwardRef<
   JmSidebarItemProps
 >((props, ref) => {
   const { collapsed } = useJmSidebarVisual();
-  const { icon, active, trailing, className, children, ...rest } = props;
+  const { icon, active, trailing, className, children, render, ...rest } = props;
 
   const content = (
     <>
@@ -466,6 +480,15 @@ export const JmSidebarItem = React.forwardRef<
 
   const titleAttr =
     collapsed && typeof children === "string" ? children : undefined;
+
+  if (render) {
+    return render({
+      className: cn(itemClasses(active, collapsed), className),
+      title: titleAttr,
+      "aria-current": active ? "page" : undefined,
+      children: content,
+    });
+  }
 
   if ("href" in rest && rest.href !== undefined) {
     return (

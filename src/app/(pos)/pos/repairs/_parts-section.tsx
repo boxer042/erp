@@ -265,7 +265,7 @@ function PartRow({
               {part.product.name}
             </span>
             <div className="flex shrink-0 items-center gap-1">
-              {/* LOST 일 때만 — 청구 토글 (회사 손실 vs 손님 청구) */}
+              {/* LOST 일 때만 — 청구 토글 (회사 손실 vs 고객 청구) */}
               {!readonly && isLost && (
                 <button
                   type="button"
@@ -277,7 +277,7 @@ function PartRow({
                   }`}
                   title={
                     part.billLost
-                      ? "손님 청구 — 합계 포함 (해제 시 회사 손실)"
+                      ? "고객 청구 — 합계 포함 (해제 시 회사 손실)"
                       : "회사 손실 — 합계 미포함 (클릭 시 청구)"
                   }
                 >

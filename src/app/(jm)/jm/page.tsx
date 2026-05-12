@@ -56,6 +56,8 @@ import {
   JmComboboxDrawer,
   JmComboboxModal,
   JmDateRangePicker,
+  JmDatePicker,
+  JmCalendar,
   type DateRange,
   JmDialog,
   JmDialogBody,
@@ -247,6 +249,8 @@ export default function JmShowcasePage() {
   // Radio / DateRange 상태
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
+  const [inlineDate, setInlineDate] = useState<Date | undefined>(undefined);
 
   // Slider / Segmented / Alert 상태
   const [singleVal, setSingleVal] = useState(40);
@@ -646,8 +650,14 @@ export default function JmShowcasePage() {
         </Section>
 
         {/* SELECT */}
-        <Section title="Select" subtitle="JmSelect — 검색 없는 드롭다운">
+        <Section
+          title="Select"
+          subtitle="JmSelect — 검색 없는 드롭다운. default 는 form control, pill 은 chip 형태 트리거 (테이블 toolbar filter strip 용)."
+        >
           <div className="grid gap-4 sm:max-w-md">
+            <div className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+              default variant — 폼 control
+            </div>
             <JmSelect
               options={[
                 { value: "card", label: "카드" },
@@ -658,6 +668,36 @@ export default function JmShowcasePage() {
               onChange={setSelectValue}
               placeholder="결제 수단 선택"
             />
+            <div className="mt-4 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+              pill variant — chip 형태 (filter strip 용)
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <JmSelect
+                variant="pill"
+                size="sm"
+                label="결제수단"
+                value={selectValue}
+                onChange={setSelectValue}
+                options={[
+                  { value: "card", label: "카드" },
+                  { value: "cash", label: "현금" },
+                  { value: "transfer", label: "계좌이체" },
+                ]}
+                pillActive={!!selectValue}
+              />
+              <JmSelect
+                variant="pill"
+                size="sm"
+                label="채널"
+                value=""
+                onChange={() => {}}
+                options={[
+                  { value: "coupang", label: "쿠팡" },
+                  { value: "naver", label: "네이버" },
+                  { value: "offline", label: "오프라인" },
+                ]}
+              />
+            </div>
             <p className="text-[13px] text-[var(--jm-text-muted)]">
               선택값: <span className="font-mono">{selectValue || "(없음)"}</span>
             </p>
@@ -716,7 +756,7 @@ export default function JmShowcasePage() {
         {/* TABLE + TOOLBAR + FILTERING */}
         <Section
           title="테이블 + 필터 툴바"
-          subtitle="JmTableToolbar — Grid 레이아웃 반응형. sm 미만에선 검색이 자기 행을 차지하고 칩은 가로 스크롤. 카테고리(Select) 처럼 폭 큰 필터는 JmTableToolbarMore 로 감싸 모바일에서 [필터 N] 버튼 → bottom drawer 로 보낸다. 창 폭을 줄여 확인."
+          subtitle="JmTableToolbar — 항상 2-row Grid (모바일·데스크톱 통일). row1: 검색 + 액션, row2: 필터 strip (가로 스크롤 + 드래그 + 휠→가로). 인라인 select 는 JmSelect variant='pill', 깊은 필터는 JmTableToolbarMore (데스크톱 popover · 모바일 drawer)."
         >
           <JmCard className="overflow-hidden p-0">
             <JmTableToolbar>
@@ -754,22 +794,42 @@ export default function JmShowcasePage() {
                     {v === "all" ? "재고 전체" : v === "in" ? "재고 있음" : "품절"}
                   </JmPill>
                 ))}
+                {/* 인라인 pill select — 자주 쓰는 필터는 strip 안에 직접 노출 */}
+                <JmSelect
+                  variant="pill"
+                  size="sm"
+                  label="카테고리"
+                  value={tableCategory}
+                  onChange={setTableCategory}
+                  options={[
+                    { value: "all", label: "전체" },
+                    { value: "lens", label: "렌즈" },
+                    { value: "frame", label: "프레임" },
+                    { value: "accessory", label: "부속" },
+                  ]}
+                  pillActive={tableCategory !== "all"}
+                />
+                {/* 깊은 필터 — 데스크톱 popover / 모바일 drawer */}
                 <JmTableToolbarMore
                   count={moreFilterCount}
                   onReset={() => setTableCategory("all")}
                 >
-                  <JmSelect
-                    size="sm"
-                    value={tableCategory}
-                    onChange={setTableCategory}
-                    options={[
-                      { value: "all", label: "전체 카테고리" },
-                      { value: "lens", label: "렌즈" },
-                      { value: "frame", label: "프레임" },
-                      { value: "accessory", label: "부속" },
-                    ]}
-                    className="w-[180px]"
-                  />
+                  <div className="flex flex-col gap-2">
+                    <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
+                      카테고리 (드로어/팝오버 안 select)
+                    </span>
+                    <JmSelect
+                      size="sm"
+                      value={tableCategory}
+                      onChange={setTableCategory}
+                      options={[
+                        { value: "all", label: "전체 카테고리" },
+                        { value: "lens", label: "렌즈" },
+                        { value: "frame", label: "프레임" },
+                        { value: "accessory", label: "부속" },
+                      ]}
+                    />
+                  </div>
                 </JmTableToolbarMore>
                 {activeFilterCount > 0 && (
                   <button
@@ -1818,6 +1878,65 @@ export default function JmShowcasePage() {
                   {dateRange.to &&
                     dateRange.to.getTime() !== dateRange.from.getTime() &&
                     ` ~ ${dateRange.to.toLocaleDateString("ko-KR")}`}
+                </span>
+              </p>
+            )}
+          </div>
+        </Section>
+
+        {/* SINGLE DATE PICKER (popover) */}
+        <Section
+          title="단일 날짜 선택 (DatePicker)"
+          subtitle="JmDatePicker — popover 통합. 선택 시 자동으로 닫힘. size sm/md/lg."
+        >
+          <div className="grid gap-4 sm:max-w-md">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <JmDatePicker
+                value={singleDate}
+                onChange={setSingleDate}
+                size="sm"
+                placeholder="sm"
+              />
+              <JmDatePicker
+                value={singleDate}
+                onChange={setSingleDate}
+                size="md"
+                placeholder="md"
+              />
+              <JmDatePicker
+                value={singleDate}
+                onChange={setSingleDate}
+                size="lg"
+                placeholder="lg"
+              />
+            </div>
+            {singleDate && (
+              <p className="text-[13px] text-[var(--jm-text-muted)]">
+                선택:{" "}
+                <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
+                  {singleDate.toLocaleDateString("ko-KR")}
+                </span>
+              </p>
+            )}
+          </div>
+        </Section>
+
+        {/* INLINE CALENDAR */}
+        <Section
+          title="인라인 캘린더 (Calendar)"
+          subtitle="JmCalendar — popover 없이 위젯만 직접 노출. sheet/dialog 안에 박는 용도."
+        >
+          <div className="grid gap-4">
+            <JmCalendar
+              value={inlineDate}
+              onChange={setInlineDate}
+              className="w-fit"
+            />
+            {inlineDate && (
+              <p className="text-[13px] text-[var(--jm-text-muted)]">
+                선택:{" "}
+                <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
+                  {inlineDate.toLocaleDateString("ko-KR")}
                 </span>
               </p>
             )}

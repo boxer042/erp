@@ -30,7 +30,7 @@ function relativeTime(iso?: string): string | null {
 }
 
 /**
- * 손님 카드. 등록·미등록 모두 처리.
+ * 고객 카드. 등록·미등록 모두 처리.
  * - 등록: 이름 + 전화 + 진행 카운트
  * - 미등록: #A2K + 컬러 아바타 + 진행 카운트
  */
@@ -119,15 +119,6 @@ export function CustomerCard({ session, onClick, onClose }: Props) {
               </>
             )}
           </div>
-
-          {/* 진행 표시 */}
-          {totalActive > 0 && (
-            <div
-              className={`flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${palette.bg} text-white`}
-            >
-              {totalActive}
-            </div>
-          )}
         </div>
 
         {/* 카운트 라벨 — 빈/채워진 상태 모두 동일 높이 유지(카드 크기 일정) */}

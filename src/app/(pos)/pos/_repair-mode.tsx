@@ -41,9 +41,9 @@ interface Props {
 }
 
 /**
- * 수리 모드 v2 — 손님 작업 페이지의 "수리" 탭.
+ * 수리 모드 v2 — 고객 작업 페이지의 "수리" 탭.
  *
- * 리스트만 책임: 그 손님의 진행중 수리 카드 + "새 수리" 버튼.
+ * 리스트만 책임: 그 고객의 진행중 수리 카드 + "새 수리" 버튼.
  * 카드 클릭 → onTicketDetail(id) 콜백 → 부모가 detail 진입 처리 (헤더/탭바 동적 변경).
  *
  * 미등록 고객은 sessions 의 repairTicketIds 로 추적 (sessions-context 기존 로직 활용).
@@ -224,8 +224,8 @@ function RepairCard({
 
 function cancelReasonLabel(reason: string): string {
   const map: Record<string, string> = {
-    CUSTOMER_DECLINED: "손님 거절",
-    CUSTOMER_NO_SHOW: "손님 미반환",
+    CUSTOMER_DECLINED: "고객 거절",
+    CUSTOMER_NO_SHOW: "고객 미반환",
     SHOP_GAVE_UP: "매장 포기",
     PARTS_UNAVAILABLE: "부속 수급 불가",
     SOLD_AS_PRODUCT: "상품 구매로 전환",
@@ -372,7 +372,7 @@ function NewRepairBody({
           // "기타" 는 null 로 저장
           repairCategoryId:
             categoryId === OTHER_CATEGORY_ID ? null : categoryId,
-          // 미등록 손님이면 카트 세션 매핑 — 클라이언트 추적 끊겨도 DB 에서 복원 가능
+          // 미등록 고객이면 카트 세션 매핑 — 클라이언트 추적 끊겨도 DB 에서 복원 가능
           posSessionId: session.customerId ? null : session.id,
         },
       );

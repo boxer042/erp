@@ -32,7 +32,7 @@ interface ResurrectResponse {
 /**
  * 저장된 상담 — parkedAt != null 인 PosSession 목록.
  * - 그리드에 노출 안 되지만 보존된 상담 카트들
- * - "장바구니로 가져오기" 누르면 unpark + 가격 갱신 + 손님 카드 부활 + 페이지 이동
+ * - "장바구니로 가져오기" 누르면 unpark + 가격 갱신 + 고객 카드 부활 + 페이지 이동
  */
 export default function ParkedSessionsPage() {
   const router = useRouter();
@@ -121,7 +121,7 @@ export default function ParkedSessionsPage() {
 
   const allItems = parkedQuery.data ?? [];
 
-  // 검색 + 정렬 — 양 늘어났을 때 손님명/전화/사업자번호로 빠르게 찾기
+  // 검색 + 정렬 — 양 늘어났을 때 고객명/전화/사업자번호로 빠르게 찾기
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = !q
@@ -168,7 +168,7 @@ export default function ParkedSessionsPage() {
               저장된 상담
             </span>
             <span className="text-[11px] text-[var(--jm-text-muted)]">
-              장바구니로 저장한 손님 카트 — 가격은 부활 시 현재가로 갱신됩니다
+              장바구니로 저장한 고객 카트 — 가격은 부활 시 현재가로 갱신됩니다
             </span>
           </div>
           <button
@@ -298,7 +298,7 @@ function SessionRow({
   pendingDelete: boolean;
 }) {
   const customerName =
-    session.customerName ?? `미등록 손님 #${session.id.slice(0, 6)}`;
+    session.customerName ?? `미등록 고객 #${session.id.slice(0, 6)}`;
   const parked = session.parkedAt ? new Date(session.parkedAt) : null;
 
   return (

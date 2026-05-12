@@ -27,7 +27,7 @@ export interface ActionDef {
 }
 
 /**
- * @param canSendToCart v2 손님 페이지 안에서 호출 시 true — 픽업 대신 "카트에 추가" 노출.
+ * @param canSendToCart v2 고객 페이지 안에서 호출 시 true — 픽업 대신 "카트에 추가" 노출.
  *                     repairs standalone 진입 시 false — 자체 PickupSheet 사용 (v1 호환).
  */
 export function nextActions(

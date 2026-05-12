@@ -282,7 +282,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {}
-    // 빈 상태로 시작 — 사용자가 명시적으로 새 손님을 만들 때만 세션 생성.
+    // 빈 상태로 시작 — 사용자가 명시적으로 새 고객을 만들 때만 세션 생성.
     // 자동 makeSession 은 새 기기/브라우저 진입마다 빈 미등록 세션이 서버에 push 되어
     // 다른 기기에 sync 되는 부작용이 있어 제거. v1 의 사이드바·카트 흐름은 ensureSessionId()
     // 가 사용자가 메뉴 클릭한 시점에 addSession 을 호출하므로 영향 없음.
@@ -433,7 +433,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * 닫은 손님 카드를 그대로 복원 — undo 토스트용.
+   * 닫은 고객 카드를 그대로 복원 — undo 토스트용.
    * 서버 sync 에 deletedIds 로 보내기 전(debounce 800ms) 에 호출하면 server 삭제 자체가 cancel.
    * 그 이후에 호출되면 server 측에선 새 row 로 다시 생성됨 (id 보존).
    */

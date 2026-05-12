@@ -36,10 +36,12 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   session: CartSession;
-  /** 결제 후 라벨 인쇄 모달 띄움 — 부모가 받아서 처리. afterPayment=true 로 호출 (닫으면 손님 그리드 이동). */
+  /** 결제 후 라벨 인쇄 모달 띄움 — 부모가 받아서 처리. afterPayment=true 로 호출 (닫으면 고객 그리드 이동). */
   onPrintLabels: (codes: string[], options?: { afterPayment?: boolean }) => void;
-  /** 손님 썸네일 카드 클릭 — 부모가 CustomerActionSheet 띄우도록 (재사용) */
+  /** 고객 썸네일 카드 클릭 — 부모가 CustomerActionSheet 띄우도록 (재사용) */
   onCustomerClick?: () => void;
+  /** 미등록 고객 회원등록 유도 — 부모가 QuickCustomerSheet 띄우도록 */
+  onCreateCustomer?: () => void;
   /** 좌상단 뒤로가기 — 부모가 카트 시트로 복귀시킴 */
   onBack?: () => void;
 }
@@ -122,7 +124,7 @@ function CustomerCard({
           ) : (
             <>
               <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
-                미등록 손님
+                미등록 고객
               </span>
               <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">#{code}</span>
               {required && (
@@ -213,8 +215,8 @@ function CheckoutAtCard({ at }: { at: Date }) {
 /**
  * 결제 시트 — 다크 합계 + 결제수단 + checkout API 호출 + 라벨 자동 발번.
  *
- * 손님 등록 강제: 임대/수리 라인이 있거나 외상 결제 시 고객 연결 필수 (통계/추적).
- * Skip 옵션: 정말 등록하기 싫은 손님 케이스를 위해 "등록 없이 진행" 작은 링크 노출.
+ * 고객 등록 강제: 임대/수리 라인이 있거나 외상 결제 시 고객 연결 필수 (통계/추적).
+ * Skip 옵션: 정말 등록하기 싫은 고객 케이스를 위해 "등록 없이 진행" 작은 링크 노출.
  */
 export function PaymentSheet({
   open,
@@ -222,6 +224,7 @@ export function PaymentSheet({
   session,
   onPrintLabels,
   onCustomerClick,
+  onCreateCustomer,
   onBack,
 }: Props) {
   if (!open) return null;
@@ -231,6 +234,7 @@ export function PaymentSheet({
       session={session}
       onPrintLabels={onPrintLabels}
       onCustomerClick={onCustomerClick}
+      onCreateCustomer={onCreateCustomer}
       onBack={onBack}
     />
   );
@@ -241,13 +245,16 @@ function Body({
   session,
   onPrintLabels,
   onCustomerClick,
+  onCreateCustomer,
   onBack,
 }: Omit<Props, "open">) {
   const router = useRouter();
   const { setSessionLabels, clear } = useSessions();
   const [method, setMethod] = useState<PaymentMethod>("CARD");
-  // 손님 등록 우회 — "이 손님은 등록 없이 진행" 클릭 시 true. 통계 데이터 안 쌓이는 단점 있음.
+  // 고객 등록 우회 — "이 고객은 등록 없이 진행" 클릭 시 true. 통계 데이터 안 쌓이는 단점 있음.
   const [skipCustomerLink, setSkipCustomerLink] = useState(false);
+  // 미등록 고객 결제 가로채기 — 결제 직전 회원등록 유도 다이얼로그
+  const [registerPromptOpen, setRegisterPromptOpen] = useState(false);
   // 세금계산서 발행 요청 — Order.taxInvoiceRequested 로 저장 (사장님이 추후 발행)
   const [taxInvoiceRequested, setTaxInvoiceRequested] = useState(false);
   // 결제시간 — 시트가 열린 순간 고정. Body 가 마운트될 때마다 새로 계산.
@@ -376,7 +383,7 @@ function Body({
         /* 팝업 차단 — silent */
       }
       // 거래명세표 자동 발행 — 등록 고객일 때만 (사업자/B2B 증빙용)
-      // 미등록 손님은 영수증으로 충분하므로 발행 생략 (스팸 방지)
+      // 미등록 고객은 영수증으로 충분하므로 발행 생략 (스팸 방지)
       if (session.customerId) {
         try {
           const stmt = await issueStatement({ ...session, items: allItems });
@@ -389,7 +396,7 @@ function Body({
       if (data.labelCodes.length > 0) {
         onPrintLabels(data.labelCodes, { afterPayment: true });
       }
-      // 카트 클리어 + 손님 그리드로 이동
+      // 카트 클리어 + 고객 그리드로 이동
       clear(session.id);
       onOpenChange(false);
       // 라벨 인쇄 모달이 떠 있으면 닫힐 때 v2 홈으로 이동
@@ -411,7 +418,20 @@ function Body({
       footer={
         <button
           type="button"
-          onClick={() => checkoutMutation.mutate()}
+          onClick={() => {
+            // 미등록 + 등록필수 아님 + skip 안함 + 등록 유도 prop 있음 → 다이얼로그로 가로채기
+            if (
+              !session.customerId &&
+              !skipCustomerLink &&
+              !hasRentalOrRepair &&
+              method !== "UNPAID" &&
+              onCreateCustomer
+            ) {
+              setRegisterPromptOpen(true);
+              return;
+            }
+            checkoutMutation.mutate();
+          }}
           disabled={
             checkoutMutation.isPending ||
             allItems.length === 0 ||
@@ -746,7 +766,95 @@ function Body({
           </div>
         )}
       </div>
+
+      {/* 미등록 고객 회원등록 유도 다이얼로그 */}
+      {registerPromptOpen && onCreateCustomer && (
+        <RegisterPromptDialog
+          onRegister={() => {
+            setRegisterPromptOpen(false);
+            onCreateCustomer();
+          }}
+          onSkip={() => {
+            setRegisterPromptOpen(false);
+            setSkipCustomerLink(true);
+            checkoutMutation.mutate();
+          }}
+          onCancel={() => setRegisterPromptOpen(false)}
+        />
+      )}
     </BottomSheet>
+  );
+}
+
+/**
+ * 미등록 고객으로 결제하려 할 때 잠깐 끼어드는 다이얼로그.
+ * 회원 등록 시 이력·통계 추적 가능 — 매장 입장에선 큰 가치.
+ * 거절(등록 없이 결제)도 한 번에 가능 — 손이 한 번 더 가는 마찰만 약하게.
+ */
+function RegisterPromptDialog({
+  onRegister,
+  onSkip,
+  onCancel,
+}: {
+  onRegister: () => void;
+  onSkip: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-[var(--jm-surface)] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col items-center gap-3 pt-2 text-center">
+          <div className="flex size-14 items-center justify-center rounded-full bg-[var(--jm-action)]/10 text-[var(--jm-action)]">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
+              <path
+                d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M18 6h4M20 4v4"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <h3 className="text-[18px] font-bold text-[var(--jm-text)]">
+            회원 등록하시겠어요?
+          </h3>
+          <p className="text-[13px] leading-relaxed text-[var(--jm-text-muted)]">
+            등록하시면 다음 방문 때 구매·수리·임대 이력을 한눈에 보실 수 있어요.
+            <br />
+            연락처만 입력해도 충분합니다.
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onRegister}
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white transition-transform active:scale-[0.99]"
+          >
+            회원 등록하고 결제
+          </button>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-[14px] font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+          >
+            등록 없이 결제
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

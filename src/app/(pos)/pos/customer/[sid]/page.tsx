@@ -48,10 +48,10 @@ const MODE_SUBLABELS: Record<Mode, string> = {
 };
 
 /**
- * POS 손님 작업 페이지.
+ * POS 고객 작업 페이지.
  *
  * 헤더 — 단일 1줄. 모드 무관 동일 layout:
- *  [< 뒤로]  [좌측 타이틀 (모드 또는 컨텐츠)]                  [우측 손님 영역]
+ *  [< 뒤로]  [좌측 타이틀 (모드 또는 컨텐츠)]                  [우측 고객 영역]
  *
  * BottomTabBar — 좌측 첫 자리에 ☰메뉴 항상 노출 → [메뉴|상품|수리|임대].
  */
@@ -67,7 +67,7 @@ export default function PosV2CustomerPage({
   const { getSession, hydrated, setCustomer, add } = useSessions();
 
   /**
-   * 미등록 손님 → 등록 고객으로 전환할 때:
+   * 미등록 고객 → 등록 고객으로 전환할 때:
    * 1. setCustomer 로 sessions state 업데이트 (UI 즉시 반영)
    * 2. 이 세션의 미등록 RepairTicket 들의 customerId 도 같은 고객으로 일괄 매핑 (server)
    * 3. repair query invalidate — useRepairSync 가 customerId 기준 fetch 로 전환되어도 ticket 따라옴
@@ -113,8 +113,8 @@ export default function PosV2CustomerPage({
   const [returnSheetOpen, setReturnSheetOpen] = useState(false);
   const [quickRegister, setQuickRegister] = useState<{ defaultText: string } | null>(null);
   const [labelCodes, setLabelCodes] = useState<string[] | null>(null);
-  // 라벨 모달 닫을 때 손님 그리드(/pos) 로 이동할지 — 결제 직후 발번 케이스만 true.
-  // 카트에서 미리 출력하는 케이스는 false (세션 유지, 손님 페이지 머물러야 함).
+  // 라벨 모달 닫을 때 고객 그리드(/pos) 로 이동할지 — 결제 직후 발번 케이스만 true.
+  // 카트에서 미리 출력하는 케이스는 false (세션 유지, 고객 페이지 머물러야 함).
   const [labelRedirectAfter, setLabelRedirectAfter] = useState(false);
   const [detail, setDetail] = useState<Detail>(null);
   // 카트/결제 시트 — 모드 무관 페이지 레벨에서 mount (수리 모드에서도 카트 열 수 있어야 함)
@@ -153,14 +153,14 @@ export default function PosV2CustomerPage({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
         <span className="text-[15px] font-semibold text-[var(--jm-text)]">
-          손님 세션을 찾을 수 없습니다
+          고객 세션을 찾을 수 없습니다
         </span>
         <button
           type="button"
           onClick={() => router.push("/pos")}
           className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-[13px] font-semibold text-white"
         >
-          손님 그리드로
+          고객 그리드로
         </button>
       </div>
     );
@@ -175,7 +175,7 @@ export default function PosV2CustomerPage({
       {/* 상단 헤더 — detail 유무로 두 레이아웃 */}
       <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
         <div className="flex items-center gap-3 px-3 py-2.5 sm:px-6">
-          {/* 좌측: 뒤로 — detail 시엔 detail 해제, 일반 시엔 손님 그리드로 */}
+          {/* 좌측: 뒤로 — detail 시엔 detail 해제, 일반 시엔 고객 그리드로 */}
           <button
             type="button"
             onClick={() => (detail ? setDetail(null) : router.push("/pos"))}
@@ -194,7 +194,7 @@ export default function PosV2CustomerPage({
           </button>
 
           {detail ? (
-            // 상세 모드 — 좌측: 컨텐츠 타이틀/상태, 우측: 손님 썸네일+이름+번호
+            // 상세 모드 — 좌측: 컨텐츠 타이틀/상태, 우측: 고객 썸네일+이름+번호
             <>
               <div className="flex min-w-0 flex-1">
                 {detail.type === "repair-ticket" ? (
@@ -207,7 +207,7 @@ export default function PosV2CustomerPage({
                 type="button"
                 onClick={() => setCustomerActionOpen(true)}
                 className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
-                aria-label="손님"
+                aria-label="고객"
               >
                 {isRegistered ? (
                   <>
@@ -255,7 +255,7 @@ export default function PosV2CustomerPage({
                     </div>
                     <div className="flex min-w-0 flex-col">
                       <span className="text-[14px] font-semibold text-[var(--jm-text)]">
-                        미등록 손님
+                        미등록 고객
                       </span>
                       <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                         #{code}
@@ -266,7 +266,7 @@ export default function PosV2CustomerPage({
               </button>
             </>
           ) : (
-            // 일반 모드 — 좌측: 모드 타이틀, (상품모드일 땐 중앙: 검색창), 우측: 손님
+            // 일반 모드 — 좌측: 모드 타이틀, (상품모드일 땐 중앙: 검색창), 우측: 고객
             <>
               <div className="flex shrink-0 flex-col">
                 <span className="text-[14px] font-semibold text-[var(--jm-text)]">
@@ -320,7 +320,7 @@ export default function PosV2CustomerPage({
                 type="button"
                 onClick={() => setCustomerActionOpen(true)}
                 className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
-                aria-label="손님"
+                aria-label="고객"
               >
                 {isRegistered ? (
                   <>
@@ -368,7 +368,7 @@ export default function PosV2CustomerPage({
                     </div>
                     <div className="flex min-w-0 flex-col">
                       <span className="text-[14px] font-semibold text-[var(--jm-text)]">
-                        미등록 손님
+                        미등록 고객
                       </span>
                       <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
                         #{code}
@@ -401,7 +401,7 @@ export default function PosV2CustomerPage({
         }}
       />
 
-      {/* 손님 액션 시트 — 썸네일 클릭 시 */}
+      {/* 고객 액션 시트 — 썸네일 클릭 시 */}
       <CustomerActionSheet
         open={customerActionOpen}
         onOpenChange={setCustomerActionOpen}
@@ -562,6 +562,7 @@ export default function PosV2CustomerPage({
           setLabelRedirectAfter(!!options?.afterPayment);
         }}
         onCustomerClick={() => setCustomerActionOpen(true)}
+        onCreateCustomer={() => setQuickRegister({ defaultText: "" })}
         onBack={() => {
           setPaymentOpen(false);
           setCartOpen(true);

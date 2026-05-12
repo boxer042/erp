@@ -16,7 +16,7 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: (ticketId: string) => void;
-  /** 미등록 손님일 때 ticket 의 카트 세션 매핑 — DB 에 영구 추적 (선택) */
+  /** 미등록 고객일 때 ticket 의 카트 세션 매핑 — DB 에 영구 추적 (선택) */
   posSessionId?: string;
 }
 
@@ -59,7 +59,7 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
           customerId: selectedCustomer?.id ?? null,
           repairProductText: device.trim() || null,
           symptom: symptom.trim() || null,
-          // 미등록 손님이면 카트 세션 매핑 — 등록 손님은 customerId 가 매핑 역할
+          // 미등록 고객이면 카트 세션 매핑 — 등록 고객은 customerId 가 매핑 역할
           posSessionId: selectedCustomer ? null : posSessionId ?? null,
         },
       );

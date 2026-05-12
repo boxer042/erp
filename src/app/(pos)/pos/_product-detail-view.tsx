@@ -30,8 +30,8 @@ interface Props {
 }
 
 /**
- * v2 손님 페이지 콘텐츠 영역에 임베드되는 상품 상세 — ERP 의 LandingPageView 그대로.
- * 헤더 없음. 본문만. 부모(customer page) 가 헤더(뒤로 + 상품명 + 손님썸네일) 그림.
+ * v2 고객 페이지 콘텐츠 영역에 임베드되는 상품 상세 — ERP 의 LandingPageView 그대로.
+ * 헤더 없음. 본문만. 부모(customer page) 가 헤더(뒤로 + 상품명 + 고객썸네일) 그림.
  * 부모는 같은 queryKey 로 product 정보를 cache 에서 읽어 헤더에 표시 (추가 fetch 없음).
  */
 export function ProductDetailView({ productId }: Props) {

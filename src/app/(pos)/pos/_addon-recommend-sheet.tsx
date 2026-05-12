@@ -40,7 +40,7 @@ interface Props {
   mainProductId: string;
   /** 메인 상품 이름 — 헤더 표시용 */
   mainProductName: string;
-  /** 손님이 선택한 추가구매 → 부모가 카트에 ADDON 자식 라인 추가 */
+  /** 고객이 선택한 추가구매 → 부모가 카트에 ADDON 자식 라인 추가 */
   onConfirm: (selections: AddonSelection[]) => void;
   /** 모달 닫고 추가 안 함 — "건너뛰기" */
   onSkip?: () => void;
@@ -48,7 +48,7 @@ interface Props {
 
 /**
  * 추가구매 추천 시트 — 메인 상품 카트 추가 후 자동 노출.
- * 손님이 추천 상품을 골라 "함께 구매" 클릭 시 카트에 ADDON 자식 라인 추가.
+ * 고객이 추천 상품을 골라 "함께 구매" 클릭 시 카트에 ADDON 자식 라인 추가.
  * 추천이 없으면 자동 onSkip → 메인만 카트에 남음.
  */
 export function AddonRecommendSheet({

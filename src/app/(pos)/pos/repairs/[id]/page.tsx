@@ -39,17 +39,17 @@ interface RepairDetailProps {
   /**
    * READY 상태에서 "카트에 추가" 버튼을 누르면 호출.
    * 미제공이면 자체 PickupSheet 가 결제 처리 (repairs standalone 호환).
-   * v2 손님 페이지(수리 탭) 가 이 prop 으로 카트에 라인 추가 + 카트 시트 열기.
+   * v2 고객 페이지(수리 탭) 가 이 prop 으로 카트에 라인 추가 + 카트 시트 열기.
    */
   onAddToCart?: (ticket: RepairTicketDetail, finalAmount: number) => void;
-  /** v2 손님 페이지에서 임베드할 때 — 부모가 자체 헤더(뒤로 + ticketNo + 상태)를 그리므로 자체 헤더 숨김 */
+  /** v2 고객 페이지에서 임베드할 때 — 부모가 자체 헤더(뒤로 + ticketNo + 상태)를 그리므로 자체 헤더 숨김 */
   hideHeader?: boolean;
-  /** 고객 카드 클릭 — 부모(customer page) 가 손님 액션 시트(CustomerActionSheet) 열기 */
+  /** 고객 카드 클릭 — 부모(customer page) 가 고객 액션 시트(CustomerActionSheet) 열기 */
   onCustomerClick?: () => void;
 }
 
 /**
- * 수리 v2 작업 화면 — repairs 라우트와 v2 손님 페이지(수리 탭) 가 공유.
+ * 수리 v2 작업 화면 — repairs 라우트와 v2 고객 페이지(수리 탭) 가 공유.
  * shadcn 0개. 부속·공임·진단비·할인 입력 + (onAddToCart 있으면 카트 통합 결제, 없으면 자체 픽업).
  */
 export function RepairDetail({
@@ -73,7 +73,7 @@ export function RepairDetail({
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["repairs", "detail", id] });
     qc.invalidateQueries({ queryKey: ["repairs", "list"] });
-    // POS v2 손님 페이지의 수리 리스트 (useRepairSync) — 새로고침 없이 즉시 반영
+    // POS v2 고객 페이지의 수리 리스트 (useRepairSync) — 새로고침 없이 즉시 반영
     qc.invalidateQueries({ queryKey: ["pos-v2", "repairs"] });
     // 어드민/POS 기존 페이지도 함께
     qc.invalidateQueries({ queryKey: ["repairs"] });
@@ -156,7 +156,7 @@ export function RepairDetail({
       return;
     }
     if (action === "cart") {
-      // 카트에 라인 추가 — 부모(v2 손님 페이지) 가 처리
+      // 카트에 라인 추가 — 부모(v2 고객 페이지) 가 처리
       onAddToCart?.(t, finalAmount);
       return;
     }
@@ -169,7 +169,7 @@ export function RepairDetail({
 
   return (
     <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-      {/* 상단 — 뒤로 + 티켓번호 + 상태. v2 손님 페이지 임베드 시엔 부모가 그림 (hideHeader). */}
+      {/* 상단 — 뒤로 + 티켓번호 + 상태. v2 고객 페이지 임베드 시엔 부모가 그림 (hideHeader). */}
       {!hideHeader && (
         <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
           <div className="flex items-center gap-2 px-4 py-3 sm:px-6">
@@ -474,7 +474,7 @@ function CustomerDeviceCard({
   ticket: RepairTicketDetail;
   onCustomerClick?: () => void;
 }) {
-  // onCustomerClick 있으면 고객 영역만 클릭 가능 — 헤더 손님 썸네일과 동일한 시트 트리거
+  // onCustomerClick 있으면 고객 영역만 클릭 가능 — 헤더 고객 썸네일과 동일한 시트 트리거
   const customerContent = ticket.customer ? (
     <div className="flex min-w-0 flex-col">
       <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
@@ -1772,7 +1772,7 @@ function DetailSkeleton({
               <div className="h-5 w-24 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             </div>
           </div>
-          {/* 손님/기기 카드 */}
+          {/* 고객/기기 카드 */}
           <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]">
             <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
             <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
@@ -1811,8 +1811,8 @@ type CancelReason =
 const CANCEL_REASONS: { value: CancelReason; label: string; desc: string }[] = [
   { value: "MISTAKE", label: "잘못 생성", desc: "실수로 만든 티켓 — 미등록 고객은 자동 영구 삭제" },
   { value: "SOLD_AS_PRODUCT", label: "상품 구매로 전환", desc: "수리 대신 같은/다른 제품 구매 — 통계 보존" },
-  { value: "CUSTOMER_DECLINED", label: "손님 거절", desc: "견적 본 후 진행 거부" },
-  { value: "CUSTOMER_NO_SHOW", label: "손님 미반환", desc: "맡겼는데 안 찾으러 옴" },
+  { value: "CUSTOMER_DECLINED", label: "고객 거절", desc: "견적 본 후 진행 거부" },
+  { value: "CUSTOMER_NO_SHOW", label: "고객 미반환", desc: "맡겼는데 안 찾으러 옴" },
   { value: "SHOP_GAVE_UP", label: "매장 포기", desc: "수리 불가 판정" },
   { value: "PARTS_UNAVAILABLE", label: "부속 수급 불가", desc: "부속을 구할 수 없음" },
   { value: "OTHER", label: "기타", desc: "메모로 사유 기록" },

@@ -86,7 +86,7 @@ export function RentalMode({ session, onCustomerClick }: Props) {
           )}
 
           {/* 가용 자산 그리드 — 매장 전체 대시보드는 메뉴 → 임대관리 로 분리됨.
-              여기서는 이번 손님 세션 카트에 담을 자산만 노출. */}
+              여기서는 이번 고객 세션 카트에 담을 자산만 노출. */}
           <section className="flex flex-col gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               임대 가능 {assets.length}
@@ -343,7 +343,7 @@ function RentalSheetBody({
 }
 
 /**
- * 고객 카드 — 글로벌 헤더 우측 손님 썸네일과 동일한 시각 패턴 (등록=zinc 원+이니셜, 미등록=palette+temp code).
+ * 고객 카드 — 글로벌 헤더 우측 고객 썸네일과 동일한 시각 패턴 (등록=zinc 원+이니셜, 미등록=palette+temp code).
  * 클릭 시 헤더 썸네일과 동일한 CustomerActionSheet 가 열림.
  * required=true 면 미등록일 때 "연결 필요" 보조 문구 노출.
  */
@@ -394,7 +394,7 @@ function CustomerCard({
           ) : (
             <>
               <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
-                미등록 손님
+                미등록 고객
               </span>
               <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">#{code}</span>
               {required && (

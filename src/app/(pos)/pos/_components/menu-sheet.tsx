@@ -49,7 +49,7 @@ export function MenuSheet({
               <rect x="11" y="11" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
             </svg>
           }
-          label="손님 그리드"
+          label="고객 그리드"
           desc="POS 메인"
           onClick={() => go("/pos")}
         />
@@ -139,7 +139,7 @@ export function MenuSheet({
               </svg>
             }
             label="저장된 상담"
-            desc="장바구니로 저장한 손님들"
+            desc="장바구니로 저장한 고객들"
             onClick={() => {
               onOpenChange(false);
               onParkedSessions();

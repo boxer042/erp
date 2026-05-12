@@ -20,9 +20,9 @@ interface ResurrectResponse {
 
 /**
  * 수리 행 클릭 시 열리는 액션 드로우.
- * - 이 손님 카드 열기 — 부활 API → 그리드 합류 → 손님 페이지 이동
+ * - 이 고객 카드 열기 — 부활 API → 그리드 합류 → 고객 페이지 이동
  * - 수리 상세        — /pos/repairs/[id] 이동
- * - 결제로 이동       — READY 일 때만. 부활(resurrect) → 합계 계산 → 카트 repair 라인 추가 → 손님 페이지 이동
+ * - 결제로 이동       — READY 일 때만. 부활(resurrect) → 합계 계산 → 카트 repair 라인 추가 → 고객 페이지 이동
  */
 export function RepairActionSheet({
   ticket,
@@ -50,7 +50,7 @@ function Body({
 
   const meta = STATUS_META[ticket.status];
   const customerName =
-    ticket.customer?.name ?? `미등록 손님 #${ticket.id.slice(0, 6)}`;
+    ticket.customer?.name ?? `미등록 고객 #${ticket.id.slice(0, 6)}`;
 
   const resurrectMutation = useMutation({
     mutationFn: (kind: "open" | "checkout") => {
@@ -128,7 +128,7 @@ function Body({
     },
     onError: (err) => {
       setPending(null);
-      toast.error(err instanceof ApiError ? err.message : "손님 카드를 열지 못했습니다");
+      toast.error(err instanceof ApiError ? err.message : "고객 카드를 열지 못했습니다");
     },
   });
 
@@ -175,7 +175,7 @@ function Body({
             <ActionButton
               icon={<CreditCard className="size-5" />}
               label="결제로 이동"
-              hint="수리 합계를 카트에 추가하고 손님 페이지로"
+              hint="수리 합계를 카트에 추가하고 고객 페이지로"
               variant="cta"
               onClick={() => resurrectMutation.mutate("checkout")}
               pending={pending === "checkout"}
@@ -184,7 +184,7 @@ function Body({
           )}
           <ActionButton
             icon={<UserCircle2 className="size-5" />}
-            label="이 손님 카드 열기"
+            label="이 고객 카드 열기"
             hint="그리드에 합류하고 작업 화면으로"
             onClick={() => resurrectMutation.mutate("open")}
             pending={pending === "open"}

@@ -57,7 +57,9 @@ export {
   type JmSidebarProps,
   type JmSidebarGroupProps,
   type JmSidebarItemProps,
+  type JmSidebarItemRenderProps,
   type JmSidebarTriggerProps,
+  type JmSidebarMode,
 } from "./sidebar";
 export {
   JmDrawer,
@@ -137,6 +139,12 @@ export {
   type JmDateRangePickerProps,
   type DateRange,
 } from "./date-range-picker";
+export {
+  JmDatePicker,
+  JmCalendar,
+  type JmDatePickerProps,
+  type JmCalendarProps,
+} from "./date-picker";
 export { JmToaster, jmToast, type JmToasterProps } from "./toast";
 export { JmSlider, type JmSliderProps } from "./slider";
 export { JmProgress, type JmProgressProps } from "./progress";

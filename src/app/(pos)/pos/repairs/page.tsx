@@ -47,8 +47,8 @@ const FILTER_CHIPS: FilterChip[] = [
  * 매장 전체 수리 현황 단일 화면.
  *
  * 섹션 (위에서 아래로 우선순위 순):
- *   1. 픽업 대기   (READY)                    — 손님 오면 인계·결제
- *   2. 견적 송부   (QUOTED)                   — 손님 답변 대기
+ *   1. 픽업 대기   (READY)                    — 고객 오면 인계·결제
+ *   2. 견적 송부   (QUOTED)                   — 고객 답변 대기
  *   3. 수리중      (APPROVED + REPAIRING)     — 작업 진행
  *   4. 진단중      (DIAGNOSING)               — 직원 진단 중
  *   5. 진단 대기   (RECEIVED)                 — 새로 접수, 아직 안 봄
@@ -56,7 +56,7 @@ const FILTER_CHIPS: FilterChip[] = [
  *
  * CANCELLED 는 노출 안 함.
  *
- * 행 클릭 → RepairActionSheet (이 손님 카드 열기 / 수리 상세 / 결제)
+ * 행 클릭 → RepairActionSheet (이 고객 카드 열기 / 수리 상세 / 결제)
  */
 export default function RepairsBoardPage() {
   const router = useRouter();
@@ -404,7 +404,7 @@ function TicketRow({
     null;
   const customerName =
     ticket.customer?.name ??
-    `미등록 손님 #${ticket.id.slice(0, 6)}`;
+    `미등록 고객 #${ticket.id.slice(0, 6)}`;
   const customerPhone = ticket.customer?.phone;
   const elapsed = formatDistanceToNow(new Date(ticket.receivedAt), {
     addSuffix: false,

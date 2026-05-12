@@ -248,7 +248,7 @@ export default function CustomersPage() {
                     onClick={() => setTypeFilter(t)}
                   >
                     {TYPE_FILTER_LABELS[t]}
-                    <span className="ml-1 tabular-nums text-[var(--jm-text-muted)]">
+                    <span className="ml-1 tabular-nums opacity-70">
                       {counts[t]}
                     </span>
                   </JmPill>

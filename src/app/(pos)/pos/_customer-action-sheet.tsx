@@ -17,7 +17,7 @@ interface Props {
 }
 
 /**
- * 손님 작업 페이지 헤더 썸네일 클릭 시 뜨는 액션 시트.
+ * 고객 작업 페이지 헤더 썸네일 클릭 시 뜨는 액션 시트.
  * - 미등록: 기존 고객 연결 / 새 고객 등록
  * - 등록: 고객 페이지 / 다른 고객으로 변경
  *
@@ -60,7 +60,7 @@ function Body({
     <BottomSheet
       open
       onOpenChange={onOpenChange}
-      title={isRegistered ? "고객" : "손님"}
+      title="고객"
     >
       <div className="flex flex-col gap-1 pb-2 pt-2">
         {isRegistered ? (

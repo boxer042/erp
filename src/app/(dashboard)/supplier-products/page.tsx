@@ -323,7 +323,7 @@ export default function SupplierProductsPage() {
                     onClick={() => setMappingFilter(m)}
                   >
                     {MAPPING_FILTER_LABELS[m]}
-                    <span className="ml-1 tabular-nums text-[var(--jm-text-muted)]">
+                    <span className="ml-1 tabular-nums opacity-70">
                       {counts[m]}
                     </span>
                   </JmPill>

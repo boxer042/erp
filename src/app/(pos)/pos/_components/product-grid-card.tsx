@@ -11,7 +11,7 @@ interface Props {
 
 /**
  * v2 상품 그리드 카드 — 모바일/태블릿 최적화. shadcn 0개.
- * - 큰 이미지 + 이름 + 가격(VAT 포함, 손님 청구 기준)
+ * - 큰 이미지 + 이름 + 가격(VAT 포함, 고객 청구 기준)
  * - 카드 탭 = 카트 추가
  * - 우상단 ℹ️ 탭 = 상세 진입
  *
@@ -23,7 +23,7 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
     product.autoMapped && (parseFloat(product.sellingPrice) || 0) === 0;
   const isOptionParent = product.productType === "OPTION_PARENT";
 
-  // 카탈로그 표시는 VAT 포함 (POS 사장님이 손님에게 청구할 금액 기준).
+  // 카탈로그 표시는 VAT 포함 (POS 사장님이 고객에게 청구할 금액 기준).
   // OPTION_PARENT 는 자체 sellingPrice 가 0 placeholder 라 옵션 SWAP 최저가 사용.
   const sellingNet = isOptionParent
     ? Number(product.minOptionPrice ?? 0)

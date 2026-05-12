@@ -10,7 +10,7 @@
  *   4) [교환] → SAME/DIFFERENT 선택 confirm → API 직접 호출
  *
  * 매장 즉석 단축 경로라 RETURN_REQUESTED→ACCEPTED→COLLECTED→INSPECTED 단계 건너뜀.
- * 손님이 매장에 와있고 매장 직원이 직접 확인하는 흐름이므로.
+ * 고객이 매장에 와있고 매장 직원이 직접 확인하는 흐름이므로.
  */
 
 import { useState } from "react";

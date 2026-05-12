@@ -57,7 +57,7 @@ export interface RepairPart {
   totalPrice: string;
   discount: string;
   status: RepairPartStatus;
-  /** LOST 상태일 때만 의미 — true 면 손님에게 청구 (합계 포함) */
+  /** LOST 상태일 때만 의미 — true 면 고객에게 청구 (합계 포함) */
   billLost: boolean;
   consumedAt: string | null;
 }
