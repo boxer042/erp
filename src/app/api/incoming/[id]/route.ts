@@ -9,6 +9,10 @@ import { ensureMappingForSupplierProducts } from "@/lib/mapping-helpers";
 import { recalcPurchaseOrderProgress } from "@/lib/purchase-order";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  restorePriceHistoryForIncoming,
+  cleanupOrphanedSupplierProduct,
+} from "@/lib/incoming-cleanup";
 
 export async function GET(
   _request: NextRequest,
@@ -525,6 +529,9 @@ export async function PUT(
         await recalcPurchaseOrderProgress(tx, incoming.purchaseOrderId);
       }
 
+      // 12-b. SP 가격 원복 — 이 입고로 인해 SP.unitPrice/listPrice 가 변경됐다면 입고 직전 값으로 되돌림
+      await restorePriceHistoryForIncoming(tx, id);
+
       // 13. 감사 로그
       await recordAudit(tx, {
         userId: auditUser?.id ?? null,
@@ -621,6 +628,11 @@ export async function PUT(
         },
       });
 
+      // 교체 전후 SP 비교 — IncomingItem 재생성 후 미참조 SP 자동 정리
+      const previousSupplierProductIds = new Set(incoming.items.map((i) => i.supplierProductId));
+      const newSupplierProductIds = new Set(newItems.map((i) => i.supplierProductId));
+      const removedSpIds = Array.from(previousSupplierProductIds).filter((id) => !newSupplierProductIds.has(id));
+
       await tx.incomingItem.deleteMany({ where: { incomingId: id } });
 
       await tx.incomingItem.createMany({
@@ -711,6 +723,11 @@ export async function PUT(
         }
       }
       await Promise.all(priceOps);
+
+      // 교체로 미참조된 SP 자동 정리 (자동 매핑된 Product 도 함께)
+      for (const spId of removedSpIds) {
+        await cleanupOrphanedSupplierProduct(tx, spId);
+      }
     });
 
     const updated = await prisma.incoming.findUnique({
@@ -1065,7 +1082,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const incoming = await prisma.incoming.findUnique({ where: { id } });
+  const incoming = await prisma.incoming.findUnique({
+    where: { id },
+    include: { items: { select: { supplierProductId: true } } },
+  });
 
   if (!incoming) {
     return NextResponse.json({ error: "입고를 찾을 수 없습니다" }, { status: 404 });
@@ -1075,11 +1095,17 @@ export async function DELETE(
     return NextResponse.json({ error: "대기 상태의 입고만 삭제할 수 있습니다" }, { status: 400 });
   }
 
+  const referencedSpIds = Array.from(new Set(incoming.items.map((i) => i.supplierProductId)));
+
   await prisma.$transaction(async (tx) => {
     await tx.incoming.delete({ where: { id } });
     // PENDING 입고도 발주 status 에는 반영되어 있으므로 (PARTIAL → ?), 삭제 후 재계산
     if (incoming.purchaseOrderId) {
       await recalcPurchaseOrderProgress(tx, incoming.purchaseOrderId);
+    }
+    // 이 입고만 참조하던 SP/자동 Product 자동 정리
+    for (const spId of referencedSpIds) {
+      await cleanupOrphanedSupplierProduct(tx, spId);
     }
   });
   return NextResponse.json({ success: true });
