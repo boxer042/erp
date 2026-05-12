@@ -78,6 +78,7 @@ import {
   type OrderPaymentStatus,
   type OrderStatus,
 } from "./_types";
+import { ExchangeDialog } from "./_exchange-dialog";
 import { formatCurrency } from "./_helpers";
 import { PaymentStatusBadge, ShippingPaymentBadge, StatusBadge } from "./_parts";
 import { RefundDialog } from "./_refund-dialog";
@@ -288,12 +289,9 @@ export function OrderDetailSheet({
   const [claimReason, setClaimReason] = useState<OrderClaimReason | "">("");
   const [claimNote, setClaimNote] = useState("");
   // 교환 분기 Dialog (RETURN_ACCEPTED 에서 SAME/DIFFERENT 결정)
+  // 교환 Dialog — 내부 state 는 ExchangeDialog 가 보유
   const [exchangeDialogOpen, setExchangeDialogOpen] = useState(false);
-  const [exchangeKind, setExchangeKind] = useState<
-    "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT"
-  >("EXCHANGE_SAME");
-  const [exchangeMode, setExchangeMode] = useState<"full" | "partial">("full");
-  const [exchangePartialReturns, setExchangePartialReturns] = useState<
+  const [exchangeDialogPrefill, setExchangeDialogPrefill] = useState<
     Record<string, string>
   >({});
   // 환불 Dialog (RETURN_INSPECTED → refund / COMPLETED → return 양쪽 진입) — 내부 state 는 RefundDialog 가 보유
@@ -322,9 +320,7 @@ export function OrderDetailSheet({
     setClaimReason("");
     setClaimNote("");
     setExchangeDialogOpen(false);
-    setExchangeKind("EXCHANGE_SAME");
-    setExchangeMode("full");
-    setExchangePartialReturns({});
+    setExchangeDialogPrefill({});
     setRefundDialogOpen(false);
     setRefundDialogPrefill({});
   }
@@ -478,34 +474,6 @@ export function OrderDetailSheet({
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
-  // 교환 처리 — claimType (SAME/DIFFERENT) + 선택적 partialItems.
-  const exchangeMutation = useMutation({
-    mutationFn: (input: {
-      kind: "EXCHANGE_SAME" | "EXCHANGE_DIFFERENT";
-      partialItems?: Array<{ orderItemId: string; returnQty: number }>;
-    }) =>
-      apiMutate(`/api/orders/${orderId}`, "PUT", {
-        action: "exchange",
-        claimType: input.kind,
-        ...(input.partialItems && input.partialItems.length > 0
-          ? { partialItems: input.partialItems }
-          : {}),
-      }),
-    onSuccess: () => {
-      toast.success(
-        "교환 처리 완료 — 새 주문이 생성되었습니다. 차액·항목은 새 주문에서 편집하세요.",
-      );
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
-      setExchangeDialogOpen(false);
-      setExchangeMode("full");
-      setExchangePartialReturns({});
-      onOpenChange(false);
-    },
-    onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : "처리 실패"),
-  });
-
   const transitionMutation = useMutation({
     mutationFn: (
       action:
@@ -649,20 +617,14 @@ export function OrderDetailSheet({
       setClaimDialogOpen(true);
       return;
     }
-    // 교환 처리 — Dialog 로 SAME/DIFFERENT + 전체/부분 분기 선택
+    // 교환 처리 — ExchangeDialog 가 SAME/DIFFERENT + 전체/부분 모두 관리
     if (action === "exchange") {
-      const cur = detailQuery.data?.claimType;
-      setExchangeKind(
-        cur === "EXCHANGE_DIFFERENT" ? "EXCHANGE_DIFFERENT" : "EXCHANGE_SAME",
-      );
-      setExchangeMode("full");
-      // 잔여 반품 가능 수량 prefill
       const init: Record<string, string> = {};
       for (const it of detailQuery.data?.items ?? []) {
         const remaining = Number(it.quantity) - Number(it.returnedQty);
         init[it.id] = String(remaining);
       }
-      setExchangePartialReturns(init);
+      setExchangeDialogPrefill(init);
       setExchangeDialogOpen(true);
       return;
     }
@@ -1204,189 +1166,6 @@ export function OrderDetailSheet({
         </JmDialogContent>
       </JmDialog>
 
-      {/* 교환 분기 Dialog — RETURN_ACCEPTED 에서 회수 후 처리 종류 선택 */}
-      <JmDialog open={exchangeDialogOpen} onOpenChange={setExchangeDialogOpen}>
-        <JmDialogContent size="md">
-          <JmDialogHeader>
-            <JmDialogTitle>교환 처리</JmDialogTitle>
-          </JmDialogHeader>
-          <div className="space-y-3 px-5 py-4">
-            <p className="text-jm-sm text-[var(--jm-text-muted)]">
-              회수 완료 시 새 주문이 자동 생성됩니다. 차액·항목은 새 주문에서
-              편집하세요.
-            </p>
-            {/* 운임 책임 안내 — claimReason 기반 자동 권장 */}
-            {detailQuery.data?.claimReason &&
-              (() => {
-                const reason = detailQuery.data.claimReason;
-                const liability = CLAIM_REASON_LIABILITY[reason];
-                const note = liabilityShippingNote(reason);
-                return (
-                  <div className="flex items-start gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-2.5 text-jm-xs">
-                    <JmBadge
-                      variant={liability === "shop" ? "warning" : "outline"}
-                      size="sm"
-                      shape="square"
-                    >
-                      {CLAIM_REASON_LABELS[reason]} · 운임{" "}
-                      {LIABILITY_LABELS[liability]}
-                    </JmBadge>
-                    <span className="text-[var(--jm-text-muted)] leading-relaxed">
-                      {note}
-                    </span>
-                  </div>
-                );
-              })()}
-            <div className="space-y-2">
-              {(["EXCHANGE_SAME", "EXCHANGE_DIFFERENT"] as const).map((k) => {
-                const active = exchangeKind === k;
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setExchangeKind(k)}
-                    className={`flex w-full flex-col gap-0.5 rounded-xl border-2 p-3 text-left transition-colors ${
-                      active
-                        ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
-                        : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
-                    }`}
-                  >
-                    <span className="text-jm-base font-medium text-[var(--jm-text)]">
-                      {CLAIM_TYPE_LABELS[k]}
-                    </span>
-                    <span className="text-jm-2xs text-[var(--jm-text-muted)]">
-                      {k === "EXCHANGE_SAME"
-                        ? "원래 주문 항목 그대로 새 주문에 복제 (차액 없음, 매출 0)"
-                        : "새 주문은 빈 항목으로 생성 — 항목·차액 직접 등록"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 전체/부분 토글 */}
-            <div className="flex gap-2 border-t border-[var(--jm-border)] pt-3">
-              <button
-                type="button"
-                onClick={() => setExchangeMode("full")}
-                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-jm-xs transition-colors ${
-                  exchangeMode === "full"
-                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
-                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
-                }`}
-              >
-                <div className="text-jm-sm font-medium">전체 교환</div>
-                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
-                  주문 항목 모두 교환 (EXCHANGED 종결)
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setExchangeMode("partial")}
-                className={`flex-1 rounded-lg border-2 p-2.5 text-left text-jm-xs transition-colors ${
-                  exchangeMode === "partial"
-                    ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
-                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
-                }`}
-              >
-                <div className="text-jm-sm font-medium">부분 교환</div>
-                <div className="text-jm-2xs text-[var(--jm-text-muted)]">
-                  일부 항목만. 원본은 배송완료 복귀
-                </div>
-              </button>
-            </div>
-
-            {exchangeMode === "partial" && data && (
-              <div className="space-y-1.5">
-                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
-                  각 항목별 교환 수량 입력 (잔여 = 주문수량 − 누적반품)
-                </p>
-                {data.items
-                  .filter((it) => it.product)
-                  .map((it) => {
-                    const ordered = Number(it.quantity);
-                    const already = Number(it.returnedQty);
-                    const remaining = ordered - already;
-                    return (
-                      <div
-                        key={it.id}
-                        className="flex items-center gap-2 rounded border border-[var(--jm-border)] p-2"
-                      >
-                        <div className="flex-1 text-jm-xs">
-                          <div className="text-[var(--jm-text)]">
-                            {it.product?.name ?? "—"}
-                          </div>
-                          <div className="text-jm-2xs text-[var(--jm-text-muted)]">
-                            잔여{" "}
-                            <span className="font-medium">
-                              {remaining.toLocaleString("ko-KR")}
-                            </span>
-                          </div>
-                        </div>
-                        <JmInput
-                          size="sm"
-                          type="text"
-                          inputMode="decimal"
-                          value={exchangePartialReturns[it.id] ?? "0"}
-                          onChange={(e) =>
-                            setExchangePartialReturns({
-                              ...exchangePartialReturns,
-                              [it.id]: e.target.value,
-                            })
-                          }
-                          onFocus={(e) => e.currentTarget.select()}
-                          className="w-[80px] text-right"
-                        />
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-          <JmDialogFooter>
-            <JmButton
-              variant="outline"
-              onClick={() => setExchangeDialogOpen(false)}
-              disabled={exchangeMutation.isPending}
-            >
-              취소
-            </JmButton>
-            <JmButton
-              onClick={() => {
-                if (exchangeMode === "full") {
-                  exchangeMutation.mutate({ kind: exchangeKind });
-                } else {
-                  const partialItems: Array<{
-                    orderItemId: string;
-                    returnQty: number;
-                  }> = [];
-                  for (const [itemId, qtyStr] of Object.entries(
-                    exchangePartialReturns,
-                  )) {
-                    const q = parseFloat(qtyStr);
-                    if (!Number.isFinite(q) || q <= 0) continue;
-                    partialItems.push({ orderItemId: itemId, returnQty: q });
-                  }
-                  if (partialItems.length === 0) {
-                    toast.error("교환 수량을 1개 이상 입력해주세요");
-                    return;
-                  }
-                  exchangeMutation.mutate({
-                    kind: exchangeKind,
-                    partialItems,
-                  });
-                }
-              }}
-              disabled={exchangeMutation.isPending}
-            >
-              {exchangeMutation.isPending && (
-                <JmSpinner size="sm" tone="inverted" />
-              )}
-              {exchangeMode === "full" ? "전체 교환 확정" : "부분 교환 확정"}
-            </JmButton>
-          </JmDialogFooter>
-        </JmDialogContent>
-      </JmDialog>
 
       {/* 환불 Dialog — 내부 state·mutations 자체 관리. parent 는 open + prefill 만 전달 */}
       {data && (
@@ -1395,6 +1174,17 @@ export function OrderDetailSheet({
           onOpenChange={setRefundDialogOpen}
           order={data}
           initialPartialReturns={refundDialogPrefill}
+          onDone={() => onOpenChange(false)}
+        />
+      )}
+
+      {/* 교환 Dialog — 내부 state·mutations 자체 관리. parent 는 open + prefill 만 전달 */}
+      {data && (
+        <ExchangeDialog
+          open={exchangeDialogOpen}
+          onOpenChange={setExchangeDialogOpen}
+          order={data}
+          initialPartialReturns={exchangeDialogPrefill}
           onDone={() => onOpenChange(false)}
         />
       )}
