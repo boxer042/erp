@@ -21,6 +21,7 @@ import { GlobalSearchSheet } from "../../_global-search-sheet";
 import { LinkCustomerSheet } from "../../_link-customer-sheet";
 import { QuickCustomerSheet } from "../../_quick-customer-sheet";
 import { CustomerActionSheet } from "../../_customer-action-sheet";
+import { ReturnExchangeSheet } from "../../_return-exchange-sheet";
 import { CartSheet } from "../../_cart-sheet";
 import { PaymentSheet } from "../../_payment-sheet";
 import { useRepairSync } from "../../_use-repair-sync";
@@ -109,6 +110,7 @@ export default function PosV2CustomerPage({
   const [productSearch, setProductSearch] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
   const [customerActionOpen, setCustomerActionOpen] = useState(false);
+  const [returnSheetOpen, setReturnSheetOpen] = useState(false);
   const [quickRegister, setQuickRegister] = useState<{ defaultText: string } | null>(null);
   const [labelCodes, setLabelCodes] = useState<string[] | null>(null);
   // 라벨 모달 닫을 때 손님 그리드(/pos) 로 이동할지 — 결제 직후 발번 케이스만 true.
@@ -406,7 +408,22 @@ export default function PosV2CustomerPage({
         session={session}
         onLinkCustomer={() => setLinkOpen(true)}
         onCreateCustomer={() => setQuickRegister({ defaultText: "" })}
+        onReturnExchange={
+          session.customerId
+            ? () => setReturnSheetOpen(true)
+            : undefined
+        }
       />
+
+      {/* 반품·교환 시트 — 등록 고객 한정. 환불 가능 주문 리스트 + Refund/Exchange Dialog */}
+      {session.customerId && session.customerName && (
+        <ReturnExchangeSheet
+          open={returnSheetOpen}
+          onOpenChange={setReturnSheetOpen}
+          customerId={session.customerId}
+          customerName={session.customerName}
+        />
+      )}
 
       {/* 미등록 → 기존 고객 매핑 시트 */}
       <LinkCustomerSheet

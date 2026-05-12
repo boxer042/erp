@@ -12,6 +12,8 @@ interface Props {
   onLinkCustomer: () => void;
   /** "새 고객 등록" — 검색 건너뛰고 등록 시트 바로. 미지정 시 onLinkCustomer 폴백. */
   onCreateCustomer?: () => void;
+  /** "반품·교환" — 등록 고객의 환불 가능 주문 시트 진입. 미지정 시 액션 비노출. */
+  onReturnExchange?: () => void;
 }
 
 /**
@@ -28,6 +30,7 @@ export function CustomerActionSheet({
   session,
   onLinkCustomer,
   onCreateCustomer,
+  onReturnExchange,
 }: Props) {
   if (!open) return null;
   return (
@@ -36,6 +39,7 @@ export function CustomerActionSheet({
       session={session}
       onLinkCustomer={onLinkCustomer}
       onCreateCustomer={onCreateCustomer}
+      onReturnExchange={onReturnExchange}
     />
   );
 }
@@ -45,6 +49,7 @@ function Body({
   session,
   onLinkCustomer,
   onCreateCustomer,
+  onReturnExchange,
 }: Omit<Props, "open">) {
   const router = useRouter();
   const isRegistered = !!session.customerId;
@@ -89,6 +94,27 @@ function Body({
                 onLinkCustomer();
               }}
             />
+            {onReturnExchange && (
+              <Action
+                icon={
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                    <path
+                      d="M4 10a6 6 0 1 1 1.76 4.24M4 14v-4h4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                }
+                label="반품·교환"
+                desc="이전 주문 선택 후 즉석 환불 또는 교환 시작"
+                onClick={() => {
+                  close();
+                  onReturnExchange();
+                }}
+              />
+            )}
           </>
         ) : (
           <>
