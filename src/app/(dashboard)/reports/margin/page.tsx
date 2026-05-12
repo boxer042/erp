@@ -411,7 +411,7 @@ export default function MarginReportPage() {
                   </TableHeader>
                   <TableBody>
                     {data.channelGroups.map((g) => (
-                      <TableRow key={g.channelId ?? g.channelName}>
+                      <TableRow key={g.channelId ?? "__offline__"}>
                         <TableCell className="text-[12px] font-medium">{g.channelName}</TableCell>
                         <TableCell className="text-right tabular-nums text-[12px]">{g.orderCount}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(g.revenue)}</TableCell>

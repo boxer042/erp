@@ -121,8 +121,9 @@ export default async function DashboardPage() {
       });
       return groups
         .map((g) => ({
+          channelId: g.channelId ?? null,
           channelName: g.channelId
-            ? channels.find((c) => c.id === g.channelId)?.name ?? ""
+            ? channels.find((c) => c.id === g.channelId)?.name ?? "(삭제된 채널)"
             : "오프라인",
           orderCount: g._count,
           totalAmount: Number(g._sum.totalAmount ?? 0),
@@ -327,7 +328,7 @@ export default async function DashboardPage() {
                   </TableRow>
                 ) : (
                   monthlyChannelSales.map((cs) => (
-                    <TableRow key={cs.channelName}>
+                    <TableRow key={cs.channelId ?? "__offline__"}>
                       <TableCell className="font-medium">{cs.channelName}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{cs.orderCount}건</TableCell>
                       <TableCell className="text-right tabular-nums">₩{fmt(cs.totalAmount)}</TableCell>
