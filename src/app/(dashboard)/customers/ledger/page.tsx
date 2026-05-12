@@ -24,25 +24,37 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ko } from "date-fns/locale";
 
 type LedgerType = "SALE" | "RECEIPT" | "ADJUSTMENT" | "REFUND";
+// 가상 행 타입 — CustomerRefund 레코드를 같은 테이블에 표시할 때 사용. 잔액에는 영향 없음.
+type RowType = LedgerType | "REFUND_LOG";
 
-const TYPE_LABELS: Record<LedgerType, string> = {
+const TYPE_LABELS: Record<RowType, string> = {
   SALE: "매출",
   RECEIPT: "수금",
   ADJUSTMENT: "조정",
   REFUND: "환불",
+  REFUND_LOG: "환불내역",
 };
-const TYPE_VARIANTS: Record<LedgerType, "default" | "secondary" | "outline" | "destructive" | "warning" | "success"> = {
+const TYPE_VARIANTS: Record<RowType, "default" | "secondary" | "outline" | "destructive" | "warning" | "success"> = {
   SALE: "default",
   RECEIPT: "success",
   ADJUSTMENT: "secondary",
   REFUND: "destructive",
+  REFUND_LOG: "destructive",
 };
 const ALL_TYPES: LedgerType[] = ["SALE", "RECEIPT", "ADJUSTMENT", "REFUND"];
+
+const REFUND_METHOD_LABELS: Record<string, string> = {
+  CARD_CANCEL: "카드 취소",
+  CASH: "현금",
+  BANK_TRANSFER: "계좌이체",
+  POINTS: "포인트",
+  OTHER: "기타",
+};
 
 interface LedgerEntry {
   id: string;
   date: string;
-  type: LedgerType;
+  type: RowType;
   description: string;
   debitAmount: string;
   creditAmount: string;
@@ -50,6 +62,16 @@ interface LedgerEntry {
   referenceId: string | null;
   referenceType: string | null;
   customer: { id: string; name: string };
+}
+
+interface RefundLog {
+  id: string;
+  refundedAt: string;
+  amount: string;
+  method: keyof typeof REFUND_METHOD_LABELS;
+  memo: string | null;
+  customer: { id: string; name: string };
+  order: { id: string; orderNo: string };
 }
 
 interface CustomerSummary {
@@ -66,6 +88,7 @@ interface CustomerSummary {
 
 interface LedgerResponse {
   entries: LedgerEntry[];
+  refunds: RefundLog[];
   customerSummaries: CustomerSummary[];
 }
 
@@ -130,7 +153,7 @@ export default function CustomerLedgerPage() {
       return apiGet<LedgerResponse>(`/api/customers/ledger?${params}`);
     },
   });
-  const data: LedgerResponse = ledgerQuery.data ?? { entries: [], customerSummaries: [] };
+  const data: LedgerResponse = ledgerQuery.data ?? { entries: [], refunds: [], customerSummaries: [] };
   const loading = ledgerQuery.isPending;
   const fetchLedger = () => queryClient.invalidateQueries({ queryKey: queryKeys.ledger.customers() });
 
@@ -226,9 +249,24 @@ export default function CustomerLedgerPage() {
         selectedCustomerSummary.currentBalance !== 0
       : filteredSummaries.some((c) => c.currentBalance !== 0 || c.openingBalance !== 0));
 
+  // CustomerRefund → LedgerEntry 모양으로 변환해 같은 테이블에 표시 (balance=null, 차변/대변=0)
+  const refundRows: LedgerEntry[] = (data.refunds ?? []).map((r) => ({
+    id: `refund-${r.id}`,
+    date: r.refundedAt,
+    type: "REFUND_LOG" as const,
+    description: `환불 — ${REFUND_METHOD_LABELS[r.method] ?? r.method}${r.memo ? ` (${r.memo})` : ""}`,
+    debitAmount: "0",
+    creditAmount: r.amount,
+    balance: "",
+    referenceId: r.order.id,
+    referenceType: r.order.orderNo,
+    customer: r.customer,
+  }));
+
   const dateGroups = (() => {
     const map = new Map<string, LedgerEntry[]>();
-    data.entries.forEach((e) => {
+    const allRows: LedgerEntry[] = [...data.entries, ...refundRows];
+    allRows.forEach((e) => {
       const key = format(new Date(e.date), "yyyy-MM-dd");
       const arr = map.get(key) || [];
       arr.push(e);
@@ -620,6 +658,7 @@ export default function CustomerLedgerPage() {
                       {rows.map((e) => {
                         const isReceipt = e.type === "RECEIPT" && e.referenceType === "CUSTOMER_PAYMENT";
                         const isManualAdj = e.type === "ADJUSTMENT" && e.referenceType === "MANUAL_ADJUSTMENT";
+                        const isRefundLog = e.type === "REFUND_LOG";
                         const isClickable = isReceipt || isManualAdj;
                         const title = isReceipt ? "더블클릭: 수금 수정" : isManualAdj ? "더블클릭: 조정 수정" : undefined;
                         return (
@@ -628,6 +667,7 @@ export default function CustomerLedgerPage() {
                             className={cn(
                               !isClickable && "hover:bg-transparent",
                               isClickable && "cursor-pointer",
+                              isRefundLog && "bg-destructive/5",
                             )}
                             title={title}
                             onDoubleClick={() => onEntryDoubleClick(e)}
@@ -651,7 +691,11 @@ export default function CustomerLedgerPage() {
                               {parseFloat(e.creditAmount) > 0 ? `₩${formatAmount(e.creditAmount)}` : "-"}
                             </TableCell>
                             <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums">
-                              ₩{formatAmount(e.balance)}
+                              {isRefundLog ? (
+                                <span className="text-muted-foreground text-xs">잔액 무관</span>
+                              ) : (
+                                `₩${formatAmount(e.balance)}`
+                              )}
                             </TableCell>
                           </TableRow>
                         );

@@ -30,6 +30,7 @@ model User {
   createdPurchaseOrders PurchaseOrder[]
   supplierPayments      SupplierPayment[]
   customerPayments      CustomerPayment[]
+  customerRefunds       CustomerRefund[]
   supplierReturns       SupplierReturn[]
   createdQuotations     Quotation[]
   createdStatements     Statement[]
@@ -89,12 +90,12 @@ model SalesChannel {
   /**
    * 채널 운영 정책·credentials 보관 JSON.
    * 구조 (선택 필드):
-   *  - pollingMinutes: number   — cron 호출 간격 (default 10)
-   *  - shipDateOffsetDays: number — 출고 예정일 offset (쿠팡=1, 네이버=정책별)
-   *  - autoStockSync: boolean   — Inventory 변동 시 채널에 push 여부 (default false)
-   *  - autoTrackingPush: boolean — ERP [발송] 시 송장 자동 push 여부 (default true)
-   *  - credentials: { ... }     — OAuth/API 키 (Phase 2 — 가입 후 입력)
-   *  - pendingThreshold: number — 보류 큐 임계값 (이 수 초과 시 알림)
+   * - pollingMinutes: number   — cron 호출 간격 (default 10)
+   * - shipDateOffsetDays: number — 출고 예정일 offset (쿠팡=1, 네이버=정책별)
+   * - autoStockSync: boolean   — Inventory 변동 시 채널에 push 여부 (default false)
+   * - autoTrackingPush: boolean — ERP [발송] 시 송장 자동 push 여부 (default true)
+   * - credentials: { ... }     — OAuth/API 키 (Phase 2 — 가입 후 입력)
+   * - pendingThreshold: number — 보류 큐 임계값 (이 수 초과 시 알림)
    */
   config         Json?    @map("config")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -114,19 +115,17 @@ model SalesChannel {
 
 /**
  * 외부 채널 outbound 자동 retry 큐.
- *
  * 흐름:
- *  - ERP 액션 후 outbound 호출 시 즉시 try → 실패하면 이 큐에 enqueue
- *  - cron `/api/cron/outbound-retry` 가 PENDING + nextAttemptAt < now 항목을 drain
- *  - 재시도 실패: attempts++ + nextAttemptAt 미루기(exponential backoff: 2^attempts 분)
- *  - attempts >= maxAttempts: status=FAILED (영구 실패 — 운영자 수동 처리)
- *  - 성공: status=SUCCESS + resolvedAt 기록
- *
+ * - ERP 액션 후 outbound 호출 시 즉시 try → 실패하면 이 큐에 enqueue
+ * - cron `/api/cron/outbound-retry` 가 PENDING + nextAttemptAt < now 항목을 drain
+ * - 재시도 실패: attempts++ + nextAttemptAt 미루기(exponential backoff: 2^attempts 분)
+ * - attempts >= maxAttempts: status=FAILED (영구 실패 — 운영자 수동 처리)
+ * - 성공: status=SUCCESS + resolvedAt 기록
  * payload 형식:
- *   PUSH_TRACKING:    { channelOrderNo, carrier, trackingNumber }
- *   PUSH_STOCK:       { items: [{ channelSku, availableQty }] }
- *   ACCEPT_RETURN:    { channelOrderNo }
- *   REJECT_RETURN:    { channelOrderNo, reason }
+ * PUSH_TRACKING:    { channelOrderNo, carrier, trackingNumber }
+ * PUSH_STOCK:       { items: [{ channelSku, availableQty }] }
+ * ACCEPT_RETURN:    { channelOrderNo }
+ * REJECT_RETURN:    { channelOrderNo, reason }
  */
 enum ChannelOutboundJobKind {
   PUSH_TRACKING
@@ -146,17 +145,27 @@ model ChannelOutboundJob {
   channelId     String                   @map("channel_id")
   channel       SalesChannel             @relation(fields: [channelId], references: [id], onDelete: Cascade)
   kind          ChannelOutboundJobKind
-  /** 어댑터 호출 입력값 — JSON. 재시도 시 그대로 push */
+  /**
+   * 어댑터 호출 입력값 — JSON. 재시도 시 그대로 push
+   */
   payload       Json
   status        ChannelOutboundJobStatus @default(PENDING)
   attempts      Int                      @default(0)
-  /** 최대 시도 횟수 — 초과 시 FAILED. 기본 5 */
+  /**
+   * 최대 시도 횟수 — 초과 시 FAILED. 기본 5
+   */
   maxAttempts   Int                      @default(5) @map("max_attempts")
-  /** 다음 시도 가능 시각 — exponential backoff. 초기엔 즉시 (now) */
+  /**
+   * 다음 시도 가능 시각 — exponential backoff. 초기엔 즉시 (now)
+   */
   nextAttemptAt DateTime                 @default(now()) @map("next_attempt_at")
-  /** 마지막 에러 메시지 (실패 시) */
+  /**
+   * 마지막 에러 메시지 (실패 시)
+   */
   lastError     String?                  @map("last_error")
-  /** 도메인 ref — orderId(주로). 추적·필터용 nullable */
+  /**
+   * 도메인 ref — orderId(주로). 추적·필터용 nullable
+   */
   orderId       String?                  @map("order_id")
   createdAt     DateTime                 @default(now()) @map("created_at")
   updatedAt     DateTime                 @updatedAt @map("updated_at")
@@ -170,39 +179,42 @@ model ChannelOutboundJob {
 
 /**
  * 채널 SKU ↔ ERP Product 매핑. 1:1 (단일) 또는 1:N (세트·번들) 지원.
- *
- *  - **단일 (1:1)**: productId 직접 사용. components 는 없음. 가장 흔한 케이스.
- *  - **다중 (1:N)**: productId=null + components 여러 개. 채널의 "선물세트" SKU 가
- *    ERP 의 [상품X 2개 + 상품Y 1개] 처럼 풀어지는 경우.
- *
+ * - **단일 (1:1)**: productId 직접 사용. components 는 없음. 가장 흔한 케이스.
+ * - **다중 (1:N)**: productId=null + components 여러 개. 채널의 "선물세트" SKU 가
+ * ERP 의 [상품X 2개 + 상품Y 1개] 처럼 풀어지는 경우.
  * import 시 components 가 있으면 우선 (productId 무시), 없으면 productId 사용.
- *
  * unique: 한 채널 내에서 channelSku 는 한 매핑에만 (단일이든 다중이든).
  */
 model ChannelProductMapping {
-  id          String                            @id @default(uuid())
-  channelId   String                            @map("channel_id")
-  channel     SalesChannel                      @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  channelSku  String                            @map("channel_sku")
-  /** 채널이 보내주는 상품명 — 매핑 UI 에서 hint 로 표시 */
-  channelName String?                           @map("channel_name")
-  /** 단일 매핑일 때 사용. components 가 있으면 무시 (다중 매핑) */
-  productId   String?                           @map("product_id")
-  product     Product?                          @relation(fields: [productId], references: [id])
+  id                   String                           @id @default(uuid())
+  channelId            String                           @map("channel_id")
+  channel              SalesChannel                     @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channelSku           String                           @map("channel_sku")
+  /**
+   * 채널이 보내주는 상품명 — 매핑 UI 에서 hint 로 표시
+   */
+  channelName          String?                          @map("channel_name")
+  /**
+   * 단일 매핑일 때 사용. components 가 있으면 무시 (다중 매핑)
+   */
+  productId            String?                          @map("product_id")
+  product              Product?                         @relation(fields: [productId], references: [id])
   /**
    * 옵션값 매핑 — 채널 SKU 가 ERP 옵션값 (특정 색상/사이즈) 에 해당.
    * import 시 OrderItem 에 다음과 같이 반영:
-   *   - productId = optionValue.mappedProduct.id (SWAP 모드면 swap 된 SKU)
-   *   - optionSnapshot = { 옵션명: 라벨 }
-   *   - entryProductId = mapping.productId (대표 상품 — funnel)
+   * - productId = optionValue.mappedProduct.id (SWAP 모드면 swap 된 SKU)
+   * - optionSnapshot = { 옵션명: 라벨 }
+   * - entryProductId = mapping.productId (대표 상품 — funnel)
    * productId 만 있고 optionValueId 없으면 일반 단일 매핑 (기존 동작).
    */
-  productOptionValueId String?                  @map("product_option_value_id")
-  productOptionValue   ProductOptionValue?      @relation("ChannelMappingOptionValue", fields: [productOptionValueId], references: [id], onDelete: SetNull)
-  /** 다중 매핑 — 한 채널 SKU 가 여러 ERP 상품으로 풀어짐 */
-  components  ChannelProductMappingComponent[]
-  createdAt   DateTime                          @default(now()) @map("created_at")
-  updatedAt   DateTime                          @updatedAt @map("updated_at")
+  productOptionValueId String?                          @map("product_option_value_id")
+  productOptionValue   ProductOptionValue?              @relation("ChannelMappingOptionValue", fields: [productOptionValueId], references: [id], onDelete: SetNull)
+  /**
+   * 다중 매핑 — 한 채널 SKU 가 여러 ERP 상품으로 풀어짐
+   */
+  components           ChannelProductMappingComponent[]
+  createdAt            DateTime                         @default(now()) @map("created_at")
+  updatedAt            DateTime                         @updatedAt @map("updated_at")
 
   @@unique([channelId, channelSku])
   @@index([productId])
@@ -212,13 +224,11 @@ model ChannelProductMapping {
 
 /**
  * 채널 SKU 매핑의 구성품. 두 가지 흐름 다 지원:
- *  - **세트 풀이 (1:N)**: 채널 SKU 1개 = ERP 상품 N개 (모두 lineRole=MAIN, productId 직접).
- *    예: "선물세트A" → [상품X × 2, 상품Y × 1].
- *  - **메인+옵션+추가 동시 매핑**: lineRole 로 컴포넌트 역할 분리.
- *    예: 한 채널 SKU = [상품X(MAIN) + ProductOptionValue(OPTION 의 mappedProduct) + 상품Z(ADDON 사은품)]
- *
+ * - **세트 풀이 (1:N)**: 채널 SKU 1개 = ERP 상품 N개 (모두 lineRole=MAIN, productId 직접).
+ * 예: "선물세트A" → [상품X × 2, 상품Y × 1].
+ * - **메인+옵션+추가 동시 매핑**: lineRole 로 컴포넌트 역할 분리.
+ * 예: 한 채널 SKU = [상품X(MAIN) + ProductOptionValue(OPTION 의 mappedProduct) + 상품Z(ADDON 사은품)]
  * import.ts 가 lineRole 보고 OrderItem 의 lineRole / parentItemId / optionSnapshot 자동 부여.
- *
  * 부모 ChannelProductMapping 의 단일 productId / productOptionValueId 는 components[] 가 비어있을 때만
  * 폴백으로 사용 (1:1 케이스 backward-compat). components[] 가 있으면 부모 단일 필드 무시.
  */
@@ -229,27 +239,31 @@ enum ChannelMappingComponentRole {
 }
 
 model ChannelProductMappingComponent {
-  id                   String                       @id @default(uuid())
-  mappingId            String                       @map("mapping_id")
-  mapping              ChannelProductMapping        @relation(fields: [mappingId], references: [id], onDelete: Cascade)
-  /** 컴포넌트 역할 — MAIN(기본 라인) / OPTION(옵션 매핑) / ADDON(추가구매·사은품). 미설정 시 MAIN. */
-  lineRole             ChannelMappingComponentRole  @default(MAIN) @map("line_role")
+  id                   String                      @id @default(uuid())
+  mappingId            String                      @map("mapping_id")
+  mapping              ChannelProductMapping       @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+  /**
+   * 컴포넌트 역할 — MAIN(기본 라인) / OPTION(옵션 매핑) / ADDON(추가구매·사은품). 미설정 시 MAIN.
+   */
+  lineRole             ChannelMappingComponentRole @default(MAIN) @map("line_role")
   /**
    * 컴포넌트의 ERP Product. lineRole=OPTION 인 경우 productOptionValue.mappedProduct 와 일치하거나,
    * 직접 productId 만 두고 productOptionValue 는 null 이어도 OK (옵션 라벨만 보존, mappedProduct 는 productId 동일).
    */
-  productId            String                       @map("product_id")
-  product              Product                      @relation(fields: [productId], references: [id])
+  productId            String                      @map("product_id")
+  product              Product                     @relation(fields: [productId], references: [id])
   /**
    * lineRole=OPTION 일 때 options snapshot 부여용 — ProductOptionValue link.
    * import 시 OrderItem.optionSnapshot = { 옵션명: 라벨 } 자동 채움.
    * 미설정이면 옵션 라벨 안 들어감 (그냥 OPTION_REF 라인만 생성).
    */
-  productOptionValueId String?                      @map("product_option_value_id")
-  productOptionValue   ProductOptionValue?          @relation("ChannelMappingComponentOption", fields: [productOptionValueId], references: [id], onDelete: SetNull)
-  /** 채널 SKU 1개당 ERP 상품 몇 개 */
-  quantity             Decimal                      @default(1) @db.Decimal(10, 4)
-  createdAt            DateTime                     @default(now()) @map("created_at")
+  productOptionValueId String?                     @map("product_option_value_id")
+  productOptionValue   ProductOptionValue?         @relation("ChannelMappingComponentOption", fields: [productOptionValueId], references: [id], onDelete: SetNull)
+  /**
+   * 채널 SKU 1개당 ERP 상품 몇 개
+   */
+  quantity             Decimal                     @default(1) @db.Decimal(10, 4)
+  createdAt            DateTime                    @default(now()) @map("created_at")
 
   @@index([mappingId])
   @@index([productId])
@@ -266,15 +280,25 @@ model PendingChannelOrder {
   id              String                    @id @default(uuid())
   channelId       String                    @map("channel_id")
   channel         SalesChannel              @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  /** 채널 측 주문번호 — 동일 채널 내 unique. 중복 import 방지 */
+  /**
+   * 채널 측 주문번호 — 동일 채널 내 unique. 중복 import 방지
+   */
   channelOrderNo  String                    @map("channel_order_no")
-  /** 어댑터가 받아온 원본 payload 전체. JSON 으로 보존해 추후 디버깅·재변환 가능 */
+  /**
+   * 어댑터가 받아온 원본 payload 전체. JSON 으로 보존해 추후 디버깅·재변환 가능
+   */
   rawPayload      Json                      @map("raw_payload")
-  /** 보류 사유 — UNMAPPED_SKU(매핑 누락), VALIDATION_FAILED(필드 부족), DUPLICATE(중복), OTHER */
+  /**
+   * 보류 사유 — UNMAPPED_SKU(매핑 누락), VALIDATION_FAILED(필드 부족), DUPLICATE(중복), OTHER
+   */
   status          PendingChannelOrderStatus @default(UNMAPPED_SKU)
-  /** 사람이 읽을 사유 메모 — 어떤 SKU 가 누락됐는지 등 */
+  /**
+   * 사람이 읽을 사유 메모 — 어떤 SKU 가 누락됐는지 등
+   */
   reason          String?
-  /** resolved 되어 정식 Order 로 변환된 경우 그 Order 의 id */
+  /**
+   * resolved 되어 정식 Order 로 변환된 경우 그 Order 의 id
+   */
   resolvedOrderId String?                   @unique @map("resolved_order_id")
   resolvedAt      DateTime?                 @map("resolved_at")
   createdAt       DateTime                  @default(now()) @map("created_at")
@@ -286,11 +310,11 @@ model PendingChannelOrder {
 }
 
 enum PendingChannelOrderStatus {
-  UNMAPPED_SKU       // 매핑 안 된 SKU 가 있어 보류
-  VALIDATION_FAILED  // 필수 필드 누락 등
-  DUPLICATE          // 이미 Order 로 import 된 채널주문번호
-  RESOLVED           // 매핑 후 정식 Order 로 승격됨
-  DISCARDED          // 사용자가 import 거부 (스팸·테스트 주문 등)
+  UNMAPPED_SKU // 매핑 안 된 SKU 가 있어 보류
+  VALIDATION_FAILED // 필수 필드 누락 등
+  DUPLICATE // 이미 Order 로 import 된 채널주문번호
+  RESOLVED // 매핑 후 정식 Order 로 승격됨
+  DISCARDED // 사용자가 import 거부 (스팸·테스트 주문 등)
 }
 
 model ChannelFee {
@@ -493,34 +517,40 @@ model Product {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  setComponents      SetComponent[]      @relation("SetParent")
-  partOfSets         SetComponent[]      @relation("SetChild")
-  productMappings    ProductMapping[]
-  channelMappings    ChannelProductMapping[]
+  setComponents            SetComponent[]                   @relation("SetParent")
+  partOfSets               SetComponent[]                   @relation("SetChild")
+  productMappings          ProductMapping[]
+  channelMappings          ChannelProductMapping[]
   channelMappingComponents ChannelProductMappingComponent[]
-  productOptions     ProductOption[]
-  optionValueMappedAs ProductOptionValue[] @relation("OptionValueProduct")
-  optionValueVariantAs ProductOptionValue[] @relation("OptionValueVariant")
-  channelPricings    ChannelPricing[]
-  repairPackageParts RepairPackagePart[]
-  inventory          Inventory?
-  orderItems         OrderItem[]
-  /** B2C funnel — 손님이 진입한 카탈로그 SKU 로 매핑된 OrderItem 들 (자사몰/외부 채널 한정) */
-  entryOrderItems    OrderItem[] @relation("OrderItemEntry")
-  /** 이 상품에 연결된 추가구매 추천 (메인=this) */
-  bundles            BundleProduct[] @relation("BundleMain")
-  /** 이 상품이 다른 메인의 추가구매로 등록된 행들 — 카탈로그 삭제 시 참조 차단용 */
-  bundledIn          BundleProduct[] @relation("BundleAddon")
-  sellingCosts       SellingCost[]
-  quotationItems     QuotationItem[]
-  statementItems     StatementItem[]
-  inventoryLots      InventoryLot[]
-  media              ProductMedia[]
-  customerMachines   CustomerMachine[]
-  repairParts        RepairPart[]
-  repairTickets      RepairTicket[]      @relation("RepairProduct")
-  rentalAssets       RentalAsset[]
-  serialItems        SerialItem[]
+  productOptions           ProductOption[]
+  optionValueMappedAs      ProductOptionValue[]             @relation("OptionValueProduct")
+  optionValueVariantAs     ProductOptionValue[]             @relation("OptionValueVariant")
+  channelPricings          ChannelPricing[]
+  repairPackageParts       RepairPackagePart[]
+  inventory                Inventory?
+  orderItems               OrderItem[]
+  /**
+   * B2C funnel — 손님이 진입한 카탈로그 SKU 로 매핑된 OrderItem 들 (자사몰/외부 채널 한정)
+   */
+  entryOrderItems          OrderItem[]                      @relation("OrderItemEntry")
+  /**
+   * 이 상품에 연결된 추가구매 추천 (메인=this)
+   */
+  bundles                  BundleProduct[]                  @relation("BundleMain")
+  /**
+   * 이 상품이 다른 메인의 추가구매로 등록된 행들 — 카탈로그 삭제 시 참조 차단용
+   */
+  bundledIn                BundleProduct[]                  @relation("BundleAddon")
+  sellingCosts             SellingCost[]
+  quotationItems           QuotationItem[]
+  statementItems           StatementItem[]
+  inventoryLots            InventoryLot[]
+  media                    ProductMedia[]
+  customerMachines         CustomerMachine[]
+  repairParts              RepairPart[]
+  repairTickets            RepairTicket[]                   @relation("RepairProduct")
+  rentalAssets             RentalAsset[]
+  serialItems              SerialItem[]
 
   assemblies                    Assembly[]
   assemblyComponentConsumptions AssemblyComponentConsumption[]
@@ -589,9 +619,13 @@ model ProductOption {
   id        String   @id @default(uuid())
   productId String   @map("product_id")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  /** 옵션 슬롯명 — "메모리", "색상", "쿨러" 등 */
+  /**
+   * 옵션 슬롯명 — "메모리", "색상", "쿨러" 등
+   */
   name      String
-  /** 필수 선택 여부 — false 면 미선택도 허용 */
+  /**
+   * 필수 선택 여부 — false 면 미선택도 허용
+   */
   required  Boolean  @default(true)
   sortOrder Int      @default(0) @map("sort_order")
   isActive  Boolean  @default(true) @map("is_active")
@@ -606,14 +640,11 @@ model ProductOption {
 
 /**
  * 옵션값 처리 모드 — mappedProductId 가 있을 때 결제 라인에 어떻게 반영할지.
- *
  * - SWAP:  메인 라인의 productId 자체를 mapped 로 교체. 본 상품의 색상/사이즈 변형 같은 케이스.
- *          예: 대표 "가습기" + "색상=블랙" → 메인 라인이 가습기-블랙 SKU 로 swap. OPTION_PARENT 와 함께 자주 사용.
- *
+ * 예: 대표 "가습기" + "색상=블랙" → 메인 라인이 가습기-블랙 SKU 로 swap. OPTION_PARENT 와 함께 자주 사용.
  * - ADDON: 메인 라인 + OPTION_REF 자식 라인 (별도 OrderItem 자동 생성).
- *          본 상품의 부속/내부 옵션이 별도 SKU로 관리되는 드문 케이스. 일반적인 "추가구매" 도메인은
- *          BundleProduct(추후 §3.3 후속) 를 쓰는 게 맞음 — 옵션 안의 ADDON 모드는 사실상 비권장.
- *
+ * 본 상품의 부속/내부 옵션이 별도 SKU로 관리되는 드문 케이스. 일반적인 "추가구매" 도메인은
+ * BundleProduct(추후 §3.3 후속) 를 쓰는 게 맞음 — 옵션 안의 ADDON 모드는 사실상 비권장.
  * mappedProductId 도 mappedVariantId 도 없는 단순 텍스트 옵션값은 모드와 무관 (메인 라인 가산만).
  */
 enum ProductOptionValueMode {
@@ -624,30 +655,40 @@ enum ProductOptionValueMode {
 }
 
 model ProductOptionValue {
-  id       String        @id @default(uuid())
-  optionId String        @map("option_id")
-  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  /** 옵션값 라벨 — "32GB", "수냉쿨러", "화이트" */
-  label    String
-  /** 추가가 — 메인 가격 대비 차액. SWAP 모드에선 mapped SKU 의 sellingPrice 가 우선이므로 0 권장 */
-  addPrice Decimal       @default(0) @map("add_price") @db.Decimal(15, 2)
-  sortOrder Int          @default(0) @map("sort_order")
-  isActive Boolean       @default(true) @map("is_active")
+  id        String        @id @default(uuid())
+  optionId  String        @map("option_id")
+  option    ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  /**
+   * 옵션값 라벨 — "32GB", "수냉쿨러", "화이트"
+   */
+  label     String
+  /**
+   * 추가가 — 메인 가격 대비 차액. SWAP 모드에선 mapped SKU 의 sellingPrice 가 우선이므로 0 권장
+   */
+  addPrice  Decimal       @default(0) @map("add_price") @db.Decimal(15, 2)
+  sortOrder Int           @default(0) @map("sort_order")
+  isActive  Boolean       @default(true) @map("is_active")
 
-  /** 옵션값이 다른 Product 를 매핑 — 색상 SKU(SWAP) 또는 부속 SKU(ADDON) */
-  mappedProductId String?  @map("mapped_product_id")
-  mappedProduct   Product? @relation("OptionValueProduct", fields: [mappedProductId], references: [id], onDelete: SetNull)
-  /** 옵션값이 매장 variant 를 결정 — 쿨러 → 수냉쿨러 variant (Phase 3 자동 Assembly) */
-  mappedVariantId String?  @map("mapped_variant_id")
-  mappedVariant   Product? @relation("OptionValueVariant", fields: [mappedVariantId], references: [id], onDelete: SetNull)
+  /**
+   * 옵션값이 다른 Product 를 매핑 — 색상 SKU(SWAP) 또는 부속 SKU(ADDON)
+   */
+  mappedProductId String?                @map("mapped_product_id")
+  mappedProduct   Product?               @relation("OptionValueProduct", fields: [mappedProductId], references: [id], onDelete: SetNull)
+  /**
+   * 옵션값이 매장 variant 를 결정 — 쿨러 → 수냉쿨러 variant (Phase 3 자동 Assembly)
+   */
+  mappedVariantId String?                @map("mapped_variant_id")
+  mappedVariant   Product?               @relation("OptionValueVariant", fields: [mappedVariantId], references: [id], onDelete: SetNull)
   /**
    * mappedProductId 처리 모드 — SWAP(메인 라인 교체) / ADDON(자식 라인 추가).
    * mappedProductId 없으면 무시. 기본 SWAP — 옵션값에서 매핑하는 일반 케이스가 SWAP(색상 등).
    */
-  mappedMode ProductOptionValueMode @default(SWAP) @map("mapped_mode")
+  mappedMode      ProductOptionValueMode @default(SWAP) @map("mapped_mode")
 
-  /** 외부 채널 SKU 가 이 옵션값을 가리키는 매핑들 — onDelete=SetNull (옵션값 삭제 시 매핑 해제) */
-  channelMappings ChannelProductMapping[] @relation("ChannelMappingOptionValue")
+  /**
+   * 외부 채널 SKU 가 이 옵션값을 가리키는 매핑들 — onDelete=SetNull (옵션값 삭제 시 매핑 해제)
+   */
+  channelMappings          ChannelProductMapping[]          @relation("ChannelMappingOptionValue")
   channelMappingComponents ChannelProductMappingComponent[] @relation("ChannelMappingComponentOption")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -659,33 +700,39 @@ model ProductOptionValue {
 
 /**
  * 추가구매 추천 (BundleProduct) — 메인 상품과 함께 사면 좋은 별도 카탈로그 상품 매핑.
- *
  * ProductOption 과 분리된 도메인:
- *  - ProductOption: 메인 상품의 선택지 (색상/사이즈) — 손님이 반드시 한 값 선택
- *  - BundleProduct: 별도 카탈로그 상품 추천 — 손님이 클릭해서 추가 (단독 판매도 됨)
- *
+ * - ProductOption: 메인 상품의 선택지 (색상/사이즈) — 손님이 반드시 한 값 선택
+ * - BundleProduct: 별도 카탈로그 상품 추천 — 손님이 클릭해서 추가 (단독 판매도 됨)
  * 흐름: 메인 상품을 카트에 담을 때 추천 모달 노출 → 손님이 ADDON 선택 시 자식 카트 라인 + OrderItem.lineRole=ADDON.
  * 메인 라인 삭제/취소 시 자식 ADDON 라인은 cascade — 추가구매는 메인의 부산물이라 단독 의미 약함.
  */
 model BundleProduct {
-  id              String   @id @default(uuid())
-  /** 메인 상품 — 이 상품 카탈로그에서 추가구매 추천 노출 */
-  mainProductId   String   @map("main_product_id")
-  mainProduct     Product  @relation("BundleMain", fields: [mainProductId], references: [id], onDelete: Cascade)
-  /** 추가 상품 — 함께 사면 좋은 단독 카탈로그 상품. 카탈로그 삭제는 참조 있으면 차단 (Restrict) */
-  bundleProductId String   @map("bundle_product_id")
-  bundleProduct   Product  @relation("BundleAddon", fields: [bundleProductId], references: [id], onDelete: Restrict)
-  /** 추천 시 기본 수량 (대부분 1) */
-  defaultQuantity Decimal  @default(1) @map("default_quantity") @db.Decimal(15, 4)
+  id               String   @id @default(uuid())
+  /**
+   * 메인 상품 — 이 상품 카탈로그에서 추가구매 추천 노출
+   */
+  mainProductId    String   @map("main_product_id")
+  mainProduct      Product  @relation("BundleMain", fields: [mainProductId], references: [id], onDelete: Cascade)
+  /**
+   * 추가 상품 — 함께 사면 좋은 단독 카탈로그 상품. 카탈로그 삭제는 참조 있으면 차단 (Restrict)
+   */
+  bundleProductId  String   @map("bundle_product_id")
+  bundleProduct    Product  @relation("BundleAddon", fields: [bundleProductId], references: [id], onDelete: Restrict)
+  /**
+   * 추천 시 기본 수량 (대부분 1)
+   */
+  defaultQuantity  Decimal  @default(1) @map("default_quantity") @db.Decimal(15, 4)
   /**
    * 번들 할인액 (세전) — 본 상품의 sellingPrice 에서 차감되는 할인.
    * null 이면 정가 그대로. 음수 금지. 카트 추가 시 unitPrice = bundle.sellingPrice − discountAmount.
    */
-  discountAmount  Decimal? @map("discount_amount") @db.Decimal(15, 2)
-  /** 추천 카피 — "필터도 함께 쓰세요", "정수기 살균 전용 세제" 같은 짧은 안내 */
-  recommendMessage String? @map("recommend_message")
-  sortOrder       Int      @default(0) @map("sort_order")
-  isActive        Boolean  @default(true) @map("is_active")
+  discountAmount   Decimal? @map("discount_amount") @db.Decimal(15, 2)
+  /**
+   * 추천 카피 — "필터도 함께 쓰세요", "정수기 살균 전용 세제" 같은 짧은 안내
+   */
+  recommendMessage String?  @map("recommend_message")
+  sortOrder        Int      @default(0) @map("sort_order")
+  isActive         Boolean  @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1033,13 +1080,13 @@ enum PurchaseOrderStatus {
   DRAFT
   SENT
   CONFIRMED
-  COUNTER_OFFER        // 거래처가 단가 변경 요청 — 우리(발주자)가 수락/거절 결정
-  PARTIAL              // 부분입고 발생 (일부 받음, 결정 대기)
-  PARTIAL_RESENT       // 부분입고 재발송 (거래처에 잔량 재요청)
-  PARTIAL_REACCEPTED   // 부분입고 수락 (거래처가 재요청 수락)
-  PARTIAL_COMPLETED    // 부분입고 완료 (부분입고 후 모두 받음, 이력 보존)
-  RECEIVED             // 정상 입고완료 (한 번에 모두 받음)
-  CLOSED               // 부분입고 종결 (잔량 포기)
+  COUNTER_OFFER // 거래처가 단가 변경 요청 — 우리(발주자)가 수락/거절 결정
+  PARTIAL // 부분입고 발생 (일부 받음, 결정 대기)
+  PARTIAL_RESENT // 부분입고 재발송 (거래처에 잔량 재요청)
+  PARTIAL_REACCEPTED // 부분입고 수락 (거래처가 재요청 수락)
+  PARTIAL_COMPLETED // 부분입고 완료 (부분입고 후 모두 받음, 이력 보존)
+  RECEIVED // 정상 입고완료 (한 번에 모두 받음)
+  CLOSED // 부분입고 종결 (잔량 포기)
   CANCELLED
 }
 
@@ -1071,19 +1118,19 @@ model PurchaseOrder {
 }
 
 enum ProposalStatus {
-  NONE      // 협상 없음 (기본)
-  PENDING   // 거래처 제안, 우리 응답 대기
-  ACCEPTED  // 우리가 수락 (proposedUnitPrice → unitPrice 적용됨)
-  REJECTED  // 우리가 거절 (proposedUnitPrice 보존, 단가 미적용)
+  NONE // 협상 없음 (기본)
+  PENDING // 거래처 제안, 우리 응답 대기
+  ACCEPTED // 우리가 수락 (proposedUnitPrice → unitPrice 적용됨)
+  REJECTED // 우리가 거절 (proposedUnitPrice 보존, 단가 미적용)
 }
 
 enum POAccessTokenStatus {
-  ACTIVE      // 발급됨, 미사용
-  VIEWED      // 거래처가 한 번 이상 봤음
-  ACCEPTED    // 수락됨 (terminal)
-  REJECTED    // 거절됨 (terminal)
-  EXPIRED     // 만료
-  REVOKED     // 재발송으로 폐기
+  ACTIVE // 발급됨, 미사용
+  VIEWED // 거래처가 한 번 이상 봤음
+  ACCEPTED // 수락됨 (terminal)
+  REJECTED // 거절됨 (terminal)
+  EXPIRED // 만료
+  REVOKED // 재발송으로 폐기
 }
 
 // 거래처가 ERP 계정 없이 발주 내용 확인 + 수락/거절 할 수 있는 외부 접근 토큰.
@@ -1113,26 +1160,26 @@ model PurchaseOrderAccessToken {
 }
 
 model PurchaseOrderItem {
-  id                String          @id @default(uuid())
-  purchaseOrderId   String          @map("purchase_order_id")
-  purchaseOrder     PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  supplierProductId String          @map("supplier_product_id")
-  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id])
-  quantity          Decimal         @db.Decimal(15, 4)
+  id                    String          @id @default(uuid())
+  purchaseOrderId       String          @map("purchase_order_id")
+  purchaseOrder         PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  supplierProductId     String          @map("supplier_product_id")
+  supplierProduct       SupplierProduct @relation(fields: [supplierProductId], references: [id])
+  quantity              Decimal         @db.Decimal(15, 4)
   // 분할 입고 누적 수량. quantity 도달 시 PurchaseOrder.status 가 RECEIVED 로 자동 전환.
   // 사용자가 "발주 종료" 누르면 잔량 무시하고 CLOSED.
-  receivedQty       Decimal         @default(0) @map("received_qty") @db.Decimal(15, 4)
-  unitPrice         Decimal         @map("unit_price") @db.Decimal(15, 2)
-  totalPrice        Decimal         @map("total_price") @db.Decimal(15, 2)
+  receivedQty           Decimal         @default(0) @map("received_qty") @db.Decimal(15, 4)
+  unitPrice             Decimal         @map("unit_price") @db.Decimal(15, 2)
+  totalPrice            Decimal         @map("total_price") @db.Decimal(15, 2)
   // 거래처가 토큰 페이지에서 제안한 새 단가.
   // 수락 시 unitPrice 로 옮기되 proposedUnitPrice 는 보존 (이력 표시용).
   // 거절 시에도 보존. 새 제안이 들어오면 덮어쓰여짐 (단일 라운드 추적).
-  proposedUnitPrice     Decimal?               @map("proposed_unit_price") @db.Decimal(15, 2)
-  proposalStatus        ProposalStatus         @default(NONE) @map("proposal_status")
-  proposalRespondedAt   DateTime?              @map("proposal_responded_at")
-  proposalRejectionNote String?                @map("proposal_rejection_note")
+  proposedUnitPrice     Decimal?        @map("proposed_unit_price") @db.Decimal(15, 2)
+  proposalStatus        ProposalStatus  @default(NONE) @map("proposal_status")
+  proposalRespondedAt   DateTime?       @map("proposal_responded_at")
+  proposalRejectionNote String?         @map("proposal_rejection_note")
   memo                  String?
-  sortOrder             Int                    @default(0) @map("sort_order")
+  sortOrder             Int             @default(0) @map("sort_order")
 
   incomingItems IncomingItem[]
 
@@ -1144,29 +1191,29 @@ model PurchaseOrderItem {
 // ============================================================
 
 enum OrderStatus {
-  PENDING           // 주문/접수 — channelId 있으면 "주문"(외부), 없으면 "접수"(매장). 재고 미차감
-  PREPARING         // 출고대기 — 재고 차감됨, 포장·송장 발급 전. 취소 가능 마지막 단계
-  PREPARING_PACKED  // 출고확정 — 포장·송장 입력 완료, 발송 직전. 취소 불가 (반품 흐름으로)
-  SHIPPED           // 배송중 — 택배 인계 / 배달 출발
-  COMPLETED         // 배송완료 — 인도 종결
-  RETURN_REQUESTED  // 클레임 요청 — claimType 으로 반품/교환 분기. 매장 수락/반려 결정 전
-  RETURN_ACCEPTED   // 클레임 수락 — 회수대기 (택배 회수 라벨 발급 전)
-  RETURN_PICKING    // 회수중 — 택배 회수 라벨 발급됨, 손님→매장 운송 중
-  RETURN_COLLECTED  // 회수완료 — 물품 도착, 검수 전
-  RETURN_INSPECTED  // 검수완료 — 다음에 환불(반품) 또는 교환출고로 분기
-  RETURNED          // 반품완료 — 재고 복원 + 환불(또는 매출 취소) 종결
-  EXCHANGED         // 교환완료 — 재고 복원 + 새 주문(-EX) 자동 생성. 차액 정산은 새 주문에서
+  PENDING // 주문/접수 — channelId 있으면 "주문"(외부), 없으면 "접수"(매장). 재고 미차감
+  PREPARING // 출고대기 — 재고 차감됨, 포장·송장 발급 전. 취소 가능 마지막 단계
+  PREPARING_PACKED // 출고확정 — 포장·송장 입력 완료, 발송 직전. 취소 불가 (반품 흐름으로)
+  SHIPPED // 배송중 — 택배 인계 / 배달 출발
+  COMPLETED // 배송완료 — 인도 종결
+  RETURN_REQUESTED // 클레임 요청 — claimType 으로 반품/교환 분기. 매장 수락/반려 결정 전
+  RETURN_ACCEPTED // 클레임 수락 — 회수대기 (택배 회수 라벨 발급 전)
+  RETURN_PICKING // 회수중 — 택배 회수 라벨 발급됨, 손님→매장 운송 중
+  RETURN_COLLECTED // 회수완료 — 물품 도착, 검수 전
+  RETURN_INSPECTED // 검수완료 — 다음에 환불(반품) 또는 교환출고로 분기
+  RETURNED // 반품완료 — 재고 복원 + 환불(또는 매출 취소) 종결
+  EXCHANGED // 교환완료 — 재고 복원 + 새 주문(-EX) 자동 생성. 차액 정산은 새 주문에서
   CANCELLED
 }
 
 /**
  * 결제 축 — 출고 상태(OrderStatus) 와 별개의 재무 상태.
- *  - UNPAID: 미수 (외상). UNPAID 인 채로 출고는 가능하지만 customer ledger 에 잔액 누적
- *  - PAID: 결제 완료
- *  - REFUND_PENDING: 환불 진행 중 (검수 후 PG/은행 처리 대기)
- *  - PARTIAL_REFUND: 일부 환불 (부분 반품 시)
- *  - REFUNDED: 전액 환불 완료
- *  - SALES_CANCELLED: 매출 취소 — 외상(UNPAID) 주문 반품. 환불 없이 customer ledger 잔액 차감
+ * - UNPAID: 미수 (외상). UNPAID 인 채로 출고는 가능하지만 customer ledger 에 잔액 누적
+ * - PAID: 결제 완료
+ * - REFUND_PENDING: 환불 진행 중 (검수 후 PG/은행 처리 대기)
+ * - PARTIAL_REFUND: 일부 환불 (부분 반품 시)
+ * - REFUNDED: 전액 환불 완료
+ * - SALES_CANCELLED: 매출 취소 — 외상(UNPAID) 주문 반품. 환불 없이 customer ledger 잔액 차감
  */
 enum OrderPaymentStatus {
   UNPAID
@@ -1179,9 +1226,9 @@ enum OrderPaymentStatus {
 
 /**
  * 클레임 종류 — 손님이 어떤 결과를 원하는지. 회수 후 처리 분기.
- *  - REFUND:             환불 종결 (RETURNED)
- *  - EXCHANGE_SAME:      같은 상품 재발송. 새 주문 자동 생성 (항목 복제, totalAmount=0)
- *  - EXCHANGE_DIFFERENT: 다른 상품으로 교체. 새 주문 자동 생성 (빈 항목, 사용자 편집 + 차액 정산)
+ * - REFUND:             환불 종결 (RETURNED)
+ * - EXCHANGE_SAME:      같은 상품 재발송. 새 주문 자동 생성 (항목 복제, totalAmount=0)
+ * - EXCHANGE_DIFFERENT: 다른 상품으로 교체. 새 주문 자동 생성 (빈 항목, 사용자 편집 + 차액 정산)
  */
 enum OrderClaimType {
   REFUND
@@ -1191,12 +1238,12 @@ enum OrderClaimType {
 
 /**
  * 클레임 사유 — 책임 소재 구분. 통계·정책(운임 부담 등)에 활용.
- *  - DEFECTIVE:          불량/하자 — 매장 책임
- *  - DAMAGED_IN_TRANSIT: 배송 중 파손 — 매장/택배사 책임
- *  - WRONG_ITEM:         오배송 — 매장 책임
- *  - CHANGE_MIND:        단순 변심 — 손님 책임
- *  - SIZE_COLOR:         사이즈/색상 변경 — 부분 손님 책임
- *  - OTHER:              기타
+ * - DEFECTIVE:          불량/하자 — 매장 책임
+ * - DAMAGED_IN_TRANSIT: 배송 중 파손 — 매장/택배사 책임
+ * - WRONG_ITEM:         오배송 — 매장 책임
+ * - CHANGE_MIND:        단순 변심 — 손님 책임
+ * - SIZE_COLOR:         사이즈/색상 변경 — 부분 손님 책임
+ * - OTHER:              기타
  */
 enum OrderClaimReason {
   DEFECTIVE
@@ -1208,16 +1255,16 @@ enum OrderClaimReason {
 }
 
 enum FulfillmentType {
-  PICKUP        // 매장 수령 (POS 즉시 종결, 워크보드 미노출)
-  DELIVERY      // 자체 배달 (당일·근거리)
-  SHIPPING      // 택배 발송
+  PICKUP // 매장 수령 (POS 즉시 종결, 워크보드 미노출)
+  DELIVERY // 자체 배달 (당일·근거리)
+  SHIPPING // 택배 발송
 }
 
 /**
  * 배송비 결제 방식 — Order.shippingPaymentType.
- *  - PREPAID: 선불 (손님이 결제 시 함께 결제)
- *  - COD: 착불 (받는 사람이 택배기사에게 직접 — 매장 회계 무관)
- *  - STORE_BURDEN: 매장 부담 (배송비 무료, 매장 비용 처리)
+ * - PREPAID: 선불 (손님이 결제 시 함께 결제)
+ * - COD: 착불 (받는 사람이 택배기사에게 직접 — 매장 회계 무관)
+ * - STORE_BURDEN: 매장 부담 (배송비 무료, 매장 비용 처리)
  */
 enum ShippingPaymentType {
   PREPAID
@@ -1238,10 +1285,14 @@ model Order {
   expectedShipDate    DateTime?           @map("expected_ship_date") @db.Date
   customerId          String?             @map("customer_id")
   customer            Customer?           @relation(fields: [customerId], references: [id])
-  /** 등록 고객 스냅샷 — POS 결제 시 받는 사람과 다를 수 있어 별도 보존 */
+  /**
+   * 등록 고객 스냅샷 — POS 결제 시 받는 사람과 다를 수 있어 별도 보존
+   */
   customerName        String?             @map("customer_name")
   customerPhone       String?             @map("customer_phone")
-  /** 받는 사람 (배송 시) — 등록 고객(customerName)과 다를 수 있음. PICKUP 일 땐 null */
+  /**
+   * 받는 사람 (배송 시) — 등록 고객(customerName)과 다를 수 있음. PICKUP 일 땐 null
+   */
   recipientName       String?             @map("recipient_name")
   recipientPhone      String?             @map("recipient_phone")
   shippingAddress     String?             @map("shipping_address")
@@ -1251,7 +1302,9 @@ model Order {
    */
   trackingCarrier     String?             @map("tracking_carrier")
   trackingNumber      String?             @map("tracking_number")
-  /** 출고 회차 — partial_ship/ship 액션마다 +1. 1=일반 발송, ≥2=분할 발송. 분할 이력 표시용 */
+  /**
+   * 출고 회차 — partial_ship/ship 액션마다 +1. 1=일반 발송, ≥2=분할 발송. 분할 이력 표시용
+   */
   shipmentCount       Int                 @default(0) @map("shipment_count")
   orderDate           DateTime            @map("order_date")
   quotationId         String?             @map("quotation_id")
@@ -1261,9 +1314,9 @@ model Order {
   shippingFee         Decimal             @default(0) @map("shipping_fee") @db.Decimal(15, 2)
   /**
    * 배송비 결제 방식:
-   *  - PREPAID: 선불 (손님이 결제 시 함께 — 자사몰/일반 POS 택배)
-   *  - COD: 착불 (받는 사람이 택배기사에게 — 가구 등 대형 상품)
-   *  - STORE_BURDEN: 매장 부담 (배송비 무료 — 도매·VIP 등)
+   * - PREPAID: 선불 (손님이 결제 시 함께 — 자사몰/일반 POS 택배)
+   * - COD: 착불 (받는 사람이 택배기사에게 — 가구 등 대형 상품)
+   * - STORE_BURDEN: 매장 부담 (배송비 무료 — 도매·VIP 등)
    * PICKUP fulfillmentType 은 배송비 자체가 무관 (default PREPAID 두되 무시).
    */
   shippingPaymentType ShippingPaymentType @default(PREPAID) @map("shipping_payment_type")
@@ -1271,21 +1324,31 @@ model Order {
   totalAmount         Decimal             @default(0) @map("total_amount") @db.Decimal(15, 2)
   commissionAmount    Decimal             @default(0) @map("commission_amount") @db.Decimal(15, 2)
   paymentMethod       OrderPaymentMethod? @map("payment_method")
-  /** 결제 축 — 출고 상태와 별개. 외상/환불 표현용 */
+  /**
+   * 결제 축 — 출고 상태와 별개. 외상/환불 표현용
+   */
   paymentStatus       OrderPaymentStatus  @default(UNPAID) @map("payment_status")
-  /** 반품 흐름 timestamp — 운영 로그 + 단계 추적 */
+  /**
+   * 반품 흐름 timestamp — 운영 로그 + 단계 추적
+   */
   returnRequestedAt   DateTime?           @map("return_requested_at")
   returnAcceptedAt    DateTime?           @map("return_accepted_at")
   returnRejectedAt    DateTime?           @map("return_rejected_at")
-  /** 클레임 분기 — 환불/같은상품교환/다른상품교환. RETURN_REQUESTED 시 결정. */
+  /**
+   * 클레임 분기 — 환불/같은상품교환/다른상품교환. RETURN_REQUESTED 시 결정.
+   */
   claimType           OrderClaimType?     @map("claim_type")
   claimReason         OrderClaimReason?   @map("claim_reason")
-  /** 교환 종결 시 새 주문 link — 차액 정산은 새 주문에서 */
+  /**
+   * 교환 종결 시 새 주문 link — 차액 정산은 새 주문에서
+   */
   exchangeOrderId     String?             @unique @map("exchange_order_id")
   exchangeOrder       Order?              @relation("OrderExchange", fields: [exchangeOrderId], references: [id])
   exchangedFromOrders Order[]             @relation("OrderExchange")
   exchangedAt         DateTime?           @map("exchanged_at")
-  /** 클레임 메모 — 손님 자유 사유 + 매장 처리 메모 (claimReason enum 외 보충) */
+  /**
+   * 클레임 메모 — 손님 자유 사유 + 매장 처리 메모 (claimReason enum 외 보충)
+   */
   returnReason        String?             @map("return_reason")
   taxInvoiceRequested Boolean             @default(false) @map("tax_invoice_requested")
   taxInvoicedAt       DateTime?           @map("tax_invoiced_at")
@@ -1304,73 +1367,74 @@ model Order {
   items      OrderItem[]
   shipments  Shipment[]
   statements Statement[]
+  refunds    CustomerRefund[]
 
-  @@index([channelId, orderDate])
-  @@index([status])
-  @@index([status, expectedShipDate])
   // 채널 import 중복 방지 — 동일 채널 내 channelOrderNo 는 한 번만 import.
   // PostgreSQL 의 unique 는 NULL 을 unique 로 보지 않으므로 오프라인(channelId=null) 주문은 영향 X.
   @@unique([channelId, channelOrderNo])
+  @@index([channelId, orderDate])
+  @@index([status])
+  @@index([status, expectedShipDate])
   // repairTicketId / rentalId 는 @unique 가 자동으로 unique index 생성 — 별도 @@index 불필요
   @@map("orders")
 }
 
 model OrderItem {
-  id                            String   @id @default(uuid())
-  orderId                       String   @map("order_id")
-  order                         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId                     String?  @map("product_id")
-  product                       Product? @relation(fields: [productId], references: [id])
-  canonicalProductId            String?  @map("canonical_product_id")
-  serviceName                   String?  @map("service_name")
-  quantity                      Decimal  @db.Decimal(15, 4)
+  id                            String            @id @default(uuid())
+  orderId                       String            @map("order_id")
+  order                         Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId                     String?           @map("product_id")
+  product                       Product?          @relation(fields: [productId], references: [id])
+  canonicalProductId            String?           @map("canonical_product_id")
+  serviceName                   String?           @map("service_name")
+  quantity                      Decimal           @db.Decimal(15, 4)
   /**
    * 정가(할인 전 단가, 세전) — 견적서/거래명세표 → 주문 전환 시 보존
    */
-  listPrice                     Decimal? @map("list_price") @db.Decimal(15, 2)
+  listPrice                     Decimal?          @map("list_price") @db.Decimal(15, 2)
   /**
    * 개당 할인액 (세전)
    */
-  discountAmount                Decimal? @map("discount_amount") @db.Decimal(15, 2)
-  unitPrice                     Decimal  @map("unit_price") @db.Decimal(15, 2)
-  totalPrice                    Decimal  @map("total_price") @db.Decimal(15, 2)
-  unitCostSnapshot              Decimal? @map("unit_cost_snapshot") @db.Decimal(15, 4)
-  channelCommissionRateSnapshot Decimal? @map("channel_commission_rate_snapshot") @db.Decimal(5, 4)
-  cardFeeRateSnapshot           Decimal? @map("card_fee_rate_snapshot") @db.Decimal(5, 4)
-  sellingCostSnapshot           Decimal? @map("selling_cost_snapshot") @db.Decimal(15, 4)
+  discountAmount                Decimal?          @map("discount_amount") @db.Decimal(15, 2)
+  unitPrice                     Decimal           @map("unit_price") @db.Decimal(15, 2)
+  totalPrice                    Decimal           @map("total_price") @db.Decimal(15, 2)
+  unitCostSnapshot              Decimal?          @map("unit_cost_snapshot") @db.Decimal(15, 4)
+  channelCommissionRateSnapshot Decimal?          @map("channel_commission_rate_snapshot") @db.Decimal(5, 4)
+  cardFeeRateSnapshot           Decimal?          @map("card_fee_rate_snapshot") @db.Decimal(5, 4)
+  sellingCostSnapshot           Decimal?          @map("selling_cost_snapshot") @db.Decimal(15, 4)
   /**
    * 부분 출고/반품/환불 추적 — 항목 단위 누적값.
-   *  - shippedQty:    누적 발송 수량 (≤ quantity). 부분 출고 후 추가 발송으로 누적
-   *  - returnedQty:   누적 반품 수량 (≤ quantity). 부분 반품 누적
-   *  - refundedAmount: 누적 환불 금액 (세전). totalPrice 와 비교해 전액/부분 판정
+   * - shippedQty:    누적 발송 수량 (≤ quantity). 부분 출고 후 추가 발송으로 누적
+   * - returnedQty:   누적 반품 수량 (≤ quantity). 부분 반품 누적
+   * - refundedAmount: 누적 환불 금액 (세전). totalPrice 와 비교해 전액/부분 판정
    */
-  shippedQty                    Decimal  @default(0) @map("shipped_qty") @db.Decimal(15, 4)
-  returnedQty                   Decimal  @default(0) @map("returned_qty") @db.Decimal(15, 4)
-  refundedAmount                Decimal  @default(0) @map("refunded_amount") @db.Decimal(15, 2)
+  shippedQty                    Decimal           @default(0) @map("shipped_qty") @db.Decimal(15, 4)
+  returnedQty                   Decimal           @default(0) @map("returned_qty") @db.Decimal(15, 4)
+  refundedAmount                Decimal           @default(0) @map("refunded_amount") @db.Decimal(15, 2)
   /**
    * 라인 역할 — MAIN(기본·variant 라인), OPTION_REF(메인의 옵션으로 매핑된 별도 Product), ADDON(추가상품, 후속).
    * parentItemId 와 함께 사용 — 메인-옵션/추가구매 트리 표현.
    */
   lineRole                      OrderItemLineRole @default(MAIN) @map("line_role")
-  parentItemId                  String?  @map("parent_item_id")
-  parentItem                    OrderItem? @relation("OrderItemParent", fields: [parentItemId], references: [id], onDelete: SetNull)
-  childItems                    OrderItem[] @relation("OrderItemParent")
+  parentItemId                  String?           @map("parent_item_id")
+  parentItem                    OrderItem?        @relation("OrderItemParent", fields: [parentItemId], references: [id], onDelete: SetNull)
+  childItems                    OrderItem[]       @relation("OrderItemParent")
   /**
    * 주문 시점 옵션값 스냅샷 — Product.option/value 가 미래에 변경되어도 보존.
    * 형식: { "메모리": "32GB", "색상": "화이트" }
    * MAIN 라인의 경우 그 라인이 가진 옵션 조합. OPTION_REF 라인은 보통 비어있음 (parentItemId 가 메인 가리킴).
    */
-  optionSnapshot                Json?    @map("option_snapshot")
+  optionSnapshot                Json?             @map("option_snapshot")
   /**
    * 진입 경로 SKU (B2C funnel 분석용) — 손님이 카탈로그에서 본 SKU.
    * SWAP 옵션 적용 후 productId 가 다른 SKU 로 바뀌므로 진입 페이지 별도 보존.
    * 정책:
-   *  - POS: null (직원이 직접 입력 — 손님 의향과 무관, 노이즈 회피)
-   *  - 자사몰/외부 채널 import: 카탈로그 진입 SKU (보통 OPTION_PARENT 또는 cross-sell 시작점)
+   * - POS: null (직원이 직접 입력 — 손님 의향과 무관, 노이즈 회피)
+   * - 자사몰/외부 채널 import: 카탈로그 진입 SKU (보통 OPTION_PARENT 또는 cross-sell 시작점)
    * 분석 쿼리는 IS NOT NULL 로 필터해 자사몰/채널 데이터만 집계.
    */
-  entryProductId                String?  @map("entry_product_id")
-  entryProduct                  Product? @relation("OrderItemEntry", fields: [entryProductId], references: [id], onDelete: SetNull)
+  entryProductId                String?           @map("entry_product_id")
+  entryProduct                  Product?          @relation("OrderItemEntry", fields: [entryProductId], references: [id], onDelete: SetNull)
   memo                          String?
 
   lotConsumptions LotConsumption[]
@@ -1403,18 +1467,20 @@ enum OrderItemLineRole {
 //   - 한 OrderItem 의 (Σ ShipmentItem.quantity) ≤ OrderItem.quantity 강제 (애플리케이션 레벨)
 
 model Shipment {
-  id              String         @id @default(uuid())
-  orderId         String         @map("order_id")
-  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  /** 같은 주문 안에서 1부터 증가 (1차·2차·3차 발송) */
-  shipmentNo      Int            @map("shipment_no")
-  trackingCarrier String?        @map("tracking_carrier")
-  trackingNumber  String?        @map("tracking_number")
-  shippedAt       DateTime       @map("shipped_at")
+  id              String   @id @default(uuid())
+  orderId         String   @map("order_id")
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /**
+   * 같은 주문 안에서 1부터 증가 (1차·2차·3차 발송)
+   */
+  shipmentNo      Int      @map("shipment_no")
+  trackingCarrier String?  @map("tracking_carrier")
+  trackingNumber  String?  @map("tracking_number")
+  shippedAt       DateTime @map("shipped_at")
   memo            String?
-  createdAt       DateTime       @default(now()) @map("created_at")
+  createdAt       DateTime @default(now()) @map("created_at")
 
-  items           ShipmentItem[]
+  items ShipmentItem[]
 
   @@unique([orderId, shipmentNo])
   @@index([orderId, shippedAt])
@@ -1427,7 +1493,9 @@ model ShipmentItem {
   shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   orderItemId String    @map("order_item_id")
   orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  /** 이 회차에 발송한 수량 (라인의 일부 수량 가능) */
+  /**
+   * 이 회차에 발송한 수량 (라인의 일부 수량 가능)
+   */
   quantity    Decimal   @db.Decimal(15, 4)
 
   @@index([orderItemId])
@@ -1675,6 +1743,7 @@ model Customer {
   orders      Order[]
   ledger      CustomerLedger[]
   payments    CustomerPayment[]
+  refunds     CustomerRefund[]
   machines    CustomerMachine[]
   notes       CustomerNote[]
   repairs     RepairTicket[]
@@ -1729,6 +1798,38 @@ model CustomerPayment {
 
   @@index([customerId, paymentDate])
   @@map("customer_payments")
+}
+
+// ============================================================
+// CustomerRefund — 고객에게 환불한 내역 (CustomerPayment 의 반대)
+// 주문 반품/취소 시 RefundDialog 에서 입력. 같은 주문이 여러 번 부분 환불될 수 있어 1:N.
+// CustomerLedger.REFUND 항목과 1:1 연결 (referenceType="CustomerRefund").
+// ============================================================
+enum CustomerRefundMethod {
+  CARD_CANCEL // 카드 취소 (PG 환불 — Toss/PortOne)
+  CASH // 현금
+  BANK_TRANSFER // 계좌이체
+  POINTS // 포인트/마일리지
+  OTHER // 기타 (수표·상품권 회수 등)
+}
+
+model CustomerRefund {
+  id          String               @id @default(uuid())
+  customerId  String               @map("customer_id")
+  customer    Customer             @relation(fields: [customerId], references: [id])
+  orderId     String               @map("order_id")
+  order       Order                @relation(fields: [orderId], references: [id])
+  amount      Decimal              @db.Decimal(15, 2)
+  method      CustomerRefundMethod
+  refundedAt  DateTime             @map("refunded_at")
+  memo        String?
+  createdById String               @map("created_by_id")
+  createdBy   User                 @relation(fields: [createdById], references: [id])
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  @@index([customerId, refundedAt])
+  @@index([orderId])
+  @@map("customer_refunds")
 }
 
 // ============================================================

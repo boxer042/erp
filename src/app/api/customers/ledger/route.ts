@@ -31,7 +31,22 @@ export async function GET(request: NextRequest) {
     ...(q ? { customer: { name: { contains: q, mode: "insensitive" as const } } } : {}),
   };
 
-  const [entries, summaries] = await Promise.all([
+  // 환불 내역 (CustomerRefund) — ledger 와 별도. PAID 결제건의 실 환불 기록.
+  // 같은 검색 필터(customerId/from/to/q) 적용. 잔액에는 영향 없으나 UI 에서 행으로 표시.
+  const refundsWhere: Prisma.CustomerRefundWhereInput = {
+    ...(customerId ? { customerId } : {}),
+    ...(from || to
+      ? {
+          refundedAt: {
+            ...(from ? { gte: new Date(from) } : {}),
+            ...(to ? { lt: new Date(to) } : {}),
+          },
+        }
+      : {}),
+    ...(q ? { customer: { name: { contains: q, mode: "insensitive" as const } } } : {}),
+  };
+
+  const [entries, refunds, summaries] = await Promise.all([
     prisma.customerLedger.findMany({
       where: entriesWhere,
       include: {
@@ -41,6 +56,18 @@ export async function GET(request: NextRequest) {
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       take: 1000,
     }),
+    // types 필터가 적용되면 REFUND 도 포함된 경우만 환불 내역 노출 (필터 일관성)
+    types === undefined || types.includes("REFUND")
+      ? prisma.customerRefund.findMany({
+          where: refundsWhere,
+          include: {
+            customer: { select: { id: true, name: true } },
+            order: { select: { id: true, orderNo: true } },
+          },
+          orderBy: [{ refundedAt: "desc" }, { createdAt: "desc" }],
+          take: 1000,
+        })
+      : Promise.resolve([]),
     prisma.customer.findMany({
       where: {
         isActive: true,
@@ -106,5 +133,5 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  return NextResponse.json({ entries, customerSummaries });
+  return NextResponse.json({ entries, refunds, customerSummaries });
 }

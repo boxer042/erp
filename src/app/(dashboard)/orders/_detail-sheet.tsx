@@ -51,6 +51,7 @@ import {
   JmIconButton,
   JmInput,
   JmSectionLabel,
+  JmSelect,
   JmSeparator,
   JmSkeleton,
   JmSpinner,
@@ -87,6 +88,46 @@ const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string }[] = [
   { value: "DELIVERY", label: "배달" },
   { value: "SHIPPING", label: "택배" },
 ];
+
+/** 환불 방법 enum (Prisma CustomerRefundMethod 와 동일) */
+type CustomerRefundMethod =
+  | "CARD_CANCEL"
+  | "CASH"
+  | "BANK_TRANSFER"
+  | "POINTS"
+  | "OTHER";
+
+const REFUND_METHOD_OPTIONS: { value: CustomerRefundMethod; label: string }[] = [
+  { value: "CARD_CANCEL", label: "카드 취소" },
+  { value: "CASH", label: "현금" },
+  { value: "BANK_TRANSFER", label: "계좌이체" },
+  { value: "POINTS", label: "포인트" },
+  { value: "OTHER", label: "기타" },
+];
+
+/** 주문 paymentMethod → 환불 method 기본값 매핑 */
+function derivedRefundMethod(paymentMethod: string | null | undefined): CustomerRefundMethod {
+  switch (paymentMethod) {
+    case "CARD":
+      return "CARD_CANCEL";
+    case "CASH":
+      return "CASH";
+    case "BANK_TRANSFER":
+      return "BANK_TRANSFER";
+    case "POINTS":
+      return "POINTS";
+    default:
+      return "CARD_CANCEL"; // 결제수단 미상 — 가장 흔한 케이스
+  }
+}
+
+function todayIsoDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function isEditable(status: OrderStatus) {
   return status === "PENDING" || status === "PREPARING" || status === "SHIPPED";
@@ -301,6 +342,11 @@ export function OrderDetailSheet({
   const [partialReturns, setPartialReturns] = useState<
     Record<string, string>
   >({});
+  // 환불 실내역 입력 — PAID/REFUND_PENDING 결제건만 사용. UNPAID 는 매출취소만 (입력 불필요).
+  const [refundAmount, setRefundAmount] = useState(""); // 콤마 포함 표시값
+  const [refundMethod, setRefundMethod] = useState<CustomerRefundMethod>("CARD_CANCEL");
+  const [refundMemo, setRefundMemo] = useState("");
+  const [refundedAtDate, setRefundedAtDate] = useState(todayIsoDate());
 
   // orderId/open 변경 시 모든 다이얼로그·편집 state 초기화 — 렌더 중 비교 패턴 (effect 회피)
   const resetKey = `${orderId ?? ""}|${open ? "1" : "0"}`;
@@ -328,6 +374,45 @@ export function OrderDetailSheet({
     setRefundDialogOpen(false);
     setRefundMode("full");
     setPartialReturns({});
+    setRefundAmount("");
+    setRefundMethod("CARD_CANCEL");
+    setRefundMemo("");
+    setRefundedAtDate(todayIsoDate());
+  }
+
+  // 환불 다이얼로그 진입 / 모드 변경 시 — 환불 금액·방법 자동 채움 (사용자가 이후 수정 가능)
+  const refundCtxKey = `${refundDialogOpen ? "1" : "0"}|${refundMode}|${detailQuery.data?.id ?? ""}`;
+  const [lastRefundCtxKey, setLastRefundCtxKey] = useState("");
+  if (
+    refundCtxKey !== lastRefundCtxKey &&
+    refundDialogOpen &&
+    detailQuery.data
+  ) {
+    setLastRefundCtxKey(refundCtxKey);
+    const order = detailQuery.data;
+    let defaultAmount = 0;
+    if (refundMode === "full") {
+      // 전체 — 주문 totalAmount 에서 누적 환불액 차감 (남은 결제건)
+      const total = Number(order.totalAmount ?? 0);
+      const refundedSoFar = order.items.reduce(
+        (s, it) => s + Number(it.refundedAmount ?? 0),
+        0,
+      );
+      defaultAmount = Math.max(0, total - refundedSoFar);
+    } else {
+      // 부분 — 현재 입력된 partialReturns × unitPrice 합. 없으면 0
+      for (const [itemId, qtyStr] of Object.entries(partialReturns)) {
+        const q = parseFloat(qtyStr);
+        if (!Number.isFinite(q) || q <= 0) continue;
+        const it = order.items.find((i) => i.id === itemId);
+        if (!it) continue;
+        defaultAmount += q * Number(it.unitPrice);
+      }
+    }
+    setRefundAmount(defaultAmount > 0 ? formatComma(String(defaultAmount)) : "");
+    setRefundMethod(derivedRefundMethod(order.paymentMethod));
+    setRefundMemo("");
+    setRefundedAtDate(todayIsoDate());
   }
 
   // highlightItemId 가 있고 데이터 로드 후 — 해당 라인으로 스크롤
@@ -479,19 +564,27 @@ export function OrderDetailSheet({
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
-  // 부분 반품 — partialItems 배열 전송. 빈 배열이면 전체 반품(서버에서 기존 동작).
+  // 부분 반품 — partialItems 배열 + 선택적 refundInput (실 환불 내역) 전송.
   const partialRefundMutation = useMutation({
-    mutationFn: (
-      partialItems: Array<{ orderItemId: string; returnQty: number }>,
-    ) =>
+    mutationFn: (input: {
+      partialItems: Array<{ orderItemId: string; returnQty: number }>;
+      refundInput?: {
+        amount: number;
+        method: CustomerRefundMethod;
+        refundedAt: string;
+        memo?: string;
+      };
+    }) =>
       apiMutate(`/api/orders/${orderId}`, "PUT", {
         action: "refund",
-        partialItems,
+        partialItems: input.partialItems,
+        ...(input.refundInput ? { refundInput: input.refundInput } : {}),
       }),
     onSuccess: () => {
       toast.success("부분 반품 처리 완료 — 재고 복원·환불 일부 진행");
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       setRefundDialogOpen(false);
       setPartialReturns({});
       onOpenChange(false);
@@ -522,6 +615,32 @@ export function OrderDetailSheet({
       setExchangeDialogOpen(false);
       setExchangeMode("full");
       setExchangePartialReturns({});
+      onOpenChange(false);
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "처리 실패"),
+  });
+
+  // 전체 환불 — refundInput (실 환불 내역) 함께 전송. UI 의 RefundDialog 에서 호출.
+  const fullRefundMutation = useMutation({
+    mutationFn: (input: {
+      refundInput?: {
+        amount: number;
+        method: CustomerRefundMethod;
+        refundedAt: string;
+        memo?: string;
+      };
+    }) =>
+      apiMutate(`/api/orders/${orderId}`, "PUT", {
+        action: "refund",
+        ...(input.refundInput ? { refundInput: input.refundInput } : {}),
+      }),
+    onSuccess: () => {
+      toast.success("반품완료 — 재고 복원·환불 처리");
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
+      setRefundDialogOpen(false);
       onOpenChange(false);
     },
     onError: (err) =>
@@ -688,12 +807,16 @@ export function OrderDetailSheet({
       setExchangeDialogOpen(true);
       return;
     }
-    // 환불 처리 — Dialog 로 전체/부분 분기 선택 (RETURN_INSPECTED 에서)
-    if (action === "refund" && detailQuery.data?.status === "RETURN_INSPECTED") {
+    // 환불 처리 — Dialog 로 전체/부분 + 환불 실내역 입력 (RETURN_INSPECTED, COMPLETED 즉시반품 양쪽)
+    if (
+      (action === "refund" &&
+        detailQuery.data?.status === "RETURN_INSPECTED") ||
+      (action === "return" && detailQuery.data?.status === "COMPLETED")
+    ) {
       setRefundMode("full");
       // 잔여 반품 가능 수량 prefill (= quantity - returnedQty)
       const init: Record<string, string> = {};
-      for (const it of detailQuery.data.items) {
+      for (const it of detailQuery.data!.items) {
         const remaining =
           Number(it.quantity) - Number(it.returnedQty);
         init[it.id] = String(remaining);
@@ -1456,12 +1579,28 @@ export function OrderDetailSheet({
                             type="text"
                             inputMode="decimal"
                             value={partialReturns[it.id] ?? "0"}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               setPartialReturns({
                                 ...partialReturns,
                                 [it.id]: e.target.value,
-                              })
-                            }
+                              });
+                              // 부분 모드 — 수량 바뀌면 환불 금액 자동 재계산 (사용자가 별도 수정 안 했으면)
+                              const next = {
+                                ...partialReturns,
+                                [it.id]: e.target.value,
+                              };
+                              if (refundMode === "partial" && data) {
+                                let sum = 0;
+                                for (const [iid, qs] of Object.entries(next)) {
+                                  const q = parseFloat(qs);
+                                  if (!Number.isFinite(q) || q <= 0) continue;
+                                  const item = data.items.find((x) => x.id === iid);
+                                  if (!item) continue;
+                                  sum += q * Number(item.unitPrice);
+                                }
+                                setRefundAmount(sum > 0 ? formatComma(String(sum)) : "");
+                              }
+                            }}
                             onFocus={(e) => e.currentTarget.select()}
                             className="w-[80px] text-right"
                           />
@@ -1471,28 +1610,125 @@ export function OrderDetailSheet({
                 </div>
               </div>
             )}
+
+            {/* 환불 실내역 — PAID/REFUND_PENDING 결제건만 노출. UNPAID 는 매출 취소(ledger ADJUSTMENT) 자동 처리 */}
+            {data &&
+              (data.paymentStatus === "PAID" ||
+                data.paymentStatus === "REFUND_PENDING" ||
+                data.paymentStatus === "PARTIAL_REFUND") && (
+                <div className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
+                      환불 실내역
+                    </span>
+                    <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                      손님에게 실제 환불한 금액·방법 기록
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <JmFormField label="환불 금액">
+                      <JmInput
+                        size="sm"
+                        type="text"
+                        inputMode="numeric"
+                        value={refundAmount}
+                        onChange={(e) =>
+                          setRefundAmount(formatComma(parseComma(e.target.value)))
+                        }
+                        onFocus={(e) => e.currentTarget.select()}
+                        placeholder="0"
+                      />
+                    </JmFormField>
+                    <JmFormField label="환불 방법">
+                      <JmSelect
+                        size="sm"
+                        value={refundMethod}
+                        onChange={(v) =>
+                          setRefundMethod(v as CustomerRefundMethod)
+                        }
+                        options={REFUND_METHOD_OPTIONS}
+                      />
+                    </JmFormField>
+                    <JmFormField label="환불 일자">
+                      <JmInput
+                        size="sm"
+                        type="date"
+                        value={refundedAtDate}
+                        onChange={(e) => setRefundedAtDate(e.target.value)}
+                      />
+                    </JmFormField>
+                    <JmFormField label="메모 (선택)">
+                      <JmInput
+                        size="sm"
+                        type="text"
+                        value={refundMemo}
+                        onChange={(e) => setRefundMemo(e.target.value)}
+                        placeholder="예: 카드 매입 취소 완료"
+                      />
+                    </JmFormField>
+                  </div>
+                </div>
+              )}
+
+            {data && data.paymentStatus === "UNPAID" && (
+              <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-warning-bg)] p-3 text-jm-2xs text-[var(--jm-warning-fg)]">
+                외상 주문 — 실 환불 없이 매출 취소 (고객 원장 잔액 자동 차감)
+              </div>
+            )}
           </div>
           <JmDialogFooter>
             <JmButton
               variant="outline"
               onClick={() => setRefundDialogOpen(false)}
               disabled={
-                transitionMutation.isPending || partialRefundMutation.isPending
+                fullRefundMutation.isPending || partialRefundMutation.isPending
               }
             >
               취소
             </JmButton>
             <JmButton
               onClick={() => {
+                if (!data) return;
+                const wasPaid =
+                  data.paymentStatus === "PAID" ||
+                  data.paymentStatus === "REFUND_PENDING" ||
+                  data.paymentStatus === "PARTIAL_REFUND";
+
+                // PAID/REFUND_PENDING — refundInput 구성·검증
+                let refundInput:
+                  | {
+                      amount: number;
+                      method: CustomerRefundMethod;
+                      refundedAt: string;
+                      memo?: string;
+                    }
+                  | undefined;
+                if (wasPaid) {
+                  const amt = parseFloat(parseComma(refundAmount));
+                  if (!Number.isFinite(amt) || amt <= 0) {
+                    toast.error("환불 금액을 입력해주세요");
+                    return;
+                  }
+                  if (!refundedAtDate) {
+                    toast.error("환불 일자를 입력해주세요");
+                    return;
+                  }
+                  refundInput = {
+                    amount: amt,
+                    method: refundMethod,
+                    refundedAt: refundedAtDate,
+                    memo: refundMemo.trim() || undefined,
+                  };
+                }
+
                 if (refundMode === "full") {
-                  setRefundDialogOpen(false);
                   if (
                     !confirm(
                       "전체 반품 처리합니다. 모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.",
                     )
                   )
                     return;
-                  transitionMutation.mutate("refund");
+                  fullRefundMutation.mutate({ refundInput });
                 } else {
                   // 부분 반품 — partialReturns 검증 후 mutation
                   const partials: Array<{
@@ -1508,14 +1744,14 @@ export function OrderDetailSheet({
                     toast.error("반품 수량을 1개 이상 입력해주세요");
                     return;
                   }
-                  partialRefundMutation.mutate(partials);
+                  partialRefundMutation.mutate({ partialItems: partials, refundInput });
                 }
               }}
               disabled={
-                transitionMutation.isPending || partialRefundMutation.isPending
+                fullRefundMutation.isPending || partialRefundMutation.isPending
               }
             >
-              {(transitionMutation.isPending ||
+              {(fullRefundMutation.isPending ||
                 partialRefundMutation.isPending) && (
                 <JmSpinner size="sm" tone="inverted" />
               )}

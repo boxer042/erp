@@ -17,6 +17,63 @@ import {
   dispatchPaymentCancel,
   dispatchRefund,
 } from "@/lib/payments/dispatch";
+import { CustomerRefundMethod, Prisma } from "@prisma/client";
+
+/**
+ * 환불 입력 — 매장이 RefundDialog 에서 실제 환불 내역을 기록할 때 전달.
+ * 없으면 paymentStatus 만 변경 (구버전 호환). 있으면 CustomerRefund row 생성.
+ */
+type RefundInputPayload = {
+  amount: number;
+  method: CustomerRefundMethod;
+  refundedAt: string; // ISO date
+  memo?: string | null;
+};
+
+function parseRefundInput(raw: unknown): RefundInputPayload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const amount = typeof o.amount === "number" ? o.amount : Number(o.amount);
+  const method = typeof o.method === "string" ? (o.method as CustomerRefundMethod) : null;
+  const refundedAt = typeof o.refundedAt === "string" ? o.refundedAt : null;
+  const memo = typeof o.memo === "string" ? o.memo : null;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (
+    !method ||
+    !["CARD_CANCEL", "CASH", "BANK_TRANSFER", "POINTS", "OTHER"].includes(method)
+  )
+    return null;
+  if (!refundedAt) return null;
+  return { amount, method, refundedAt, memo };
+}
+
+/**
+ * CustomerRefund 기록 — 손님에게 실제 돈이 나간 사실을 기록.
+ * - customerId 가 있어야 함 (anonymous 결제 즉시환불은 기록 안 함)
+ * - 금액·방법·일자·메모 는 UI 에서 입력. method 는 enum (CARD_CANCEL/CASH/BANK_TRANSFER/POINTS/OTHER)
+ */
+async function createCustomerRefundRecord(
+  tx: Prisma.TransactionClient,
+  args: {
+    orderId: string;
+    orderNo: string;
+    customerId: string;
+    input: RefundInputPayload;
+    createdById: string;
+  },
+) {
+  return tx.customerRefund.create({
+    data: {
+      customerId: args.customerId,
+      orderId: args.orderId,
+      amount: args.input.amount,
+      method: args.input.method,
+      refundedAt: new Date(args.input.refundedAt),
+      memo: args.input.memo ?? null,
+      createdById: args.createdById,
+    },
+  });
+}
 
 /**
  * 교환 새 주문번호 — 원본 주문번호 뒤에 -EX 접미사. 사용자가 한눈에 교환 새 주문임을 인지.
@@ -1377,7 +1434,18 @@ export async function PUT(
         await rebalanceCustomerLedger(tx, order.customerId);
       }
 
-      void wasPaidOrPending; // 결제 흐름은 paymentStatus 갱신으로 충분 (외부 PG 처리는 별도)
+      // CustomerRefund 기록 — PAID/REFUND_PENDING 결제건의 실제 돈 환불 내역 (UI 입력 시)
+      // UNPAID 는 위에서 ledger ADJUSTMENT 처리되므로 별도 기록 불필요
+      const refundInput = parseRefundInput((body as { refundInput?: unknown }).refundInput);
+      if (wasPaidOrPending && refundInput && order.customerId && auditUser?.id) {
+        await createCustomerRefundRecord(tx, {
+          orderId: id,
+          orderNo: order.orderNo,
+          customerId: order.customerId,
+          input: refundInput,
+          createdById: auditUser.id,
+        });
+      }
 
       await recordAudit(tx, {
         userId: auditUser?.id ?? null,
@@ -1390,6 +1458,8 @@ export async function PUT(
           action: "partial_refund",
           orderNo: order.orderNo,
           refundAmount: totalRefundAmount,
+          refundMethod: refundInput?.method ?? null,
+          refundedAt: refundInput?.refundedAt ?? null,
           partials,
           fullyReturned: allFullyReturnedAfter,
         },
@@ -1578,6 +1648,25 @@ export async function PUT(
         // 후속 ledger 항목들의 balance 재계산 (시간순 정렬 보장)
         await rebalanceCustomerLedger(tx, order.customerId);
       }
+      // CustomerRefund 기록 — refund/cancel/return 시 실제 환불 내역 (UI 입력 시).
+      // exchange 는 paymentStatus 유지 → 차액은 새 -EX 주문에서 처리되므로 여기서는 제외.
+      const refundInput = parseRefundInput((body as { refundInput?: unknown }).refundInput);
+      if (
+        !isExchange &&
+        wasPaidOrPending &&
+        refundInput &&
+        order.customerId &&
+        auditUser?.id
+      ) {
+        await createCustomerRefundRecord(tx, {
+          orderId: id,
+          orderNo: order.orderNo,
+          customerId: order.customerId,
+          input: refundInput,
+          createdById: auditUser.id,
+        });
+      }
+
       await recordAudit(tx, {
         userId: auditUser?.id ?? null,
         entity: "Order",
@@ -1590,6 +1679,8 @@ export async function PUT(
           totalAmount: Number(order.totalAmount),
           stockRestored: wasStockDeducted,
           paymentTransition: paymentPatch.paymentStatus ?? null,
+          refundMethod: !isExchange ? refundInput?.method ?? null : undefined,
+          refundedAt: !isExchange ? refundInput?.refundedAt ?? null : undefined,
           isExchange,
           claimType: isExchange ? order.claimType ?? null : undefined,
           exchangeNewOrderId: exchangeNewOrderId ?? undefined,
