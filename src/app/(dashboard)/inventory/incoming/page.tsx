@@ -1233,8 +1233,8 @@ function IncomingPageInner() {
                           {rows.map(({ detail: d, item }, ri) => {
                             const qty = parseFloat(item.quantity);
                             const up = parseFloat(item.unitPrice);
-                            const origPrice = parseFloat(item.supplierProduct.unitPrice);
-                            const discPerUnit = up < origPrice ? origPrice - up : 0;
+                            const discPerUnit = item.discountAmount ? parseFloat(item.discountAmount) : 0;
+                            const origPrice = item.originalPrice ? parseFloat(item.originalPrice) : up + discPerUnit;
                             const supplyLine = up * qty;
                             const taxLine = Math.round(supplyLine * 0.1);
                             return (
@@ -1410,8 +1410,8 @@ function IncomingPageInner() {
                       {detail.items.map((item, idx) => {
                         const qty = parseFloat(item.quantity);
                         const up = parseFloat(item.unitPrice);
-                        const origPrice = parseFloat(item.supplierProduct.unitPrice);
-                        const discPerUnit = up < origPrice ? origPrice - up : 0;
+                        const discPerUnit = item.discountAmount ? parseFloat(item.discountAmount) : 0;
+                        const origPrice = item.originalPrice ? parseFloat(item.originalPrice) : up + discPerUnit;
                         const supplyLine = up * qty;
                         const taxLine = Math.round(supplyLine * 0.1);
                         const shipDisplay = detailShippingMap.get(item.id);
@@ -1472,9 +1472,8 @@ function IncomingPageInner() {
                     const dSupply = detail.items.reduce((s, i) => s + parseFloat(i.quantity) * parseFloat(i.unitPrice), 0);
                     const dTax = Math.round(dSupply * 0.1);
                     const dDiscount = detail.items.reduce((s, i) => {
-                      const orig = parseFloat(i.supplierProduct.unitPrice);
-                      const cur = parseFloat(i.unitPrice);
-                      return s + (orig > cur ? (orig - cur) * parseFloat(i.quantity) : 0);
+                      const discPerUnit = i.discountAmount ? parseFloat(i.discountAmount) : 0;
+                      return s + discPerUnit * parseFloat(i.quantity);
                     }, 0);
                     return (
                       <div className="border-t border-border bg-muted">

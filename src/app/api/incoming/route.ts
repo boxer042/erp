@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
           id: true,
           quantity: true,
           unitPrice: true,
+          originalPrice: true,
+          discountAmount: true,
           memo: true,
           supplierProduct: {
             select: {

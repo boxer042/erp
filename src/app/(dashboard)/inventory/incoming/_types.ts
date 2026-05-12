@@ -31,6 +31,8 @@ export interface Incoming {
     id: string;
     quantity: string;
     unitPrice: string;
+    originalPrice: string | null;
+    discountAmount: string | null;
     memo: string | null;
     supplierProduct: {
       id: string;
