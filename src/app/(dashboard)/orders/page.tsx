@@ -53,7 +53,6 @@ import {
   PaymentStatusBadge,
   ShipDateCell,
   ShippingPaymentBadge,
-  StatusFlowGuide,
   TableRowSkeleton,
 } from "./_parts";
 import {
@@ -673,6 +672,14 @@ export default function OrdersBoardPage() {
                 <BookOpen className="size-4" />
                 도움말
               </JmButton>
+              <JmButton
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/orders/claims")}
+              >
+                <RotateCcw className="size-4" />
+                반품 처리
+              </JmButton>
               <JmIconButton
                 variant="ghost"
                 size="sm"
@@ -721,11 +728,6 @@ export default function OrdersBoardPage() {
               </button>
             </div>
           )}
-
-          {/* 상태 흐름 안내 — 각 상태가 무엇을 의미하고 다음에 무엇을 유도하는지 */}
-          <div className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)]">
-            <StatusFlowGuide />
-          </div>
 
           <div className="overflow-x-auto">
             <JmTable className="min-w-[1320px]">

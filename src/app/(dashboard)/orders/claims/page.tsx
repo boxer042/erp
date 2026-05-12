@@ -31,11 +31,7 @@ import {
 } from "@/jm";
 
 import { OrderDetailSheet } from "../_detail-sheet";
-import {
-  ChannelBadge,
-  ItemPhaseBadge,
-  StatusFlowGuide,
-} from "../_parts";
+import { ChannelBadge, ItemPhaseBadge } from "../_parts";
 import {
   CLAIM_REASON_LABELS,
   CLAIM_TYPE_LABELS,
@@ -305,8 +301,6 @@ export default function ClaimsPage() {
             </JmTable>
           )}
         </JmCard>
-
-        <StatusFlowGuide />
       </div>
 
       <OrderDetailSheet
