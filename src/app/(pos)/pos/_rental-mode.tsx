@@ -326,12 +326,7 @@ function RentalSheetBody({
       toast.error("종료일이 시작일보다 빠를 수 없습니다");
       return;
     }
-    if (overlap) {
-      toast.error(
-        `${format(overlap.start, "M/d")} ~ ${format(overlap.end, "M/d")} 예약과 겹칩니다`,
-      );
-      return;
-    }
+    // overlap 차단은 canAdd 에서 이미 처리됨. UI 안내는 기간 섹션 하단 빨강 라벨 + 캘린더 disabled 로 표시.
     add(
       {
         itemType: "rental",
