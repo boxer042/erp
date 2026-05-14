@@ -30,6 +30,18 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
     : parseFloat(product.sellingPrice) || 0;
   const displayPrice = taxFree ? sellingNet : Math.round(sellingNet * 1.1);
 
+  // 정가 비교 — listPrice 가 sellingPrice 와 다르면 할인/인상 표시 (카트 라인과 동일 패턴).
+  // OPTION_PARENT 는 minOptionPrice 가 표시 기준이라 정가 비교 의미 없음 → 미적용.
+  const listNet = !isOptionParent && product.listPrice
+    ? parseFloat(product.listPrice) || 0
+    : 0;
+  const showListDiff = listNet > 0 && listNet !== sellingNet;
+  const listDisplay = showListDiff ? (taxFree ? listNet : Math.round(listNet * 1.1)) : 0;
+  const listDiff = showListDiff ? sellingNet - listNet : 0;
+  const listDiffPercent = showListDiff && listNet
+    ? Math.round(((sellingNet - listNet) / listNet) * 1000) / 10
+    : 0;
+
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -113,25 +125,43 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
         <span className="mt-auto pt-1 font-mono text-[10px] text-[var(--jm-text-subtle)]">
           {product.sku}
         </span>
-        <span className="text-[14px] font-bold tabular-nums text-[var(--jm-text)] sm:text-[15px]">
-          {autoNoPrice ? (
-            <span className="text-[12px] font-semibold text-[var(--jm-warning-fg)]">
-              담당자 문의
-            </span>
-          ) : (
-            <>
-              ₩{displayPrice.toLocaleString("ko-KR")}
-              {isOptionParent && (
-                <span className="ml-0.5 text-[var(--jm-text-muted)]">~</span>
+        {autoNoPrice ? (
+          <span className="text-[12px] font-semibold text-[var(--jm-warning-fg)]">
+            담당자 문의
+          </span>
+        ) : (
+          <div className="flex flex-col">
+            <div className="flex items-baseline gap-1.5">
+              {showListDiff && (
+                <span className="text-[11px] tabular-nums text-[var(--jm-text-subtle)] line-through">
+                  ₩{listDisplay.toLocaleString("ko-KR")}
+                </span>
               )}
+              <span className="text-[14px] font-bold tabular-nums text-[var(--jm-text)] sm:text-[15px]">
+                ₩{displayPrice.toLocaleString("ko-KR")}
+                {isOptionParent && (
+                  <span className="ml-0.5 text-[var(--jm-text-muted)]">~</span>
+                )}
+              </span>
               {!taxFree && (
-                <span className="ml-1 text-[10px] font-normal text-[var(--jm-text-subtle)]">
+                <span className="text-[10px] font-normal text-[var(--jm-text-subtle)]">
                   VAT 포함
                 </span>
               )}
-            </>
-          )}
-        </span>
+            </div>
+            {showListDiff && (
+              <span
+                className={`text-[10px] font-semibold tabular-nums ${
+                  listDiff < 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
+                }`}
+              >
+                {listDiff < 0
+                  ? `−₩${Math.abs(listDiff).toLocaleString("ko-KR")} (${Math.abs(listDiffPercent).toFixed(1)}% 할인)`
+                  : `+₩${listDiff.toLocaleString("ko-KR")} (${listDiffPercent.toFixed(1)}% 인상)`}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

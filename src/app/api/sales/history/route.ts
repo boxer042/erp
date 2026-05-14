@@ -60,7 +60,7 @@ export type SalesHistoryRow = {
   status: OrderStatus | "PICKED_UP" | "RETURNED";
   claimType: OrderClaimType | null;
   claimReason: OrderClaimReason | null;
-  fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING" | null;
+  fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" | null;
   amount: number;
   /** 순매출 기여분 — 환불/매출취소면 0, PARTIAL_REFUND 면 amount - partialRefundAmount, 그 외엔 amount */
   netAmount: number;

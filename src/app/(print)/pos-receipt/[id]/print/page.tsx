@@ -59,18 +59,23 @@ export default async function PosReceiptPrintPage({
           : null,
         channel: order.channel?.name ?? "오프라인",
         fulfillmentType: order.fulfillmentType,
+        // 매장 인도(IN_STORE/PICKUP) 는 배송 정보 무관
         shippingAddress:
-          order.fulfillmentType === "PICKUP" ? null : order.shippingAddress,
+          order.fulfillmentType === "IN_STORE" || order.fulfillmentType === "PICKUP"
+            ? null
+            : order.shippingAddress,
         recipientName:
-          order.fulfillmentType === "PICKUP"
+          order.fulfillmentType === "IN_STORE" || order.fulfillmentType === "PICKUP"
             ? null
             : order.recipientName ?? order.customerName,
         recipientPhone:
-          order.fulfillmentType === "PICKUP"
+          order.fulfillmentType === "IN_STORE" || order.fulfillmentType === "PICKUP"
             ? null
             : order.recipientPhone ?? order.customerPhone,
         expectedShipDate:
-          order.fulfillmentType === "PICKUP" || !order.expectedShipDate
+          order.fulfillmentType === "IN_STORE" ||
+          order.fulfillmentType === "PICKUP" ||
+          !order.expectedShipDate
             ? null
             : format(new Date(order.expectedShipDate), "yyyy-MM-dd"),
         lines,

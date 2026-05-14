@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -374,7 +375,7 @@ export function AssemblyRegisterSheet({
                   inputMode="decimal"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                   className="max-w-[200px]"
                 />
               </div>
@@ -398,7 +399,7 @@ export function AssemblyRegisterSheet({
                   inputMode="numeric"
                   value={formatComma(laborCost)}
                   onChange={(e) => setLaborCost(parseComma(e.target.value))}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                   className="max-w-[200px]"
                   placeholder="선택"
                 />
@@ -470,7 +471,7 @@ export function AssemblyRegisterSheet({
                               inputMode="decimal"
                               value={c.quantity}
                               onChange={(e) => updateComponent(idx, { quantity: e.target.value })}
-                              onFocus={(e) => e.currentTarget.select()}
+                              onFocus={focusCaretEnd}
                               disabled={!c.isVariable}
                               className="text-right"
                             />
@@ -546,7 +547,7 @@ export function AssemblyRegisterSheet({
                 <Input
                   value={newVariantSku}
                   onChange={(e) => setNewVariantSku(e.target.value)}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                 />
               </div>
             </div>

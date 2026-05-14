@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { formatBusinessNumber, formatPhone } from "@/lib/utils";
 
 interface Line {
   name: string;
@@ -22,7 +23,7 @@ interface Data {
   };
   customer: { name: string; phone: string } | null;
   channel: string;
-  fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING";
+  fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
   shippingAddress: string | null;
   recipientName: string | null;
   recipientPhone: string | null;
@@ -156,9 +157,9 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
         <div className="receipt" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
           <h1>{data.company.name}</h1>
           <div className="meta">
-            {data.company.businessNumber && <div>사업자 {data.company.businessNumber}</div>}
+            {data.company.businessNumber && <div>사업자 {formatBusinessNumber(data.company.businessNumber)}</div>}
             {data.company.ceo && <div>대표 {data.company.ceo}</div>}
-            {data.company.phone && <div>{data.company.phone}</div>}
+            {data.company.phone && <div>{formatPhone(data.company.phone)}</div>}
             {data.company.address && <div>{data.company.address}</div>}
           </div>
 
@@ -176,7 +177,7 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
             <div className="row">
               <span className="label">고객</span>
               <span className="val">
-                {data.customer.name} {data.customer.phone}
+                {data.customer.name} {formatPhone(data.customer.phone)}
               </span>
             </div>
           )}
@@ -195,8 +196,8 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
             </span>
           </div>
 
-          {/* 배달/택배 — 받는사람·연락처·주소·출고예정일 */}
-          {data.fulfillmentType !== "PICKUP" && (
+          {/* 배달/택배 — 받는사람·연락처·주소·출고예정일 (매장 인도 IN_STORE/PICKUP 은 제외) */}
+          {data.fulfillmentType !== "IN_STORE" && data.fulfillmentType !== "PICKUP" && (
             <>
               {data.expectedShipDate && (
                 <div className="row">
@@ -208,7 +209,10 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
                 <div className="row">
                   <span className="label">받는분</span>
                   <span className="val">
-                    {[data.recipientName, data.recipientPhone]
+                    {[
+                      data.recipientName,
+                      data.recipientPhone ? formatPhone(data.recipientPhone) : null,
+                    ]
                       .filter(Boolean)
                       .join(" ")}
                   </span>

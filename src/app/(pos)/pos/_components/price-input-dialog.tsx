@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BottomSheet } from "./bottom-sheet";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 const TAX_RATE = 0.1;
 
@@ -120,7 +121,7 @@ function Body({
             inputMode="numeric"
             value={formatComma(net)}
             onChange={(e) => setNetAndSync(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
+            onFocus={focusCaretEnd}
             className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
           />
         </Field>
@@ -142,7 +143,7 @@ function Body({
             inputMode="numeric"
             value={formatComma(gross)}
             onChange={(e) => setGrossAndSync(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
+            onFocus={focusCaretEnd}
             className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
           />
         </Field>

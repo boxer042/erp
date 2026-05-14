@@ -1,7 +1,7 @@
 import "@/jm/tokens.css";
 import { requireAuth } from "@/lib/auth";
 import { SessionsProvider } from "@/components/pos/sessions-context";
-import { PosLoadingBar } from "./pos/_components/pos-loading-bar";
+import { JmLoadingBar } from "@/jm";
 import { PosThemeWrapper } from "./pos/_components/pos-theme-wrapper";
 
 /**
@@ -21,7 +21,7 @@ export default async function PosLayout({
   return (
     <SessionsProvider>
       <PosThemeWrapper>
-        <PosLoadingBar />
+        <JmLoadingBar />
         <div className="flex h-dvh flex-col overflow-hidden bg-[var(--jm-bg)] text-[var(--jm-text)]">
           {children}
         </div>

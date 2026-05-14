@@ -64,7 +64,14 @@ export default function PosV2CustomerPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const qc = useQueryClient();
-  const { getSession, hydrated, setCustomer, add } = useSessions();
+  const { getSession, hydrated, setCustomer, add, removeSession } = useSessions();
+
+  // 결제 인쇄 큐가 끝나거나 "출력 안 함" 선택 시: /pos 그리드로 복귀.
+  // 세션 자체는 결제 직후 PaymentSheet 내부에서 서버 즉시 삭제 + 부모 onPaymentSuccess 에서
+  // 로컬 removeSession 까지 모두 끝난 상태이므로 여기선 navigation 만 수행.
+  const finishCheckoutAndExit = () => {
+    router.push("/pos");
+  };
 
   /**
    * 미등록 고객 → 등록 고객으로 전환할 때:
@@ -112,10 +119,17 @@ export default function PosV2CustomerPage({
   const [customerActionOpen, setCustomerActionOpen] = useState(false);
   const [returnSheetOpen, setReturnSheetOpen] = useState(false);
   const [quickRegister, setQuickRegister] = useState<{ defaultText: string } | null>(null);
-  const [labelCodes, setLabelCodes] = useState<string[] | null>(null);
-  // 라벨 모달 닫을 때 고객 그리드(/pos) 로 이동할지 — 결제 직후 발번 케이스만 true.
-  // 카트에서 미리 출력하는 케이스는 false (세션 유지, 고객 페이지 머물러야 함).
-  const [labelRedirectAfter, setLabelRedirectAfter] = useState(false);
+  // 출력 큐 — 라벨/거래명세표/영수증 iframe 모달을 순차 표시.
+  // 큐의 head 가 현재 모달, 닫으면 shift. 큐가 비면 redirectAfterQueue=true 일 때만 /pos 이동.
+  const [printQueue, setPrintQueue] = useState<PrintQueueItem[]>([]);
+  const [redirectAfterQueue, setRedirectAfterQueue] = useState(false);
+  // 결제 완료 후 출력 선택 다이얼로그
+  const [paymentResult, setPaymentResult] = useState<{
+    orderId: string;
+    orderNo: string;
+    labelCodes: string[];
+    statementId: string | null;
+  } | null>(null);
   const [detail, setDetail] = useState<Detail>(null);
   // 카트/결제 시트 — 모드 무관 페이지 레벨에서 mount (수리 모드에서도 카트 열 수 있어야 함)
   const [cartOpen, setCartOpen] = useState(false);
@@ -149,7 +163,59 @@ export default function PosV2CustomerPage({
     return <CustomerPageSkeleton />;
   }
 
+  // 결제 후 인쇄 모달 / 다이얼로그 — 세션 가드 밖에서 렌더되어야 결제 직후 removeSession 으로
+  // 세션이 사라져도 모달이 unmount 되지 않음.
+  const printOverlays = (
+    <>
+      {printQueue[0] && (
+        <PrintModal
+          item={printQueue[0]}
+          onClose={() => {
+            setPrintQueue((q) => {
+              const next = q.slice(1);
+              if (next.length === 0 && redirectAfterQueue) {
+                setRedirectAfterQueue(false);
+                finishCheckoutAndExit();
+              }
+              return next;
+            });
+          }}
+        />
+      )}
+      {paymentResult && (
+        <PostPaymentPrintDialog
+          hasLabels={paymentResult.labelCodes.length > 0}
+          hasStatement={!!paymentResult.statementId}
+          onChoose={(opts) => {
+            const r = paymentResult;
+            setPaymentResult(null);
+            const queue: PrintQueueItem[] = [];
+            if (opts.labels && r.labelCodes.length > 0) {
+              queue.push({ kind: "labels", codes: r.labelCodes });
+            }
+            if (opts.statement && r.statementId) {
+              queue.push({ kind: "statement", id: r.statementId });
+            }
+            if (opts.receipt) {
+              queue.push({ kind: "receipt", id: r.orderId });
+            }
+            if (queue.length === 0) {
+              finishCheckoutAndExit();
+              return;
+            }
+            setPrintQueue(queue);
+            setRedirectAfterQueue(true);
+          }}
+        />
+      )}
+    </>
+  );
+
   if (!session) {
+    // 결제 직후 — 로컬 세션은 removeSession 으로 사라졌지만 인쇄 모달은 진행 중. 모달만 렌더.
+    if (printQueue.length > 0 || paymentResult) {
+      return printOverlays;
+    }
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
         <span className="text-[15px] font-semibold text-[var(--jm-text)]">
@@ -516,29 +582,9 @@ export default function PosV2CustomerPage({
         )}
       </main>
 
-      {/* 라벨 인쇄 모달 — 결제 직후 자동 표시 또는 카트의 시리얼출력 */}
-      {labelCodes && labelCodes.length > 0 && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/40 backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setLabelCodes(null);
-              if (labelRedirectAfter) {
-                setLabelRedirectAfter(false);
-                router.push("/pos");
-              }
-            }}
-            className="m-4 self-end rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--jm-text)] shadow"
-          >
-            닫기
-          </button>
-          <iframe
-            src={`/serial-items/print?codes=${labelCodes.join(",")}`}
-            className="mx-auto mb-4 size-full max-h-[88vh] max-w-3xl rounded-2xl bg-[var(--jm-surface)] shadow-2xl"
-            title="라벨 미리보기"
-          />
-        </div>
-      )}
+      {/* 인쇄 모달 + 결제 후 출력 선택 다이얼로그 — 세션 가드 밖에서도 렌더되도록 lift.
+          정의는 if(!hydrated) 위쪽 printOverlays 변수 참고. */}
+      {printOverlays}
 
       {/* 카트 / 결제 시트 — 모드 무관 페이지 레벨에서 mount.
           수리·임대 모드에서도 BottomTabBar 의 장바구니 버튼 또는
@@ -548,18 +594,21 @@ export default function PosV2CustomerPage({
         onOpenChange={setCartOpen}
         session={session}
         onCheckout={() => setPaymentOpen(true)}
-        onPrintLabels={(codes, options) => {
-          setLabelCodes(codes);
-          setLabelRedirectAfter(!!options?.afterPayment);
+        onPrintLabels={(codes) => {
+          setPrintQueue([{ kind: "labels", codes }]);
+          setRedirectAfterQueue(false);
         }}
       />
       <PaymentSheet
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
         session={session}
-        onPrintLabels={(codes, options) => {
-          setLabelCodes(codes);
-          setLabelRedirectAfter(!!options?.afterPayment);
+        onPaymentSuccess={(info) => {
+          // 1) 출력 선택 다이얼로그 띄움 (큐는 다이얼로그에서 결정)
+          setPaymentResult(info);
+          // 2) 로컬 세션 제거 — 그리드에서 즉시 사라짐. 서버는 PaymentSheet 가 await fetch 로 이미 삭제.
+          //    인쇄 모달은 session 가드 밖에서 렌더되므로 unmount 되지 않음.
+          removeSession(sid);
         }}
         onCustomerClick={() => setCustomerActionOpen(true)}
         onCreateCustomer={() => setQuickRegister({ defaultText: "" })}
@@ -672,6 +721,207 @@ function ProductHeader({ productId }: { productId: string }) {
         <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">{q.data.sku}</span>
       )}
     </div>
+  );
+}
+
+// ─── 인쇄 큐 / 모달 ─────────────────────────────────────────────────────────
+// 영수증·거래명세표·시리얼 라벨을 같은 iframe 셸로 순차 표시. 큐 head 가 현재 모달.
+type PrintQueueItem =
+  | { kind: "labels"; codes: string[] }
+  | { kind: "statement"; id: string }
+  | { kind: "receipt"; id: string };
+
+function PrintModal({
+  item,
+  onClose,
+}: {
+  item: PrintQueueItem;
+  onClose: () => void;
+}) {
+  const meta =
+    item.kind === "labels"
+      ? {
+          title: "라벨 미리보기",
+          src: `/serial-items/print?codes=${item.codes.join(",")}`,
+          maxW: "max-w-3xl",
+        }
+      : item.kind === "statement"
+        ? {
+            title: "거래명세표 미리보기",
+            src: `/statements/${item.id}/print?auto=1`,
+            maxW: "max-w-4xl",
+          }
+        : {
+            title: "영수증 미리보기",
+            src: `/pos-receipt/${item.id}/print?auto=1`,
+            maxW: "max-w-md",
+          };
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/40 backdrop-blur-sm">
+      <button
+        type="button"
+        onClick={onClose}
+        className="m-4 self-end rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--jm-text)] shadow"
+      >
+        닫기
+      </button>
+      <iframe
+        src={meta.src}
+        className={`mx-auto mb-4 size-full max-h-[88vh] ${meta.maxW} rounded-2xl bg-[var(--jm-surface)] shadow-2xl`}
+        title={meta.title}
+      />
+    </div>
+  );
+}
+
+// ─── 결제 후 출력 선택 다이얼로그 ───────────────────────────────────────────
+// 결제 완료 직후 표시 — 영수증/시리얼 라벨/거래명세표를 어떻게 출력할지 체크박스로 선택.
+// 영수증은 기본 ON, 시리얼은 발번된 경우 기본 ON, 거래명세표는 발행됐어도 기본 OFF (B2B opt-in).
+// backdrop tap = "출력 안 함".
+function PostPaymentPrintDialog({
+  hasLabels,
+  hasStatement,
+  onChoose,
+}: {
+  hasLabels: boolean;
+  hasStatement: boolean;
+  onChoose: (opts: {
+    receipt: boolean;
+    labels: boolean;
+    statement: boolean;
+  }) => void;
+}) {
+  const [receipt, setReceipt] = useState(true);
+  const [labels, setLabels] = useState(true);
+  const [statement, setStatement] = useState(false);
+
+  const submit = () => onChoose({ receipt, labels, statement });
+  const skip = () =>
+    onChoose({ receipt: false, labels: false, statement: false });
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      onClick={skip}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-[var(--jm-surface)] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col items-center gap-3 pt-2 text-center">
+          <div className="flex size-14 items-center justify-center rounded-full bg-[var(--jm-action)]/10 text-[var(--jm-action)]">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <h3 className="text-[18px] font-bold text-[var(--jm-text)]">
+            출력하시겠어요?
+          </h3>
+          <p className="text-[13px] leading-relaxed text-[var(--jm-text-muted)]">
+            결제가 완료됐어요. 출력할 항목을 선택해주세요.
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <PrintToggle
+            label="영수증"
+            sub="80mm 영수증 프린터"
+            checked={receipt}
+            onChange={setReceipt}
+          />
+          {hasLabels && (
+            <PrintToggle
+              label="시리얼 라벨"
+              sub="라벨 프린터"
+              checked={labels}
+              onChange={setLabels}
+            />
+          )}
+          {hasStatement && (
+            <PrintToggle
+              label="거래명세표"
+              sub="A4 / B2B 증빙"
+              checked={statement}
+              onChange={setStatement}
+            />
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!receipt && !labels && !statement}
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+          >
+            출력하기
+          </button>
+          <button
+            type="button"
+            onClick={skip}
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-[14px] font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+          >
+            출력 안 함
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PrintToggle({
+  label,
+  sub,
+  checked,
+  onChange,
+}: {
+  label: string;
+  sub: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+        checked
+          ? "bg-[var(--jm-action)]/10 ring-1 ring-[var(--jm-action)]/40"
+          : "bg-[var(--jm-bg)] hover:bg-[var(--jm-surface-muted)]"
+      }`}
+    >
+      <div className="flex flex-col">
+        <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+          {label}
+        </span>
+        <span className="text-[11px] text-[var(--jm-text-muted)]">{sub}</span>
+      </div>
+      <span
+        className={`flex size-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+          checked
+            ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-white"
+            : "border-[var(--jm-border-strong)] bg-[var(--jm-surface)]"
+        }`}
+      >
+        {checked && (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path
+              d="M3 7.5l3 3 5-6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+    </button>
   );
 }
 

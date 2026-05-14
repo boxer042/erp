@@ -786,7 +786,7 @@ export default function OrdersBoardPage() {
                     const { order, item, isFirstInGroup, groupSize } = row;
                     const days = daysUntilShip(order.expectedShipDate, today);
                     const next = isFirstInGroup
-                      ? nextActionFor(order.status, order.claimType)
+                      ? nextActionFor(order.status, order.claimType, order.fulfillmentType)
                       : null;
                     const rowPending =
                       transitionMutation.isPending &&
@@ -983,9 +983,10 @@ export default function OrdersBoardPage() {
                           })()}
                         </JmTableCell>
 
-                        {/* 8. 배송비 — 첫 행에만 (order-level). PICKUP 은 배송비 자체 무관 → 빈 셀 */}
+                        {/* 8. 배송비 — 첫 행에만 (order-level). 매장 인도(IN_STORE/PICKUP) 는 배송비 자체 무관 → 빈 셀 */}
                         <JmTableCell>
                           {isFirstInGroup &&
+                          order.fulfillmentType !== "IN_STORE" &&
                           order.fulfillmentType !== "PICKUP" ? (
                             <ShippingPaymentBadge
                               type={order.shippingPaymentType}

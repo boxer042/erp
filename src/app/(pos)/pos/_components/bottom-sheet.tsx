@@ -15,6 +15,9 @@ interface Props {
   locked?: boolean;
   /** 좌상단 뒤로가기 버튼 — 제공 시 헤더에 노출. 닫기(X)와 별개 동작 */
   onBack?: () => void;
+  /** 다른 시트 위에 겹쳐 띄울 때 "elevated" — backdrop z-[60] / sheet z-[70].
+   *  기본 "base" — backdrop z-40 / sheet z-50. */
+  z?: "base" | "elevated";
 }
 
 /**
@@ -37,7 +40,10 @@ function Body({
   maxHeight = "92vh",
   locked,
   onBack,
+  z = "base",
 }: Props) {
+  const backdropZ = z === "elevated" ? "z-[60]" : "z-40";
+  const sheetZ = z === "elevated" ? "z-[70]" : "z-50";
   // ESC 닫기
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -55,11 +61,11 @@ function Body({
       <button
         type="button"
         onClick={() => !locked && onOpenChange(false)}
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        className={`fixed inset-0 ${backdropZ} bg-black/40 backdrop-blur-sm`}
         aria-label="닫기"
       />
       <div
-        className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-3xl bg-[var(--jm-surface)] shadow-2xl"
+        className={`fixed inset-x-0 bottom-0 ${sheetZ} flex flex-col rounded-t-3xl bg-[var(--jm-surface)] shadow-2xl`}
         style={{ maxHeight }}
       >
         <div className="flex shrink-0 justify-center pt-3">

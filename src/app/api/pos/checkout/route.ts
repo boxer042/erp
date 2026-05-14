@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureBulkStock } from "@/lib/inventory/fifo";
+import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
 
 type Action = "order" | "quotation" | "statement";
 
@@ -9,6 +10,11 @@ interface CheckoutItem {
   productId?: string;      // 상품 항목만 있음, 서비스 항목(수리/임대)은 없음
   quantity: number;
   unitPrice: number;       // 할인 전 단가(세전) — 메인 base 가격, optionValueIds addPrice 미포함
+  /**
+   * 정가(상품 마스터 listPrice, 세전) — null 이면 unitPrice 와 동일로 간주.
+   * unitPrice 가 가격 다이얼로그로 깎였더라도 정가는 보존돼야 통합 판매내역 상세에서 정가/할인 비교가 표시됨.
+   */
+  listPrice?: number | null;
   discountPerUnit: number; // 개당 할인액 (세전)
   name: string;
   sku?: string;
@@ -70,10 +76,11 @@ interface CheckoutBody {
   /** 결제 직전 발번된 SerialItem 코드들 — 서버에서 OrderItem 과 매칭해 orderItemId 연결 */
   labelCodes?: string[];
   /**
-   * 출고 방식 — POS 결제 시 픽업/배달/택배 선택.
-   * 미지정 시 PICKUP (매장 즉시 인도). DELIVERY/SHIPPING 은 ERP 워크보드로 진입.
+   * 출고 방식 — POS 결제 시 매장즉시판매/픽업대기/배달/택배 선택.
+   * 미지정 시 IN_STORE (매장 즉시 인도, 즉시 종결).
+   * PICKUP/DELIVERY/SHIPPING 은 ERP 워크보드로 진입.
    */
-  fulfillmentType?: "PICKUP" | "DELIVERY" | "SHIPPING";
+  fulfillmentType?: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
   /** DELIVERY/SHIPPING 일 때 받는 사람·연락처·주소 (받는사람 이름은 customerName 재활용) */
   shippingRecipientName?: string | null;
   shippingRecipientPhone?: string | null;
@@ -82,7 +89,7 @@ interface CheckoutBody {
   expectedShipDate?: string | null;
   /**
    * 배송비 결제 방식 — PREPAID(선불)/COD(착불)/STORE_BURDEN(매장 부담).
-   * PICKUP fulfillmentType 은 의미 없음 (default PREPAID 두되 무시).
+   * IN_STORE/PICKUP fulfillmentType 은 의미 없음 (default PREPAID 두되 무시).
    */
   shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
 }
@@ -136,6 +143,8 @@ export async function POST(request: NextRequest) {
     sku?: string;
     quantity: number;
     unitPrice: number;
+    /** 정가(상품 마스터 listPrice) — null 이면 unitPrice 와 동일로 간주 */
+    listPrice: number | null;
     discountPerUnit: number;
     netUnitPrice: number;
     lineSubtotal: number;
@@ -163,6 +172,7 @@ export async function POST(request: NextRequest) {
         sku: it.sku,
         quantity: it.quantity,
         unitPrice: it.unitPrice,
+        listPrice: it.listPrice ?? null,
         discountPerUnit: it.discountPerUnit ?? 0,
         netUnitPrice: addonNet,
         lineSubtotal: addonNet * it.quantity,
@@ -248,6 +258,7 @@ export async function POST(request: NextRequest) {
       sku: mainSku,
       quantity: it.quantity,
       unitPrice: mainBase,
+      listPrice: it.listPrice ?? null,
       discountPerUnit: it.discountPerUnit ?? 0,
       netUnitPrice: mainNet,
       lineSubtotal: mainNet * it.quantity,
@@ -266,6 +277,7 @@ export async function POST(request: NextRequest) {
         sku: ref.sku,
         quantity: it.quantity,
         unitPrice: ref.addPrice,
+        listPrice: null,
         discountPerUnit: 0,
         netUnitPrice: ref.addPrice,
         lineSubtotal: ref.addPrice * it.quantity,
@@ -404,19 +416,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 출고 방식 결정 — 수리/임대는 매장 인도라 항상 PICKUP, 그 외 명시값 또는 기본 PICKUP
-  const fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING" =
-    body.repairTicketId || body.repairTicketData || (body.rentalRecords && body.rentalRecords.length > 0)
-      ? "PICKUP"
-      : (body.fulfillmentType ?? "PICKUP");
+  // 출고 방식 결정 — 임대만 IN_STORE 강제 (자산 인계가 매장 필수).
+  // 수리는 사용자 선택 허용 (수리 완료된 기기를 배송으로 받는 케이스 종종 발생).
+  const fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" =
+    body.rentalRecords && body.rentalRecords.length > 0
+      ? "IN_STORE"
+      : (body.fulfillmentType ?? "IN_STORE");
 
-  // 픽업이면 즉시 종결(COMPLETED), 배달/택배면 워크보드 진입(PREPARING)
+  // IN_STORE 만 즉시 종결(COMPLETED), 나머지(PICKUP/DELIVERY/SHIPPING)는 워크보드 진입(PREPARING)
   const orderStatus: "COMPLETED" | "PREPARING" =
-    fulfillmentType === "PICKUP" ? "COMPLETED" : "PREPARING";
+    fulfillmentType === "IN_STORE" ? "COMPLETED" : "PREPARING";
 
-  // 출고 예정일 — 명시 없으면 주문일 + 1일 (배송/택배일 때만)
+  // 매장 인도(IN_STORE/PICKUP)는 배송정보 무관 — 주소·수령인 null
+  const isInStore = fulfillmentType === "IN_STORE" || fulfillmentType === "PICKUP";
+
+  // 출고 예정일 — 명시 없으면 주문일 + 1일 (배송/택배일 때만). 매장 인도는 null
   const expectedShipDate =
-    fulfillmentType === "PICKUP"
+    isInStore
       ? null
       : body.expectedShipDate
         ? new Date(body.expectedShipDate)
@@ -441,11 +457,11 @@ export async function POST(request: NextRequest) {
           customerPhone: body.customerPhone || null,
           // 받는 사람은 별도 컬럼. 미입력 시 등록 고객 정보를 fallback 으로 채움
           recipientName:
-            fulfillmentType === "PICKUP"
+            isInStore
               ? null
               : body.shippingRecipientName || body.customerName || null,
           recipientPhone:
-            fulfillmentType === "PICKUP"
+            isInStore
               ? null
               : body.shippingRecipientPhone || body.customerPhone || null,
           shippingAddress: body.shippingAddress || null,
@@ -482,12 +498,25 @@ export async function POST(request: NextRequest) {
       for (const stage of stagedItems) {
         const parentId =
           stage.parentItemIndex !== null ? createdIds[stage.parentItemIndex] : null;
+        // listPrice 결정 — 카트가 보낸 상품 마스터 정가가 우선.
+        // 없으면 mainBase(stage.unitPrice) 폴백 — 정가/할인 비교는 안 됨.
+        // 가격 다이얼로그로 단가만 깎인 케이스를 정확히 표시하려면 카트 listPrice 가 핵심.
+        const finalListPrice =
+          stage.listPrice !== null && stage.listPrice > 0
+            ? stage.listPrice
+            : stage.unitPrice;
+        // discountAmount = 정가 - 결제가 (per unit, 양수). 명시 할인이 없어도 단가가 정가보다 낮으면 차이를 할인으로 표기.
+        const finalDiscountPerUnit = Math.max(0, finalListPrice - stage.netUnitPrice);
         const oi = await tx.orderItem.create({
           data: {
             orderId: orderHeader.id,
             productId: stage.productId,
             serviceName: stage.productId ? null : stage.name,
             quantity: stage.quantity,
+            // 할인 추적 — listPrice(정가) + discountAmount(개당) + unitPrice(실제 결제가).
+            // 통합 판매내역 상세에서 정가 취소선 + 할인 배지 표시에 사용.
+            listPrice: finalListPrice,
+            discountAmount: finalDiscountPerUnit,
             unitPrice: stage.netUnitPrice,
             totalPrice: stage.lineSubtotal,
             lineRole: stage.lineRole as never,
@@ -622,6 +651,9 @@ export async function POST(request: NextRequest) {
       }
 
       // 기존 RepairTicket 픽업/결제 — body.repairTicketId 단독 (repairTicketData 없음)
+      // 분기:
+      //  - IN_STORE: 결제 즉시 PICKED_UP + 보증 시작 (손님 손에 들어감)
+      //  - PICKUP/DELIVERY/SHIPPING: READY 에 머무름 — 보증은 Order COMPLETED 시점부터 시작
       if (body.repairTicketId && !body.repairTicketData) {
         const existing = await tx.repairTicket.findUnique({
           where: { id: body.repairTicketId },
@@ -634,15 +666,6 @@ export async function POST(request: NextRequest) {
           },
         });
         if (existing && existing.status !== "PICKED_UP" && existing.status !== "CANCELLED") {
-          const pickupAt = new Date();
-          const warrantyEnds =
-            existing.repairWarrantyMonths != null && existing.repairWarrantyMonths > 0
-              ? new Date(
-                  pickupAt.getFullYear(),
-                  pickupAt.getMonth() + existing.repairWarrantyMonths,
-                  pickupAt.getDate(),
-                )
-              : null;
           // 수리 라인 합계 = 본 수리에 대한 finalAmount
           const repairLines = body.items.filter((i) => !i.productId);
           const repairTotal = repairLines.reduce(
@@ -651,24 +674,55 @@ export async function POST(request: NextRequest) {
               Math.max(0, i.unitPrice - (i.discountPerUnit || 0)) * i.quantity,
             0,
           );
-          await tx.repairTicket.update({
-            where: { id: existing.id },
-            data: {
-              status: "PICKED_UP",
-              pickedUpAt: pickupAt,
-              finalAmount: repairTotal,
-              paymentMethod: body.paymentMethod ?? null,
-              repairWarrantyEnds: warrantyEnds,
-              // 미등록이었던 티켓 → 결제 시점 등록된 고객으로 업그레이드
-              ...(existing.customerId == null && body.customerId
-                ? { customerId: body.customerId }
-                : {}),
-            },
-          });
+          const customerPatch =
+            existing.customerId == null && body.customerId
+              ? { customerId: body.customerId }
+              : {};
+
+          if (fulfillmentType === "IN_STORE") {
+            const pickupAt = new Date();
+            const warrantyEnds =
+              existing.repairWarrantyMonths != null && existing.repairWarrantyMonths > 0
+                ? new Date(
+                    pickupAt.getFullYear(),
+                    pickupAt.getMonth() + existing.repairWarrantyMonths,
+                    pickupAt.getDate(),
+                  )
+                : null;
+            await tx.repairTicket.update({
+              where: { id: existing.id },
+              data: {
+                status: "PICKED_UP",
+                pickedUpAt: pickupAt,
+                finalAmount: repairTotal,
+                paymentMethod: body.paymentMethod ?? null,
+                repairWarrantyEnds: warrantyEnds,
+                ...customerPatch,
+              },
+            });
+            // Phase 4 세트 학습 — IN_STORE 즉시 픽업
+            await learnDiagnosisPartSet(tx, existing.id);
+          } else {
+            // 결제는 완료됐지만 매장에 기기 보관 / 배송 대기 — 보증은 인도 후 시작
+            await tx.repairTicket.update({
+              where: { id: existing.id },
+              data: {
+                // READY 미만 단계였다면 READY 로 끌어올림 (결제 = 수리 완료 가정)
+                status: "READY",
+                readyAt: new Date(),
+                finalAmount: repairTotal,
+                paymentMethod: body.paymentMethod ?? null,
+                ...customerPatch,
+              },
+            });
+          }
         }
       }
 
-      // RepairTicket 생성 (수리 항목 + 고객 있을 때) — POS는 즉시수리(ON_SITE) → 결제 즉시 PICKED_UP
+      // RepairTicket 생성 (수리 항목 + 고객 있을 때) — POS는 즉시수리(ON_SITE)
+      // 분기:
+      //  - IN_STORE: 결제 즉시 PICKED_UP + 보증 시작
+      //  - PICKUP/DELIVERY/SHIPPING: READY 까지만 진행 — 보증은 Order COMPLETED 시점에 시작
       if (body.repairTicketData && body.customerId) {
         const rd = body.repairTicketData;
         const symptomParts = [rd.deviceBrand, rd.deviceModel].filter(Boolean).join(" ");
@@ -682,8 +736,9 @@ export async function POST(request: NextRequest) {
         const warrantyMonths = company?.defaultRepairWarrantyMonths ?? null;
 
         const now = new Date();
+        const isInStorePickup = fulfillmentType === "IN_STORE";
         const warrantyEnds =
-          warrantyMonths != null && warrantyMonths > 0
+          isInStorePickup && warrantyMonths != null && warrantyMonths > 0
             ? new Date(now.getFullYear(), now.getMonth() + warrantyMonths, now.getDate())
             : null;
 
@@ -696,11 +751,11 @@ export async function POST(request: NextRequest) {
             customerId: body.customerId,
             serialItemId: rd.serialItemId || null,
             symptom: symptomFull,
-            status: "PICKED_UP",
+            status: isInStorePickup ? "PICKED_UP" : "READY",
             receivedAt: now,
             startedAt: now,
             readyAt: now,
-            pickedUpAt: now,
+            pickedUpAt: isInStorePickup ? now : null,
             paymentMethod: body.paymentMethod ?? null,
             finalAmount: laborTotal,
             quotedLaborAmount: laborTotal,
@@ -720,6 +775,10 @@ export async function POST(request: NextRequest) {
           },
         });
         await tx.order.update({ where: { id: order.id }, data: { repairTicketId: ticket.id } });
+        // Phase 4 세트 학습 — IN_STORE 즉시 픽업 케이스만 (PICKED_UP 진입)
+        if (isInStorePickup) {
+          await learnDiagnosisPartSet(tx, ticket.id);
+        }
       }
 
       // Rental 생성 (임대 항목 + 고객 있을 때)

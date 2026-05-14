@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { supplierPaymentSchema } from "@/lib/validators/supplier";
-import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
+import { rebalanceSupplierLedger, recomputeIncomingPaymentStatus } from "@/lib/supplier-ledger";
 import { recordAudit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
@@ -92,15 +92,25 @@ export async function POST(request: NextRequest) {
     // 백-입력(과거 일자로 결제)된 경우에도 잔액 컬럼을 정리
     await rebalanceSupplierLedger(tx, data.supplierId);
 
+    // FIFO 자동 매칭 — 입고 paymentStatus 를 결제 합계 기준으로 재계산
+    const matchResult = await recomputeIncomingPaymentStatus(tx, data.supplierId);
+
     await recordAudit(tx, {
       userId: user.id,
       entity: "SupplierPayment",
       entityId: payment.id,
       action: "CREATE",
-      meta: { supplierId: data.supplierId, amount, method: data.method, paymentDate: data.paymentDate },
+      meta: {
+        supplierId: data.supplierId,
+        amount,
+        method: data.method,
+        paymentDate: data.paymentDate,
+        paidIncomings: matchResult.paidCount,
+        totalIncomings: matchResult.totalCount,
+      },
     });
 
-    return { payment, newBalance };
+    return { payment, newBalance, autoMatchedIncomings: matchResult.paidCount };
   });
 
   return NextResponse.json(result, { status: 201 });

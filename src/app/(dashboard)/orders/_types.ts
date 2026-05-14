@@ -37,7 +37,17 @@ export type OrderClaimReason =
   | "SIZE_COLOR"
   | "OTHER";
 
-export type FulfillmentType = "PICKUP" | "DELIVERY" | "SHIPPING";
+export type FulfillmentType = "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
+
+/**
+ * 매장 인도 여부 — IN_STORE(즉시판매) 또는 PICKUP(픽업대기) 둘 다 손님이 매장에서 받음.
+ * 배송정보(주소·수령인) 가 불필요한 모든 분기에서 사용. DELIVERY/SHIPPING 만 배송정보 필요.
+ */
+export function isInStoreFulfillment(
+  type: FulfillmentType | null | undefined,
+): boolean {
+  return type === "IN_STORE" || type === "PICKUP";
+}
 
 /** OrderItem 라인 역할 — 메인/옵션/추가구매 분기 */
 export type OrderItemLineRole = "MAIN" | "OPTION_REF" | "ADDON";
@@ -301,6 +311,9 @@ export const STATUS_LABELS = STATUS_LABEL_DEFAULTS;
 /**
  * 컨텍스트 인지 라벨.
  *  - PENDING: channelId 있으면 "주문", 없으면 "접수"
+ *  - COMPLETED + fulfillmentType=IN_STORE: "매장판매" (즉시 인도 종결)
+ *  - COMPLETED + fulfillmentType=PICKUP: "픽업완료" (대기 후 손님 방문 수령 종결)
+ *  - PREPARING + fulfillmentType=PICKUP: "픽업대기" (재고 차감 후 손님 방문 대기)
  *  - RETURN_REQUESTED + EXCHANGE_*: "교환요청"
  *  - RETURN_ACCEPTED + EXCHANGE_*: "교환 회수대기"
  *  - 그 외 RETURN_*: 기본 라벨 ("반품...")
@@ -310,10 +323,18 @@ export function statusLabel(
   ctx: {
     channelId?: string | null;
     claimType?: OrderClaimType | null;
+    fulfillmentType?: FulfillmentType | null;
   } = {},
 ): string {
   if (status === "PENDING") {
     return ctx.channelId ? "주문" : "접수";
+  }
+  if (status === "COMPLETED") {
+    if (ctx.fulfillmentType === "IN_STORE") return "매장판매";
+    if (ctx.fulfillmentType === "PICKUP") return "픽업완료";
+  }
+  if (status === "PREPARING" && ctx.fulfillmentType === "PICKUP") {
+    return "픽업대기";
   }
   const isExchangeClaim =
     ctx.claimType === "EXCHANGE_SAME" || ctx.claimType === "EXCHANGE_DIFFERENT";
@@ -385,7 +406,8 @@ export function liabilityShippingNote(
 }
 
 export const FULFILLMENT_LABELS: Record<FulfillmentType, string> = {
-  PICKUP: "매장 수령",
+  IN_STORE: "매장판매",
+  PICKUP: "픽업",
   DELIVERY: "배달",
   SHIPPING: "택배",
 };
@@ -418,11 +440,15 @@ export type WorkboardAction =
 export function nextActionFor(
   status: OrderStatus,
   claimType?: OrderClaimType | null,
+  fulfillmentType?: FulfillmentType | null,
 ): { action: WorkboardAction; label: string } | null {
+  const isPickup = fulfillmentType === "PICKUP";
   switch (status) {
     case "PENDING":
-      return { action: "prepare", label: "출고대기" };
+      return { action: "prepare", label: isPickup ? "픽업준비" : "출고대기" };
     case "PREPARING":
+      // 픽업 대기는 포장·발송 단계를 건너뛰고 [픽업완료] 로 직행
+      if (isPickup) return { action: "complete", label: "픽업완료" };
       return { action: "pack", label: "출고확정" };
     case "PREPARING_PACKED":
       return { action: "ship", label: "발송" };

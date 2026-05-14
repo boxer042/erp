@@ -34,7 +34,7 @@ export function SalesStatusBadge({
 }: {
   row: Pick<
     SalesHistoryRow,
-    "status" | "channelId" | "claimType" | "isExchangeReplacement" | "isOrphan" | "type"
+    "status" | "channelId" | "claimType" | "isExchangeReplacement" | "isOrphan" | "type" | "fulfillmentType"
   >;
 }) {
   // orphan 수리 — PICKED_UP
@@ -61,6 +61,7 @@ export function SalesStatusBadge({
       channelId={row.channelId}
       claimType={row.claimType}
       isExchangeReplacement={row.isExchangeReplacement}
+      fulfillmentType={row.fulfillmentType}
     />
   );
 }

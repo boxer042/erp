@@ -41,6 +41,7 @@ export default function OrderHelpPage() {
         <Toc />
         <SectionOverview />
         <SectionShipping />
+        <SectionFulfillment />
         <SectionWorkboard />
         <SectionPartial />
         <SectionOptions />
@@ -61,6 +62,7 @@ function Toc() {
   const items = [
     { href: "#overview", label: "1. 개요 — 3축 모델" },
     { href: "#shipping", label: "2. 출고 흐름 (5단계)" },
+    { href: "#fulfillment", label: "2-1. 출고 방식 (4종) — 매장판매 · 픽업 · 배달 · 택배" },
     { href: "#workboard", label: "2-2. 워크보드 필터·검색 사용법" },
     { href: "#partial", label: "3. 부분 처리 / 분할 발송 정책" },
     { href: "#options", label: "4. 옵션 도메인 — SWAP / ADDON / OPTION_PARENT" },
@@ -258,6 +260,115 @@ function SectionShipping() {
           { who: "매장", what: "[즉시 반품] 으로 매장 즉석 환불 가능 (단축 경로)" },
         ]}
       />
+    </Section>
+  );
+}
+
+// ─────────── 2-1. 출고 방식 (4종)
+
+function SectionFulfillment() {
+  return (
+    <Section id="fulfillment" title="2-1. 출고 방식 (4종) — 매장판매 · 픽업 · 배달 · 택배">
+      <p>
+        모든 주문은 4가지 <code className="text-jm-2xs">fulfillmentType</code> 중
+        하나로 분기됩니다. 출고 방식에 따라 위 5단계 흐름이 그대로 적용되거나
+        단축됩니다.
+      </p>
+
+      <table className="mt-3 w-full table-fixed text-jm-sm">
+        <thead>
+          <tr className="border-b border-[var(--jm-border)] text-left text-jm-xs text-[var(--jm-text-muted)]">
+            <th className="w-[110px] py-2">enum</th>
+            <th className="w-[110px] py-2">라벨</th>
+            <th className="py-2">의미 / 흐름</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-mono text-jm-xs">IN_STORE</td>
+            <td className="py-2">매장판매</td>
+            <td className="py-2">
+              POS 결제 + 즉시 인도. 결제 순간 <strong>바로 COMPLETED</strong> →
+              워크보드 진입 안 함. 통합 판매내역에서 "매장판매" 라벨로 표시.{" "}
+              <strong>POS 결제의 기본값.</strong>
+            </td>
+          </tr>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-mono text-jm-xs">PICKUP</td>
+            <td className="py-2">픽업</td>
+            <td className="py-2">
+              결제 후 손님이 추후 방문 수령. POS 결제 시{" "}
+              <strong>[픽업 대기] 토글</strong>로 진입.{" "}
+              <code className="text-jm-2xs">PREPARING(픽업대기)</code> 상태로
+              워크보드 노출 → 손님 방문 시 헤더{" "}
+              <code className="text-jm-2xs">[픽업완료]</code> 액션 한 번에 종결
+              (포장·발송 단계 건너뜀).
+            </td>
+          </tr>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-mono text-jm-xs">DELIVERY</td>
+            <td className="py-2">배달</td>
+            <td className="py-2">
+              자체 배달 (당일·근거리). 위 5단계 전체 흐름 적용.
+            </td>
+          </tr>
+          <tr>
+            <td className="py-2 font-mono text-jm-xs">SHIPPING</td>
+            <td className="py-2">택배</td>
+            <td className="py-2">
+              택배사 발송. 위 5단계 전체 흐름 적용. 송장번호 입력 시 외부 채널
+              주문이면 채널에도 자동 push.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="mt-4 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+        <p className="mb-2 text-jm-xs font-medium text-[var(--jm-text-subtle)]">
+          단계 ↔ 라벨 변형
+        </p>
+        <ul className="space-y-1 text-jm-xs">
+          <li>
+            <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+              COMPLETED
+            </code>{" "}
+            + IN_STORE → 라벨 <strong>"매장판매"</strong>
+          </li>
+          <li>
+            <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+              COMPLETED
+            </code>{" "}
+            + PICKUP → 라벨 <strong>"픽업완료"</strong>
+          </li>
+          <li>
+            <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+              PREPARING
+            </code>{" "}
+            + PICKUP → 라벨 <strong>"픽업대기"</strong> (포장·송장 무관)
+          </li>
+          <li>
+            <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
+              COMPLETED
+            </code>{" "}
+            + DELIVERY/SHIPPING → 라벨 <strong>"배송완료"</strong>
+          </li>
+        </ul>
+      </div>
+
+      <div className="mt-3 rounded-md border border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] p-3 text-jm-xs text-[var(--jm-warning-fg)]">
+        <p className="mb-1 font-semibold">수리 / 임대와의 조합</p>
+        <ul className="space-y-1">
+          <li>
+            <strong>임대</strong>는 IN_STORE 강제 — 자산 인계가 매장 필수.
+            토글 숨김.
+          </li>
+          <li>
+            <strong>수리</strong>는 4 방식 모두 선택 가능. 결제 시 IN_STORE 가
+            아니면 RepairTicket 은 READY 에 머무름 → Order COMPLETED 시점에
+            PICKED_UP 으로 전환 + 보증기간 시작.
+          </li>
+        </ul>
+      </div>
     </Section>
   );
 }

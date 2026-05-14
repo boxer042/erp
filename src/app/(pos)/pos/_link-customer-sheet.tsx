@@ -47,6 +47,7 @@ export function LinkCustomerSheet({
     <MobileCombobox<Customer>
       open={open}
       onOpenChange={onOpenChange}
+      z="elevated"
       title="고객 검색"
       placeholder="이름·전화·사업자번호"
       items={customersQuery.data ?? []}

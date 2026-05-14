@@ -149,10 +149,10 @@ export default function RentalManagementPage() {
             </svg>
           </button>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+            <span className="text-jm-base font-semibold text-[var(--jm-text)]">
               임대관리
             </span>
-            <span className="text-[11px] text-[var(--jm-text-muted)]">
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
               매장 자산·임대 현황
             </span>
           </div>
@@ -345,10 +345,10 @@ function SectionHeader({
   return (
     <div className="flex items-center gap-2">
       {dot && <span className={`size-2 rounded-full ${dotColor}`} />}
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+      <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {label}
       </span>
-      <span className="text-[11px] font-semibold tabular-nums text-[var(--jm-text)]">
+      <span className="text-jm-2xs font-semibold tabular-nums text-[var(--jm-text)]">
         {count}
       </span>
     </div>
@@ -357,7 +357,7 @@ function SectionHeader({
 
 function EmptyHint({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl bg-[var(--jm-surface)] px-4 py-5 text-center text-[13px] text-[var(--jm-text-subtle)] border border-[var(--jm-border)]">
+    <div className="rounded-2xl bg-[var(--jm-surface)] px-4 py-5 text-center text-jm-sm text-[var(--jm-text-subtle)] border border-[var(--jm-border)]">
       {text}
     </div>
   );
@@ -439,16 +439,16 @@ function RentalRowCard({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5">
-          <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+          <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
             {rental.asset.name}
           </span>
           {isOverdue && (
-            <span className="rounded bg-[var(--jm-danger-solid)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+            <span className="rounded bg-[var(--jm-danger-solid)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-white">
               연체
             </span>
           )}
         </div>
-        <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">
+        <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-muted)]">
           {rental.customer.name}
           {rental.customer.phone && (
             <span className="ml-1.5 font-mono text-[var(--jm-text-subtle)]">
@@ -456,9 +456,9 @@ function RentalRowCard({
             </span>
           )}
         </span>
-        <span className="text-[11px] text-[var(--jm-text-muted)]">{subtitle}</span>
+        <span className="text-jm-2xs text-[var(--jm-text-muted)]">{subtitle}</span>
       </div>
-      <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">
+      <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">
         {rental.asset.assetNo}
       </span>
     </>
@@ -511,30 +511,30 @@ function AssetCard({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-col">
-            <span className="line-clamp-1 text-[14px] font-semibold leading-tight text-[var(--jm-text)]">
+            <span className="line-clamp-1 text-jm-base font-semibold leading-tight text-[var(--jm-text)]">
               {asset.name}
             </span>
-            <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">
+            <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">
               {asset.assetNo}
             </span>
           </div>
-          <span className="shrink-0 text-[14px] font-bold tabular-nums text-[var(--jm-text)]">
+          <span className="shrink-0 text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
             {fmtKRW(dailyRate)}
-            <span className="ml-0.5 text-[10px] font-normal text-[var(--jm-text-muted)]">
+            <span className="ml-0.5 text-jm-3xs font-normal text-[var(--jm-text-muted)]">
               /일
             </span>
           </span>
         </div>
         {reservations.length > 0 ? (
           <div className="mt-0.5 flex flex-col gap-0.5">
-            <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
+            <span className="flex items-center gap-1 text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
               <span className="size-1.5 rounded-full bg-[var(--jm-warning-solid)]" />
               예약·임대 {reservations.length}건
             </span>
             {reservations.map((r) => (
               <span
                 key={r.id}
-                className="line-clamp-1 text-[11px] text-[var(--jm-text-muted)]"
+                className="line-clamp-1 text-jm-2xs text-[var(--jm-text-muted)]"
               >
                 <span
                   className={`mr-1 font-semibold ${
@@ -557,7 +557,7 @@ function AssetCard({
             ))}
           </div>
         ) : (
-          <span className="text-[11px] text-[var(--jm-text-subtle)]">
+          <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
             예약 없음 — 즉시 임대 가능
           </span>
         )}
@@ -580,7 +580,7 @@ function AssetThumb({ asset }: { asset: { name: string; imageUrl: string | null 
     );
   }
   return (
-    <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[16px] font-bold text-[var(--jm-text)] border border-[var(--jm-border)]">
+    <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-jm-lg font-bold text-[var(--jm-text)] border border-[var(--jm-border)]">
       {asset.name.charAt(0)}
     </div>
   );
@@ -612,7 +612,7 @@ function FilterChipButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition-colors ${
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-jm-xs font-medium transition-colors ${
         active
           ? "bg-[var(--jm-action)] text-white"
           : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] border border-[var(--jm-border)] hover:bg-[var(--jm-bg)]"

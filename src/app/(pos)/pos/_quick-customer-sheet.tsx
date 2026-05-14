@@ -147,6 +147,7 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
       open
       onOpenChange={onOpenChange}
       title="고객 빠른 등록"
+      z="elevated"
       footer={
         <button
           type="button"

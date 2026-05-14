@@ -61,6 +61,7 @@ function Body({
       open
       onOpenChange={onOpenChange}
       title="고객"
+      z="elevated"
     >
       <div className="flex flex-col gap-1 pb-2 pt-2">
         {isRegistered ? (

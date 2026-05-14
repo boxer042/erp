@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supplierPaymentUpdateSchema } from "@/lib/validators/supplier";
-import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
+import { rebalanceSupplierLedger, recomputeIncomingPaymentStatus } from "@/lib/supplier-ledger";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -68,6 +68,8 @@ export async function PUT(
 
     // balance 재계산
     await rebalanceSupplierLedger(tx, existing.supplierId);
+    // 결제 금액 변경 시 입고 PAID/UNPAID 재매칭
+    await recomputeIncomingPaymentStatus(tx, existing.supplierId);
 
     const auditUser = await getCurrentUser();
     await recordAudit(tx, {
@@ -104,6 +106,8 @@ export async function DELETE(
     });
     await tx.supplierPayment.delete({ where: { id } });
     await rebalanceSupplierLedger(tx, existing.supplierId);
+    // 결제 삭제 시 매칭됐던 입고 PAID 를 잔여 결제 합계 기준으로 재계산 (UNPAID 로 되돌릴 수 있음)
+    await recomputeIncomingPaymentStatus(tx, existing.supplierId);
 
     const auditUser = await getCurrentUser();
     await recordAudit(tx, {

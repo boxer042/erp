@@ -35,6 +35,7 @@ import {
 import { apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 import type { OrderPaymentStatus } from "./_types";
 
@@ -335,7 +336,7 @@ export function RefundDialog({
                             }
                             setRefundAmount(sum > 0 ? formatComma(String(sum)) : "");
                           }}
-                          onFocus={(e) => e.currentTarget.select()}
+                          onFocus={focusCaretEnd}
                           className="w-[80px] text-right"
                         />
                       </div>
@@ -365,7 +366,7 @@ export function RefundDialog({
                     onChange={(e) =>
                       setRefundAmount(formatComma(parseComma(e.target.value)))
                     }
-                    onFocus={(e) => e.currentTarget.select()}
+                    onFocus={focusCaretEnd}
                     placeholder="0"
                   />
                 </JmFormField>

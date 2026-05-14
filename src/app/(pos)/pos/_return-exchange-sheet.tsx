@@ -159,6 +159,7 @@ export function ReturnExchangeSheet({
         onOpenChange={onOpenChange}
         title={`반품·교환 — ${customerName}`}
         maxHeight="92vh"
+        z="elevated"
       >
         {ordersQuery.isPending ? (
           <div className="flex flex-col gap-2 py-4">

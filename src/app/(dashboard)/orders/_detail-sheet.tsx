@@ -16,7 +16,9 @@ import {
   Phone,
   Printer,
   Search,
+  ShoppingBag,
   StickyNote,
+  Store,
   ThumbsDown,
   Truck,
   Trash2,
@@ -63,6 +65,7 @@ import {
   JmTextarea,
 } from "@/jm";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 import {
   CLAIM_REASON_LABELS,
@@ -85,7 +88,8 @@ import { RefundDialog } from "./_refund-dialog";
 import { VariantResolveDialog } from "./_variant-resolve-dialog";
 
 const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string }[] = [
-  { value: "PICKUP", label: "매장 수령" },
+  { value: "IN_STORE", label: "매장판매" },
+  { value: "PICKUP", label: "픽업 대기" },
   { value: "DELIVERY", label: "배달" },
   { value: "SHIPPING", label: "택배" },
 ];
@@ -169,6 +173,10 @@ interface OrderDetail {
     quantity: string;
     unitPrice: string;
     totalPrice: string;
+    /** 정가(할인 전 단가, 세전) — null 이면 할인 없이 정가 그대로 */
+    listPrice?: string | null;
+    /** 개당 할인액 (세전) — null 또는 0 이면 할인 없음 */
+    discountAmount?: string | null;
     /** 누적 발송 수량 (≤ quantity) — 부분 출고 추적 */
     shippedQty: string;
     /** 부분 반품 누적 (≤ quantity) */
@@ -697,6 +705,7 @@ export function OrderDetailSheet({
                   isExchangeReplacement={
                     (data.exchangedFromOrders?.length ?? 0) > 0
                   }
+                  fulfillmentType={data.fulfillmentType}
                 />
                 <PaymentStatusBadge status={data.paymentStatus} showPaid />
                 <JmBadge variant="outline" size="sm" shape="square">
@@ -999,7 +1008,7 @@ export function OrderDetailSheet({
                               [it.id]: e.target.value,
                             })
                           }
-                          onFocus={(e) => e.currentTarget.select()}
+                          onFocus={focusCaretEnd}
                           className="w-[80px] text-right"
                         />
                       </div>
@@ -1219,7 +1228,7 @@ function ReadView({
             <Field label="출고 방식" icon={<FulfillmentIcon type={order.fulfillmentType} />}>
               {FULFILLMENT_LABELS[order.fulfillmentType]}
             </Field>
-            {order.fulfillmentType !== "PICKUP" && (
+            {order.fulfillmentType !== "IN_STORE" && order.fulfillmentType !== "PICKUP" && (
               <>
                 <Field label="출고 예정일" icon={<CalendarClock className="size-3.5" />}>
                   {order.expectedShipDate
@@ -1392,10 +1401,65 @@ function ReadView({
                     {Number(item.quantity).toLocaleString("ko-KR")}
                   </JmTableCell>
                   <JmTableCell className="text-right tabular-nums">
-                    {formatCurrency(item.unitPrice)}
+                    {(() => {
+                      const listNet = item.listPrice ? Number(item.listPrice) : 0;
+                      const discNet = item.discountAmount ? Number(item.discountAmount) : 0;
+                      const unitNet = Number(item.unitPrice);
+                      const showDiscount = listNet > 0 && listNet !== unitNet;
+                      if (!showDiscount) {
+                        return formatCurrency(item.unitPrice);
+                      }
+                      const diff = unitNet - listNet;
+                      const pct = listNet > 0
+                        ? Math.round((diff / listNet) * 1000) / 10
+                        : 0;
+                      const perUnitDisc = discNet > 0 ? discNet : Math.abs(diff);
+                      return (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-jm-2xs text-[var(--jm-text-muted)] line-through">
+                            {formatCurrency(listNet)}
+                          </span>
+                          <span>{formatCurrency(unitNet)}</span>
+                          <span
+                            className={`text-jm-2xs font-semibold ${
+                              diff < 0
+                                ? "text-[var(--jm-success-fg)]"
+                                : "text-[var(--jm-danger-fg)]"
+                            }`}
+                          >
+                            {diff < 0
+                              ? `−${formatCurrency(perUnitDisc)} (${Math.abs(pct).toFixed(1)}%)`
+                              : `+${formatCurrency(diff)} (${pct.toFixed(1)}%)`}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </JmTableCell>
                   <JmTableCell className="text-right tabular-nums font-semibold">
-                    {formatCurrency(item.totalPrice)}
+                    {(() => {
+                      const listNet = item.listPrice ? Number(item.listPrice) : 0;
+                      const unitNet = Number(item.unitPrice);
+                      const qty = Number(item.quantity);
+                      const showDiscount = listNet > 0 && listNet !== unitNet;
+                      if (!showDiscount) {
+                        return formatCurrency(item.totalPrice);
+                      }
+                      const grossTotal = listNet * qty;
+                      const totalDisc = (listNet - unitNet) * qty;
+                      return (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-jm-2xs font-normal text-[var(--jm-text-muted)] line-through">
+                            {formatCurrency(grossTotal)}
+                          </span>
+                          <span>{formatCurrency(item.totalPrice)}</span>
+                          {totalDisc > 0 && (
+                            <span className="text-jm-2xs font-semibold text-[var(--jm-success-fg)]">
+                              −{formatCurrency(totalDisc)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </JmTableCell>
                 </JmTableRow>
               );
@@ -1404,10 +1468,12 @@ function ReadView({
         </JmTable>
       </JmCard>
 
-      {/* 송장 사전 등록 — PREPARING 단계에서 미리 송장 발급 (출고확정 시 자동 prefill) */}
-      {order.status === "PREPARING" && order.fulfillmentType !== "PICKUP" && (
-        <PreShipmentTrackingCard order={order} />
-      )}
+      {/* 송장 사전 등록 — PREPARING 단계에서 미리 송장 발급 (출고확정 시 자동 prefill). 매장 인도(IN_STORE/PICKUP) 제외 */}
+      {order.status === "PREPARING" &&
+        order.fulfillmentType !== "IN_STORE" &&
+        order.fulfillmentType !== "PICKUP" && (
+          <PreShipmentTrackingCard order={order} />
+        )}
 
       {/* 분할 송장 — 회차별 발송 이력. 1건 이상 있으면 노출 */}
       {order.shipments.length > 0 && (
@@ -1435,8 +1501,8 @@ function ReadView({
             {Number(order.shippingFee) > 0 && (
               <SumRow label="배송비" value={Number(order.shippingFee)} muted />
             )}
-            {/* 배송비 결제 방식 — 배송 주문일 때만 (PICKUP 은 배송 자체 무관) */}
-            {order.fulfillmentType !== "PICKUP" && (
+            {/* 배송비 결제 방식 — 배송 주문일 때만 (매장 인도 IN_STORE/PICKUP 은 배송 자체 무관) */}
+            {order.fulfillmentType !== "IN_STORE" && order.fulfillmentType !== "PICKUP" && (
               <div className="flex items-center justify-between text-jm-xs text-[var(--jm-text-muted)]">
                 <span>배송비 결제</span>
                 <ShippingPaymentBadge type={order.shippingPaymentType} />
@@ -1556,7 +1622,8 @@ function ReadView({
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               <Field label="등록 고객">{order.customerName ?? "—"}</Field>
               <Field label="연락처">{order.customerPhone ?? "—"}</Field>
-              {order.fulfillmentType !== "PICKUP" &&
+              {order.fulfillmentType !== "IN_STORE" &&
+                order.fulfillmentType !== "PICKUP" &&
                 ((order.recipientName &&
                   order.recipientName !== order.customerName) ||
                   (order.recipientPhone &&
@@ -1641,7 +1708,7 @@ function EditView({
             </div>
           </JmFormField>
 
-          {form.fulfillmentType !== "PICKUP" && (
+          {form.fulfillmentType !== "IN_STORE" && form.fulfillmentType !== "PICKUP" && (
             <>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <JmFormField label="출고 예정일">
@@ -1813,7 +1880,7 @@ function ItemsEditView({
                             onChange={(e) =>
                               onUpdate(idx, { quantity: e.target.value })
                             }
-                            onFocus={(e) => e.currentTarget.select()}
+                            onFocus={focusCaretEnd}
                           />
                         </JmTableCell>
                         <JmTableCell>
@@ -1827,7 +1894,7 @@ function ItemsEditView({
                                 unitPrice: parseComma(e.target.value),
                               })
                             }
-                            onFocus={(e) => e.currentTarget.select()}
+                            onFocus={focusCaretEnd}
                             className="text-right"
                           />
                         </JmTableCell>
@@ -2125,7 +2192,14 @@ function ActionFooter({
 /* ------------------------------ HELPERS ------------------------------ */
 
 function FulfillmentIcon({ type }: { type: FulfillmentType }) {
-  const Icon = type === "DELIVERY" ? Truck : type === "SHIPPING" ? Package : User;
+  const Icon =
+    type === "DELIVERY"
+      ? Truck
+      : type === "SHIPPING"
+      ? Package
+      : type === "PICKUP"
+      ? ShoppingBag
+      : Store; // IN_STORE
   return <Icon className="size-3" />;
 }
 

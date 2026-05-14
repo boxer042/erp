@@ -1,39 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query-keys";
-import { Button } from "@/components/ui/button";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Pencil, Trash2, FileText } from "lucide-react";
+import React, { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
+import { FileText, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { StatementSheet, type StatementFormData } from "@/components/statement-sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DocumentPrintDialog } from "@/components/document-print-dialog";
 
-function StatementsSkeletonRows({ rows = 8 }: { rows?: number }) {
-  return (
-    <>
-      {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-20" /></div></TableCell>
-          <TableCell><div className="flex gap-1"><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import { StatementSheet, type StatementFormData } from "@/components/statement-sheet";
+import { DocumentPrintDialog } from "@/components/document-print-dialog";
+import {
+  JmBadge,
+  JmButton,
+  JmIconButton,
+  JmScope,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 
 type StatementStatus = "DRAFT" | "ISSUED" | "CANCELLED";
 
@@ -55,27 +44,65 @@ const STATUS_LABEL: Record<StatementStatus, string> = {
   ISSUED: "발행",
   CANCELLED: "취소",
 };
-const STATUS_VARIANT: Record<StatementStatus, "default" | "secondary" | "destructive" | "success"> = {
-  DRAFT: "secondary",
+
+const STATUS_JM_VARIANT: Record<StatementStatus, "default" | "success" | "danger"> = {
+  DRAFT: "default",
   ISSUED: "success",
-  CANCELLED: "destructive",
+  CANCELLED: "danger",
 };
+
+function StatementsSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-28" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-12 rounded-md" /></JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-20" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex gap-1">
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+            </div>
+          </JmTableCell>
+        </JmTableRow>
+      ))}
+    </>
+  );
+}
 
 export default function StatementsPage() {
   const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editData, setEditData] = useState<StatementFormData | null>(null);
-  const [previewTarget, setPreviewTarget] = useState<{ id: string; statementNo: string } | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{
+    id: string;
+    statementNo: string;
+  } | null>(null);
 
   const statementsQuery = useQuery({
     queryKey: queryKeys.statements.list({ search: appliedSearch }),
-    queryFn: () => apiGet<StatementRow[]>(`/api/statements?search=${encodeURIComponent(appliedSearch)}`),
+    queryFn: () =>
+      apiGet<StatementRow[]>(
+        `/api/statements?search=${encodeURIComponent(appliedSearch)}`,
+      ),
   });
   const statements = statementsQuery.data ?? [];
   const loading = statementsQuery.isPending;
-  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
+  const refreshing = statementsQuery.isFetching && !loading;
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
 
   const openCreate = () => {
     setEditData(null);
@@ -136,7 +163,8 @@ export default function StatementsPage() {
         spec: it.spec || "",
         unitOfMeasure: it.unitOfMeasure,
         quantity: it.quantity,
-        unitPrice: parseFloat(it.listPrice) > 0 ? it.listPrice : it.unitPrice,
+        unitPrice:
+          parseFloat(it.listPrice) > 0 ? it.listPrice : it.unitPrice,
         discount: parseFloat(it.discountAmount) > 0 ? it.discountAmount : "",
         isTaxable: it.isTaxable,
         isZeroRateEligible: it.isZeroRateEligible ?? false,
@@ -152,7 +180,8 @@ export default function StatementsPage() {
       toast.success("거래명세표가 삭제되었습니다");
       refresh();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
   });
 
   const handleDelete = (id: string) => {
@@ -161,73 +190,149 @@ export default function StatementsPage() {
   };
 
   return (
-    <>
-      <div className="flex h-full flex-col">
-        <DataTableToolbar
-          search={{
-            value: search,
-            onChange: setSearch,
-            onSearch: () => setAppliedSearch(search),
-            placeholder: "명세표번호 / 고객 검색",
-          }}
-          onRefresh={refresh}
-          onAdd={openCreate}
-          addLabel="거래명세표 작성"
-          loading={loading}
-        />
-        <ScrollArea className="flex-1 min-h-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>명세표번호</TableHead>
-                <TableHead>고객</TableHead>
-                <TableHead>발행일자</TableHead>
-                <TableHead>원본</TableHead>
-                <TableHead>상태</TableHead>
-                <TableHead className="text-right">합계</TableHead>
-                <TableHead className="w-[130px]">관리</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+        {/* 툴바 */}
+        <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2 shrink-0">
+          <div className="flex flex-1 items-center gap-1.5 h-8 max-w-[320px] rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2.5">
+            <Search className="size-3.5 text-[var(--jm-text-muted)] shrink-0" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  setAppliedSearch(search);
+                }
+              }}
+              placeholder="명세표번호 / 고객 검색"
+              className="flex-1 bg-transparent text-jm-sm outline-none placeholder:text-[var(--jm-text-muted)] text-[var(--jm-text)]"
+            />
+          </div>
+          <JmIconButton
+            aria-label="새로고침"
+            onClick={refresh}
+            disabled={loading}
+            size="sm"
+            variant="ghost"
+          >
+            <RefreshCw className={refreshing ? "animate-spin" : ""} />
+          </JmIconButton>
+          <div className="ml-auto">
+            <JmButton size="sm" variant="cta" onClick={openCreate}>
+              <Plus />
+              <span>거래명세표 작성</span>
+            </JmButton>
+          </div>
+        </div>
+
+        {/* 테이블 */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <JmTable className="min-w-[900px]">
+            <JmTableHeader className="sticky top-0 z-10">
+              <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">명세표번호</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">고객</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">발행일자</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">원본</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">상태</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">합계</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[130px]">관리</JmTableHead>
+              </JmTableRow>
+            </JmTableHeader>
+            <JmTableBody>
               {loading ? (
                 <StatementsSkeletonRows />
               ) : statements.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8">등록된 거래명세표가 없습니다</TableCell></TableRow>
+                <JmTableRow className="hover:bg-transparent">
+                  <JmTableCell colSpan={7} className="text-center py-10 text-[var(--jm-text-muted)] text-sm">
+                    {appliedSearch ? (
+                      <>
+                        <span className="text-[var(--jm-text)] font-medium">
+                          &ldquo;{appliedSearch}&rdquo;
+                        </span>{" "}
+                        검색 결과가 없습니다
+                      </>
+                    ) : (
+                      "등록된 거래명세표가 없습니다"
+                    )}
+                  </JmTableCell>
+                </JmTableRow>
               ) : (
                 statements.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium font-mono text-xs">{s.statementNo}</TableCell>
-                    <TableCell>{s.customer?.name || s.customerNameSnapshot || "-"}</TableCell>
-                    <TableCell>{s.issueDate.slice(0, 10)}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {s.order ? s.order.orderNo : s.quotation ? s.quotation.quotationNo : "-"}
-                    </TableCell>
-                    <TableCell><Badge variant={STATUS_VARIANT[s.status]}>{STATUS_LABEL[s.status]}</Badge></TableCell>
-                    <TableCell className="text-right font-medium">₩{Math.round(parseFloat(s.totalAmount)).toLocaleString("ko-KR")}</TableCell>
-                    <TableCell>
+                  <JmTableRow key={s.id}>
+                    <JmTableCell className="px-3 py-2 font-medium font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text)]">
+                      {s.statementNo}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2 text-[var(--jm-text)]">
+                      {s.customer?.name || s.customerNameSnapshot || "-"}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)] tabular-nums">
+                      {s.issueDate.slice(0, 10)}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2 font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
+                      {s.order
+                        ? s.order.orderNo
+                        : s.quotation
+                          ? s.quotation.quotationNo
+                          : "-"}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2">
+                      <JmBadge
+                        variant={STATUS_JM_VARIANT[s.status]}
+                        size="sm"
+                        shape="square"
+                      >
+                        {STATUS_LABEL[s.status]}
+                      </JmBadge>
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2 text-right font-medium tabular-nums text-[var(--jm-text)]">
+                      ₩{Math.round(parseFloat(s.totalAmount)).toLocaleString("ko-KR")}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2">
                       <div className="flex gap-1">
-                        <Button
+                        <JmIconButton
+                          aria-label="거래명세표 보기"
+                          size="sm"
                           variant="ghost"
-                          size="icon"
-                          onClick={() => setPreviewTarget({ id: s.id, statementNo: s.statementNo })}
-                          title="거래명세표 보기"
+                          onClick={() =>
+                            setPreviewTarget({ id: s.id, statementNo: s.statementNo })
+                          }
                         >
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <FileText />
+                        </JmIconButton>
+                        <JmIconButton
+                          aria-label="수정"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openEdit(s)}
+                        >
+                          <Pencil />
+                        </JmIconButton>
+                        <JmIconButton
+                          aria-label="삭제"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(s.id)}
+                          disabled={
+                            deleteMutation.isPending &&
+                            deleteMutation.variables === s.id
+                          }
+                        >
+                          {deleteMutation.isPending &&
+                          deleteMutation.variables === s.id ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Trash2 />
+                          )}
+                        </JmIconButton>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </JmTableCell>
+                  </JmTableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+            </JmTableBody>
+          </JmTable>
+        </div>
       </div>
 
       <StatementSheet
@@ -242,10 +347,14 @@ export default function StatementsPage() {
 
       <DocumentPrintDialog
         open={!!previewTarget}
-        onOpenChange={(v) => { if (!v) setPreviewTarget(null); }}
+        onOpenChange={(v) => {
+          if (!v) setPreviewTarget(null);
+        }}
         printPath={previewTarget ? `/statements/${previewTarget.id}/print` : null}
-        title={previewTarget ? `거래명세표 — ${previewTarget.statementNo}` : "거래명세표"}
+        title={
+          previewTarget ? `거래명세표 — ${previewTarget.statementNo}` : "거래명세표"
+        }
       />
-    </>
+    </JmScope>
   );
 }

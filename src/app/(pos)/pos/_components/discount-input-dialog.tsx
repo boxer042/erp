@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BottomSheet } from "./bottom-sheet";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 interface Props {
   open: boolean;
@@ -132,7 +133,7 @@ function Body({
                   setRaw(v);
                 }
               }}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               placeholder="0"
               className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 pr-12 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
             />

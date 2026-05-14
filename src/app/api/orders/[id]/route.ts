@@ -12,6 +12,7 @@ import {
   dispatchRejectReturn,
 } from "@/lib/channels/outbound";
 import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
+import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
 import { notify } from "@/lib/notifications/dispatch";
 import {
   dispatchPaymentCancel,
@@ -304,7 +305,8 @@ export async function PUT(
     prepare: { from: "PENDING", to: "PREPARING" },
     pack: { from: "PREPARING", to: "PREPARING_PACKED" },
     ship: { from: "PREPARING_PACKED", to: "SHIPPED" },
-    complete: { from: "SHIPPED", to: "COMPLETED" },
+    // SHIPPED→COMPLETED (배송 종결) + PREPARING→COMPLETED (PICKUP 픽업완료 단축)
+    complete: { from: ["SHIPPED", "PREPARING"], to: "COMPLETED" },
     cancel: { from: ["PENDING", "PREPARING"], to: "CANCELLED" },
     request_return: { from: "COMPLETED", to: "RETURN_REQUESTED" },
     accept_return: { from: "RETURN_REQUESTED", to: "RETURN_ACCEPTED" },
@@ -554,6 +556,18 @@ export async function PUT(
   if (!allowedFrom.includes(order.status)) {
     return NextResponse.json(
       { error: `현재 상태(${order.status})에서 ${action} 할 수 없습니다` },
+      { status: 400 },
+    );
+  }
+
+  // PREPARING→COMPLETED 단축 전이는 PICKUP(픽업대기) 에만 허용. DELIVERY/SHIPPING 은 pack→ship→complete 거쳐야 함.
+  if (
+    action === "complete" &&
+    order.status === "PREPARING" &&
+    order.fulfillmentType !== "PICKUP"
+  ) {
+    return NextResponse.json(
+      { error: "PICKUP(픽업대기) 주문만 PREPARING 단계에서 바로 완료할 수 있습니다" },
       { status: 400 },
     );
   }
@@ -1870,6 +1884,39 @@ export async function PUT(
         });
       }
     }
+    // complete 액션 — Order 가 COMPLETED 가 되는 시점에 연결된 RepairTicket 도 PICKED_UP 으로 전환.
+    // POS IN_STORE 결제 시엔 이미 PICKED_UP 이므로 무시 (READY 상태일 때만 전환). 보증은 이 시점부터 시작.
+    if (action === "complete" && order.repairTicketId) {
+      const ticket = await tx.repairTicket.findUnique({
+        where: { id: order.repairTicketId },
+        select: {
+          id: true,
+          status: true,
+          repairWarrantyMonths: true,
+        },
+      });
+      if (ticket && ticket.status !== "PICKED_UP" && ticket.status !== "CANCELLED") {
+        const pickupAt = new Date();
+        const warrantyEnds =
+          ticket.repairWarrantyMonths != null && ticket.repairWarrantyMonths > 0
+            ? new Date(
+                pickupAt.getFullYear(),
+                pickupAt.getMonth() + ticket.repairWarrantyMonths,
+                pickupAt.getDate(),
+              )
+            : null;
+        await tx.repairTicket.update({
+          where: { id: ticket.id },
+          data: {
+            status: "PICKED_UP",
+            pickedUpAt: pickupAt,
+            repairWarrantyEnds: warrantyEnds,
+          },
+        });
+        // Phase 4 세트 학습 — Order 배송/픽업 완료 시점에 연결된 RepairTicket 도 PICKED_UP 진입
+        await learnDiagnosisPartSet(tx, ticket.id);
+      }
+    }
     await recordAudit(tx, {
       userId: auditUserShip?.id ?? null,
       entity: "Order",
@@ -1905,16 +1952,19 @@ export async function PUT(
     }
   }
 
-  // 알림 — 배송완료 시 고객에게 통지 (best-effort)
+  // 알림 — 배송완료/픽업완료 시 고객에게 통지 (best-effort)
   if (action === "complete") {
     const phone = updated.recipientPhone || updated.customerPhone;
     if (phone) {
+      const isPickup = updated.fulfillmentType === "PICKUP";
       await notify(
         { phone, name: updated.recipientName ?? updated.customerName ?? undefined },
         {
           kind: "ORDER_DELIVERED",
-          subject: `[배송완료] ${updated.orderNo}`,
-          body: `주문 ${updated.orderNo} 배송이 완료되었습니다. 이용해주셔서 감사합니다.`,
+          subject: isPickup ? `[픽업완료] ${updated.orderNo}` : `[배송완료] ${updated.orderNo}`,
+          body: isPickup
+            ? `주문 ${updated.orderNo} 픽업이 완료되었습니다. 이용해주셔서 감사합니다.`
+            : `주문 ${updated.orderNo} 배송이 완료되었습니다. 이용해주셔서 감사합니다.`,
         },
         "sms",
       );
@@ -1986,8 +2036,9 @@ export async function PATCH(
     );
   }
 
-  // fulfillmentType=PICKUP 으로 변경 시 expectedShipDate / shippingAddress / recipient 정리.
-  const isPickup = data.fulfillmentType === "PICKUP";
+  // fulfillmentType=IN_STORE/PICKUP(매장 인도) 로 변경 시 expectedShipDate / shippingAddress / recipient 정리.
+  const isPickup =
+    data.fulfillmentType === "IN_STORE" || data.fulfillmentType === "PICKUP";
 
   // 항목 변경 시 금액 재계산 — POST /api/orders 와 동일 로직
   let recalcPatch: Record<string, unknown> = {};

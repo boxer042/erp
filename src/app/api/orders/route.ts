@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       : {}),
   };
 
-  // 워크보드 뷰: 출고 대상 + 반품 처리 대상. PICKUP 제외.
+  // 워크보드 뷰: 출고 대상 + 반품 처리 대상. IN_STORE(즉시판매) 제외, PICKUP(픽업대기)는 노출.
   // RETURN_REQUESTED/RETURN_ACCEPTED 는 반품 처리 대기 — 매장이 결정·회수해야 하므로 워크보드에 노출.
   if (view === "board") {
     // 평소엔 진행 중 주문만 (운영 우선순위 보드).
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         ? [...inProgressStatuses, ...closedStatuses]
         : [...inProgressStatuses],
     };
-    where.fulfillmentType = { in: ["DELIVERY", "SHIPPING"] };
+    where.fulfillmentType = { in: ["PICKUP", "DELIVERY", "SHIPPING"] };
     if (channelFilter === "offline") {
       where.channelId = null;
     } else if (channelFilter === "external") {
@@ -362,7 +362,9 @@ export async function POST(request: NextRequest) {
     : 0;
 
   // ERP 수동 등록은 PENDING 으로 시작 (재고 미차감 — prepare 액션에서 차감)
-  const isPickup = data.fulfillmentType === "PICKUP";
+  // 매장 인도(IN_STORE/PICKUP) 는 배송정보 불필요 → recipient/address null
+  const isPickup =
+    data.fulfillmentType === "IN_STORE" || data.fulfillmentType === "PICKUP";
   // paymentStatus 산출 — paymentMethod=UNPAID 또는 미입력은 외상, 그 외는 결제 완료.
   const paymentStatus =
     !data.paymentMethod || data.paymentMethod === "UNPAID" ? "UNPAID" : "PAID";

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -261,7 +262,7 @@ export default function RentalAssetsPage() {
                   className="text-right"
                   value={formatComma(form.dailyRate)}
                   onChange={(e) => setForm({ ...form, dailyRate: parseComma(e.target.value) })}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                 />
               </FieldRow>
               <FieldRow label="월 요율">
@@ -271,7 +272,7 @@ export default function RentalAssetsPage() {
                   className="text-right"
                   value={formatComma(form.monthlyRate)}
                   onChange={(e) => setForm({ ...form, monthlyRate: parseComma(e.target.value) })}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                 />
               </FieldRow>
               <FieldRow label="보증금">
@@ -281,7 +282,7 @@ export default function RentalAssetsPage() {
                   className="text-right"
                   value={formatComma(form.depositAmount)}
                   onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                 />
               </FieldRow>
               <FieldRow label="취득일">

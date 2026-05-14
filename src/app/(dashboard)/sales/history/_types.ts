@@ -51,7 +51,7 @@ export interface SalesHistoryRow {
   status: SalesRowStatus;
   claimType: OrderClaimType | null;
   claimReason: OrderClaimReason | null;
-  fulfillmentType: "PICKUP" | "DELIVERY" | "SHIPPING" | null;
+  fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" | null;
   amount: number;
   netAmount: number;
   isExchangeReplacement: boolean;

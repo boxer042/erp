@@ -32,6 +32,7 @@ import {
 } from "@/jm";
 import { apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 import {
   CLAIM_REASON_LABELS,
@@ -278,7 +279,7 @@ export function ExchangeDialog({
                             [it.id]: e.target.value,
                           })
                         }
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                         className="w-[80px] text-right"
                       />
                     </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -15,7 +14,7 @@ import {
   deriveTempColor,
 } from "@/components/pos/temp-customer";
 import { BottomSheet } from "./_components/bottom-sheet";
-import { issueStatement, openPrintTab } from "./_issue-document";
+import { issueStatement } from "./_issue-document";
 
 type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
 const METHODS: { value: PaymentMethod; label: string; sub?: string }[] = [
@@ -25,9 +24,10 @@ const METHODS: { value: PaymentMethod; label: string; sub?: string }[] = [
   { value: "UNPAID", label: "외상", sub: "고객 미수금" },
 ];
 
-type FulfillmentType = "PICKUP" | "DELIVERY" | "SHIPPING";
+type FulfillmentType = "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
 const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string; sub: string }[] = [
-  { value: "PICKUP", label: "매장 수령", sub: "즉시 인도" },
+  { value: "IN_STORE", label: "매장판매", sub: "즉시 인도 · 종결" },
+  { value: "PICKUP", label: "픽업 대기", sub: "추후 방문 수령" },
   { value: "DELIVERY", label: "배달", sub: "당일·근거리" },
   { value: "SHIPPING", label: "택배", sub: "ERP 출고 워크보드" },
 ];
@@ -36,8 +36,14 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   session: CartSession;
-  /** 결제 후 라벨 인쇄 모달 띄움 — 부모가 받아서 처리. afterPayment=true 로 호출 (닫으면 고객 그리드 이동). */
-  onPrintLabels: (codes: string[], options?: { afterPayment?: boolean }) => void;
+  /** 결제 완료 — 부모가 영수증/라벨/거래명세표 출력 선택 다이얼로그 + 모달 처리.
+   *  statementId 는 등록 고객일 때만 (자동 발행됨). */
+  onPaymentSuccess: (info: {
+    orderId: string;
+    orderNo: string;
+    labelCodes: string[];
+    statementId: string | null;
+  }) => void;
   /** 고객 썸네일 카드 클릭 — 부모가 CustomerActionSheet 띄우도록 (재사용) */
   onCustomerClick?: () => void;
   /** 미등록 고객 회원등록 유도 — 부모가 QuickCustomerSheet 띄우도록 */
@@ -222,7 +228,7 @@ export function PaymentSheet({
   open,
   onOpenChange,
   session,
-  onPrintLabels,
+  onPaymentSuccess,
   onCustomerClick,
   onCreateCustomer,
   onBack,
@@ -232,7 +238,7 @@ export function PaymentSheet({
     <Body
       onOpenChange={onOpenChange}
       session={session}
-      onPrintLabels={onPrintLabels}
+      onPaymentSuccess={onPaymentSuccess}
       onCustomerClick={onCustomerClick}
       onCreateCustomer={onCreateCustomer}
       onBack={onBack}
@@ -243,13 +249,12 @@ export function PaymentSheet({
 function Body({
   onOpenChange,
   session,
-  onPrintLabels,
+  onPaymentSuccess,
   onCustomerClick,
   onCreateCustomer,
   onBack,
 }: Omit<Props, "open">) {
-  const router = useRouter();
-  const { setSessionLabels, clear } = useSessions();
+  const { setSessionLabels } = useSessions();
   const [method, setMethod] = useState<PaymentMethod>("CARD");
   // 고객 등록 우회 — "이 고객은 등록 없이 진행" 클릭 시 true. 통계 데이터 안 쌓이는 단점 있음.
   const [skipCustomerLink, setSkipCustomerLink] = useState(false);
@@ -259,8 +264,8 @@ function Body({
   const [taxInvoiceRequested, setTaxInvoiceRequested] = useState(false);
   // 결제시간 — 시트가 열린 순간 고정. Body 가 마운트될 때마다 새로 계산.
   const [paymentAt] = useState(() => new Date());
-  // 출고 방식 — 매장 수령(즉시 종결) / 배달 / 택배. 수리·임대 라인이 있으면 PICKUP 강제.
-  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("PICKUP");
+  // 출고 방식 — 매장판매(즉시 종결) / 픽업대기(워크보드) / 배달 / 택배. 수리·임대 라인이 있으면 IN_STORE 강제.
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("IN_STORE");
   const [shippingRecipientName, setShippingRecipientName] = useState("");
   const [shippingRecipientPhone, setShippingRecipientPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
@@ -278,10 +283,13 @@ function Body({
   const totals = calcCartTotals({ ...session, items: allItems });
 
   const hasRentalOrRepair = rentalItems.length > 0 || repairItems.length > 0;
-  // 출고 방식 토글 노출 여부 — 수리/임대는 매장 인도라 PICKUP 강제 (토글 숨김)
-  const fulfillmentLocked = hasRentalOrRepair;
-  const effectiveFulfillment: FulfillmentType = fulfillmentLocked ? "PICKUP" : fulfillmentType;
-  const needsShippingInfo = effectiveFulfillment !== "PICKUP";
+  // 출고 방식 토글 노출 여부 — 임대만 매장 인도 강제 (자산 인계·보증금 정산이 매장에서 일어나야 함).
+  // 수리는 배달/택배 허용 (수리 끝난 기기를 손님이 배송으로 받는 케이스가 종종 발생).
+  const fulfillmentLocked = rentalItems.length > 0;
+  const effectiveFulfillment: FulfillmentType = fulfillmentLocked ? "IN_STORE" : fulfillmentType;
+  // 매장 인도(IN_STORE/PICKUP)는 배송정보 불필요
+  const needsShippingInfo =
+    effectiveFulfillment !== "IN_STORE" && effectiveFulfillment !== "PICKUP";
   // 모든 결제는 고객 등록을 권장 (통계/추적). skip 활성화 시 우회.
   const needsCustomer = !session.customerId && !skipCustomerLink;
   const requiresCustomer = hasRentalOrRepair && needsCustomer;
@@ -376,33 +384,37 @@ function Body({
       } else {
         toast.success(`결제 완료 — ${data.no}`);
       }
-      // 영수증 — 새창으로 자동 인쇄 (auto=1)
-      try {
-        window.open(`/pos-receipt/${data.id}/print?auto=1`, "_blank");
-      } catch {
-        /* 팝업 차단 — silent */
-      }
-      // 거래명세표 자동 발행 — 등록 고객일 때만 (사업자/B2B 증빙용)
-      // 미등록 고객은 영수증으로 충분하므로 발행 생략 (스팸 방지)
+      // 거래명세표 자동 발행 — 등록 고객일 때만 (사업자/B2B 증빙용 DB 기록).
+      // 출력 자체는 결제 후 다이얼로그에서 사장님이 선택.
+      let statementId: string | null = null;
       if (session.customerId) {
         try {
           const stmt = await issueStatement({ ...session, items: allItems });
-          openPrintTab("statements", stmt.id);
+          statementId = stmt.id;
         } catch {
           /* 거래명세표 실패해도 결제는 완료됨 — silent */
         }
       }
-      // 라벨 있으면 인쇄 모달 띄움 (영수증과 별도) — 결제 직후 → afterPayment=true
-      if (data.labelCodes.length > 0) {
-        onPrintLabels(data.labelCodes, { afterPayment: true });
+      // 서버 세션 즉시 soft delete — 인쇄 모달 진행 중 새로고침해도 세션이 부활하지 않게.
+      // 부모의 removeSession 만 호출하면 800ms debounce sync 갭에 새로고침 시 부활 가능.
+      // sessions=[] 라 다른 세션은 영향 없음 (route.ts:196 — incoming 중 deletedIds 항목은 skip).
+      try {
+        await fetch("/api/pos/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessions: [], deletedIds: [session.id] }),
+        });
+      } catch {
+        /* 네트워크 실패 — 부모 removeSession 의 다음 sync 가 재시도 */
       }
-      // 카트 클리어 + 고객 그리드로 이동
-      clear(session.id);
+      // 결제 시트 닫기. 부모는 onPaymentSuccess 안에서 removeSession(로컬) + 다이얼로그 표시.
       onOpenChange(false);
-      // 라벨 인쇄 모달이 떠 있으면 닫힐 때 v2 홈으로 이동
-      if (data.labelCodes.length === 0) {
-        router.push("/pos");
-      }
+      onPaymentSuccess({
+        orderId: data.id,
+        orderNo: data.no,
+        labelCodes: data.labelCodes,
+        statementId,
+      });
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : err.message || "결제 실패"),
@@ -756,15 +768,6 @@ function Body({
           </div>
         </div>
 
-        {/* 고객 정보 */}
-        {session.customerName && (
-          <div className="rounded-2xl bg-[var(--jm-bg)] px-4 py-3 text-[13px]">
-            <span className="text-[var(--jm-text-muted)]">고객 </span>
-            <span className="font-semibold text-[var(--jm-text)]">
-              {session.customerName}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* 미등록 고객 회원등록 유도 다이얼로그 */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -894,7 +895,7 @@ export default function ExpensesPage() {
                     placeholder="0"
                     value={usageQuantity}
                     onChange={(e) => setUsageQuantity(e.target.value)}
-                    onFocus={(e) => e.currentTarget.select()}
+                    onFocus={focusCaretEnd}
                   />
                 </div>
                 <div className="space-y-1">
@@ -1073,7 +1074,7 @@ export default function ExpensesPage() {
                     placeholder="0"
                     value={formatComma(form.amount)}
                     onChange={(e) => setForm({ ...form, amount: parseComma(e.target.value) })}
-                    onFocus={(e) => e.currentTarget.select()}
+                    onFocus={focusCaretEnd}
                   />
                 </div>
                 <div className="flex items-center gap-4">
@@ -1116,7 +1117,7 @@ export default function ExpensesPage() {
                     placeholder="0"
                     value={formatComma(form.amount)}
                     onChange={(e) => setForm({ ...form, amount: parseComma(e.target.value) })}
-                    onFocus={(e) => e.currentTarget.select()}
+                    onFocus={focusCaretEnd}
                   />
                 </div>
                 <div className="space-y-1">

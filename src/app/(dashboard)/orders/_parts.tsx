@@ -197,11 +197,13 @@ export function StatusBadge({
   channelId,
   claimType,
   isExchangeReplacement,
+  fulfillmentType,
 }: {
   status: OrderStatus;
   channelId?: string | null;
   claimType?: OrderClaimType | null;
   isExchangeReplacement?: boolean;
+  fulfillmentType?: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" | null;
 }) {
   const { variant, icon: Icon } = resolveStatusVisual(status, {
     claimType,
@@ -210,7 +212,7 @@ export function StatusBadge({
   return (
     <JmBadge variant={variant} size="md" shape="square">
       {Icon && <Icon className="size-3" />}
-      {statusLabel(status, { channelId, claimType })}
+      {statusLabel(status, { channelId, claimType, fulfillmentType })}
     </JmBadge>
   );
 }
@@ -355,7 +357,7 @@ export function ShipmentSummaryChip({
  *  - PREPAID: 선불 (일반 텍스트)
  *  - COD: 착불 (warning fg — 매장이 받지 않음, 출고 시 라벨 주의)
  *  - STORE_BURDEN: 매장 부담 (muted — 비용 처리, 손님 결제 무관)
- * fulfillmentType=PICKUP 인 주문은 배송비 자체 무관 — 셀 비움 (호출 측에서 분기).
+ * 매장 인도(IN_STORE/PICKUP) 주문은 배송비 자체 무관 — 셀 비움 (호출 측에서 분기).
  */
 export function ShippingPaymentBadge({
   type,

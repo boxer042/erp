@@ -5,7 +5,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose,
 } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
-import { CornerDownLeft, Plus, Search, X } from "lucide-react";
+import { CornerDownLeft, Loader2, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -36,6 +36,8 @@ interface Props<T extends SupplierProductLike> {
   pendingNewProducts?: PendingNewProduct[];
   onSelectPending?: (p: PendingNewProduct) => void;
   disableAlreadyAdded?: boolean;
+  /** 공급상품 fetch 중 — 거래처 변경 직후 표시 */
+  loading?: boolean;
 }
 
 export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
@@ -50,6 +52,7 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
   pendingNewProducts,
   onSelectPending,
   disableAlreadyAdded = false,
+  loading = false,
 }: Props<T>) {
   const isPhoneSize = useIsMobile();
   const [open, setOpen] = useState(false);
@@ -191,7 +194,12 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-4">
-            {filtered.length === 0 && matchingPending.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                공급상품 불러오는 중…
+              </div>
+            ) : filtered.length === 0 && matchingPending.length === 0 ? (
               trimmed ? (
                 <button
                   type="button"

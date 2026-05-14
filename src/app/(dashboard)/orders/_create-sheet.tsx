@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import {
   JmButton,
   JmCombobox,
@@ -70,7 +71,8 @@ interface OrderItemForm {
 }
 
 const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string }[] = [
-  { value: "PICKUP", label: "매장 수령" },
+  { value: "IN_STORE", label: "매장판매" },
+  { value: "PICKUP", label: "픽업 대기" },
   { value: "DELIVERY", label: "배달" },
   { value: "SHIPPING", label: "택배" },
 ];
@@ -231,7 +233,12 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
       if (items.length === 0) {
         throw new Error("주문 항목을 1개 이상 추가해주세요");
       }
-      if (fulfillmentType !== "PICKUP" && !shippingAddress.trim()) {
+      // 매장 인도(IN_STORE/PICKUP) 가 아닐 때만 배송지 필수
+      if (
+        fulfillmentType !== "IN_STORE" &&
+        fulfillmentType !== "PICKUP" &&
+        !shippingAddress.trim()
+      ) {
         throw new Error("배송지를 입력해주세요");
       }
       if (paymentMethod === "UNPAID" && !customerId) {
@@ -359,12 +366,14 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
             <JmFormField
               label="출고 방식"
               hint={
-                fulfillmentType === "PICKUP"
-                  ? "매장 인도건은 POS 결제로 등록하면 즉시 종결되어 워크보드를 거치지 않습니다."
+                fulfillmentType === "IN_STORE"
+                  ? "매장판매는 POS 결제로 등록하면 즉시 종결되어 워크보드를 거치지 않습니다."
+                  : fulfillmentType === "PICKUP"
+                  ? "픽업 대기 — 결제 후 손님이 추후 방문 수령. 워크보드에 노출됩니다."
                   : undefined
               }
             >
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 {FULFILLMENT_OPTIONS.map((opt) => {
                   const active = fulfillmentType === opt.value;
                   return (
@@ -385,7 +394,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
               </div>
             </JmFormField>
 
-            {fulfillmentType !== "PICKUP" && (
+            {fulfillmentType !== "IN_STORE" && fulfillmentType !== "PICKUP" && (
               <>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <JmFormField label="받는 사람">
@@ -482,7 +491,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                                 onChange={(e) =>
                                   updateItem(idx, { quantity: e.target.value })
                                 }
-                                onFocus={(e) => e.currentTarget.select()}
+                                onFocus={focusCaretEnd}
                               />
                             </JmTableCell>
                             <JmTableCell>
@@ -496,7 +505,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                                     unitPrice: parseComma(e.target.value),
                                   })
                                 }
-                                onFocus={(e) => e.currentTarget.select()}
+                                onFocus={focusCaretEnd}
                                 className="text-right"
                               />
                             </JmTableCell>
@@ -557,7 +566,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                   onChange={(e) =>
                     setDiscountAmount(parseComma(e.target.value))
                   }
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                 />
               </JmFormField>
               <JmFormField label="배송비">
@@ -566,10 +575,10 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                   inputMode="numeric"
                   value={formatComma(shippingFee)}
                   onChange={(e) => setShippingFee(parseComma(e.target.value))}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                 />
               </JmFormField>
-              {fulfillmentType !== "PICKUP" && (
+              {fulfillmentType !== "IN_STORE" && fulfillmentType !== "PICKUP" && (
                 <JmFormField label="배송비 결제">
                   <div className="flex gap-1.5">
                     {(

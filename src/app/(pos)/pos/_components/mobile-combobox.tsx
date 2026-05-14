@@ -25,6 +25,8 @@ interface Props<T> {
   title?: string;
   placeholder?: string;
   emptyText?: string;
+  /** 다른 시트 위에 겹쳐 띄울 때 "elevated" — z-[70]. 기본 "base" — z-50. */
+  z?: "base" | "elevated";
 }
 
 /**
@@ -52,7 +54,9 @@ function Body<T>({
   title = "검색",
   placeholder = "이름·코드 검색",
   emptyText = "결과 없음",
+  z = "base",
 }: Props<T>) {
+  const rootZ = z === "elevated" ? "z-[70]" : "z-50";
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   useBodyScrollLock();
@@ -68,7 +72,7 @@ function Body<T>({
       : items.filter((it) => (filterFn ? filterFn(it, q.trim()) : false));
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--jm-surface)]">
+    <div className={`fixed inset-0 ${rootZ} flex flex-col bg-[var(--jm-surface)]`}>
       {/* 헤더 */}
       <header className="shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
         <div className="flex items-center gap-2 px-3 py-2">
