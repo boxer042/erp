@@ -31,6 +31,17 @@ interface RentalAsset {
   imageUrl: string | null;
 }
 
+/**
+ * 자산 카드에 미리 노출할 예약 — AVAILABLE 자산의 미래 RESERVED 만 의미가 있으므로 최소 형태로 한정.
+ */
+interface RentalReservation {
+  id: string;
+  startDate: string;
+  endDate: string;
+  asset: { id: string };
+  customer: { name: string };
+}
+
 interface Props {
   session: CartSession;
   /** 임대 시트의 고객 카드 클릭 → 부모의 CustomerActionSheet 열기 (헤더 썸네일과 동일 트리거) */
@@ -49,6 +60,30 @@ export function RentalMode({ session, onCustomerClick }: Props) {
     queryFn: () => apiGet<RentalAsset[]>("/api/rental-assets?status=AVAILABLE"),
     staleTime: 1000 * 60,
   });
+
+  // 카드에 미리 노출할 예약 — AVAILABLE 자산이라도 미래 RESERVED 가 잡혀있을 수 있음.
+  // 그리드 카드에 자산별로 묶어 표시해 손님 응대 시 즉시 임대 가능 여부 + 다음 예약을 한눈에 보여줌.
+  const reservedQuery = useQuery<RentalReservation[]>({
+    queryKey: ["pos-v2", "rentals", "RESERVED"],
+    queryFn: () => apiGet<RentalReservation[]>("/api/rentals?status=RESERVED"),
+    staleTime: 1000 * 30,
+  });
+
+  const reservationsByAssetId = useMemo(() => {
+    const map = new Map<string, RentalReservation[]>();
+    for (const r of reservedQuery.data ?? []) {
+      const arr = map.get(r.asset.id) ?? [];
+      arr.push(r);
+      map.set(r.asset.id, arr);
+    }
+    for (const arr of map.values()) {
+      arr.sort(
+        (a, b) =>
+          new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+      );
+    }
+    return map;
+  }, [reservedQuery.data]);
 
   const assets = assetsQuery.data ?? [];
   const rentalItems = session.items.filter((i) => i.itemType === "rental");
@@ -110,6 +145,7 @@ export function RentalMode({ session, onCustomerClick }: Props) {
                   <AssetCard
                     key={a.id}
                     asset={a}
+                    reservations={reservationsByAssetId.get(a.id) ?? []}
                     onClick={() => setSelectedAsset(a)}
                   />
                 ))}
@@ -142,9 +178,12 @@ export function RentalMode({ session, onCustomerClick }: Props) {
 
 function AssetCard({
   asset,
+  reservations,
   onClick,
 }: {
   asset: RentalAsset;
+  /** 이 자산에 잡혀있는 RESERVED — startDate ASC. 카드 하단에 최대 2건 미리보기. */
+  reservations: RentalReservation[];
   onClick: () => void;
 }) {
   const dailyRate = parseFloat(asset.dailyRate) || 0;
@@ -163,6 +202,35 @@ function AssetCard({
         {fmtKRW(dailyRate)}
         <span className="ml-0.5 text-jm-3xs font-normal text-[var(--jm-text-muted)]">/일</span>
       </span>
+      {reservations.length > 0 ? (
+        <div className="mt-1 flex flex-col gap-0.5 border-t border-[var(--jm-border)]/60 pt-1.5">
+          <span className="flex items-center gap-1 text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
+            <span className="size-1.5 rounded-full bg-[var(--jm-warning-solid)]" />
+            예약 {reservations.length}건
+          </span>
+          {reservations.slice(0, 2).map((r) => (
+            <span
+              key={r.id}
+              className="line-clamp-1 text-jm-2xs text-[var(--jm-text-muted)]"
+            >
+              {format(new Date(r.startDate), "M/d")}~
+              {format(new Date(r.endDate), "M/d")}
+              <span className="ml-1 text-[var(--jm-text-subtle)]">
+                {r.customer.name}
+              </span>
+            </span>
+          ))}
+          {reservations.length > 2 && (
+            <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
+              외 {reservations.length - 2}건 더
+            </span>
+          )}
+        </div>
+      ) : (
+        <span className="mt-1 text-jm-2xs text-[var(--jm-text-subtle)]">
+          예약 없음 — 즉시 임대 가능
+        </span>
+      )}
     </button>
   );
 }
@@ -196,6 +264,10 @@ function AssetThumb({
   );
 }
 
+/**
+ * AssetCard 형태 스켈레톤 — 정사각 썸 + 이름(2줄) + 자산번호 + 일일가 + 예약 라인.
+ * 실제 카드의 line-clamp-2 min-h-[2.4em] / mt-1 일일가 / 예약 안내 위치까지 맞춰 layout shift 최소화.
+ */
 function GridSkeleton() {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
@@ -204,10 +276,14 @@ function GridSkeleton() {
           key={i}
           className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]"
         >
-          <div className="h-3 w-16 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
-          <div className="h-4 w-full animate-pulse rounded bg-[var(--jm-surface-muted)]" />
-          <div className="h-3 w-1/2 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
-          <div className="mt-1 h-3.5 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="aspect-square w-full animate-pulse rounded-xl bg-[var(--jm-surface-muted)]" />
+          <div className="flex min-h-[2.4em] flex-col gap-1">
+            <div className="h-3.5 w-5/6 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+            <div className="h-3.5 w-2/3 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          </div>
+          <div className="h-2.5 w-14 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="mt-1 h-5 w-20 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
+          <div className="mt-1 h-3 w-3/4 animate-pulse rounded bg-[var(--jm-surface-muted)]" />
         </div>
       ))}
     </div>
