@@ -25,22 +25,25 @@ model User {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  createdOrders         Order[]
-  createdIncomings      Incoming[]
-  createdPurchaseOrders PurchaseOrder[]
-  supplierPayments      SupplierPayment[]
-  customerPayments      CustomerPayment[]
-  customerRefunds       CustomerRefund[]
-  supplierReturns       SupplierReturn[]
-  createdQuotations     Quotation[]
-  createdStatements     Statement[]
-  customerNotes         CustomerNote[]
-  createdRepairs        RepairTicket[]
-  assignedRepairs       RepairTicket[]    @relation("RepairAssignee")
-  createdRentals        Rental[]
-  createdExpenses       Expense[]
-  posSessions           PosSession[]
-  auditLogs             AuditLog[]
+  createdOrders             Order[]
+  createdIncomings          Incoming[]
+  createdPurchaseOrders     PurchaseOrder[]
+  supplierPayments          SupplierPayment[]
+  customerPayments          CustomerPayment[]
+  customerRefunds           CustomerRefund[]
+  supplierReturns           SupplierReturn[]
+  createdQuotations         Quotation[]
+  createdStatements         Statement[]
+  customerNotes             CustomerNote[]
+  createdRepairs            RepairTicket[]
+  assignedRepairs           RepairTicket[]            @relation("RepairAssignee")
+  createdSymptomTemplates   RepairSymptomTemplate[]   @relation("SymptomTemplateCreator")
+  createdDiagnosisTemplates RepairDiagnosisTemplate[] @relation("DiagnosisTemplateCreator")
+  createdRentals            Rental[]
+  createdExpenses           Expense[]
+  posSessions               PosSession[]
+  auditLogs                 AuditLog[]
+  productPriceChanges       ProductPriceHistory[]     @relation("ProductPriceHistoryChangedBy")
 
   @@map("users")
 }
@@ -549,6 +552,7 @@ model Product {
   customerMachines         CustomerMachine[]
   repairParts              RepairPart[]
   repairTickets            RepairTicket[]                   @relation("RepairProduct")
+  diagnosisPartUsages      DiagnosisPartUsage[]
   rentalAssets             RentalAsset[]
   serialItems              SerialItem[]
 
@@ -558,8 +562,33 @@ model Product {
   assemblyPresetItems           AssemblyPresetItem[]
 
   specValues ProductSpecValue[]
+  priceHistory ProductPriceHistory[]
 
   @@map("products")
+}
+
+/**
+ * 우리 상품(Product) 의 정가/판매가 변동 이력.
+ * - PUT /api/products/[id] 가 listPrice 또는 sellingPrice 차이 감지 시 row 생성
+ * - SupplierProductPriceHistory 와 패턴 동일 — 상품 상세에서 변경 추적용
+ * - field: 어느 가격이 바뀌었는지 ("LIST" | "SELLING")
+ */
+model ProductPriceHistory {
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  field         String
+  oldPrice      Decimal  @map("old_price") @db.Decimal(15, 2)
+  newPrice      Decimal  @map("new_price") @db.Decimal(15, 2)
+  changeAmount  Decimal  @map("change_amount") @db.Decimal(15, 2)
+  changePercent Decimal  @map("change_percent") @db.Decimal(8, 2)
+  reason        String?
+  changedById   String?  @map("changed_by_id")
+  changedBy     User?    @relation("ProductPriceHistoryChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([productId, createdAt])
+  @@map("product_price_history")
 }
 
 enum ProductSpecType {
@@ -769,10 +798,13 @@ model ProductCategory {
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
-  products        Product[]
-  channelMappings ChannelCategoryMapping[]
+  products           Product[]
+  channelMappings    ChannelCategoryMapping[]
   // 새 수리 접수 시 선택한 카테고리 (RepairTicket.repairCategoryId)
-  repairTickets   RepairTicket[]           @relation("RepairCategory")
+  repairTickets      RepairTicket[]            @relation("RepairCategory")
+  // 카테고리별 증상·진단 템플릿
+  symptomTemplates   RepairSymptomTemplate[]   @relation("SymptomCategory")
+  diagnosisTemplates RepairDiagnosisTemplate[] @relation("DiagnosisCategory")
 
   @@map("product_categories")
 }
@@ -1013,32 +1045,40 @@ enum IncomingStatus {
   CANCELLED
 }
 
+// 입고 결제 상태 — supplier-payment FIFO 자동 매칭용 (현금 결제는 항상 PAID, 외상은 UNPAID 로 시작)
+enum IncomingPaymentStatus {
+  UNPAID
+  PAID
+}
+
 model Incoming {
-  id                String         @id @default(uuid())
-  incomingNo        String         @unique @map("incoming_no")
-  supplierId        String         @map("supplier_id")
-  supplier          Supplier       @relation(fields: [supplierId], references: [id])
-  status            IncomingStatus @default(PENDING)
-  incomingDate      DateTime       @map("incoming_date")
-  totalAmount       Decimal        @default(0) @map("total_amount") @db.Decimal(15, 2)
-  taxAmount         Decimal        @default(0) @map("tax_amount") @db.Decimal(15, 2)
-  shippingCost      Decimal        @default(0) @map("shipping_cost") @db.Decimal(12, 2)
-  shippingIsTaxable Boolean        @default(true) @map("shipping_is_taxable")
-  shippingDeducted  Boolean        @default(false) @map("shipping_deducted")
+  id                String                @id @default(uuid())
+  incomingNo        String                @unique @map("incoming_no")
+  supplierId        String                @map("supplier_id")
+  supplier          Supplier              @relation(fields: [supplierId], references: [id])
+  status            IncomingStatus        @default(PENDING)
+  paymentStatus     IncomingPaymentStatus @default(UNPAID) @map("payment_status")
+  incomingDate      DateTime              @map("incoming_date")
+  totalAmount       Decimal               @default(0) @map("total_amount") @db.Decimal(15, 2)
+  taxAmount         Decimal               @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  shippingCost      Decimal               @default(0) @map("shipping_cost") @db.Decimal(12, 2)
+  shippingIsTaxable Boolean               @default(true) @map("shipping_is_taxable")
+  shippingDeducted  Boolean               @default(false) @map("shipping_deducted")
   memo              String?
-  quotationId       String?        @map("quotation_id")
-  quotation         Quotation?     @relation(fields: [quotationId], references: [id])
-  purchaseOrderId   String?        @map("purchase_order_id")
-  purchaseOrder     PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
-  createdById       String         @map("created_by_id")
-  createdBy         User           @relation(fields: [createdById], references: [id])
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
+  quotationId       String?               @map("quotation_id")
+  quotation         Quotation?            @relation(fields: [quotationId], references: [id])
+  purchaseOrderId   String?               @map("purchase_order_id")
+  purchaseOrder     PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id])
+  createdById       String                @map("created_by_id")
+  createdBy         User                  @relation(fields: [createdById], references: [id])
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
 
   items          IncomingItem[]
   supplierReturn SupplierReturn?
 
   @@index([supplierId, incomingDate])
+  @@index([supplierId, paymentStatus, incomingDate])
   @@index([purchaseOrderId])
   @@map("incomings")
 }
@@ -1255,7 +1295,8 @@ enum OrderClaimReason {
 }
 
 enum FulfillmentType {
-  PICKUP // 매장 수령 (POS 즉시 종결, 워크보드 미노출)
+  IN_STORE // 매장 즉시판매 (POS 결제 + 즉시 인도, 워크보드 미노출)
+  PICKUP // 매장 픽업 대기 (결제 후 추후 방문 수령, 워크보드 노출)
   DELIVERY // 자체 배달 (당일·근거리)
   SHIPPING // 택배 발송
 }
@@ -1281,7 +1322,7 @@ model Order {
   channel             SalesChannel?       @relation(fields: [channelId], references: [id])
   channelOrderNo      String?             @map("channel_order_no")
   status              OrderStatus         @default(PENDING)
-  fulfillmentType     FulfillmentType     @default(PICKUP) @map("fulfillment_type")
+  fulfillmentType     FulfillmentType     @default(IN_STORE) @map("fulfillment_type")
   expectedShipDate    DateTime?           @map("expected_ship_date") @db.Date
   customerId          String?             @map("customer_id")
   customer            Customer?           @relation(fields: [customerId], references: [id])
@@ -2082,67 +2123,75 @@ enum RepairCancelReason {
 }
 
 model RepairTicket {
-  id                     String                @id @default(uuid())
-  ticketNo               String                @unique @map("ticket_no")
-  type                   RepairType            @default(ON_SITE)
-  customerId             String?               @map("customer_id")
-  customer               Customer?             @relation(fields: [customerId], references: [id])
-  customerMachineId      String?               @map("customer_machine_id")
-  customerMachine        CustomerMachine?      @relation(fields: [customerMachineId], references: [id])
-  serialItemId           String?               @map("serial_item_id")
-  serialItem             SerialItem?           @relation(fields: [serialItemId], references: [id], onDelete: SetNull)
-  status                 RepairStatus          @default(RECEIVED)
-  receivedAt             DateTime              @map("received_at")
+  id                     String                   @id @default(uuid())
+  ticketNo               String                   @unique @map("ticket_no")
+  type                   RepairType               @default(ON_SITE)
+  customerId             String?                  @map("customer_id")
+  customer               Customer?                @relation(fields: [customerId], references: [id])
+  customerMachineId      String?                  @map("customer_machine_id")
+  customerMachine        CustomerMachine?         @relation(fields: [customerMachineId], references: [id])
+  serialItemId           String?                  @map("serial_item_id")
+  serialItem             SerialItem?              @relation(fields: [serialItemId], references: [id], onDelete: SetNull)
+  status                 RepairStatus             @default(RECEIVED)
+  receivedAt             DateTime                 @map("received_at")
+  /**
+   * 증상 — 자유 텍스트 (display 용, 그대로 보존). 콤보박스에서 선택했으면 symptomTemplateId 도 함께 설정됨.
+   * 직접 입력 시엔 자동으로 template 생성 + ID 연결 (PUT API hook 에서 처리).
+   */
   symptom                String?
+  symptomTemplateId      String?                  @map("symptom_template_id")
+  symptomTemplate        RepairSymptomTemplate?   @relation(fields: [symptomTemplateId], references: [id], onDelete: SetNull)
   diagnosis              String?
-  repairNotes            String?               @map("repair_notes")
+  diagnosisTemplateId    String?                  @map("diagnosis_template_id")
+  diagnosisTemplate      RepairDiagnosisTemplate? @relation(fields: [diagnosisTemplateId], references: [id], onDelete: SetNull)
+  repairNotes            String?                  @map("repair_notes")
   // 가져온 기기 정보 — 시리얼/판매상품 카탈로그에 없을 때 자유 입력 fallback
-  repairProductId        String?               @map("repair_product_id")
-  repairProduct          Product?              @relation("RepairProduct", fields: [repairProductId], references: [id], onDelete: SetNull)
-  repairProductText      String?               @map("repair_product_text") // 카탈로그에 없을 때 자유 입력 (예: "Sony A7M4 Black")
-  diagnosisFee           Decimal               @default(0) @map("diagnosis_fee") @db.Decimal(15, 2)
-  totalDiscount          String                @default("0") @map("total_discount") // "1000" or "10%"
-  quotedLaborAmount      Decimal               @default(0) @map("quoted_labor_amount") @db.Decimal(15, 2)
-  quotedPartsAmount      Decimal               @default(0) @map("quoted_parts_amount") @db.Decimal(15, 2)
-  quotedTotalAmount      Decimal               @default(0) @map("quoted_total_amount") @db.Decimal(15, 2)
-  quotedAt               DateTime?             @map("quoted_at")
-  approvalMethod         RepairApprovalMethod? @map("approval_method")
-  approvalToken          String?               @unique @map("approval_token")
-  approvalTokenExpiresAt DateTime?             @map("approval_token_expires_at")
-  approvedAt             DateTime?             @map("approved_at")
-  approvedByName         String?               @map("approved_by_name")
-  startedAt              DateTime?             @map("started_at")
-  readyAt                DateTime?             @map("ready_at")
-  pickedUpAt             DateTime?             @map("picked_up_at")
-  finalAmount            Decimal               @default(0) @map("final_amount") @db.Decimal(15, 2)
-  paymentMethod          OrderPaymentMethod?   @map("payment_method")
+  repairProductId        String?                  @map("repair_product_id")
+  repairProduct          Product?                 @relation("RepairProduct", fields: [repairProductId], references: [id], onDelete: SetNull)
+  repairProductText      String?                  @map("repair_product_text") // 카탈로그에 없을 때 자유 입력 (예: "Sony A7M4 Black")
+  diagnosisFee           Decimal                  @default(0) @map("diagnosis_fee") @db.Decimal(15, 2)
+  totalDiscount          String                   @default("0") @map("total_discount") // "1000" or "10%"
+  quotedLaborAmount      Decimal                  @default(0) @map("quoted_labor_amount") @db.Decimal(15, 2)
+  quotedPartsAmount      Decimal                  @default(0) @map("quoted_parts_amount") @db.Decimal(15, 2)
+  quotedTotalAmount      Decimal                  @default(0) @map("quoted_total_amount") @db.Decimal(15, 2)
+  quotedAt               DateTime?                @map("quoted_at")
+  approvalMethod         RepairApprovalMethod?    @map("approval_method")
+  approvalToken          String?                  @unique @map("approval_token")
+  approvalTokenExpiresAt DateTime?                @map("approval_token_expires_at")
+  approvedAt             DateTime?                @map("approved_at")
+  approvedByName         String?                  @map("approved_by_name")
+  startedAt              DateTime?                @map("started_at")
+  readyAt                DateTime?                @map("ready_at")
+  pickedUpAt             DateTime?                @map("picked_up_at")
+  finalAmount            Decimal                  @default(0) @map("final_amount") @db.Decimal(15, 2)
+  paymentMethod          OrderPaymentMethod?      @map("payment_method")
   // 수리 보증 — 픽업(완료) 시점부터 시작
-  repairWarrantyMonths   Int?                  @map("repair_warranty_months")
-  repairWarrantyEnds     DateTime?             @map("repair_warranty_ends")
+  repairWarrantyMonths   Int?                     @map("repair_warranty_months")
+  repairWarrantyEnds     DateTime?                @map("repair_warranty_ends")
   // 재수리 — 보증 내 같은 증상으로 다시 입고
-  parentRepairTicketId   String?               @map("parent_repair_ticket_id")
-  parentRepairTicket     RepairTicket?         @relation("RepairRevisits", fields: [parentRepairTicketId], references: [id], onDelete: SetNull)
-  revisits               RepairTicket[]        @relation("RepairRevisits")
+  parentRepairTicketId   String?                  @map("parent_repair_ticket_id")
+  parentRepairTicket     RepairTicket?            @relation("RepairRevisits", fields: [parentRepairTicketId], references: [id], onDelete: SetNull)
+  revisits               RepairTicket[]           @relation("RepairRevisits")
   // 작업자 지정
-  assignedToId           String?               @map("assigned_to_id")
-  assignedTo             User?                 @relation("RepairAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId           String?                  @map("assigned_to_id")
+  assignedTo             User?                    @relation("RepairAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   // 취소 정보 (status=CANCELLED 일 때만 의미)
-  cancelReason           RepairCancelReason?   @map("cancel_reason")
-  cancelMemo             String?               @map("cancel_memo") // OTHER 사유 또는 추가 설명
-  cancelledAt            DateTime?             @map("cancelled_at")
+  cancelReason           RepairCancelReason?      @map("cancel_reason")
+  cancelMemo             String?                  @map("cancel_memo") // OTHER 사유 또는 추가 설명
+  cancelledAt            DateTime?                @map("cancelled_at")
   // 미등록 손님 추적 — POS 의 어떤 카트 세션에서 만들어졌는지 (등록 손님이면 customerId 로 충분)
   // 클라이언트 sessions.repairTicketIds 추적이 끊겨도 DB 에서 복원 가능. 세션 자체가 사라지면 NULL.
-  posSessionId           String?               @map("pos_session_id")
-  posSession             PosSession?           @relation(fields: [posSessionId], references: [id], onDelete: SetNull)
+  posSessionId           String?                  @map("pos_session_id")
+  posSession             PosSession?              @relation(fields: [posSessionId], references: [id], onDelete: SetNull)
   // 새 수리 접수 시 선택한 상품 카테고리 — 수리 진행 페이지의 "카테고리" 검색 모드에서 사용.
   // null = "기타" (카테고리 미지정 또는 없는 항목)
-  repairCategoryId       String?               @map("repair_category_id")
-  repairCategory         ProductCategory?      @relation("RepairCategory", fields: [repairCategoryId], references: [id], onDelete: SetNull)
+  repairCategoryId       String?                  @map("repair_category_id")
+  repairCategory         ProductCategory?         @relation("RepairCategory", fields: [repairCategoryId], references: [id], onDelete: SetNull)
   memo                   String?
-  createdById            String                @map("created_by_id")
-  createdBy              User                  @relation(fields: [createdById], references: [id])
-  createdAt              DateTime              @default(now()) @map("created_at")
-  updatedAt              DateTime              @updatedAt @map("updated_at")
+  createdById            String                   @map("created_by_id")
+  createdBy              User                     @relation(fields: [createdById], references: [id])
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
 
   parts  RepairPart[]
   labors RepairLabor[]
@@ -2157,7 +2206,153 @@ model RepairTicket {
   @@index([serialItemId])
   @@index([posSessionId])
   @@index([repairCategoryId])
+  @@index([symptomTemplateId])
+  @@index([diagnosisTemplateId])
   @@map("repair_tickets")
+}
+
+/**
+ * 증상 템플릿 — 자유 입력으로 들어온 증상 텍스트를 정규화·재사용 가능한 마스터로 관리.
+ * 카테고리별로 unique (분무기·세탁기 등 컨텍스트마다 같은 표현이 다른 의미 가능).
+ * usageCount = 같은 template 이 RepairTicket 에 연결된 누적 횟수 — 콤보박스 정렬용.
+ */
+model RepairSymptomTemplate {
+  id          String           @id @default(uuid())
+  text        String // 예: "압력이 안 생겨요"
+  categoryId  String?          @map("category_id")
+  category    ProductCategory? @relation("SymptomCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  usageCount  Int              @default(0) @map("usage_count")
+  createdById String?          @map("created_by_id")
+  createdBy   User?            @relation("SymptomTemplateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  tickets        RepairTicket[]
+  diagnosisLinks SymptomDiagnosisLink[]
+
+  @@unique([categoryId, text])
+  @@index([categoryId, usageCount(sort: Desc)])
+  @@map("repair_symptom_templates")
+}
+
+/**
+ * 진단 템플릿 — 증상에 대응되는 진단(원인). 부속/공임과 별개의 자유 텍스트 차원.
+ * SymptomDiagnosisLink 와 함께 사용 시: 증상 선택 → 자주 매칭된 진단 자동 추천.
+ */
+model RepairDiagnosisTemplate {
+  id          String           @id @default(uuid())
+  text        String // 예: "패킹 마모"
+  categoryId  String?          @map("category_id")
+  category    ProductCategory? @relation("DiagnosisCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  usageCount  Int              @default(0) @map("usage_count")
+  createdById String?          @map("created_by_id")
+  createdBy   User?            @relation("DiagnosisTemplateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  tickets      RepairTicket[]
+  symptomLinks SymptomDiagnosisLink[]
+  partUsages   DiagnosisPartUsage[]
+  laborUsages  DiagnosisLaborUsage[]
+  partSets     DiagnosisPartSet[]
+
+  @@unique([categoryId, text])
+  @@index([categoryId, usageCount(sort: Desc)])
+  @@map("repair_diagnosis_templates")
+}
+
+/**
+ * 진단 ↔ 부속(Product) 자주 매칭 — 진단 선택 시 부속 추천 정렬에 사용.
+ * RepairPart 추가/삭제 hook 에서 자동 upsert (RepairTicket.diagnosisTemplateId 있을 때만).
+ */
+model DiagnosisPartUsage {
+  diagnosisId     String   @map("diagnosis_id")
+  productId       String   @map("product_id")
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+  lastOccurredAt  DateTime @default(now()) @map("last_occurred_at")
+
+  diagnosis RepairDiagnosisTemplate @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+  product   Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([diagnosisId, productId])
+  @@index([diagnosisId, occurrenceCount(sort: Desc)])
+  @@map("diagnosis_part_usage")
+}
+
+/**
+ * 진단 ↔ "부속·공임 묶음(세트)" 빈도 — Phase 4 세트 매칭.
+ * RepairTicket 의 PICKED_UP 전이 시점에만 학습 (확정된 케이스만 통계 반영).
+ * 작업 중 토글/실수가 통계 오염하지 않게 종결 시점 집계.
+ * normalize: productIds 와 laborNames 는 항상 정렬되어 저장.
+ * 같은 (정렬된 productIds, 정렬된 laborNames) 조합은 unique row 1개.
+ * 평균 수량·단가는 추천 시 prefill 에 사용 (예: "패킹 보통 5개씩 사용").
+ * 누적 평균 = (기존 평균 × (count-1) + 새 값) / count
+ */
+model DiagnosisPartSet {
+  id              String   @id @default(uuid())
+  diagnosisId     String   @map("diagnosis_id")
+  /**
+   * 정렬된 productId 배열 — 부속 묶음을 unique 키로 표현
+   */
+  productIds      String[] @map("product_ids")
+  /**
+   * 정렬된 공임 이름 배열
+   */
+  laborNames      String[] @map("labor_names")
+  /**
+   * 부속별 평균 수량 — productIds 와 같은 인덱스 순서
+   */
+  avgQuantities   Float[]  @map("avg_quantities")
+  /**
+   * 공임별 평균 단가 — laborNames 와 같은 인덱스 순서
+   */
+  avgLaborRates   Float[]  @map("avg_labor_rates")
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+  lastOccurredAt  DateTime @default(now()) @map("last_occurred_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  diagnosis RepairDiagnosisTemplate @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+
+  @@unique([diagnosisId, productIds, laborNames])
+  @@index([diagnosisId, occurrenceCount(sort: Desc)])
+  @@map("diagnosis_part_sets")
+}
+
+/**
+ * 진단 ↔ 공임 자유텍스트 자주 매칭 — 진단 선택 시 공임 추천.
+ * 공임은 자유 입력 + RepairLaborPreset 양쪽 다 있으므로 텍스트 기준으로 집계 (presetId 가 있으면 보너스).
+ */
+model DiagnosisLaborUsage {
+  diagnosisId     String   @map("diagnosis_id")
+  laborName       String   @map("labor_name")
+  unitRate        Decimal  @default(0) @map("unit_rate") @db.Decimal(15, 2) // 마지막 입력 단가 — 추천 시 기본값
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+  lastOccurredAt  DateTime @default(now()) @map("last_occurred_at")
+
+  diagnosis RepairDiagnosisTemplate @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+
+  @@id([diagnosisId, laborName])
+  @@index([diagnosisId, occurrenceCount(sort: Desc)])
+  @@map("diagnosis_labor_usage")
+}
+
+/**
+ * 증상 ↔ 진단 관계. RepairTicket 저장 시 두 template 이 모두 있으면 자동으로 upsert + occurrenceCount++.
+ * 콤보박스에서 증상 선택 후 진단 추천 정렬에 사용.
+ */
+model SymptomDiagnosisLink {
+  symptomId       String   @map("symptom_id")
+  diagnosisId     String   @map("diagnosis_id")
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+  lastOccurredAt  DateTime @default(now()) @map("last_occurred_at")
+
+  symptom   RepairSymptomTemplate   @relation(fields: [symptomId], references: [id], onDelete: Cascade)
+  diagnosis RepairDiagnosisTemplate @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+
+  @@id([symptomId, diagnosisId])
+  @@index([symptomId, occurrenceCount(sort: Desc)])
+  @@map("symptom_diagnosis_links")
 }
 
 model RepairPart {
