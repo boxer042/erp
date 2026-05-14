@@ -144,8 +144,9 @@ export async function PUT(
         }
       }
 
-    // 3. 외상 거래처면 원장에 REFUND 기록 (VAT 포함 금액)
-    if (supplierReturn.supplier.paymentMethod === "CREDIT") {
+    // 3. 거래처 원장에 REFUND 기록 (VAT 포함 금액).
+    //    paymentMethod 무관 — 모든 반품은 원장에 남는다.
+    {
       const goodsAmount = supplierReturn.items.reduce((sum, item) => {
         const supply = Number(item.totalPrice);
         const tax = item.supplierProduct.isTaxable ? Math.round(supply * 0.1) : 0;

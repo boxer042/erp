@@ -223,8 +223,8 @@ export async function PUT(
         })
       );
 
-      // 3. CREDIT 거래처: 배송비 차감 원장 처리
-      if (incoming.supplier.paymentMethod === "CREDIT") {
+      // 3. 배송비 차감 원장 처리 (paymentMethod 무관)
+      {
         const existingAdj = await tx.supplierLedger.findFirst({
           where: {
             referenceId: id,
@@ -503,9 +503,7 @@ export async function PUT(
       await tx.supplierLedger.deleteMany({
         where: { referenceId: incoming.id, referenceType: "INCOMING" },
       });
-      if (incoming.supplier.paymentMethod === "CREDIT") {
-        await rebalanceSupplierLedger(tx, incoming.supplierId);
-      }
+      await rebalanceSupplierLedger(tx, incoming.supplierId);
 
       // 9. Expense(SHIPPING) 삭제
       await tx.expense.deleteMany({
@@ -518,10 +516,12 @@ export async function PUT(
         data: { unitCostSnapshot: 0 },
       });
 
-      // 11. Incoming.status = PENDING
+      // 11. Incoming.status = PENDING — paymentStatus 도 UNPAID 로 리셋
+      //    (unconfirm 시 매칭됐던 결제는 잔액에만 남고 다른 외상 입고로 자동 재매칭되지 않음.
+      //     관리자가 결제 삭제·재등록으로 명시 처리)
       await tx.incoming.update({
         where: { id },
-        data: { status: "PENDING" },
+        data: { status: "PENDING", paymentStatus: "UNPAID" },
       });
 
       // 12. 발주 기반이면 진행률 재계산 (CONFIRMED 가 빠지므로 receivedQty 감소)
@@ -812,10 +812,15 @@ export async function PUT(
     });
     const mappingsBySpId = new Map(refreshedSps.map((sp) => [sp.id, sp.productMappings]));
 
-    // 1. 상태 변경
+    // 1. 상태 변경 — paymentStatus 는 항상 UNPAID 로 시작.
+    //    SupplierPayment 등록 시 recomputeIncomingPaymentStatus 가 FIFO 매칭으로 PAID 마킹.
+    //    (paymentMethod 는 라벨일 뿐 원장·결제 흐름에 영향 없음)
     await tx.incoming.update({
       where: { id },
-      data: { status: "CONFIRMED" },
+      data: {
+        status: "CONFIRMED",
+        paymentStatus: "UNPAID",
+      },
     });
 
     // 2. 재고 증가 (매핑된 판매 상품 기준) + 원가 스냅샷 저장
@@ -986,8 +991,10 @@ export async function PUT(
       });
     }
 
-    // 3. 외상 거래처면 원장 기록 (VAT 포함 금액을 미지급금으로 반영)
-    if (incoming.supplier.paymentMethod === "CREDIT") {
+    // 3. 거래처 원장에 PURCHASE 기록 (VAT 포함 금액).
+    //    paymentMethod 와 무관하게 모든 입고는 원장에 남는다 — 선결제 여부는 라벨일 뿐
+    //    실제 결제는 SupplierPayment 로 별도 등록.
+    {
       const totalWithTax = incoming.items.reduce((sum, item) => {
         const supply = Number(item.totalPrice);
         const tax = item.supplierProduct.isTaxable ? Math.round(supply * 0.1) : 0;
