@@ -1,122 +1,142 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import { Plus, Search, SlidersHorizontal, Printer, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useTheme } from "next-themes";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from "@/components/ui/table";
-import { Plus, Search, SlidersHorizontal, Check, Printer, FileEdit, PanelLeftClose, PanelLeftOpen, CalendarIcon } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+  JmBadge,
+  JmButton,
+  JmCheckbox,
+  JmDateRangePicker,
+  JmScope,
+  JmScrollArea,
+  JmSegmentedControl,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { cn } from "@/lib/utils";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
 import { SupplierAdjustmentDialog } from "@/components/supplier-adjustment-dialog";
 import { type PaymentMethod } from "@/lib/validators/supplier";
-import { startOfMonth, endOfMonth, startOfDay, subMonths, format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { startOfMonth, endOfMonth, format } from "date-fns";
 
-type LedgerType = "PURCHASE" | "PAYMENT" | "ADJUSTMENT" | "REFUND";
+import {
+  ALL_TYPES,
+  TYPE_JM_VARIANTS,
+  TYPE_LABELS,
+  type DatePreset,
+  type LedgerEntry,
+  type LedgerItem,
+  type LedgerResponse,
+  type LedgerType,
+  type ViewMode,
+} from "./_types";
+import {
+  applyDatePreset,
+  buildItemDateGroups,
+  formatAmount,
+  getCurrentPresetLabel,
+} from "./_helpers";
+import { ItemsView } from "./_views";
+import {
+  SupplierLedgerTable,
+  type SupplierLedgerEntry,
+} from "@/components/supplier-ledger-table";
 
-const TYPE_LABELS: Record<LedgerType, string> = {
-  PURCHASE: "매입",
-  PAYMENT: "결제",
-  ADJUSTMENT: "조정",
-  REFUND: "환급",
-};
-const TYPE_VARIANTS: Record<LedgerType, "default" | "secondary" | "outline" | "destructive" | "warning" | "success"> = {
-  PURCHASE: "default",
-  PAYMENT: "success",
-  ADJUSTMENT: "secondary",
-  REFUND: "destructive",
-};
-const ALL_TYPES: LedgerType[] = ["PURCHASE", "PAYMENT", "ADJUSTMENT", "REFUND"];
-
-interface LedgerEntry {
-  id: string;
-  date: string;
-  createdAt: string;
-  type: LedgerType;
-  description: string;
-  debitAmount: string;
-  creditAmount: string;
-  balance: string;
-  referenceId: string | null;
-  referenceType: string | null;
-  supplier: { id: string; name: string };
+// URL ↔ state 헬퍼 — 새로고침/북마크 살리기 위함
+function parseDateParam(s: string | null): Date | undefined {
+  if (!s) return undefined;
+  const d = new Date(`${s}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? undefined : d;
 }
-
-interface SupplierSummary {
-  supplierId: string;
-  supplierName: string;
-  currentBalance: number;
-  openingBalance: number;
-  totalPurchase: number;
-  totalPayment: number;
-  totalAdjustment: number;
-  totalRefund: number;
+function fmtDateParam(d: Date | undefined): string | undefined {
+  if (!d) return undefined;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-interface LedgerResponse {
-  entries: LedgerEntry[];
-  supplierSummaries: SupplierSummary[];
-}
-
-interface LedgerItem {
-  id: string;
-  incomingId: string;
-  incomingNo: string;
-  incomingDate: string;
-  supplier: { id: string; name: string };
-  supplierProduct: {
-    id: string;
-    name: string;
-    spec: string | null;
-    supplierCode: string | null;
-    unitOfMeasure: string;
-    isTaxable: boolean;
-    mapped: boolean;
-  };
-  quantity: string;
-  originalPrice: string | null;
-  discountAmount: string | null;
-  unitPrice: string;
-  totalPrice: string;
-  memo: string | null;
-}
-
-function formatAmount(n: number | string) {
-  const v = typeof n === "string" ? parseFloat(n) : n;
-  return Math.round(v).toLocaleString("ko-KR");
-}
-
-type ViewMode = "ledger" | "items";
 
 export default function SupplierLedgerPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useState<ViewMode>("ledger");
-  // 모바일/좁은 화면에서 좌측 패널 접기 토글 (기본: 펼침)
+  const { resolvedTheme } = useTheme();
+
+  // 모바일/좁은 화면에서 좌측 패널 접기 토글 (기본: 펼침) — URL 비반영
   const [panelOpen, setPanelOpen] = useState(true);
 
   const now = useMemo(() => new Date(), []);
-  const [from, setFrom] = useState<Date | undefined>(startOfMonth(now));
-  const [to, setTo] = useState<Date | undefined>(endOfMonth(now));
 
-  const [search, setSearch] = useState("");
-  const [types, setTypes] = useState<LedgerType[]>([...ALL_TYPES]);
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  // ─── URL → state 초기화 (mount 1회) ──────────────────────────────
+  const initialView: ViewMode =
+    searchParams.get("view") === "ledger" ? "ledger" : "items";
+  const initialFrom =
+    parseDateParam(searchParams.get("from")) ??
+    (searchParams.has("from") ? undefined : startOfMonth(now));
+  const initialTo =
+    parseDateParam(searchParams.get("to")) ??
+    (searchParams.has("to") ? undefined : endOfMonth(now));
+  const initialSearch = searchParams.get("q") ?? "";
+  const initialSupplierId = searchParams.get("supplier");
+  const initialTypesParam = searchParams.get("types");
+  const initialTypes: LedgerType[] = initialTypesParam
+    ? (initialTypesParam
+        .split(",")
+        .filter((t) => (ALL_TYPES as readonly string[]).includes(t)) as LedgerType[])
+    : [...ALL_TYPES];
+
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
+  const [from, setFrom] = useState<Date | undefined>(initialFrom);
+  const [to, setTo] = useState<Date | undefined>(initialTo);
+
+  const [search, setSearch] = useState(initialSearch);
+  // 검색은 입력 즉시 UI 반영하되, 서버 fetch / URL 동기화는 300ms debounce
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const [types, setTypes] = useState<LedgerType[]>(initialTypes);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(
+    initialSupplierId,
+  );
   const [typePopoverOpen, setTypePopoverOpen] = useState(false);
-  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+
+  // ─── state → URL 동기화 (replace, debounce 된 search 사용) ──────
+  // mount 시 첫 effect 는 skip — 초기화 단계에서 불필요한 history 생성 방지
+  const didMountRef = React.useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    const sp = new URLSearchParams();
+    if (viewMode !== "items") sp.set("view", viewMode);
+    if (selectedSupplierId) sp.set("supplier", selectedSupplierId);
+    const f = fmtDateParam(from);
+    const t = fmtDateParam(to);
+    if (f) sp.set("from", f);
+    if (t) sp.set("to", t);
+    if (!from && !to) {
+      // "전체 기간" 도 명시적으로 표시 (기본값과 구분)
+      sp.set("from", "");
+      sp.set("to", "");
+    }
+    if (debouncedSearch.trim()) sp.set("q", debouncedSearch.trim());
+    if (types.length < ALL_TYPES.length) sp.set("types", types.join(","));
+    const qs = sp.toString();
+    router.replace(qs ? `?${qs}` : "?", { scroll: false });
+  }, [viewMode, selectedSupplierId, from, to, debouncedSearch, types, router]);
 
   // 결제 등록/수정 Dialog
   const [payDialogOpen, setPayDialogOpen] = useState(false);
@@ -144,7 +164,7 @@ export default function SupplierLedgerPage() {
       from: from?.toISOString(),
       to: to?.toISOString(),
       types: types.join(","),
-      search,
+      search: debouncedSearch,
       selectedSupplierId,
       viewMode,
     }),
@@ -157,7 +177,7 @@ export default function SupplierLedgerPage() {
         params.set("to", toInclusive.toISOString());
       }
       if (types.length < ALL_TYPES.length) params.set("types", types.join(","));
-      if (search && !selectedSupplierId) params.set("q", search);
+      if (debouncedSearch && !selectedSupplierId) params.set("q", debouncedSearch);
       if (selectedSupplierId) params.set("supplierId", selectedSupplierId);
 
       const ledger = await apiGet<LedgerResponse>(`/api/suppliers/ledger?${params}`);
@@ -175,7 +195,7 @@ export default function SupplierLedgerPage() {
           payParams.set("to", toInc.toISOString());
         }
         if (selectedSupplierId) payParams.set("supplierId", selectedSupplierId);
-        else if (search) payParams.set("q", search);
+        else if (debouncedSearch) payParams.set("q", debouncedSearch);
         payParams.set("types", "PAYMENT,ADJUSTMENT,REFUND");
 
         const purParams = new URLSearchParams(payParams);
@@ -199,40 +219,19 @@ export default function SupplierLedgerPage() {
   const paymentsInItems: LedgerEntry[] = ledgerQuery.data?.paymentsInItems ?? [];
   const purchasesInItems: LedgerEntry[] = ledgerQuery.data?.purchasesInItems ?? [];
   const loading = ledgerQuery.isPending;
-  const fetchLedger = () => queryClient.invalidateQueries({ queryKey: ["ledger", "suppliers"] });
+  // ["ledger", "suppliers"] prefix 로 모든 파라미터 변형을 한 번에 무효화 (factory 와 동일 prefix)
+  const fetchLedger = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.ledger.suppliers() });
 
-  const applyPreset = (preset: "thisMonth" | "lastMonth" | "last3" | "all") => {
-    if (preset === "thisMonth") {
-      setFrom(startOfMonth(now));
-      setTo(endOfMonth(now));
-    } else if (preset === "lastMonth") {
-      const last = subMonths(now, 1);
-      setFrom(startOfMonth(last));
-      setTo(endOfMonth(last));
-    } else if (preset === "last3") {
-      setFrom(startOfDay(subMonths(now, 3)));
-      setTo(endOfMonth(now));
-    } else {
-      setFrom(undefined);
-      setTo(undefined);
-    }
+  const applyPreset = (preset: DatePreset) => {
+    const { from: nextFrom, to: nextTo } = applyDatePreset(preset, now);
+    setFrom(nextFrom);
+    setTo(nextTo);
   };
 
-  const currentPresetLabel = (() => {
-    if (!from && !to) return "전체";
-    if (from && to) {
-      const thisF = startOfMonth(now).getTime();
-      const thisT = endOfMonth(now).getTime();
-      if (from.getTime() === thisF && to.getTime() === thisT) return "이번달";
-      const last = subMonths(now, 1);
-      if (from.getTime() === startOfMonth(last).getTime() && to.getTime() === endOfMonth(last).getTime())
-        return "지난달";
-      if (from.getTime() === startOfDay(subMonths(now, 3)).getTime() && to.getTime() === endOfMonth(now).getTime())
-        return "최근3개월";
-    }
-    return "커스텀";
-  })();
+  const currentPresetLabel = getCurrentPresetLabel(from, to, now);
 
+  // 좌측 패널은 즉시 필터링 (UX 반응성 — debounce 와 별개)
   const filteredSummaries = data.supplierSummaries.filter((s) => {
     if (search) {
       const q = search.toLowerCase();
@@ -305,18 +304,49 @@ export default function SupplierLedgerPage() {
         selectedSupplierSummary.currentBalance !== 0
       : filteredSummaries.some((s) => s.currentBalance !== 0 || s.openingBalance !== 0));
 
-  const EmptyStateHint = () => (
-    <div className="text-center py-8 text-muted-foreground text-sm">
+  // 빈 상태 분기 — (1) 거래처 미등록, (2) 검색 무결과, (3) 기간 내 무거래
+  const isDataEmpty = data.supplierSummaries.length === 0;
+  const isSearchEmpty =
+    !!debouncedSearch.trim() && filteredSummaries.length === 0 && !isDataEmpty;
+
+  const emptyStateHint = isDataEmpty ? (
+    <div className="text-center py-10 text-[var(--jm-text-muted)] text-sm">
+      <p>등록된 거래처가 없습니다</p>
+      <Link
+        href="/suppliers"
+        className="inline-flex items-center gap-1 mt-3 px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-[11px] hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
+      >
+        거래처 등록하러 가기
+      </Link>
+    </div>
+  ) : isSearchEmpty ? (
+    <div className="text-center py-10 text-[var(--jm-text-muted)] text-sm">
+      <p>
+        <span className="text-[var(--jm-text)] font-medium">
+          &ldquo;{debouncedSearch}&rdquo;
+        </span>{" "}
+        에 해당하는 거래처가 없습니다
+      </p>
+      <button
+        type="button"
+        onClick={() => setSearch("")}
+        className="mt-3 px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-[11px] hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
+      >
+        검색 지우기
+      </button>
+    </div>
+  ) : (
+    <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">
       거래 내역이 없습니다
       {hasHiddenHistory && (
         <div className="mt-3 flex flex-col items-center gap-2">
-          <p className="text-[11px] text-muted-foreground max-w-[360px]">
+          <p className="text-[11px] text-[var(--jm-text-muted)] max-w-[360px]">
             선택한 기간에 거래가 없습니다. 과거 거래를 보려면 기간을 넓혀보세요.
           </p>
           <button
             type="button"
             onClick={() => applyPreset("all")}
-            className="px-3 h-7 rounded-md border border-primary/40 bg-primary/10 text-primary text-[11px] hover:bg-primary/20 transition-colors"
+            className="px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-[11px] hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
           >
             전체 기간 보기
           </button>
@@ -325,116 +355,43 @@ export default function SupplierLedgerPage() {
     </div>
   );
 
-  // 날짜별 그룹핑 — 원장 뷰
-  const dateGroups = (() => {
-    const map = new Map<string, LedgerEntry[]>();
-    data.entries.forEach((e) => {
-      const key = format(new Date(e.date), "yyyy-MM-dd");
-      const arr = map.get(key) || [];
-      arr.push(e);
-      map.set(key, arr);
-    });
-    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  })();
-
-  // 매입 원장 엔트리 맵: incomingId → 해당 PURCHASE ledger entry
-  const purchaseEntryByIncoming = new Map<string, LedgerEntry>();
-  purchasesInItems.forEach((p) => {
-    if (p.referenceId) purchaseEntryByIncoming.set(p.referenceId, p);
-  });
-
-  // 날짜별 그룹핑 — 품목 뷰 (품목 + 결제/조정/환급을 원장뷰와 동일한 순서로 섞음)
-  type ItemViewRow =
-    | { kind: "item"; data: LedgerItem; isLastInGroup: boolean; balance: number | null }
-    | { kind: "payment"; data: LedgerEntry };
-
-  const itemDateGroups = (() => {
-    // incoming별 items 묶음 + 매입 엔트리의 createdAt을 정렬 키로 사용
-    const itemsByIncoming = new Map<string, LedgerItem[]>();
-    items.forEach((it) => {
-      const arr = itemsByIncoming.get(it.incomingId) || [];
-      arr.push(it);
-      itemsByIncoming.set(it.incomingId, arr);
-    });
-
-    // 날짜 → 그룹(rows + 정렬키) 리스트
-    type Group = { sortKey: number; rows: ItemViewRow[] };
-    const dayMap = new Map<string, Group[]>();
-
-    // 1) 각 incoming을 한 그룹으로 추가
-    itemsByIncoming.forEach((its, incomingId) => {
-      const purchaseEntry = purchaseEntryByIncoming.get(incomingId);
-      // 키: 매입 엔트리가 있으면 그 createdAt, 없으면 incomingDate
-      const dateBasis = purchaseEntry ? purchaseEntry.date : its[0].incomingDate;
-      const sortKey = purchaseEntry
-        ? new Date(purchaseEntry.createdAt).getTime()
-        : new Date(its[0].incomingDate).getTime();
-      const dayKey = format(new Date(dateBasis), "yyyy-MM-dd");
-      const balance = purchaseEntry ? Number(purchaseEntry.balance) : null;
-      const rows: ItemViewRow[] = its.map((it, idx) => ({
-        kind: "item",
-        data: it,
-        isLastInGroup: idx === its.length - 1,
-        balance: idx === its.length - 1 ? balance : null,
-      }));
-      const groups = dayMap.get(dayKey) || [];
-      groups.push({ sortKey, rows });
-      dayMap.set(dayKey, groups);
-    });
-
-    // 2) 결제/조정/환급은 각자 한 행 그룹으로 추가
-    paymentsInItems.forEach((p) => {
-      const dayKey = format(new Date(p.date), "yyyy-MM-dd");
-      const sortKey = new Date(p.createdAt).getTime();
-      const groups = dayMap.get(dayKey) || [];
-      groups.push({ sortKey, rows: [{ kind: "payment", data: p }] });
-      dayMap.set(dayKey, groups);
-    });
-
-    // 3) 같은 날짜 안에서 createdAt desc로 정렬 후 평탄화
-    const flattened = new Map<string, ItemViewRow[]>();
-    dayMap.forEach((groups, day) => {
-      groups.sort((a, b) => b.sortKey - a.sortKey);
-      flattened.set(day, groups.flatMap((g) => g.rows));
-    });
-
-    return Array.from(flattened.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  })();
+  // 날짜별 그룹핑 — 품목 뷰만 (원장 뷰는 SupplierLedgerTable 내부에서 빌드)
+  const itemDateGroups = buildItemDateGroups(items, paymentsInItems, purchasesInItems);
 
   return (
-    <>
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
       <div className="flex h-full">
         {/* ─── 좌측 패널 ─── */}
         {panelOpen && (
-        <div className="w-[320px] max-md:w-[280px] shrink-0 border-r border-border flex flex-col bg-background">
+        <div className="w-[320px] max-md:w-[280px] shrink-0 border-r border-[var(--jm-border)] flex flex-col bg-[var(--jm-bg)]">
           {/* 헤더 */}
-          <div className="h-10 px-3 border-b border-border flex items-center shrink-0">
+          <div className="h-10 px-3 border-b border-[var(--jm-border)] flex items-center shrink-0">
             <h2 className="text-sm font-medium">거래처 원장</h2>
           </div>
 
           {/* 등록 버튼들 */}
           <div className="px-3 pt-2 shrink-0 space-y-1.5">
             <div className="grid grid-cols-2 gap-1.5">
-              <Button
+              <JmButton
                 size="sm"
                 onClick={() => { setEditingPayment(null); setPayDialogOpen(true); }}
                 className="h-8 text-xs"
               >
                 <Plus /><span>결제 등록</span>
-              </Button>
-              <Button
+              </JmButton>
+              <JmButton
                 size="sm"
                 variant="outline"
                 onClick={() => { setEditingAdjustment(null); setAdjDialogOpen(true); }}
                 className="h-8 text-xs"
               >
                 <FileEdit className="size-3.5" /><span>조정 등록</span>
-              </Button>
+              </JmButton>
             </div>
             <div className="flex gap-1.5">
               <Link
                 href="/suppliers/initial-balance"
-                className="flex-1 h-7 rounded-md border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+                className="flex-1 h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] hover:bg-[var(--jm-surface-muted)] text-[11px] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] flex items-center justify-center transition-colors"
               >
                 기초잔액 등록
               </Link>
@@ -457,8 +414,8 @@ export default function SupplierLedgerPage() {
                 className={cn(
                   "flex-1 h-7 rounded-md border text-[11px] flex items-center justify-center gap-1 transition-colors",
                   selectedSupplierId
-                    ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"
-                    : "border-border bg-card opacity-40 cursor-not-allowed text-muted-foreground"
+                    ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)] hover:bg-[var(--jm-info-bg)]/80"
+                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] opacity-40 cursor-not-allowed text-[var(--jm-text-muted)]"
                 )}
                 title={
                   !selectedSupplierId
@@ -473,32 +430,19 @@ export default function SupplierLedgerPage() {
             </div>
           </div>
 
-          {/* 뷰 전환 */}
+          {/* 뷰 전환 — SegmentedControl */}
           <div className="px-3 pt-2 shrink-0">
-            <div className="flex h-8 rounded-md border border-border overflow-hidden">
-              <button
-                onClick={() => setViewMode("ledger")}
-                className={cn(
-                  "flex-1 text-xs font-medium transition-colors",
-                  viewMode === "ledger"
-                    ? "bg-secondary text-foreground"
-                    : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-              >
-                원장 뷰
-              </button>
-              <button
-                onClick={() => setViewMode("items")}
-                className={cn(
-                  "flex-1 text-xs font-medium transition-colors border-l border-border",
-                  viewMode === "items"
-                    ? "bg-secondary text-foreground"
-                    : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-              >
-                품목별 뷰
-              </button>
-            </div>
+            <JmSegmentedControl
+              size="sm"
+              fullWidth
+              ariaLabel="뷰 전환"
+              value={viewMode}
+              onChange={(v) => setViewMode(v as ViewMode)}
+              options={[
+                { value: "items", label: "품목별 뷰" },
+                { value: "ledger", label: "원장 뷰" },
+              ]}
+            />
           </div>
 
           {/* 기간 프리셋 */}
@@ -513,8 +457,8 @@ export default function SupplierLedgerPage() {
                   className={cn(
                     "px-2 h-6 rounded text-[11px] border transition-colors",
                     active
-                      ? "bg-primary/10 border-primary/40 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)]"
+                      : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
                   )}
                 >
                   {labels[p]}
@@ -523,114 +467,105 @@ export default function SupplierLedgerPage() {
             })}
           </div>
 
-          {/* 기간 선택 (Popover) */}
+          {/* 기간 선택 — JmDateRangePicker */}
           <div className="px-3 pt-2 pb-2 shrink-0">
-            <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-              <PopoverTrigger
-                className={cn(
-                  "flex h-8 w-full items-center gap-2 rounded-md border border-border bg-card px-2.5 text-xs transition-colors hover:bg-muted",
-                  currentPresetLabel === "커스텀" && "border-primary/40 text-primary"
-                )}
-              >
-                <CalendarIcon className="size-3.5 text-muted-foreground shrink-0" />
-                <span className="flex-1 truncate text-left tabular-nums">
-                  {from && to
-                    ? `${format(from, "yyyy-MM-dd")} ~ ${format(to, "yyyy-MM-dd")}`
-                    : from
-                    ? `${format(from, "yyyy-MM-dd")} 부터`
-                    : to
-                    ? `${format(to, "yyyy-MM-dd")} 까지`
-                    : "전체 기간"}
-                </span>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="range"
-                  selected={{ from, to }}
-                  onSelect={(range) => {
-                    setFrom(range?.from);
-                    setTo(range?.to);
-                  }}
-                  numberOfMonths={1}
-                  locale={ko}
-                />
-              </PopoverContent>
-            </Popover>
+            <JmDateRangePicker
+              size="sm"
+              value={{ from, to }}
+              onChange={(range) => {
+                setFrom(range?.from);
+                setTo(range?.to);
+              }}
+              placeholder="전체 기간"
+            />
           </div>
 
           {/* 검색 + 유형 필터 */}
           <div className="px-3 pb-2 flex items-center gap-2 shrink-0">
-            <div className="flex-1 flex items-center gap-1.5 h-8 rounded-md border border-border bg-card px-2.5">
-              <Search className="size-3.5 text-muted-foreground shrink-0" />
+            <div className="flex-1 flex items-center gap-1.5 h-8 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2.5">
+              <Search className="size-3.5 text-[var(--jm-text-muted)] shrink-0" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="거래처 검색..."
-                className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+                className="flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--jm-text-muted)]"
               />
             </div>
-            <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
-              <PopoverTrigger
+            <PopoverPrimitive.Root open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
+              <PopoverPrimitive.Trigger
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-md border border-border shrink-0 transition-colors",
+                  "flex h-8 w-8 items-center justify-center rounded-md border border-[var(--jm-border)] shrink-0 transition-colors",
                   types.length < ALL_TYPES.length
-                    ? "bg-primary/10 text-primary border-primary/30"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)] border-[var(--jm-info-fg)]/30"
+                    : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
                 )}
               >
                 <SlidersHorizontal className="size-3.5" />
-              </PopoverTrigger>
-              <PopoverContent className="w-[180px] p-2" align="end">
-                <p className="text-xs text-muted-foreground mb-2 px-1">유형 필터</p>
-                {ALL_TYPES.map((t) => {
-                  const checked = types.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      className={cn(
-                        "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs transition-colors",
-                        checked ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      )}
-                      onClick={() => setTypes((prev) => checked ? prev.filter((x) => x !== t) : [...prev, t])}
-                    >
-                      <div className={cn("h-3.5 w-3.5 rounded border flex items-center justify-center", checked ? "bg-primary border-primary" : "border-input")}>
-                        {checked && <Check className="size-2.5 text-foreground" />}
-                      </div>
-                      <Badge variant={TYPE_VARIANTS[t]} className="text-[10px]">{TYPE_LABELS[t]}</Badge>
-                    </button>
-                  );
-                })}
-                {types.length < ALL_TYPES.length && (
-                  <button className="w-full text-xs text-muted-foreground hover:text-foreground mt-1.5 pt-1.5 border-t border-border" onClick={() => setTypes([...ALL_TYPES])}>
-                    전체 선택
-                  </button>
-                )}
-              </PopoverContent>
-            </Popover>
+              </PopoverPrimitive.Trigger>
+              <PopoverPrimitive.Portal>
+                <PopoverPrimitive.Positioner align="end" sideOffset={4} className="isolate z-50">
+                  <PopoverPrimitive.Popup
+                    data-jm-scope
+                    className="z-50 w-[180px] rounded-xl bg-[var(--jm-surface)] p-2 ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
+                  >
+                    <p className="text-xs text-[var(--jm-text-muted)] mb-2 px-1">유형 필터</p>
+                    {ALL_TYPES.map((t) => {
+                      const checked = types.includes(t);
+                      return (
+                        <label
+                          key={t}
+                          className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs cursor-pointer text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] transition-colors"
+                        >
+                          <JmCheckbox
+                            checked={checked}
+                            onCheckedChange={() =>
+                              setTypes((prev) =>
+                                checked ? prev.filter((x) => x !== t) : [...prev, t],
+                              )
+                            }
+                          />
+                          <JmBadge variant={TYPE_JM_VARIANTS[t]} size="sm" shape="square">{TYPE_LABELS[t]}</JmBadge>
+                        </label>
+                      );
+                    })}
+                    {types.length < ALL_TYPES.length && (
+                      <button className="w-full text-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] mt-1.5 pt-1.5 border-t border-[var(--jm-border)]" onClick={() => setTypes([...ALL_TYPES])}>
+                        전체 선택
+                      </button>
+                    )}
+                  </PopoverPrimitive.Popup>
+                </PopoverPrimitive.Positioner>
+              </PopoverPrimitive.Portal>
+            </PopoverPrimitive.Root>
           </div>
 
           {/* 거래처 목록 */}
-          <ScrollArea className="flex-1 min-h-0">
+          <JmScrollArea className="flex-1 min-h-0">
             <div
               onClick={() => setSelectedSupplierId(null)}
-              className={cn("px-3 py-2.5 border-b border-border cursor-pointer transition-colors", selectedSupplierId === null ? "bg-muted" : "hover:bg-muted/50")}
+              className={cn("px-3 py-2.5 border-b border-[var(--jm-border)] cursor-pointer transition-colors", selectedSupplierId === null ? "bg-[var(--jm-surface-muted)]" : "hover:bg-[var(--jm-surface-muted)]/60")}
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm">전체 거래</span>
-                <span className="text-xs text-muted-foreground">{data.entries.length}건</span>
+                <span className="text-xs text-[var(--jm-text-muted)]">{data.entries.length}건</span>
               </div>
             </div>
             {filteredSummaries.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">거래처가 없습니다</div>
+              <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">
+                {isDataEmpty
+                  ? "거래처가 없습니다"
+                  : `"${search}" 검색 결과 없음`}
+              </div>
             ) : (
               filteredSummaries.map((s) => {
                 const bal = s.currentBalance;
-                const balColor = bal < 0 ? "text-red-400" : "text-muted-foreground";
+                // 정상 미지급(음수)·0 → 기본색. 과지급(양수, 비정상) → 빨강 강조
+                const balColor = bal > 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text-muted)]";
                 return (
                   <div
                     key={s.supplierId}
                     onClick={() => setSelectedSupplierId(s.supplierId)}
-                    className={cn("px-3 py-2.5 border-b border-border cursor-pointer transition-colors", selectedSupplierId === s.supplierId ? "bg-muted" : "hover:bg-muted/50")}
+                    className={cn("px-3 py-2.5 border-b border-[var(--jm-border)] cursor-pointer transition-colors", selectedSupplierId === s.supplierId ? "bg-[var(--jm-surface-muted)]" : "hover:bg-[var(--jm-surface-muted)]/60")}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm truncate">{s.supplierName}</span>
@@ -642,7 +577,7 @@ export default function SupplierLedgerPage() {
                 );
               })
             )}
-          </ScrollArea>
+          </JmScrollArea>
         </div>
         )}
 
@@ -656,43 +591,44 @@ export default function SupplierLedgerPage() {
             const openingTotal = selectedSupplierSummary
               ? selectedSupplierSummary.openingBalance
               : filteredSummaries.reduce((s, sup) => s + sup.openingBalance, 0);
-            const balanceClass = totalBalance < 0 ? "text-red-400" : "text-foreground";
+            // 과지급(양수) 만 빨강. 정상 미지급(음수)·0 은 기본색
+            const balanceClass = totalBalance > 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]";
             return (
-              <div className="min-h-10 px-4 border-b border-border flex items-center flex-wrap gap-x-4 gap-y-1 py-1 text-xs text-muted-foreground shrink-0">
+              <div className="min-h-10 px-4 border-b border-[var(--jm-border)] flex items-center flex-wrap gap-x-4 gap-y-1 py-1 text-xs text-[var(--jm-text-muted)] shrink-0">
                 <button
                   type="button"
                   onClick={() => setPanelOpen((v) => !v)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors -ml-1"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] transition-colors -ml-1"
                   aria-label={panelOpen ? "사이드 패널 접기" : "사이드 패널 펼치기"}
                 >
                   {panelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
                 </button>
-                <span>기간: <b className="text-foreground">{from ? format(from, "yyyy-MM-dd") : "제한 없음"} ~ {to ? format(to, "yyyy-MM-dd") : "제한 없음"}</b></span>
-                <span className="text-muted-foreground/50">|</span>
+                <span>기간: <b className="text-[var(--jm-text)]">{from ? format(from, "yyyy-MM-dd") : "제한 없음"} ~ {to ? format(to, "yyyy-MM-dd") : "제한 없음"}</b></span>
+                <span className="text-[var(--jm-text-muted)]/50">|</span>
                 {from && (
                   <>
-                    <span>이월: <b className="text-foreground tabular-nums">₩{formatAmount(openingTotal)}</b></span>
-                    <span className="text-muted-foreground/50">|</span>
+                    <span>이월: <b className="text-[var(--jm-text)] tabular-nums">₩{formatAmount(openingTotal)}</b></span>
+                    <span className="text-[var(--jm-text-muted)]/50">|</span>
                   </>
                 )}
                 {viewMode === "ledger" ? (
                   <>
-                    <span>거래: <b className="text-foreground">{data.entries.length}건</b></span>
-                    <span>차변 합: <b className="text-foreground">₩{formatAmount(totalDebit)}</b></span>
-                    <span>대변 합: <b className="text-foreground">₩{formatAmount(totalCredit)}</b></span>
+                    <span>거래: <b className="text-[var(--jm-text)]">{data.entries.length}건</b></span>
+                    <span>차변 합: <b className="text-[var(--jm-text)]">₩{formatAmount(totalDebit)}</b></span>
+                    <span>대변 합: <b className="text-[var(--jm-text)]">₩{formatAmount(totalCredit)}</b></span>
                   </>
                 ) : (
                   <>
-                    <span>품목: <b className="text-foreground">{items.length}건</b></span>
-                    <span>결제: <b className="text-foreground">{paymentsInItems.length}건</b></span>
-                    <span>합계 합 (VAT 포함): <b className="text-foreground">₩{formatAmount(items.reduce((s, i) => {
+                    <span>품목: <b className="text-[var(--jm-text)]">{items.length}건</b></span>
+                    <span>결제: <b className="text-[var(--jm-text)]">{paymentsInItems.length}건</b></span>
+                    <span>합계 합 (VAT 포함): <b className="text-[var(--jm-text)]">₩{formatAmount(items.reduce((s, i) => {
                       const supply = parseFloat(i.totalPrice);
                       return s + (i.supplierProduct.isTaxable ? Math.round(supply * 1.1) : supply);
                     }, 0))}</b></span>
-                    <span>결제 합: <b className="text-foreground">₩{formatAmount(paymentsInItems.reduce((s, p) => s + parseFloat(p.creditAmount), 0))}</b></span>
+                    <span>결제 합: <b className="text-[var(--jm-text)]">₩{formatAmount(paymentsInItems.reduce((s, p) => s + parseFloat(p.creditAmount), 0))}</b></span>
                   </>
                 )}
-                <span className="text-muted-foreground/50">|</span>
+                <span className="text-[var(--jm-text-muted)]/50">|</span>
                 <span>잔금: <b className={cn("tabular-nums", balanceClass)}>₩{formatAmount(totalBalance)}</b></span>
               </div>
             );
@@ -700,40 +636,40 @@ export default function SupplierLedgerPage() {
 
           {/* 선택된 거래처 요약 */}
           {selectedSupplierSummary && (
-            <div className="border-b border-border px-4 py-3 flex items-center flex-wrap gap-x-6 gap-y-3 shrink-0">
+            <div className="border-b border-[var(--jm-border)] px-4 py-3 flex items-center flex-wrap gap-x-6 gap-y-3 shrink-0">
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">거래처</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">거래처</p>
                 <p className="text-sm font-medium">{selectedSupplierSummary.supplierName}</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">현재 잔액</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">현재 잔액</p>
                 <p className={cn("text-sm font-medium tabular-nums",
-                  selectedSupplierSummary.currentBalance < 0 ? "text-red-400" : "text-foreground")}>
+                  selectedSupplierSummary.currentBalance > 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]")}>
                   ₩{formatAmount(selectedSupplierSummary.currentBalance)}
                 </p>
               </div>
               {from && (
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">이월 잔액</p>
-                  <p className="text-sm tabular-nums text-foreground">
+                  <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">이월 잔액</p>
+                  <p className="text-sm tabular-nums text-[var(--jm-text)]">
                     ₩{formatAmount(selectedSupplierSummary.openingBalance)}
                   </p>
                 </div>
               )}
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">기간 매입</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 매입</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedSupplierSummary.totalPurchase)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">기간 결제</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 결제</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedSupplierSummary.totalPayment)}</p>
               </div>
               <div>
-                <Button size="sm" variant="outline" className="h-7 text-xs"
+                <JmButton size="sm" variant="outline" className="h-7 text-xs"
                   onClick={() => { setEditingPayment(null); setPayDialogOpen(true); }}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />결제 등록
-                </Button>
+                </JmButton>
               </div>
             </div>
           )}
@@ -741,7 +677,7 @@ export default function SupplierLedgerPage() {
           {/* 테이블 */}
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <Table className="min-w-[900px] table-fixed">
+              <JmTable className="min-w-[900px] table-fixed border-b border-[var(--jm-border)]">
                 <colgroup>
                   {!selectedSupplierId && <col style={{ width: "14%" }} />}
                   <col style={{ width: "70px" }} />
@@ -751,303 +687,74 @@ export default function SupplierLedgerPage() {
                   <col style={{ width: "120px" }} />
                   <col style={{ width: "120px" }} />
                 </colgroup>
-                <TableHeader className="sticky top-0 z-10">
-                  <TableRow className="bg-muted text-muted-foreground text-xs hover:bg-muted">
-                    {!selectedSupplierId && <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">거래처</TableHead>}
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">유형</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">설명</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">참조</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">차변 (매입)</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">대변 (결제)</TableHead>
-                    <TableHead className="border-b border-border h-auto py-1.5 px-2 text-right font-medium">잔액</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                <JmTableHeader className="sticky top-0 z-10">
+                  <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                    {!selectedSupplierId && <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">거래처</JmTableHead>}
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">유형</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">설명</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">참조</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">차변 (매입)</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">대변 (결제)</JmTableHead>
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">잔액</JmTableHead>
+                  </JmTableRow>
+                </JmTableHeader>
+                <JmTableBody>
                   {Array.from({ length: 3 }).map((_, gi) => (
                     <React.Fragment key={`sk-group-${gi}`}>
-                      <TableRow className="bg-card hover:bg-card">
-                        <TableCell colSpan={selectedSupplierId ? 6 : 7} className="px-3 py-1.5">
-                          <Skeleton className="h-3 w-24" />
-                        </TableCell>
-                      </TableRow>
+                      <JmTableRow className="bg-[var(--jm-surface)] hover:bg-[var(--jm-surface)]">
+                        <JmTableCell colSpan={selectedSupplierId ? 6 : 7} className="px-3 py-1.5">
+                          <JmSkeleton className="h-3 w-24" />
+                        </JmTableCell>
+                      </JmTableRow>
                       {Array.from({ length: 3 }).map((_, ri) => (
-                        <TableRow key={`sk-${gi}-${ri}`} className="hover:bg-transparent">
+                        <JmTableRow key={`sk-${gi}-${ri}`} className="hover:bg-transparent">
                           {!selectedSupplierId && (
-                            <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-24" /></TableCell>
+                            <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-24" /></JmTableCell>
                           )}
-                          <TableCell className="border-r border-border px-2 py-1.5 text-center">
-                            <Skeleton className="h-5 w-12 rounded-md mx-auto" />
-                          </TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-40" /></TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
-                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
-                          </TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
-                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 text-right">
-                            <div className="flex justify-end"><Skeleton className="h-4 w-24" /></div>
-                          </TableCell>
-                        </TableRow>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center">
+                            <JmSkeleton className="h-5 w-12 rounded-md mx-auto" />
+                          </JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-40" /></JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-16 mx-auto" /></JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div>
+                          </JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div>
+                          </JmTableCell>
+                          <JmTableCell className="px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><JmSkeleton className="h-4 w-24" /></div>
+                          </JmTableCell>
+                        </JmTableRow>
                       ))}
                     </React.Fragment>
                   ))}
-                </TableBody>
-              </Table>
+                </JmTableBody>
+              </JmTable>
             ) : viewMode === "ledger" ? (
-              dateGroups.length === 0 ? (
-                <EmptyStateHint />
-              ) : (
-                <Table className="min-w-[900px] table-fixed">
-                  <colgroup>
-                    {!selectedSupplierId && <col style={{ width: "14%" }} />}
-                    <col style={{ width: "70px" }} />
-                    <col />
-                    <col style={{ width: "130px" }} />
-                    <col style={{ width: "120px" }} />
-                    <col style={{ width: "120px" }} />
-                    <col style={{ width: "120px" }} />
-                  </colgroup>
-                  <TableHeader className="sticky top-0 z-10">
-                    <TableRow className="bg-muted text-muted-foreground text-xs hover:bg-muted">
-                      {!selectedSupplierId && <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">거래처</TableHead>}
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">유형</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">설명</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">참조</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">차변 (매입)</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">대변 (결제)</TableHead>
-                      <TableHead className="border-b border-border h-auto py-1.5 px-2 text-right font-medium">잔액</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {from && selectedSupplierSummary && (
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableCell
-                          colSpan={selectedSupplierId ? 5 : 6}
-                          className="px-3 py-1.5 text-xs text-muted-foreground font-medium"
-                        >
-                          이월 잔액 ({format(from, "yyyy-MM-dd")} 기준)
-                        </TableCell>
-                        <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums text-primary">
-                          ₩{formatAmount(selectedSupplierSummary.openingBalance)}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {dateGroups.map(([date, rows]) => (
-                      <React.Fragment key={`date-${date}`}>
-                        <TableRow className="bg-card hover:bg-card">
-                          <TableCell
-                            colSpan={selectedSupplierId ? 6 : 7}
-                            className="px-3 py-1.5 text-xs text-muted-foreground font-medium"
-                          >
-                            {date}
-                          </TableCell>
-                        </TableRow>
-                        {rows.map((e) => {
-                          const isPayment = e.type === "PAYMENT" && e.referenceType === "SUPPLIER_PAYMENT";
-                          const isManualAdj = e.type === "ADJUSTMENT" && e.referenceType === "MANUAL_ADJUSTMENT";
-                          const isIncoming = (e.type === "PURCHASE" || e.type === "REFUND") && !!e.referenceId;
-                          const isClickable = isPayment || isManualAdj || isIncoming;
-                          const title = isPayment
-                            ? "더블클릭: 결제 수정"
-                            : isManualAdj
-                              ? "더블클릭: 조정 수정"
-                              : isIncoming
-                                ? "더블클릭: 입고 상세"
-                                : undefined;
-                          return (
-                          <TableRow
-                            key={e.id}
-                            className={cn(
-                              !isClickable && "hover:bg-transparent",
-                              isClickable && "cursor-pointer",
-                            )}
-                            title={title}
-                            onDoubleClick={() => onEntryDoubleClick(e)}
-                          >
-                            {!selectedSupplierId && (
-                              <TableCell className="border-r border-border px-2 py-1.5 truncate">{e.supplier.name}</TableCell>
-                            )}
-                            <TableCell className="border-r border-border px-2 py-1.5 text-center">
-                              <Badge variant={TYPE_VARIANTS[e.type]} className="text-[10px]">
-                                {TYPE_LABELS[e.type]}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 truncate">{e.description}</TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 text-center text-muted-foreground text-xs">
-                              {e.referenceType ?? "-"}
-                            </TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">
-                              {parseFloat(e.debitAmount) > 0 ? `₩${formatAmount(e.debitAmount)}` : "-"}
-                            </TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">
-                              {parseFloat(e.creditAmount) > 0 ? `₩${formatAmount(e.creditAmount)}` : "-"}
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums">
-                              ₩{formatAmount(e.balance)}
-                            </TableCell>
-                          </TableRow>
-                          );
-                        })}
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
-              )
+              <SupplierLedgerTable
+                entries={data.entries as SupplierLedgerEntry[]}
+                showSupplierColumn={!selectedSupplierId}
+                opening={
+                  from && selectedSupplierSummary
+                    ? { from, amount: selectedSupplierSummary.openingBalance }
+                    : undefined
+                }
+                onEntryDoubleClick={(e) =>
+                  onEntryDoubleClick(e as unknown as Parameters<typeof onEntryDoubleClick>[0])
+                }
+                emptyState={emptyStateHint}
+              />
             ) : (
-              // 품목별 뷰 (매입 품목 + 결제)
-              itemDateGroups.length === 0 ? (
-                <EmptyStateHint />
-              ) : (
-                <Table className="min-w-[900px] table-fixed">
-                  <colgroup>
-                    {!selectedSupplierId && <col style={{ width: "12%" }} />}
-                    <col style={{ width: "110px" }} />
-                    <col />
-                    <col style={{ width: "8%" }} />
-                    <col style={{ width: "50px" }} />
-                    <col style={{ width: "70px" }} />
-                    <col style={{ width: "90px" }} />
-                    <col style={{ width: "80px" }} />
-                    <col style={{ width: "120px" }} />
-                    <col style={{ width: "110px" }} />
-                    <col style={{ width: "120px" }} />
-                  </colgroup>
-                  <TableHeader className="sticky top-0 z-10">
-                    <TableRow className="bg-muted text-muted-foreground text-xs hover:bg-muted">
-                      {!selectedSupplierId && <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">거래처</TableHead>}
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">입고번호</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">품명</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">규격</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 text-center font-medium">단위</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 text-center font-medium">수량</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 text-center font-medium">단가</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 text-center font-medium">할인</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 text-center font-medium">합계 (VAT포함)</TableHead>
-                      <TableHead className="border-r border-b border-border h-auto py-1.5 text-center font-medium">입금</TableHead>
-                      <TableHead className="border-b border-border h-auto py-1.5 text-center font-medium">잔액</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {from && selectedSupplierSummary && (
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableCell
-                          colSpan={selectedSupplierId ? 9 : 10}
-                          className="px-3 py-1.5 text-xs text-muted-foreground font-medium"
-                        >
-                          이월 잔액 ({format(from, "yyyy-MM-dd")} 기준)
-                        </TableCell>
-                        <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums text-primary">
-                          ₩{formatAmount(selectedSupplierSummary.openingBalance)}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {itemDateGroups.map(([date, rows]) => (
-                      <React.Fragment key={`item-date-${date}`}>
-                        <TableRow className="bg-card hover:bg-card">
-                          <TableCell
-                            colSpan={selectedSupplierId ? 10 : 11}
-                            className="px-3 py-1.5 text-xs text-muted-foreground font-medium"
-                          >
-                            {date}
-                          </TableCell>
-                        </TableRow>
-                        {rows.map((row) => {
-                          if (row.kind === "payment") {
-                            const p = row.data;
-                            const isPayment = p.type === "PAYMENT" && p.referenceType === "SUPPLIER_PAYMENT";
-                            const isManualAdj = p.type === "ADJUSTMENT" && p.referenceType === "MANUAL_ADJUSTMENT";
-                            const isClickable = isPayment || isManualAdj;
-                            const title = isPayment
-                              ? "더블클릭: 결제 수정"
-                              : isManualAdj
-                                ? "더블클릭: 조정 수정"
-                                : undefined;
-                            return (
-                              <TableRow
-                                key={`pay-${p.id}`}
-                                className={cn(
-                                  "bg-muted/50 hover:bg-muted/50",
-                                  isClickable && "cursor-pointer",
-                                )}
-                                title={title}
-                                onDoubleClick={() => onEntryDoubleClick(p)}
-                              >
-                                {!selectedSupplierId && (
-                                  <TableCell className="border-r border-border px-2 py-1.5 truncate">{p.supplier.name}</TableCell>
-                                )}
-                                <TableCell className="border-r border-border px-2 py-1.5 text-center">
-                                  <Badge variant={TYPE_VARIANTS[p.type]} className="text-[10px]">{TYPE_LABELS[p.type]}</Badge>
-                                </TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-muted-foreground truncate">{p.description}</TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-muted-foreground">—</TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-center text-muted-foreground">—</TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-right text-muted-foreground">—</TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-right text-muted-foreground">—</TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-right text-muted-foreground">—</TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">
-                                  {parseFloat(p.debitAmount) > 0
-                                    ? <span className="text-red-400">₩{formatAmount(p.debitAmount)}</span>
-                                    : <span className="text-muted-foreground">—</span>}
-                                </TableCell>
-                                <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">
-                                  {parseFloat(p.creditAmount) > 0
-                                    ? <span className="text-primary">₩{formatAmount(p.creditAmount)}</span>
-                                    : <span className="text-muted-foreground">—</span>}
-                                </TableCell>
-                                <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums">
-                                  ₩{formatAmount(p.balance)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          }
-                          const it = row.data;
-                          const qty = parseFloat(it.quantity);
-                          const up = parseFloat(it.unitPrice);
-                          const origP = it.originalPrice ? parseFloat(it.originalPrice) : up;
-                          const disc = origP > up ? origP - up : 0;
-                          const supply = parseFloat(it.totalPrice);
-                          const totalWithTax = it.supplierProduct.isTaxable
-                            ? Math.round(supply * 1.1)
-                            : supply;
-                          return (
-                            <TableRow
-                              key={it.id}
-                              className="cursor-pointer"
-                              title="더블클릭: 입고 상세"
-                              onDoubleClick={() => router.push(`/inventory/incoming?incomingId=${it.incomingId}`)}
-                            >
-                              {!selectedSupplierId && (
-                                <TableCell className="border-r border-border px-2 py-1.5 truncate">{it.supplier.name}</TableCell>
-                              )}
-                              <TableCell className="border-r border-border px-2 py-1.5 text-xs text-muted-foreground truncate">{it.incomingNo}</TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 truncate">
-                                <span className="font-medium">{it.supplierProduct.name}</span>
-                                {it.supplierProduct.supplierCode && (
-                                  <span className="ml-1 text-xs text-muted-foreground">({it.supplierProduct.supplierCode})</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 text-muted-foreground truncate">{it.supplierProduct.spec ?? ""}</TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 text-center text-muted-foreground">{it.supplierProduct.unitOfMeasure}</TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">{qty.toLocaleString("ko-KR")}</TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">{formatAmount(up)}</TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">
-                                {disc > 0 ? <span className="text-red-400">-{formatAmount(disc)}</span> : ""}
-                              </TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">{formatAmount(totalWithTax)}</TableCell>
-                              <TableCell className="border-r border-border px-2 py-1.5 text-right text-muted-foreground">—</TableCell>
-                              <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums">
-                                {row.balance !== null ? `₩${formatAmount(row.balance)}` : ""}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
-              )
+              <ItemsView
+                itemDateGroups={itemDateGroups}
+                selectedSupplierId={selectedSupplierId}
+                selectedSupplierSummary={selectedSupplierSummary}
+                from={from}
+                onEntryDoubleClick={onEntryDoubleClick}
+                onIncomingDeepLink={(id) => router.push(`/inventory/incoming?incomingId=${id}`)}
+                emptyState={emptyStateHint}
+              />
             )}
           </div>
         </div>
@@ -1081,6 +788,6 @@ export default function SupplierLedgerPage() {
         onSaved={fetchLedger}
       />
 
-    </>
+    </JmScope>
   );
 }

@@ -1,18 +1,28 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect -- dialog open 토글 시 props 기반 form 초기화 (의도된 패턴) */
 
 import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query-keys";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import {
+  JmButton,
+  JmDatePicker,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmInput,
+  JmSegmentedControl,
+} from "@/jm";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { CustomerCombobox } from "@/components/customer-combobox";
-import { cn, formatComma, parseComma } from "@/lib/utils";
+import { formatComma, parseComma } from "@/lib/utils";
 
 interface Customer {
   id: string;
@@ -25,6 +35,7 @@ export interface CustomerAdjustmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fixedCustomer?: { id: string; name: string };
+  /** 수정 모드일 때 제공 — amount는 부호 포함 (debit 양수, credit 음수) */
   initialAdjustment?: {
     id: string;
     customer: { id: string; name: string };
@@ -39,6 +50,8 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+type Sign = "+" | "-";
+
 export function CustomerAdjustmentDialog({
   open,
   onOpenChange,
@@ -52,7 +65,7 @@ export function CustomerAdjustmentDialog({
   const [form, setForm] = useState<{
     customerId: string;
     customerName: string;
-    sign: "+" | "-";
+    sign: Sign;
     amount: string;
     date: string;
     memo: string;
@@ -135,20 +148,27 @@ export function CustomerAdjustmentDialog({
       onOpenChange(false);
       onSaved?.();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || (editing ? "수정 실패" : "등록 실패")),
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : err.message || (editing ? "수정 실패" : "등록 실패"),
+      ),
   });
   const submitting = submitMutation.isPending;
   const handleSubmit = () => submitMutation.mutate();
 
   const deleteMutation = useMutation({
-    mutationFn: () => apiMutate(`/api/customers/adjustments/${initialAdjustment!.id}`, "DELETE"),
+    mutationFn: () =>
+      apiMutate(`/api/customers/adjustments/${initialAdjustment!.id}`, "DELETE"),
     onSuccess: () => {
       toast.success("조정이 삭제되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.ledger.customers() });
       onOpenChange(false);
       onSaved?.();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
   });
   const deleting = deleteMutation.isPending;
   const handleDelete = () => {
@@ -157,115 +177,171 @@ export function CustomerAdjustmentDialog({
     deleteMutation.mutate();
   };
 
+  const isIncrease = form.sign === "+";
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{editing ? "조정 수정" : "조정 등록"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <div className="space-y-1.5">
-            <label className="block text-[13px] text-muted-foreground">
-              고객<span className="text-red-400 ml-0.5">*</span>
-            </label>
-            {editing || fixedCustomer ? (
-              <Input value={form.customerName} disabled />
-            ) : (
-              <CustomerCombobox
-                customers={customers}
-                value={form.customerId}
-                onChange={(id, c) => setForm((f) => ({ ...f, customerId: id, customerName: c.name }))}
-                onCreateNew={() => toast.info("고객은 '고객' 메뉴에서 등록하세요")}
-                placeholder="고객 선택..."
+    <JmDialog open={open} onOpenChange={onOpenChange}>
+      <JmDialogContent size="lg">
+        <JmDialogHeader>
+          <JmDialogTitle>{editing ? "조정 수정" : "조정 등록"}</JmDialogTitle>
+        </JmDialogHeader>
+
+        <JmDialogBody>
+          <div className="space-y-4 text-jm-sm">
+            {/* 고객 */}
+            <Field label="고객" required>
+              {editing || fixedCustomer ? (
+                <JmInput size="sm" value={form.customerName} disabled />
+              ) : (
+                <CustomerCombobox
+                  customers={customers}
+                  value={form.customerId}
+                  onChange={(id, c) =>
+                    setForm((f) => ({ ...f, customerId: id, customerName: c.name }))
+                  }
+                  onCreateNew={() => toast.info("고객은 '고객' 메뉴에서 등록하세요")}
+                  placeholder="고객 선택..."
+                />
+              )}
+            </Field>
+
+            {/* 조정 종류 */}
+            <Field label="조정 종류" required>
+              <JmSegmentedControl
+                size="sm"
+                fullWidth
+                ariaLabel="조정 종류"
+                value={form.sign}
+                onChange={(v) => setForm((f) => ({ ...f, sign: v as Sign }))}
+                options={[
+                  { value: "+", label: "미수 증가 (+)" },
+                  { value: "-", label: "미수 감소 (−)" },
+                ]}
               />
-            )}
+            </Field>
+
+            {/* 금액 + 일자 */}
+            <div className="grid grid-cols-[1fr_180px] gap-3">
+              <Field label="금액" required>
+                <JmInput
+                  size="sm"
+                  value={formatComma(form.amount)}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, amount: parseComma(e.target.value) }))
+                  }
+                  onFocus={focusCaretEnd}
+                  inputMode="numeric"
+                  placeholder="0"
+                  autoFocus
+                  className="text-right tabular-nums font-semibold"
+                />
+              </Field>
+              <Field label="일자" required>
+                <JmDatePicker
+                  size="sm"
+                  value={form.date ? new Date(form.date + "T00:00:00") : undefined}
+                  onChange={(d) =>
+                    setForm((f) => ({
+                      ...f,
+                      date: d
+                        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+                        : "",
+                    }))
+                  }
+                />
+              </Field>
+            </div>
+
+            {/* 메모 */}
+            <Field label="메모">
+              <JmInput
+                size="sm"
+                value={form.memo}
+                onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
+                onFocus={focusCaretEnd}
+                placeholder={
+                  isIncrease
+                    ? "예: 누락된 매출 보정, 에누리 취소"
+                    : "예: 에누리, 잘못 청구된 금액 정정"
+                }
+              />
+            </Field>
+
+            {/* 안내 */}
+            <div
+              className={`rounded-lg border px-3 py-2 text-jm-xs ${
+                isIncrease
+                  ? "border-[var(--jm-warning-fg)]/30 bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
+                  : "border-[var(--jm-success-fg)]/30 bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
+              }`}
+            >
+              {isIncrease ? (
+                <>
+                  <strong>미수금이 늘어납니다</strong> — 차변에 기록되어 고객에게
+                  받을 돈이 증가합니다.
+                </>
+              ) : (
+                <>
+                  <strong>미수금이 줄어듭니다</strong> — 대변에 기록되어 고객에게
+                  받을 돈이 감소합니다.
+                </>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-[auto_1fr_1fr] gap-3">
-            <div className="space-y-1.5">
-              <label className="block text-[13px] text-muted-foreground">부호</label>
-              <div className="flex h-8 rounded-md border border-border overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, sign: "+" }))}
-                  className={cn(
-                    "px-3 text-xs",
-                    form.sign === "+" ? "bg-secondary text-foreground" : "text-muted-foreground",
-                  )}
-                  title="미수 증가"
+        </JmDialogBody>
+
+        <JmDialogFooter>
+          <div className="flex w-full items-center justify-between gap-2">
+            <div>
+              {editing && (
+                <JmButton
+                  variant="danger"
+                  onClick={handleDelete}
+                  disabled={deleting || submitting}
                 >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, sign: "-" }))}
-                  className={cn(
-                    "px-3 text-xs border-l border-border",
-                    form.sign === "-" ? "bg-secondary text-foreground" : "text-muted-foreground",
+                  {deleting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
                   )}
-                  title="미수 감소"
-                >
-                  −
-                </button>
-              </div>
+                  삭제
+                </JmButton>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <label className="block text-[13px] text-muted-foreground">
-                금액<span className="text-red-400 ml-0.5">*</span>
-              </label>
-              <Input
-                value={formatComma(form.amount)}
-                onChange={(e) => setForm((f) => ({ ...f, amount: parseComma(e.target.value) }))}
-                onFocus={(e) => e.currentTarget.select()}
-                inputMode="numeric"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-[13px] text-muted-foreground">
-                일자<span className="text-red-400 ml-0.5">*</span>
-              </label>
-              <Input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              />
+            <div className="flex gap-2">
+              <JmButton variant="ghost" onClick={() => onOpenChange(false)}>
+                취소
+              </JmButton>
+              <JmButton variant="cta" onClick={handleSubmit} disabled={submitting}>
+                {submitting && <Loader2 className="size-4 animate-spin" />}
+                <span>{editing ? "수정" : "등록"}</span>
+              </JmButton>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="block text-[13px] text-muted-foreground">메모</label>
-            <Input
-              value={form.memo}
-              onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
-              placeholder="예: 에누리, 오차 정정"
-            />
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            {form.sign === "+" ? "미수금 증가 — 차변 기록" : "미수금 감소 — 대변 기록"}
-          </p>
-        </div>
-        <DialogFooter className="sm:justify-between">
-          <div>
-            {editing && (
-              <Button
-                variant="outline"
-                onClick={handleDelete}
-                disabled={deleting || submitting}
-                className="text-red-400 hover:text-red-300"
-              >
-                {deleting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
-                삭제
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editing ? "수정" : "등록"}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </JmDialogFooter>
+      </JmDialogContent>
+    </JmDialog>
+  );
+}
+
+// ─── Field wrapper ─────────────────────────────────────────────────────────
+
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-jm-xs font-medium text-[var(--jm-text-muted)]">
+        {label}
+        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
+      </label>
+      {children}
+    </div>
   );
 }

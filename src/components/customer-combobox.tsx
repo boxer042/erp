@@ -1,6 +1,7 @@
 "use client";
 
-import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { useMemo } from "react";
+import { JmCombobox, type JmComboboxItem } from "@/jm";
 
 interface Customer {
   id: string;
@@ -10,60 +11,81 @@ interface Customer {
   type?: "INDIVIDUAL" | "BUSINESS";
 }
 
+type CustomerItem = JmComboboxItem & {
+  customer: Customer;
+};
+
 interface CustomerComboboxProps {
   customers: Customer[];
   value: string;
   onChange: (id: string, customer: Customer) => void;
   onCreateNew: (name: string) => void;
   placeholder?: string;
+  clearable?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
 const EMPTY_CUSTOMER: Customer = { id: "", name: "" };
 
+/** JmCombobox 기반 고객 선택. 기업이면 기업 배지 + 사업자번호, 개인이면 전화번호 표시. */
 export function CustomerCombobox({
   customers,
   value,
   onChange,
   onCreateNew,
   placeholder = "고객 선택...",
+  clearable = true,
+  size = "sm",
 }: CustomerComboboxProps) {
-  const selected = customers.find((c) => c.id === value);
+  const items = useMemo<CustomerItem[]>(
+    () =>
+      customers.map((c) => ({
+        id: c.id,
+        label: c.name,
+        description:
+          c.type === "BUSINESS" && c.businessNumber
+            ? c.businessNumber
+            : c.phone ?? undefined,
+        customer: c,
+      })),
+    [customers],
+  );
 
   return (
-    <ResponsiveCombobox<Customer>
-      items={customers}
+    <JmCombobox<CustomerItem>
+      items={items}
       value={value}
-      getItemId={(c) => c.id}
-      matches={(c, q) => {
+      size={size}
+      onChange={(item) => onChange(item.id, item.customer)}
+      onCreateNew={onCreateNew}
+      placeholder={placeholder}
+      searchPlaceholder="고객 검색..."
+      emptyMessage="고객이 없습니다"
+      clearable={clearable}
+      onClear={() => onChange("", EMPTY_CUSTOMER)}
+      matches={(item, q) => {
         const lower = q.toLowerCase();
+        const c = item.customer;
         return (
           c.name.toLowerCase().includes(lower) ||
           (c.phone?.toLowerCase().includes(lower) ?? false) ||
           (c.businessNumber?.toLowerCase().includes(lower) ?? false)
         );
       }}
-      onSelect={(c) => onChange(c.id, c)}
-      onCreateNew={onCreateNew}
-      selectedLabel={selected?.name}
-      placeholder={placeholder}
-      searchPlaceholder="고객 검색..."
-      mobileTitle="고객 선택"
-      clearable
-      onClear={() => onChange("", EMPTY_CUSTOMER)}
-      renderItem={(c) => (
-        <>
-          {c.type === "BUSINESS" && (
-            <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+      renderItem={(item) => (
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {item.customer.type === "BUSINESS" && (
+            <span className="shrink-0 rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-jm-2xs font-semibold text-[var(--jm-warning-fg)]">
               기업
             </span>
           )}
-          <span>{c.name}</span>
-          <span className="ml-auto text-xs text-muted-foreground">
-            {c.type === "BUSINESS" && c.businessNumber
-              ? c.businessNumber
-              : c.phone}
-          </span>
-        </>
+          <span className="truncate text-[var(--jm-text)]">{item.label}</span>
+          {item.description && (
+            <span className="ml-auto shrink-0 text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
+              {item.description}
+            </span>
+          )}
+        </span>
       )}
     />
   );

@@ -1,92 +1,68 @@
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { JmCard, JmCardContent, JmCardHeader, JmSkeleton } from "@/jm";
 
 export default function Loading() {
   return (
-    <div className="flex flex-col h-full">
-      {/* 상단 바: 뒤로 + 품명 + 거래처 + 수정 버튼 */}
-      <div className="px-6 py-4 border-b border-border flex items-center gap-3 shrink-0">
-        <Skeleton className="h-7 w-7 rounded-md" />
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      {/* 스티키 헤더 */}
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+        <JmSkeleton className="h-7 w-7 rounded-md" />
         <div className="flex-1 min-w-0 space-y-1">
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-3 w-24" />
+          <JmSkeleton className="h-5 w-48" />
+          <JmSkeleton className="h-3 w-24" />
         </div>
-        <Skeleton className="h-8 w-16 rounded-md" />
+        <JmSkeleton className="h-8 w-16 rounded-md" />
       </div>
 
-      <div className="flex-1 overflow-auto">
-        {/* 요약 카드 3개 */}
-        <div className="grid grid-cols-3 gap-4 px-6 py-4 border-b border-border">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-card rounded-lg p-4 border border-border space-y-2">
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-6 w-24" />
-            </div>
+      <div className="space-y-6 p-6 max-w-[1280px] mx-auto w-full">
+        {/* 요약 KPI 5 */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <JmCard key={i}>
+              <JmCardContent className="p-4 space-y-2">
+                <JmSkeleton className="h-3 w-16" />
+                <JmSkeleton className="h-6 w-24" />
+              </JmCardContent>
+            </JmCard>
           ))}
         </div>
 
-        <div className="px-6 py-6 space-y-6">
-          {/* 기본 정보 */}
-          <Card>
-            <CardHeader className="pb-3"><Skeleton className="h-4 w-16" /></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-3 w-16 shrink-0" />
-                    <Skeleton className="h-4 flex-1" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 매핑된 판매상품 */}
-          <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-7 w-20 rounded-md" />
-            </CardHeader>
-            <CardContent className="p-0">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="px-4 py-3 border-t border-border first:border-t-0 grid grid-cols-4 gap-4 items-center">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-5 w-16 rounded-md" />
-                  <Skeleton className="h-4 w-12" />
-                  <Skeleton className="h-7 w-7 rounded-md ml-auto" />
+        {/* 기본 정보 */}
+        <JmCard>
+          <JmCardHeader>
+            <JmSkeleton className="h-5 w-20" />
+          </JmCardHeader>
+          <JmCardContent>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <JmSkeleton className="h-3 w-16 shrink-0" />
+                  <JmSkeleton className="h-4 flex-1" />
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </JmCardContent>
+        </JmCard>
 
-          {/* 입고 비용 */}
-          <Card>
-            <CardHeader className="pb-3"><Skeleton className="h-4 w-16" /></CardHeader>
-            <CardContent className="p-0">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="px-4 py-3 border-t border-border first:border-t-0 grid grid-cols-5 gap-4">
-                  {Array.from({ length: 5 }).map((_, c) => (
-                    <Skeleton key={c} className="h-4 w-full" />
-                  ))}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* 입고 이력 */}
-          <Card>
-            <CardHeader className="pb-3"><Skeleton className="h-4 w-16" /></CardHeader>
-            <CardContent className="p-0">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="px-4 py-3 border-t border-border first:border-t-0 grid grid-cols-6 gap-4">
+        {/* 매핑/로트/비용/입고 이력 카드 4개 */}
+        {Array.from({ length: 4 }).map((_, i) => (
+          <JmCard key={i}>
+            <JmCardHeader>
+              <JmSkeleton className="h-5 w-32" />
+            </JmCardHeader>
+            <JmCardContent className="p-0">
+              {Array.from({ length: 3 }).map((_, r) => (
+                <div
+                  key={r}
+                  className="px-4 py-3 border-t border-[var(--jm-border)] grid grid-cols-6 gap-4 items-center"
+                >
                   {Array.from({ length: 6 }).map((_, c) => (
-                    <Skeleton key={c} className="h-4 w-full" />
+                    <JmSkeleton key={c} className="h-4 w-full" />
                   ))}
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        </div>
+            </JmCardContent>
+          </JmCard>
+        ))}
       </div>
     </div>
   );

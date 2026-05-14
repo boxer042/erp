@@ -1,34 +1,65 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query-keys";
+import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Pencil, Trash2 } from "lucide-react";
+  ArrowLeft,
+  Building2,
+  Loader2,
+  Mail,
+  Pencil,
+  Phone,
+  Plus,
+  Receipt,
+  Trash2,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
-import { formatComma, parseComma } from "@/lib/utils";
+
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { PAYMENT_METHODS, UNITS_OF_MEASURE } from "@/lib/constants";
+import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
+import {
+  SupplierLedgerTable,
+  type SupplierLedgerEntry,
+} from "@/components/supplier-ledger-table";
 import { NameAutocomplete } from "@/components/new-product-form/parts";
+import {
+  JmBadge,
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmContainer,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmIconButton,
+  JmInput,
+  JmScope,
+  JmSelect,
+  JmStat,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmTabs,
+  JmTabsList,
+  JmTabsPanel,
+  JmTabsTrigger,
+  JmTextarea,
+} from "@/jm";
 import Loading from "./loading";
 
 interface SupplierProduct {
@@ -72,20 +103,16 @@ interface SupplierDetail {
   balanceLedger: Array<{
     id: string;
     date: string;
-    type: string;
+    createdAt: string;
+    type: "PURCHASE" | "PAYMENT" | "ADJUSTMENT" | "REFUND";
     description: string;
     debitAmount: string;
     creditAmount: string;
     balance: string;
+    referenceId: string | null;
+    referenceType: string | null;
   }>;
 }
-
-const ledgerTypeLabels: Record<string, string> = {
-  PURCHASE: "매입",
-  PAYMENT: "결제",
-  ADJUSTMENT: "조정",
-  REFUND: "환불",
-};
 
 const emptyProductForm = {
   name: "",
@@ -99,10 +126,34 @@ const emptyProductForm = {
   vatIncluded: false,
 };
 
+const UNIT_OPTIONS = UNITS_OF_MEASURE.map((u) => ({
+  value: u.value,
+  label: `${u.label} (${u.value})`,
+}));
+
+const CURRENCY_OPTIONS = [
+  { value: "KRW", label: "KRW (원)" },
+  { value: "USD", label: "USD ($)" },
+  { value: "CNY", label: "CNY (¥)" },
+  { value: "JPY", label: "JPY (¥)" },
+];
+
+function formatAmount(amount: string | number) {
+  const v = typeof amount === "string" ? parseFloat(amount) : amount;
+  return Math.round(v).toLocaleString("ko-KR");
+}
+
+function formatKRW(amount: string | number) {
+  return `₩${formatAmount(amount)}`;
+}
+
 export default function SupplierDetailPage() {
   const params = useParams();
   const supplierId = String(params.id ?? "");
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
+
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
@@ -110,12 +161,11 @@ export default function SupplierDetailPage() {
       router.push("/suppliers");
     }
   };
-  const queryClient = useQueryClient();
+
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SupplierProduct | null>(null);
   const [productForm, setProductForm] = useState(emptyProductForm);
 
-  // 결제 등록 Dialog (원장 탭에서 사용)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   const supplierQuery = useQuery({
@@ -124,7 +174,8 @@ export default function SupplierDetailPage() {
   });
   const supplier = supplierQuery.data ?? null;
   const loading = supplierQuery.isPending;
-  const fetchSupplier = () => queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(supplierId) });
+  const fetchSupplier = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(supplierId) });
 
   const productNameItems = useMemo(
     () =>
@@ -165,34 +216,34 @@ export default function SupplierDetailPage() {
     return productForm.unitPrice;
   };
 
-  const handleProductSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const url = editingProduct
-      ? `/api/supplier-products/${editingProduct.id}`
-      : "/api/supplier-products";
-    const method = editingProduct ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+  const productSubmitMutation = useMutation({
+    mutationFn: async () => {
+      const url = editingProduct
+        ? `/api/supplier-products/${editingProduct.id}`
+        : "/api/supplier-products";
+      const method = editingProduct ? "PUT" : "POST";
+      return apiMutate(url, method, {
         ...productForm,
         unitPrice: getProductSubmitPrice(),
-        supplierId: supplierId,
-        leadTimeDays: productForm.leadTimeDays ? parseInt(productForm.leadTimeDays) : undefined,
+        supplierId,
+        leadTimeDays: productForm.leadTimeDays
+          ? parseInt(productForm.leadTimeDays)
+          : undefined,
         minOrderQty: parseInt(productForm.minOrderQty),
-      }),
-    });
+      });
+    },
+    onSuccess: () => {
+      toast.success(editingProduct ? "상품이 수정되었습니다" : "상품이 등록되었습니다");
+      setProductDialogOpen(false);
+      fetchSupplier();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장에 실패했습니다"),
+  });
 
-    if (!res.ok) {
-      const err = await res.json();
-      toast.error(typeof err.error === "string" ? err.error : "저장에 실패했습니다");
-      return;
-    }
-
-    toast.success(editingProduct ? "상품이 수정되었습니다" : "상품이 등록되었습니다");
-    setProductDialogOpen(false);
-    fetchSupplier();
+  const handleProductSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    productSubmitMutation.mutate();
   };
 
   const deleteProductMutation = useMutation({
@@ -201,7 +252,8 @@ export default function SupplierDetailPage() {
       toast.success("상품이 비활성화되었습니다");
       fetchSupplier();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
   });
   const handleDeleteProduct = (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
@@ -215,390 +267,535 @@ export default function SupplierDetailPage() {
     PAYMENT_METHODS.find((m) => m.value === supplier.paymentMethod)?.label ||
     supplier.paymentMethod;
 
-  const formatAmount = (amount: string) =>
-    parseFloat(amount).toLocaleString("ko-KR");
+  const outstandingNum = parseFloat(supplier.outstandingBalance);
+  // 잔액 색상 룰 — 거래처원장과 통일: 음수(미지급)는 정상, 양수(과지급)만 빨강
+  const outstandingHint =
+    outstandingNum < 0
+      ? "갚을 돈"
+      : outstandingNum > 0
+        ? "과지급"
+        : "잔액 없음";
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={handleBack} aria-label="뒤로가기">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-lg font-semibold">{supplier.name}</h2>
-        <Badge
-          variant={
-            supplier.paymentMethod === "CREDIT" ? "destructive" : "default"
-          }
-        >
-          {paymentLabel}
-        </Badge>
-      </div>
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
+      <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+        {/* 스티키 헤더 */}
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+          <JmIconButton
+            aria-label="뒤로"
+            size="sm"
+            variant="ghost"
+            onClick={handleBack}
+          >
+            <ArrowLeft />
+          </JmIconButton>
+          <span className="text-jm-base font-semibold text-[var(--jm-text)] truncate">
+            {supplier.name}
+          </span>
+          <JmBadge
+            variant={supplier.paymentMethod === "CREDIT" ? "danger" : "default"}
+            size="sm"
+            shape="square"
+          >
+            {paymentLabel}
+          </JmBadge>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>미지급 잔액</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ₩{formatAmount(supplier.outstandingBalance)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>결제 기한</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {supplier.paymentTermDays}일
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>등록 상품</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {supplier.supplierProducts.length}개
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>기본 정보</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <dt className="text-muted-foreground">사업자번호</dt>
-              <dd>{supplier.businessNumber || "-"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">대표자</dt>
-              <dd>{supplier.representative || "-"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">전화번호</dt>
-              <dd>{supplier.phone || "-"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">FAX</dt>
-              <dd>{supplier.fax || "-"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">이메일</dt>
-              <dd>{supplier.email || "-"}</dd>
-            </div>
-            <div className="col-span-2">
-              <dt className="text-muted-foreground">주소</dt>
-              <dd>{supplier.address || "-"}</dd>
-            </div>
-            {(supplier.bankName || supplier.bankAccount) && (
-              <div className="col-span-2">
-                <dt className="text-muted-foreground">계좌정보</dt>
-                <dd>{[supplier.bankName, supplier.bankAccount, supplier.bankHolder].filter(Boolean).join(" / ") || "-"}</dd>
-              </div>
+        <JmContainer width="default" padded={false} className="space-y-6 p-6">
+          {/* 메타 정보 — 전화/이메일/사업자번호 inline */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-jm-sm text-[var(--jm-text-muted)]">
+            {supplier.phone && (
+              <span className="inline-flex items-center gap-1.5">
+                <Phone className="size-3.5" />
+                <span className="tabular-nums">{supplier.phone}</span>
+              </span>
             )}
-            {supplier.memo && (
-              <div className="col-span-2">
-                <dt className="text-muted-foreground">메모</dt>
-                <dd>{supplier.memo}</dd>
-              </div>
+            {supplier.email && (
+              <span className="inline-flex items-center gap-1.5">
+                <Mail className="size-3.5" />
+                {supplier.email}
+              </span>
             )}
-          </dl>
-        </CardContent>
-      </Card>
+            {supplier.businessNumber && (
+              <span className="inline-flex items-center gap-1.5">
+                <Building2 className="size-3.5" />
+                <span className="tabular-nums">{supplier.businessNumber}</span>
+              </span>
+            )}
+          </div>
 
-      {/* 담당자 */}
-      {supplier.contacts && supplier.contacts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>담당자</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>이름</TableHead>
-                  <TableHead>휴대폰</TableHead>
-                  <TableHead>직책</TableHead>
-                  <TableHead>이메일</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {supplier.contacts.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.phone || "-"}</TableCell>
-                    <TableCell>{c.position || "-"}</TableCell>
-                    <TableCell>{c.email || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+          {/* KPI */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <JmStat
+              label="미지급 잔액"
+              value={formatKRW(supplier.outstandingBalance)}
+              icon={<Wallet className="size-4" />}
+              hint={outstandingHint}
+              size="sm"
+              positiveIsGood={false}
+              className={
+                outstandingNum > 0
+                  ? "ring-2 ring-[var(--jm-danger-fg)]/30"
+                  : undefined
+              }
+            />
+            <JmStat
+              label="결제 기한"
+              value={`${supplier.paymentTermDays}일`}
+              icon={<Receipt className="size-4" />}
+              size="sm"
+            />
+            <JmStat
+              label="등록 상품"
+              value={`${supplier.supplierProducts.length}개`}
+              size="sm"
+            />
+          </div>
 
-      <Tabs defaultValue="products">
-        <TabsList>
-          <TabsTrigger value="products">공급 상품</TabsTrigger>
-          <TabsTrigger value="ledger">거래 원장</TabsTrigger>
-        </TabsList>
+          {/* 기본 정보 */}
+          <JmCard>
+            <JmCardHeader>
+              <JmCardTitle>기본 정보</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent>
+              <dl className="grid grid-cols-2 gap-4 text-jm-sm">
+                <InfoRow label="사업자번호" value={supplier.businessNumber} />
+                <InfoRow label="대표자" value={supplier.representative} />
+                <InfoRow label="전화번호" value={supplier.phone} />
+                <InfoRow label="FAX" value={supplier.fax} />
+                <InfoRow label="이메일" value={supplier.email} />
+                <InfoRow
+                  label="주소"
+                  value={supplier.address}
+                  className="col-span-2"
+                />
+                {(supplier.bankName || supplier.bankAccount) && (
+                  <InfoRow
+                    label="계좌정보"
+                    value={
+                      [supplier.bankName, supplier.bankAccount, supplier.bankHolder]
+                        .filter(Boolean)
+                        .join(" / ") || null
+                    }
+                    className="col-span-2"
+                  />
+                )}
+                {supplier.memo && (
+                  <InfoRow
+                    label="메모"
+                    value={supplier.memo}
+                    className="col-span-2"
+                  />
+                )}
+              </dl>
+            </JmCardContent>
+          </JmCard>
 
-        <TabsContent value="products">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>공급 상품 목록</CardTitle>
-                <Button size="sm" onClick={openCreateProduct}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  상품 추가
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>상품명</TableHead>
-                    <TableHead>품번</TableHead>
-                    <TableHead>단위</TableHead>
-                    <TableHead className="text-right">단가</TableHead>
-                    <TableHead>리드타임</TableHead>
-                    <TableHead>최소주문</TableHead>
-                    <TableHead className="w-[100px]">관리</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {supplier.supplierProducts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
-                        등록된 공급 상품이 없습니다
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    supplier.supplierProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell className="font-medium">
-                          {product.name}
-                        </TableCell>
-                        <TableCell>{product.supplierCode || "-"}</TableCell>
-                        <TableCell>{product.unitOfMeasure}</TableCell>
-                        <TableCell className="text-right">
-                          ₩{formatAmount(product.unitPrice)}
-                        </TableCell>
-                        <TableCell>
-                          {product.leadTimeDays ? `${product.leadTimeDays}일` : "-"}
-                        </TableCell>
-                        <TableCell>{product.minOrderQty}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEditProduct(product)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(product.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          {/* 담당자 */}
+          {supplier.contacts && supplier.contacts.length > 0 && (
+            <JmCard>
+              <JmCardHeader>
+                <JmCardTitle>담당자</JmCardTitle>
+              </JmCardHeader>
+              <JmCardContent className="px-0 pb-0">
+                <JmTable>
+                  <JmTableHeader>
+                    <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">이름</JmTableHead>
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">휴대폰</JmTableHead>
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">직책</JmTableHead>
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">이메일</JmTableHead>
+                    </JmTableRow>
+                  </JmTableHeader>
+                  <JmTableBody>
+                    {supplier.contacts.map((c) => (
+                      <JmTableRow key={c.id}>
+                        <JmTableCell className="px-3 py-2 font-medium text-[var(--jm-text)]">{c.name}</JmTableCell>
+                        <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">{c.phone || "-"}</JmTableCell>
+                        <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">{c.position || "-"}</JmTableCell>
+                        <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">{c.email || "-"}</JmTableCell>
+                      </JmTableRow>
+                    ))}
+                  </JmTableBody>
+                </JmTable>
+              </JmCardContent>
+            </JmCard>
+          )}
 
-        <TabsContent value="ledger">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">거래 원장</CardTitle>
-              <Button size="sm" onClick={() => setPaymentDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />결제 등록
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>일자</TableHead>
-                    <TableHead>유형</TableHead>
-                    <TableHead>설명</TableHead>
-                    <TableHead className="text-right">차변 (매입)</TableHead>
-                    <TableHead className="text-right">대변 (결제)</TableHead>
-                    <TableHead className="text-right">잔액</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {supplier.balanceLedger.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
+          {/* 탭 — 공급 상품 / 거래 원장 */}
+          <JmTabs defaultValue="products">
+            <JmTabsList variant="line" className="overflow-x-auto">
+              <JmTabsTrigger value="products">
+                공급 상품
+                <span className="ml-1 tabular-nums text-[var(--jm-text-subtle)]">
+                  {supplier.supplierProducts.length}
+                </span>
+              </JmTabsTrigger>
+              <JmTabsTrigger value="ledger">
+                거래 원장
+                <span className="ml-1 tabular-nums text-[var(--jm-text-subtle)]">
+                  {supplier.balanceLedger.length}
+                </span>
+              </JmTabsTrigger>
+            </JmTabsList>
+
+            <JmTabsPanel value="products">
+              <JmCard>
+                <JmCardHeader>
+                  <div className="flex items-center justify-between">
+                    <JmCardTitle>공급 상품 목록</JmCardTitle>
+                    <JmButton size="sm" variant="cta" onClick={openCreateProduct}>
+                      <Plus />
+                      <span>상품 추가</span>
+                    </JmButton>
+                  </div>
+                </JmCardHeader>
+                <JmCardContent className="px-0 pb-0">
+                  <JmTable>
+                    <JmTableHeader>
+                      <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">상품명</JmTableHead>
+                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">품번</JmTableHead>
+                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">단위</JmTableHead>
+                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">단가</JmTableHead>
+                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">리드타임</JmTableHead>
+                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">최소주문</JmTableHead>
+                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[100px]">관리</JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {supplier.supplierProducts.length === 0 ? (
+                        <JmTableRow className="hover:bg-transparent">
+                          <JmTableCell colSpan={7} className="text-center py-8 text-[var(--jm-text-muted)]">
+                            등록된 공급 상품이 없습니다
+                          </JmTableCell>
+                        </JmTableRow>
+                      ) : (
+                        supplier.supplierProducts.map((product) => (
+                          <JmTableRow key={product.id}>
+                            <JmTableCell className="px-3 py-2 font-medium text-[var(--jm-text)]">
+                              {product.name}
+                            </JmTableCell>
+                            <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">
+                              {product.supplierCode || "-"}
+                            </JmTableCell>
+                            <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">
+                              {product.unitOfMeasure}
+                            </JmTableCell>
+                            <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
+                              ₩{formatAmount(product.unitPrice)}
+                            </JmTableCell>
+                            <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">
+                              {product.leadTimeDays ? `${product.leadTimeDays}일` : "-"}
+                            </JmTableCell>
+                            <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)] tabular-nums">
+                              {product.minOrderQty}
+                            </JmTableCell>
+                            <JmTableCell className="px-3 py-2">
+                              <div className="flex gap-1">
+                                <JmIconButton
+                                  aria-label="수정"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => openEditProduct(product)}
+                                >
+                                  <Pencil />
+                                </JmIconButton>
+                                <JmIconButton
+                                  aria-label="삭제"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteProduct(product.id)}
+                                  disabled={
+                                    deleteProductMutation.isPending &&
+                                    deleteProductMutation.variables === product.id
+                                  }
+                                >
+                                  {deleteProductMutation.isPending &&
+                                  deleteProductMutation.variables === product.id ? (
+                                    <Loader2 className="animate-spin" />
+                                  ) : (
+                                    <Trash2 />
+                                  )}
+                                </JmIconButton>
+                              </div>
+                            </JmTableCell>
+                          </JmTableRow>
+                        ))
+                      )}
+                    </JmTableBody>
+                  </JmTable>
+                </JmCardContent>
+              </JmCard>
+            </JmTabsPanel>
+
+            <JmTabsPanel value="ledger">
+              <JmCard>
+                <JmCardHeader>
+                  <div className="flex items-center justify-between">
+                    <JmCardTitle>거래 원장</JmCardTitle>
+                    <JmButton
+                      size="sm"
+                      variant="cta"
+                      onClick={() => setPaymentDialogOpen(true)}
+                    >
+                      <Plus />
+                      <span>결제 등록</span>
+                    </JmButton>
+                  </div>
+                </JmCardHeader>
+                <JmCardContent className="px-0 pb-0">
+                  <SupplierLedgerTable
+                    entries={supplier.balanceLedger as SupplierLedgerEntry[]}
+                    showSupplierColumn={false}
+                    emptyState={
+                      <p className="text-center py-8 text-[var(--jm-text-muted)] text-jm-sm">
                         거래 내역이 없습니다
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    supplier.balanceLedger.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>
-                          {new Date(entry.date).toLocaleDateString("ko-KR")}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {ledgerTypeLabels[entry.type] || entry.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{entry.description}</TableCell>
-                        <TableCell className="text-right">
-                          {parseFloat(entry.debitAmount) > 0
-                            ? `₩${formatAmount(entry.debitAmount)}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {parseFloat(entry.creditAmount) > 0
-                            ? `₩${formatAmount(entry.creditAmount)}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ₩{formatAmount(entry.balance)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-      </Tabs>
+                      </p>
+                    }
+                  />
+                </JmCardContent>
+              </JmCard>
+            </JmTabsPanel>
+          </JmTabs>
+        </JmContainer>
+      </div>
 
       {/* 결제 등록 다이얼로그 (거래처 고정) */}
       <SupplierPaymentDialog
         open={paymentDialogOpen}
         onOpenChange={setPaymentDialogOpen}
-        fixedSupplier={supplier ? { id: supplier.id, name: supplier.name } : undefined}
+        fixedSupplier={{ id: supplier.id, name: supplier.name }}
         onSaved={fetchSupplier}
       />
 
       {/* 공급 상품 등록/수정 다이얼로그 */}
-      <Dialog open={productDialogOpen} onOpenChange={(open) => { setProductDialogOpen(open); if (!open) setEditingProduct(null); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingProduct ? "공급 상품 수정" : "공급 상품 등록"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleProductSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>상품명 *</Label>
-              <NameAutocomplete
-                value={productForm.name}
-                onChange={(name) => setProductForm({ ...productForm, name })}
-                items={productNameItems}
-                placeholder="공급상품명을 입력하세요"
-                warningLabel="이미 등록된 공급상품"
-                inputClassName=""
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>품번 (공급자 코드)</Label>
-                <Input value={productForm.supplierCode} onChange={(e) => setProductForm({ ...productForm, supplierCode: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>단위</Label>
-                <Select value={productForm.unitOfMeasure} onValueChange={(v) => setProductForm({ ...productForm, unitOfMeasure: v ?? "EA" })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {UNITS_OF_MEASURE.map((u) => (
-                      <SelectItem key={u.value} value={u.value}>{u.label} ({u.value})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>단가 (원)</Label>
-                <div className="flex h-[28px] rounded-md border border-border bg-card text-[12px]">
-                  <button
-                    type="button"
-                    className={`px-2.5 rounded-l-md transition-colors ${productForm.vatIncluded ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    onClick={() => setProductForm({ ...productForm, vatIncluded: true })}
-                  >
-                    VAT 포함
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-2.5 rounded-r-md transition-colors ${!productForm.vatIncluded ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    onClick={() => setProductForm({ ...productForm, vatIncluded: false })}
-                  >
-                    VAT 별도
-                  </button>
+      <JmDialog
+        open={productDialogOpen}
+        onOpenChange={(open) => {
+          setProductDialogOpen(open);
+          if (!open) setEditingProduct(null);
+        }}
+      >
+        <JmDialogContent size="lg">
+          <JmDialogHeader>
+            <JmDialogTitle>
+              {editingProduct ? "공급 상품 수정" : "공급 상품 등록"}
+            </JmDialogTitle>
+          </JmDialogHeader>
+          <form onSubmit={handleProductSubmit}>
+            <JmDialogBody>
+              <div className="space-y-4 text-jm-sm">
+                <Field label="상품명" required>
+                  <NameAutocomplete
+                    value={productForm.name}
+                    onChange={(name) => setProductForm({ ...productForm, name })}
+                    items={productNameItems}
+                    placeholder="공급상품명을 입력하세요"
+                    warningLabel="이미 등록된 공급상품"
+                    inputClassName=""
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="품번 (공급자 코드)">
+                    <JmInput
+                      size="sm"
+                      value={productForm.supplierCode}
+                      onChange={(e) =>
+                        setProductForm({ ...productForm, supplierCode: e.target.value })
+                      }
+                      onFocus={focusCaretEnd}
+                    />
+                  </Field>
+                  <Field label="단위">
+                    <JmSelect
+                      size="sm"
+                      options={UNIT_OPTIONS}
+                      value={productForm.unitOfMeasure}
+                      onChange={(v) =>
+                        setProductForm({ ...productForm, unitOfMeasure: v })
+                      }
+                    />
+                  </Field>
                 </div>
-              </div>
-              <Input
-                type="text"
-                inputMode="numeric"
-                value={formatComma(productForm.unitPrice)}
-                onChange={(e) => setProductForm({ ...productForm, unitPrice: parseComma(e.target.value) })}
-                onFocus={(e) => e.currentTarget.select()}
-              />
-              {parseFloat(productForm.unitPrice || "0") > 0 && (
-                <div className="flex gap-4 text-xs text-muted-foreground bg-card rounded-md px-3 py-2">
-                  {productForm.vatIncluded ? (
-                    <>
-                      <span>공급가액: ₩{parseFloat(String(Math.round(parseFloat(productForm.unitPrice) / 1.1))).toLocaleString("ko-KR")}</span>
-                      <span>세액: ₩{(parseFloat(productForm.unitPrice) - Math.round(parseFloat(productForm.unitPrice) / 1.1)).toLocaleString("ko-KR")}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>공급가액: ₩{parseFloat(productForm.unitPrice).toLocaleString("ko-KR")}</span>
-                      <span>세액: ₩{Math.round(parseFloat(productForm.unitPrice) * 0.1).toLocaleString("ko-KR")}</span>
-                      <span className="font-medium text-foreground">합계: ₩{Math.round(parseFloat(productForm.unitPrice) * 1.1).toLocaleString("ko-KR")}</span>
-                    </>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-jm-xs font-medium text-[var(--jm-text-muted)]">
+                      단가 (원)
+                    </label>
+                    <div className="flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-jm-2xs overflow-hidden">
+                      <button
+                        type="button"
+                        className={`px-2.5 transition-colors ${
+                          productForm.vatIncluded
+                            ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                            : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                        }`}
+                        onClick={() =>
+                          setProductForm({ ...productForm, vatIncluded: true })
+                        }
+                      >
+                        VAT 포함
+                      </button>
+                      <button
+                        type="button"
+                        className={`px-2.5 transition-colors border-l border-[var(--jm-border)] ${
+                          !productForm.vatIncluded
+                            ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                            : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                        }`}
+                        onClick={() =>
+                          setProductForm({ ...productForm, vatIncluded: false })
+                        }
+                      >
+                        VAT 별도
+                      </button>
+                    </div>
+                  </div>
+                  <JmInput
+                    size="sm"
+                    inputMode="numeric"
+                    value={formatComma(productForm.unitPrice)}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, unitPrice: parseComma(e.target.value) })
+                    }
+                    onFocus={focusCaretEnd}
+                    className="text-right tabular-nums font-semibold"
+                  />
+                  {parseFloat(productForm.unitPrice || "0") > 0 && (
+                    <div className="flex gap-4 text-jm-2xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] rounded-md px-3 py-2">
+                      {productForm.vatIncluded ? (
+                        <>
+                          <span>
+                            공급가액: ₩
+                            {formatAmount(Math.round(parseFloat(productForm.unitPrice) / 1.1))}
+                          </span>
+                          <span>
+                            세액: ₩
+                            {formatAmount(
+                              parseFloat(productForm.unitPrice) -
+                                Math.round(parseFloat(productForm.unitPrice) / 1.1),
+                            )}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span>공급가액: ₩{formatAmount(productForm.unitPrice)}</span>
+                          <span>
+                            세액: ₩
+                            {formatAmount(Math.round(parseFloat(productForm.unitPrice) * 0.1))}
+                          </span>
+                          <span className="font-medium text-[var(--jm-text)]">
+                            합계: ₩
+                            {formatAmount(Math.round(parseFloat(productForm.unitPrice) * 1.1))}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>통화</Label>
-                <Select value={productForm.currency} onValueChange={(v) => setProductForm({ ...productForm, currency: v ?? "KRW" })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="KRW">KRW (원)</SelectItem>
-                    <SelectItem value="USD">USD ($)</SelectItem>
-                    <SelectItem value="CNY">CNY (¥)</SelectItem>
-                    <SelectItem value="JPY">JPY (¥)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="통화">
+                    <JmSelect
+                      size="sm"
+                      options={CURRENCY_OPTIONS}
+                      value={productForm.currency}
+                      onChange={(v) => setProductForm({ ...productForm, currency: v })}
+                    />
+                  </Field>
+                  <Field label="리드타임 (일)">
+                    <JmInput
+                      size="sm"
+                      type="number"
+                      value={productForm.leadTimeDays}
+                      onChange={(e) =>
+                        setProductForm({ ...productForm, leadTimeDays: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="최소 주문 수량">
+                    <JmInput
+                      size="sm"
+                      type="number"
+                      value={productForm.minOrderQty}
+                      onChange={(e) =>
+                        setProductForm({ ...productForm, minOrderQty: e.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+                <Field label="메모">
+                  <JmTextarea
+                    value={productForm.memo}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, memo: e.target.value })
+                    }
+                    rows={3}
+                  />
+                </Field>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>리드타임 (일)</Label>
-                <Input type="number" value={productForm.leadTimeDays} onChange={(e) => setProductForm({ ...productForm, leadTimeDays: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>최소 주문 수량</Label>
-                <Input type="number" value={productForm.minOrderQty} onChange={(e) => setProductForm({ ...productForm, minOrderQty: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>메모</Label>
-              <Textarea value={productForm.memo} onChange={(e) => setProductForm({ ...productForm, memo: e.target.value })} />
-            </div>
-            <DialogFooter>
-              <Button type="submit">{editingProduct ? "수정" : "등록"}</Button>
-            </DialogFooter>
+            </JmDialogBody>
+            <JmDialogFooter>
+              <JmButton
+                type="button"
+                variant="ghost"
+                onClick={() => setProductDialogOpen(false)}
+              >
+                취소
+              </JmButton>
+              <JmButton
+                type="submit"
+                variant="cta"
+                disabled={productSubmitMutation.isPending}
+              >
+                {productSubmitMutation.isPending && (
+                  <Loader2 className="size-4 animate-spin" />
+                )}
+                <span>{editingProduct ? "수정" : "등록"}</span>
+              </JmButton>
+            </JmDialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </JmDialogContent>
+      </JmDialog>
+    </JmScope>
+  );
+}
+
+// ─── helpers ───────────────────────────────────────────────────────────
+
+function InfoRow({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | null | undefined;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <dt className="text-[var(--jm-text-muted)] text-jm-xs">{label}</dt>
+      <dd className="text-[var(--jm-text)] mt-0.5">{value || "-"}</dd>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-jm-xs font-medium text-[var(--jm-text-muted)]">
+        {label}
+        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
+      </label>
+      {children}
     </div>
   );
 }

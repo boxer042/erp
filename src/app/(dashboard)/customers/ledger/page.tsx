@@ -1,104 +1,56 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import { Plus, Search, SlidersHorizontal, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useTheme } from "next-themes";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from "@/components/ui/table";
-import { Plus, Search, SlidersHorizontal, Check, FileEdit, PanelLeftClose, PanelLeftOpen, CalendarIcon } from "lucide-react";
+  JmBadge,
+  JmButton,
+  JmCheckbox,
+  JmDateRangePicker,
+  JmScope,
+  JmScrollArea,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { cn } from "@/lib/utils";
 import { CustomerPaymentDialog } from "@/components/customer-payment-dialog";
 import { CustomerAdjustmentDialog } from "@/components/customer-adjustment-dialog";
 import { type PaymentMethod } from "@/lib/validators/supplier";
-import { startOfMonth, endOfMonth, startOfDay, subMonths, format } from "date-fns";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ko } from "date-fns/locale";
+import { startOfMonth, endOfMonth, format } from "date-fns";
 
-type LedgerType = "SALE" | "RECEIPT" | "ADJUSTMENT" | "REFUND";
-// 가상 행 타입 — CustomerRefund 레코드를 같은 테이블에 표시할 때 사용. 잔액에는 영향 없음.
-type RowType = LedgerType | "REFUND_LOG";
-
-const TYPE_LABELS: Record<RowType, string> = {
-  SALE: "매출",
-  RECEIPT: "수금",
-  ADJUSTMENT: "조정",
-  REFUND: "환불",
-  REFUND_LOG: "환불내역",
-};
-const TYPE_VARIANTS: Record<RowType, "default" | "secondary" | "outline" | "destructive" | "warning" | "success"> = {
-  SALE: "default",
-  RECEIPT: "success",
-  ADJUSTMENT: "secondary",
-  REFUND: "destructive",
-  REFUND_LOG: "destructive",
-};
-const ALL_TYPES: LedgerType[] = ["SALE", "RECEIPT", "ADJUSTMENT", "REFUND"];
-
-const REFUND_METHOD_LABELS: Record<string, string> = {
-  CARD_CANCEL: "카드 취소",
-  CASH: "현금",
-  BANK_TRANSFER: "계좌이체",
-  POINTS: "포인트",
-  OTHER: "기타",
-};
-
-interface LedgerEntry {
-  id: string;
-  date: string;
-  type: RowType;
-  description: string;
-  debitAmount: string;
-  creditAmount: string;
-  balance: string;
-  referenceId: string | null;
-  referenceType: string | null;
-  customer: { id: string; name: string };
-}
-
-interface RefundLog {
-  id: string;
-  refundedAt: string;
-  amount: string;
-  method: keyof typeof REFUND_METHOD_LABELS;
-  memo: string | null;
-  customer: { id: string; name: string };
-  order: { id: string; orderNo: string };
-}
-
-interface CustomerSummary {
-  customerId: string;
-  customerName: string;
-  customerType?: "INDIVIDUAL" | "BUSINESS";
-  currentBalance: number;
-  openingBalance: number;
-  totalSale: number;
-  totalReceipt: number;
-  totalAdjustment: number;
-  totalRefund: number;
-}
-
-interface LedgerResponse {
-  entries: LedgerEntry[];
-  refunds: RefundLog[];
-  customerSummaries: CustomerSummary[];
-}
-
-function formatAmount(n: number | string) {
-  const v = typeof n === "string" ? parseFloat(n) : n;
-  return Math.round(v).toLocaleString("ko-KR");
-}
+import {
+  ALL_TYPES,
+  REFUND_METHOD_LABELS,
+  TYPE_JM_VARIANTS,
+  TYPE_LABELS,
+  type DatePreset,
+  type LedgerEntry,
+  type LedgerResponse,
+  type LedgerType,
+} from "./_types";
+import {
+  applyDatePreset,
+  buildLedgerDateGroups,
+  formatAmount,
+  getCurrentPresetLabel,
+} from "./_helpers";
+import { LedgerView } from "./_views";
 
 export default function CustomerLedgerPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
   // 모바일/좁은 화면에서 좌측 패널 접기 토글 (기본: 펼침)
   const [panelOpen, setPanelOpen] = useState(true);
 
@@ -110,7 +62,6 @@ export default function CustomerLedgerPage() {
   const [types, setTypes] = useState<LedgerType[]>([...ALL_TYPES]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [typePopoverOpen, setTypePopoverOpen] = useState(false);
-  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<{
@@ -157,37 +108,13 @@ export default function CustomerLedgerPage() {
   const loading = ledgerQuery.isPending;
   const fetchLedger = () => queryClient.invalidateQueries({ queryKey: queryKeys.ledger.customers() });
 
-  const applyPreset = (preset: "thisMonth" | "lastMonth" | "last3" | "all") => {
-    if (preset === "thisMonth") {
-      setFrom(startOfMonth(now));
-      setTo(endOfMonth(now));
-    } else if (preset === "lastMonth") {
-      const last = subMonths(now, 1);
-      setFrom(startOfMonth(last));
-      setTo(endOfMonth(last));
-    } else if (preset === "last3") {
-      setFrom(startOfDay(subMonths(now, 3)));
-      setTo(endOfMonth(now));
-    } else {
-      setFrom(undefined);
-      setTo(undefined);
-    }
+  const applyPreset = (preset: DatePreset) => {
+    const { from: nextFrom, to: nextTo } = applyDatePreset(preset, now);
+    setFrom(nextFrom);
+    setTo(nextTo);
   };
 
-  const currentPresetLabel = (() => {
-    if (!from && !to) return "전체";
-    if (from && to) {
-      const thisF = startOfMonth(now).getTime();
-      const thisT = endOfMonth(now).getTime();
-      if (from.getTime() === thisF && to.getTime() === thisT) return "이번달";
-      const last = subMonths(now, 1);
-      if (from.getTime() === startOfMonth(last).getTime() && to.getTime() === endOfMonth(last).getTime())
-        return "지난달";
-      if (from.getTime() === startOfDay(subMonths(now, 3)).getTime() && to.getTime() === endOfMonth(now).getTime())
-        return "최근3개월";
-    }
-    return "커스텀";
-  })();
+  const currentPresetLabel = getCurrentPresetLabel(from, to, now);
 
   const filteredSummaries = data.customerSummaries.filter((c) => {
     if (search) {
@@ -232,6 +159,11 @@ export default function CustomerLedgerPage() {
         memo: e.description.startsWith("조정 — ") ? e.description.slice(5) : null,
       });
       setAdjDialogOpen(true);
+      return;
+    }
+    // 매출/환불 → 주문 상세 deeplink
+    if ((e.type === "SALE" || e.type === "REFUND") && e.referenceType === "ORDER" && e.referenceId) {
+      router.push(`/orders?id=${e.referenceId}`);
     }
   };
 
@@ -263,45 +195,35 @@ export default function CustomerLedgerPage() {
     customer: r.customer,
   }));
 
-  const dateGroups = (() => {
-    const map = new Map<string, LedgerEntry[]>();
-    const allRows: LedgerEntry[] = [...data.entries, ...refundRows];
-    allRows.forEach((e) => {
-      const key = format(new Date(e.date), "yyyy-MM-dd");
-      const arr = map.get(key) || [];
-      arr.push(e);
-      map.set(key, arr);
-    });
-    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  })();
+  const dateGroups = buildLedgerDateGroups([...data.entries, ...refundRows]);
 
   return (
-    <>
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
       <div className="flex h-full">
         {/* ─── 좌측 패널 ─── */}
         {panelOpen && (
-        <div className="w-[320px] max-md:w-[280px] shrink-0 border-r border-border flex flex-col bg-background">
-          <div className="h-10 px-3 border-b border-border flex items-center shrink-0">
+        <div className="w-[320px] max-md:w-[280px] shrink-0 border-r border-[var(--jm-border)] flex flex-col bg-[var(--jm-bg)]">
+          <div className="h-10 px-3 border-b border-[var(--jm-border)] flex items-center shrink-0">
             <h2 className="text-sm font-medium">고객 원장</h2>
           </div>
 
           <div className="px-3 pt-2 shrink-0 space-y-1.5">
             <div className="grid grid-cols-2 gap-1.5">
-              <Button
+              <JmButton
                 size="sm"
                 onClick={() => { setEditingPayment(null); setPayDialogOpen(true); }}
                 className="h-8 text-xs"
               >
                 <Plus /><span>수금 등록</span>
-              </Button>
-              <Button
+              </JmButton>
+              <JmButton
                 size="sm"
                 variant="outline"
                 onClick={() => { setEditingAdjustment(null); setAdjDialogOpen(true); }}
                 className="h-8 text-xs"
               >
                 <FileEdit className="size-3.5" /><span>조정 등록</span>
-              </Button>
+              </JmButton>
             </div>
           </div>
 
@@ -316,8 +238,8 @@ export default function CustomerLedgerPage() {
                   className={cn(
                     "px-2 h-6 rounded text-[11px] border transition-colors",
                     active
-                      ? "bg-primary/10 border-primary/40 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)]"
+                      : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
                   )}
                 >
                   {labels[p]}
@@ -327,116 +249,102 @@ export default function CustomerLedgerPage() {
           </div>
 
           <div className="px-3 pt-2 pb-2 shrink-0">
-            <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-              <PopoverTrigger
-                className={cn(
-                  "flex h-8 w-full items-center gap-2 rounded-md border border-border bg-card px-2.5 text-xs transition-colors hover:bg-muted",
-                  currentPresetLabel === "커스텀" && "border-primary/40 text-primary"
-                )}
-              >
-                <CalendarIcon className="size-3.5 text-muted-foreground shrink-0" />
-                <span className="flex-1 truncate text-left tabular-nums">
-                  {from && to
-                    ? `${format(from, "yyyy-MM-dd")} ~ ${format(to, "yyyy-MM-dd")}`
-                    : from
-                    ? `${format(from, "yyyy-MM-dd")} 부터`
-                    : to
-                    ? `${format(to, "yyyy-MM-dd")} 까지`
-                    : "전체 기간"}
-                </span>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="range"
-                  selected={{ from, to }}
-                  onSelect={(range) => {
-                    setFrom(range?.from);
-                    setTo(range?.to);
-                  }}
-                  numberOfMonths={1}
-                  locale={ko}
-                />
-              </PopoverContent>
-            </Popover>
+            <JmDateRangePicker
+              size="sm"
+              value={{ from, to }}
+              onChange={(range) => {
+                setFrom(range?.from);
+                setTo(range?.to);
+              }}
+              placeholder="전체 기간"
+            />
           </div>
 
           <div className="px-3 pb-2 flex items-center gap-2 shrink-0">
-            <div className="flex-1 flex items-center gap-1.5 h-8 rounded-md border border-border bg-card px-2.5">
-              <Search className="size-3.5 text-muted-foreground shrink-0" />
+            <div className="flex-1 flex items-center gap-1.5 h-8 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2.5">
+              <Search className="size-3.5 text-[var(--jm-text-muted)] shrink-0" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="고객 검색..."
-                className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+                className="flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--jm-text-muted)]"
               />
             </div>
-            <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
-              <PopoverTrigger
+            <PopoverPrimitive.Root open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
+              <PopoverPrimitive.Trigger
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-md border border-border shrink-0 transition-colors",
+                  "flex h-8 w-8 items-center justify-center rounded-md border border-[var(--jm-border)] shrink-0 transition-colors",
                   types.length < ALL_TYPES.length
-                    ? "bg-primary/10 text-primary border-primary/30"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)] border-[var(--jm-info-fg)]/30"
+                    : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
                 )}
               >
                 <SlidersHorizontal className="size-3.5" />
-              </PopoverTrigger>
-              <PopoverContent className="w-[180px] p-2" align="end">
-                <p className="text-xs text-muted-foreground mb-2 px-1">유형 필터</p>
-                {ALL_TYPES.map((t) => {
-                  const checked = types.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      className={cn(
-                        "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs transition-colors",
-                        checked ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      )}
-                      onClick={() => setTypes((prev) => checked ? prev.filter((x) => x !== t) : [...prev, t])}
-                    >
-                      <div className={cn("h-3.5 w-3.5 rounded border flex items-center justify-center", checked ? "bg-primary border-primary" : "border-input")}>
-                        {checked && <Check className="size-2.5 text-foreground" />}
-                      </div>
-                      <Badge variant={TYPE_VARIANTS[t]} className="text-[10px]">{TYPE_LABELS[t]}</Badge>
-                    </button>
-                  );
-                })}
-                {types.length < ALL_TYPES.length && (
-                  <button className="w-full text-xs text-muted-foreground hover:text-foreground mt-1.5 pt-1.5 border-t border-border" onClick={() => setTypes([...ALL_TYPES])}>
-                    전체 선택
-                  </button>
-                )}
-              </PopoverContent>
-            </Popover>
+              </PopoverPrimitive.Trigger>
+              <PopoverPrimitive.Portal>
+                <PopoverPrimitive.Positioner align="end" sideOffset={4} className="isolate z-50">
+                  <PopoverPrimitive.Popup
+                    data-jm-scope
+                    className="z-50 w-[180px] rounded-xl bg-[var(--jm-surface)] p-2 ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
+                  >
+                    <p className="text-xs text-[var(--jm-text-muted)] mb-2 px-1">유형 필터</p>
+                    {ALL_TYPES.map((t) => {
+                      const checked = types.includes(t);
+                      return (
+                        <label
+                          key={t}
+                          className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs cursor-pointer text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] transition-colors"
+                        >
+                          <JmCheckbox
+                            checked={checked}
+                            onCheckedChange={() =>
+                              setTypes((prev) =>
+                                checked ? prev.filter((x) => x !== t) : [...prev, t],
+                              )
+                            }
+                          />
+                          <JmBadge variant={TYPE_JM_VARIANTS[t]} size="sm" shape="square">{TYPE_LABELS[t]}</JmBadge>
+                        </label>
+                      );
+                    })}
+                    {types.length < ALL_TYPES.length && (
+                      <button className="w-full text-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] mt-1.5 pt-1.5 border-t border-[var(--jm-border)]" onClick={() => setTypes([...ALL_TYPES])}>
+                        전체 선택
+                      </button>
+                    )}
+                  </PopoverPrimitive.Popup>
+                </PopoverPrimitive.Positioner>
+              </PopoverPrimitive.Portal>
+            </PopoverPrimitive.Root>
           </div>
 
-          <ScrollArea className="flex-1 min-h-0">
+          <JmScrollArea className="flex-1 min-h-0">
             <div
               onClick={() => setSelectedCustomerId(null)}
-              className={cn("px-3 py-2.5 border-b border-border cursor-pointer transition-colors", selectedCustomerId === null ? "bg-muted" : "hover:bg-muted/50")}
+              className={cn("px-3 py-2.5 border-b border-[var(--jm-border)] cursor-pointer transition-colors", selectedCustomerId === null ? "bg-[var(--jm-surface-muted)]" : "hover:bg-[var(--jm-surface-muted)]/60")}
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm">전체 거래</span>
-                <span className="text-xs text-muted-foreground">{data.entries.length}건</span>
+                <span className="text-xs text-[var(--jm-text-muted)]">{data.entries.length}건</span>
               </div>
             </div>
             {filteredSummaries.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">고객이 없습니다</div>
+              <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">고객이 없습니다</div>
             ) : (
               filteredSummaries.map((c) => {
                 const bal = c.currentBalance;
-                // 양수 = 미수금 (받을 돈) → 빨강 강조
-                const balColor = bal > 0 ? "text-red-400" : "text-muted-foreground";
+                // 정상 미수(양수)·0 → 기본색. 과수금(음수, 비정상) → 빨강 강조
+                const balColor = bal < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text-muted)]";
                 return (
                   <div
                     key={c.customerId}
                     onClick={() => setSelectedCustomerId(c.customerId)}
-                    className={cn("px-3 py-2.5 border-b border-border cursor-pointer transition-colors", selectedCustomerId === c.customerId ? "bg-muted" : "hover:bg-muted/50")}
+                    className={cn("px-3 py-2.5 border-b border-[var(--jm-border)] cursor-pointer transition-colors", selectedCustomerId === c.customerId ? "bg-[var(--jm-surface-muted)]" : "hover:bg-[var(--jm-surface-muted)]/60")}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-1.5">
                         {c.customerType === "BUSINESS" && (
-                          <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-800">
+                          <span className="shrink-0 rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
                             기업
                           </span>
                         )}
@@ -450,7 +358,7 @@ export default function CustomerLedgerPage() {
                 );
               })
             )}
-          </ScrollArea>
+          </JmScrollArea>
         </div>
         )}
 
@@ -463,76 +371,77 @@ export default function CustomerLedgerPage() {
             const openingTotal = selectedCustomerSummary
               ? selectedCustomerSummary.openingBalance
               : filteredSummaries.reduce((s, c) => s + c.openingBalance, 0);
-            const balanceClass = totalBalance > 0 ? "text-red-400" : "text-foreground";
+            // 과수금(음수) 만 빨강. 정상 미수(양수)·0 은 기본색
+            const balanceClass = totalBalance < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]";
             return (
-              <div className="min-h-10 px-4 border-b border-border flex items-center flex-wrap gap-x-4 gap-y-1 py-1 text-xs text-muted-foreground shrink-0">
+              <div className="min-h-10 px-4 border-b border-[var(--jm-border)] flex items-center flex-wrap gap-x-4 gap-y-1 py-1 text-xs text-[var(--jm-text-muted)] shrink-0">
                 <button
                   type="button"
                   onClick={() => setPanelOpen((v) => !v)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors -ml-1"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] transition-colors -ml-1"
                   aria-label={panelOpen ? "사이드 패널 접기" : "사이드 패널 펼치기"}
                 >
                   {panelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
                 </button>
-                <span>기간: <b className="text-foreground">{from ? format(from, "yyyy-MM-dd") : "제한 없음"} ~ {to ? format(to, "yyyy-MM-dd") : "제한 없음"}</b></span>
-                <span className="text-muted-foreground/50">|</span>
+                <span>기간: <b className="text-[var(--jm-text)]">{from ? format(from, "yyyy-MM-dd") : "제한 없음"} ~ {to ? format(to, "yyyy-MM-dd") : "제한 없음"}</b></span>
+                <span className="text-[var(--jm-text-muted)]/50">|</span>
                 {from && (
                   <>
-                    <span>이월: <b className="text-foreground tabular-nums">₩{formatAmount(openingTotal)}</b></span>
-                    <span className="text-muted-foreground/50">|</span>
+                    <span>이월: <b className="text-[var(--jm-text)] tabular-nums">₩{formatAmount(openingTotal)}</b></span>
+                    <span className="text-[var(--jm-text-muted)]/50">|</span>
                   </>
                 )}
-                <span>거래: <b className="text-foreground">{data.entries.length}건</b></span>
-                <span>차변 합 (매출): <b className="text-foreground">₩{formatAmount(totalDebit)}</b></span>
-                <span>대변 합 (수금): <b className="text-foreground">₩{formatAmount(totalCredit)}</b></span>
-                <span className="text-muted-foreground/50">|</span>
+                <span>거래: <b className="text-[var(--jm-text)]">{data.entries.length}건</b></span>
+                <span>차변 합 (매출): <b className="text-[var(--jm-text)]">₩{formatAmount(totalDebit)}</b></span>
+                <span>대변 합 (수금): <b className="text-[var(--jm-text)]">₩{formatAmount(totalCredit)}</b></span>
+                <span className="text-[var(--jm-text-muted)]/50">|</span>
                 <span>미수금: <b className={cn("tabular-nums", balanceClass)}>₩{formatAmount(totalBalance)}</b></span>
               </div>
             );
           })()}
 
           {selectedCustomerSummary && (
-            <div className="border-b border-border px-4 py-3 flex items-center flex-wrap gap-x-6 gap-y-3 shrink-0">
+            <div className="border-b border-[var(--jm-border)] px-4 py-3 flex items-center flex-wrap gap-x-6 gap-y-3 shrink-0">
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">고객</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">고객</p>
                 <p className="text-sm font-medium">{selectedCustomerSummary.customerName}</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">현재 미수금</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">현재 미수금</p>
                 <p className={cn("text-sm font-medium tabular-nums",
-                  selectedCustomerSummary.currentBalance > 0 ? "text-red-400" : "text-foreground")}>
+                  selectedCustomerSummary.currentBalance < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]")}>
                   ₩{formatAmount(selectedCustomerSummary.currentBalance)}
                 </p>
               </div>
               {from && (
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">이월 미수</p>
-                  <p className="text-sm tabular-nums text-foreground">
+                  <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">이월 미수</p>
+                  <p className="text-sm tabular-nums text-[var(--jm-text)]">
                     ₩{formatAmount(selectedCustomerSummary.openingBalance)}
                   </p>
                 </div>
               )}
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">기간 매출</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 매출</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedCustomerSummary.totalSale)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">기간 수금</p>
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 수금</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedCustomerSummary.totalReceipt)}</p>
               </div>
               <div>
-                <Button size="sm" variant="outline" className="h-7 text-xs"
+                <JmButton size="sm" variant="outline" className="h-7 text-xs"
                   onClick={() => { setEditingPayment(null); setPayDialogOpen(true); }}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />수금 등록
-                </Button>
+                </JmButton>
               </div>
             </div>
           )}
 
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <Table className="min-w-[900px] table-fixed">
+              <JmTable className="min-w-[900px] table-fixed border-b border-[var(--jm-border)]">
                 <colgroup>
                   {!selectedCustomerId && <col style={{ width: "14%" }} />}
                   <col style={{ width: "70px" }} />
@@ -542,168 +451,81 @@ export default function CustomerLedgerPage() {
                   <col style={{ width: "120px" }} />
                   <col style={{ width: "120px" }} />
                 </colgroup>
-                <TableHeader className="sticky top-0 z-10">
-                  <TableRow className="bg-muted text-muted-foreground text-xs hover:bg-muted">
-                    {!selectedCustomerId && <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">고객</TableHead>}
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">유형</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">설명</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">참조</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">차변 (매출)</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">대변 (수금)</TableHead>
-                    <TableHead className="border-b border-border h-auto py-1.5 px-2 text-right font-medium">미수 잔액</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                <JmTableHeader className="sticky top-0 z-10">
+                  <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                    {!selectedCustomerId && <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">고객</JmTableHead>}
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">유형</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">설명</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">참조</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">차변 (매출)</JmTableHead>
+                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">대변 (수금)</JmTableHead>
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">미수 잔액</JmTableHead>
+                  </JmTableRow>
+                </JmTableHeader>
+                <JmTableBody>
                   {Array.from({ length: 3 }).map((_, gi) => (
                     <React.Fragment key={`sk-group-${gi}`}>
-                      <TableRow className="bg-card hover:bg-card">
-                        <TableCell colSpan={selectedCustomerId ? 6 : 7} className="px-3 py-1.5">
-                          <Skeleton className="h-3 w-24" />
-                        </TableCell>
-                      </TableRow>
+                      <JmTableRow className="bg-[var(--jm-surface)] hover:bg-[var(--jm-surface)]">
+                        <JmTableCell colSpan={selectedCustomerId ? 6 : 7} className="px-3 py-1.5">
+                          <JmSkeleton className="h-3 w-24" />
+                        </JmTableCell>
+                      </JmTableRow>
                       {Array.from({ length: 3 }).map((_, ri) => (
-                        <TableRow key={`sk-${gi}-${ri}`} className="hover:bg-transparent">
+                        <JmTableRow key={`sk-${gi}-${ri}`} className="hover:bg-transparent">
                           {!selectedCustomerId && (
-                            <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-24" /></TableCell>
+                            <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-24" /></JmTableCell>
                           )}
-                          <TableCell className="border-r border-border px-2 py-1.5 text-center">
-                            <Skeleton className="h-5 w-12 rounded-md mx-auto" />
-                          </TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-40" /></TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5"><Skeleton className="h-4 w-16 mx-auto" /></TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
-                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
-                          </TableCell>
-                          <TableCell className="border-r border-border px-2 py-1.5 text-right">
-                            <div className="flex justify-end"><Skeleton className="h-4 w-20" /></div>
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 text-right">
-                            <div className="flex justify-end"><Skeleton className="h-4 w-24" /></div>
-                          </TableCell>
-                        </TableRow>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center">
+                            <JmSkeleton className="h-5 w-12 rounded-md mx-auto" />
+                          </JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-40" /></JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-16 mx-auto" /></JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div>
+                          </JmTableCell>
+                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div>
+                          </JmTableCell>
+                          <JmTableCell className="px-2 py-1.5 text-right">
+                            <div className="flex justify-end"><JmSkeleton className="h-4 w-24" /></div>
+                          </JmTableCell>
+                        </JmTableRow>
                       ))}
                     </React.Fragment>
                   ))}
-                </TableBody>
-              </Table>
+                </JmTableBody>
+              </JmTable>
             ) : dateGroups.length === 0 && !(from && selectedCustomerSummary) ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
+              <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">
                 거래 내역이 없습니다
                 {hasHiddenHistory ? (
                   <div className="mt-3 flex flex-col items-center gap-2">
-                    <p className="text-[11px] text-muted-foreground max-w-[360px]">
+                    <p className="text-[11px] text-[var(--jm-text-muted)] max-w-[360px]">
                       선택한 기간에 거래가 없습니다. 과거 거래를 보려면 기간을 넓혀보세요.
                     </p>
                     <button
                       type="button"
                       onClick={() => applyPreset("all")}
-                      className="px-3 h-7 rounded-md border border-primary/40 bg-primary/10 text-primary text-[11px] hover:bg-primary/20 transition-colors"
+                      className="px-3 h-7 rounded-md border border-[var(--jm-info-fg)]/40 bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)] text-[11px] hover:bg-[var(--jm-info-bg)]/80 transition-colors"
                     >
                       전체 기간 보기
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-2 text-[11px] text-muted-foreground">
+                  <p className="mt-2 text-[11px] text-[var(--jm-text-muted)]">
                     판매 시스템이 연동되면 매출(SALE) 원장이 자동 기록됩니다.
                     현재는 수동 수금/조정만 등록 가능합니다.
                   </p>
                 )}
               </div>
             ) : (
-              <Table className="min-w-[900px] table-fixed">
-                <colgroup>
-                  {!selectedCustomerId && <col style={{ width: "14%" }} />}
-                  <col style={{ width: "70px" }} />
-                  <col />
-                  <col style={{ width: "130px" }} />
-                  <col style={{ width: "120px" }} />
-                  <col style={{ width: "120px" }} />
-                  <col style={{ width: "120px" }} />
-                </colgroup>
-                <TableHeader className="sticky top-0 z-10">
-                  <TableRow className="bg-muted text-muted-foreground text-xs hover:bg-muted">
-                    {!selectedCustomerId && <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">고객</TableHead>}
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">유형</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 font-medium">설명</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-center font-medium">참조</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">차변 (매출)</TableHead>
-                    <TableHead className="border-r border-b border-border h-auto py-1.5 px-2 text-right font-medium">대변 (수금)</TableHead>
-                    <TableHead className="border-b border-border h-auto py-1.5 px-2 text-right font-medium">미수 잔액</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {from && selectedCustomerSummary && (
-                    <TableRow className="bg-muted/50 hover:bg-muted/50">
-                      <TableCell
-                        colSpan={selectedCustomerId ? 5 : 6}
-                        className="px-3 py-1.5 text-xs text-muted-foreground font-medium"
-                      >
-                        이월 잔액 ({format(from, "yyyy-MM-dd")} 기준)
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums text-primary">
-                        ₩{formatAmount(selectedCustomerSummary.openingBalance)}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {dateGroups.map(([date, rows]) => (
-                    <React.Fragment key={`date-${date}`}>
-                      <TableRow className="bg-card hover:bg-card">
-                        <TableCell
-                          colSpan={selectedCustomerId ? 6 : 7}
-                          className="px-3 py-1.5 text-xs text-muted-foreground font-medium"
-                        >
-                          {date}
-                        </TableCell>
-                      </TableRow>
-                      {rows.map((e) => {
-                        const isReceipt = e.type === "RECEIPT" && e.referenceType === "CUSTOMER_PAYMENT";
-                        const isManualAdj = e.type === "ADJUSTMENT" && e.referenceType === "MANUAL_ADJUSTMENT";
-                        const isRefundLog = e.type === "REFUND_LOG";
-                        const isClickable = isReceipt || isManualAdj;
-                        const title = isReceipt ? "더블클릭: 수금 수정" : isManualAdj ? "더블클릭: 조정 수정" : undefined;
-                        return (
-                          <TableRow
-                            key={e.id}
-                            className={cn(
-                              !isClickable && "hover:bg-transparent",
-                              isClickable && "cursor-pointer",
-                              isRefundLog && "bg-destructive/5",
-                            )}
-                            title={title}
-                            onDoubleClick={() => onEntryDoubleClick(e)}
-                          >
-                            {!selectedCustomerId && (
-                              <TableCell className="border-r border-border px-2 py-1.5 truncate">{e.customer.name}</TableCell>
-                            )}
-                            <TableCell className="border-r border-border px-2 py-1.5 text-center">
-                              <Badge variant={TYPE_VARIANTS[e.type]} className="text-[10px]">
-                                {TYPE_LABELS[e.type]}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 truncate">{e.description}</TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 text-center text-muted-foreground text-xs">
-                              {e.referenceType ?? "-"}
-                            </TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">
-                              {parseFloat(e.debitAmount) > 0 ? `₩${formatAmount(e.debitAmount)}` : "-"}
-                            </TableCell>
-                            <TableCell className="border-r border-border px-2 py-1.5 text-right tabular-nums">
-                              {parseFloat(e.creditAmount) > 0 ? `₩${formatAmount(e.creditAmount)}` : "-"}
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-right font-medium tabular-nums">
-                              {isRefundLog ? (
-                                <span className="text-muted-foreground text-xs">잔액 무관</span>
-                              ) : (
-                                `₩${formatAmount(e.balance)}`
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
-                </TableBody>
-              </Table>
+              <LedgerView
+                dateGroups={dateGroups}
+                selectedCustomerId={selectedCustomerId}
+                selectedCustomerSummary={selectedCustomerSummary}
+                from={from}
+                onEntryDoubleClick={onEntryDoubleClick}
+              />
             )}
           </div>
         </div>
@@ -736,6 +558,6 @@ export default function CustomerLedgerPage() {
         initialAdjustment={editingAdjustment ?? undefined}
         onSaved={fetchLedger}
       />
-    </>
+    </JmScope>
   );
 }

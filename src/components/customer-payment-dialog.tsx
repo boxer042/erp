@@ -1,24 +1,31 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect -- dialog open 토글 시 props 기반 form 초기화 (의도된 패턴) */
 
 import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query-keys";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import {
+  JmButton,
+  JmDatePicker,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmInput,
+  JmSelect,
+} from "@/jm";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { CustomerCombobox } from "@/components/customer-combobox";
 import { formatComma, parseComma } from "@/lib/utils";
 import {
-  SUPPLIER_PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
+  SUPPLIER_PAYMENT_METHODS,
   type PaymentMethod,
 } from "@/lib/validators/supplier";
 
@@ -47,6 +54,11 @@ export interface CustomerPaymentDialogProps {
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
+
+const METHOD_OPTIONS = SUPPLIER_PAYMENT_METHODS.map((m) => ({
+  value: m,
+  label: PAYMENT_METHOD_LABELS[m],
+}));
 
 export function CustomerPaymentDialog({
   open,
@@ -143,20 +155,27 @@ export function CustomerPaymentDialog({
       onOpenChange(false);
       onSaved?.();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || (editing ? "수정 실패" : "등록 실패")),
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : err.message || (editing ? "수정 실패" : "등록 실패"),
+      ),
   });
   const submitting = submitMutation.isPending;
   const handleSubmit = () => submitMutation.mutate();
 
   const deleteMutation = useMutation({
-    mutationFn: () => apiMutate(`/api/customer-payments/${initialPayment!.id}`, "DELETE"),
+    mutationFn: () =>
+      apiMutate(`/api/customer-payments/${initialPayment!.id}`, "DELETE"),
     onSuccess: () => {
       toast.success("수금이 삭제되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.ledger.customers() });
       onOpenChange(false);
       onSaved?.();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
   });
   const deleting = deleteMutation.isPending;
   const handleDelete = () => {
@@ -166,108 +185,143 @@ export function CustomerPaymentDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{editing ? "수금 수정" : "수금 등록"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <div className="space-y-1.5">
-            <label className="block text-[13px] text-muted-foreground">
-              고객<span className="text-red-400 ml-0.5">*</span>
-            </label>
-            {editing || fixedCustomer ? (
-              <Input value={form.customerName} disabled />
-            ) : (
-              <CustomerCombobox
-                customers={customers}
-                value={form.customerId}
-                onChange={(id, c) => setForm((f) => ({ ...f, customerId: id, customerName: c.name }))}
-                onCreateNew={() => toast.info("고객은 '고객' 메뉴에서 등록하세요")}
-                placeholder="고객 선택..."
-              />
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="block text-[13px] text-muted-foreground">
-                금액<span className="text-red-400 ml-0.5">*</span>
-              </label>
-              <Input
-                value={formatComma(form.amount)}
-                onChange={(e) => setForm((f) => ({ ...f, amount: parseComma(e.target.value) }))}
-                onFocus={(e) => e.currentTarget.select()}
-                inputMode="numeric"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-[13px] text-muted-foreground">
-                수금일<span className="text-red-400 ml-0.5">*</span>
-              </label>
-              <Input
-                type="date"
-                value={form.paymentDate}
-                onChange={(e) => setForm((f) => ({ ...f, paymentDate: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="block text-[13px] text-muted-foreground">
-              수금 방식<span className="text-red-400 ml-0.5">*</span>
-            </label>
-            <Select
-              value={form.method}
-              onValueChange={(v) => setForm((f) => ({ ...f, method: (v ?? "TRANSFER") as PaymentMethod }))}
-            >
-              <SelectTrigger>
-                <SelectValue>
-                  {(v: unknown) =>
-                    typeof v === "string" && v in PAYMENT_METHOD_LABELS
-                      ? PAYMENT_METHOD_LABELS[v as PaymentMethod]
-                      : ""
+    <JmDialog open={open} onOpenChange={onOpenChange}>
+      <JmDialogContent size="lg">
+        <JmDialogHeader>
+          <JmDialogTitle>{editing ? "수금 수정" : "수금 등록"}</JmDialogTitle>
+        </JmDialogHeader>
+
+        <JmDialogBody>
+          <div className="space-y-4 text-jm-sm">
+            {/* 고객 */}
+            <Field label="고객" required>
+              {editing || fixedCustomer ? (
+                <JmInput size="sm" value={form.customerName} disabled />
+              ) : (
+                <CustomerCombobox
+                  customers={customers}
+                  value={form.customerId}
+                  onChange={(id, c) =>
+                    setForm((f) => ({ ...f, customerId: id, customerName: c.name }))
                   }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPLIER_PAYMENT_METHODS.map((m) => (
-                  <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  onCreateNew={() => toast.info("고객은 '고객' 메뉴에서 등록하세요")}
+                  placeholder="고객 선택..."
+                />
+              )}
+            </Field>
+
+            {/* 금액 + 수금일 */}
+            <div className="grid grid-cols-[1fr_180px] gap-3">
+              <Field label="금액 (VAT 포함)" required>
+                <JmInput
+                  size="sm"
+                  value={formatComma(form.amount)}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, amount: parseComma(e.target.value) }))
+                  }
+                  onFocus={focusCaretEnd}
+                  inputMode="numeric"
+                  placeholder="0"
+                  autoFocus
+                  className="text-right tabular-nums font-semibold"
+                />
+              </Field>
+              <Field label="수금일" required>
+                <JmDatePicker
+                  size="sm"
+                  value={form.paymentDate ? new Date(form.paymentDate + "T00:00:00") : undefined}
+                  onChange={(d) =>
+                    setForm((f) => ({
+                      ...f,
+                      paymentDate: d
+                        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+                        : "",
+                    }))
+                  }
+                />
+              </Field>
+            </div>
+
+            {/* 수금 방식 */}
+            <Field label="수금 방식" required>
+              <JmSelect
+                size="sm"
+                options={METHOD_OPTIONS}
+                value={form.method}
+                onChange={(v) => setForm((f) => ({ ...f, method: v as PaymentMethod }))}
+              />
+            </Field>
+
+            {/* 메모 */}
+            <Field label="메모">
+              <JmInput
+                size="sm"
+                value={form.memo}
+                onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
+                onFocus={focusCaretEnd}
+                placeholder="선택 — 입금 메모, 영수증 번호 등"
+              />
+            </Field>
+
+            {/* 안내 */}
+            <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+              수금 등록 시 고객 미수금이 차감됩니다 (대변 기록).
+            </p>
           </div>
-          <div className="space-y-1.5">
-            <label className="block text-[13px] text-muted-foreground">메모</label>
-            <Input
-              value={form.memo}
-              onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
-              placeholder="선택"
-            />
+        </JmDialogBody>
+
+        <JmDialogFooter>
+          <div className="flex w-full items-center justify-between gap-2">
+            <div>
+              {editing && (
+                <JmButton
+                  variant="danger"
+                  onClick={handleDelete}
+                  disabled={deleting || submitting}
+                >
+                  {deleting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                  삭제
+                </JmButton>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <JmButton variant="ghost" onClick={() => onOpenChange(false)}>
+                취소
+              </JmButton>
+              <JmButton variant="cta" onClick={handleSubmit} disabled={submitting}>
+                {submitting && <Loader2 className="size-4 animate-spin" />}
+                <span>{editing ? "수정" : "등록"}</span>
+              </JmButton>
+            </div>
           </div>
-        </div>
-        <DialogFooter className="sm:justify-between">
-          <div>
-            {editing && (
-              <Button
-                variant="outline"
-                onClick={handleDelete}
-                disabled={deleting || submitting}
-                className="text-red-400 hover:text-red-300"
-              >
-                {deleting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
-                삭제
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editing ? "수정" : "등록"}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </JmDialogFooter>
+      </JmDialogContent>
+    </JmDialog>
+  );
+}
+
+// ─── Field wrapper — label + 컨트롤 ────────────────────────────────────────
+
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-jm-xs font-medium text-[var(--jm-text-muted)]">
+        {label}
+        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
+      </label>
+      {children}
+    </div>
   );
 }

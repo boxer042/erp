@@ -1,51 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Pencil, Trash2, Eye, Loader2 } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Eye, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { PAYMENT_METHODS } from "@/lib/constants";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { QuickSupplierSheet } from "@/components/quick-register-sheets";
+
 import { apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { Skeleton } from "@/components/ui/skeleton";
-
-function SuppliersSkeletonRows({ rows = 8 }: { rows?: number }) {
-  return (
-    <>
-      {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-10 rounded-full" /></TableCell>
-          <TableCell>
-            <div className="flex gap-1">
-              <Skeleton className="h-8 w-8 rounded-md" />
-              <Skeleton className="h-8 w-8 rounded-md" />
-              <Skeleton className="h-8 w-8 rounded-md" />
-            </div>
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
+import { PAYMENT_METHODS } from "@/lib/constants";
+import { QuickSupplierSheet } from "@/components/quick-register-sheets";
+import {
+  JmBadge,
+  JmButton,
+  JmIconButton,
+  JmScope,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 
 interface SupplierContact {
   id: string;
@@ -75,8 +53,33 @@ interface Supplier {
   contacts?: SupplierContact[];
 }
 
+function SuppliersSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-28" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-28" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-12 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-10 rounded-md" /></JmTableCell>
+          <JmTableCell>
+            <div className="flex gap-1">
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+            </div>
+          </JmTableCell>
+        </JmTableRow>
+      ))}
+    </>
+  );
+}
+
 export default function SuppliersPage() {
   const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -89,6 +92,7 @@ export default function SuppliersPage() {
 
   const suppliers = suppliersQuery.data ?? [];
   const loading = suppliersQuery.isPending;
+  const refreshing = suppliersQuery.isFetching && !loading;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all });
 
@@ -145,103 +149,140 @@ export default function SuppliersPage() {
     PAYMENT_METHODS.find((m) => m.value === method)?.label || method;
 
   return (
-    <>
-      <div className="flex h-full flex-col">
-        <DataTableToolbar
-          search={{
-            value: search,
-            onChange: setSearch,
-            onSearch: handleSearch,
-            placeholder: "거래처명 또는 사업자번호로 검색",
-          }}
-          onRefresh={() => suppliersQuery.refetch()}
-          onAdd={openCreate}
-          addLabel="거래처 추가"
-          loading={loading}
-        />
-        <ScrollArea className="flex-1 min-h-0">
-          <Table className="min-w-[800px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>거래처명</TableHead>
-                <TableHead>사업자번호</TableHead>
-                <TableHead>대표자</TableHead>
-                <TableHead>전화번호</TableHead>
-                <TableHead>결제방식</TableHead>
-                <TableHead>상태</TableHead>
-                <TableHead className="w-[120px]">관리</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+        {/* 툴바 */}
+        <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2 shrink-0">
+          <div className="flex flex-1 items-center gap-1.5 h-8 max-w-[320px] rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2.5">
+            <Search className="size-3.5 text-[var(--jm-text-muted)] shrink-0" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSearch();
+              }}
+              placeholder="거래처명 또는 사업자번호로 검색"
+              className="flex-1 bg-transparent text-jm-sm outline-none placeholder:text-[var(--jm-text-muted)] text-[var(--jm-text)]"
+            />
+          </div>
+          <JmIconButton
+            aria-label="새로고침"
+            onClick={() => suppliersQuery.refetch()}
+            disabled={loading}
+            size="sm"
+            variant="ghost"
+          >
+            <RefreshCw className={refreshing ? "animate-spin" : ""} />
+          </JmIconButton>
+          <div className="ml-auto">
+            <JmButton size="sm" variant="cta" onClick={openCreate}>
+              <Plus />
+              <span>거래처 추가</span>
+            </JmButton>
+          </div>
+        </div>
+
+        {/* 테이블 */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <JmTable className="min-w-[800px]">
+            <JmTableHeader className="sticky top-0 z-10">
+              <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">거래처명</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">사업자번호</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">대표자</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">전화번호</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">결제방식</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">상태</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[120px]">관리</JmTableHead>
+              </JmTableRow>
+            </JmTableHeader>
+            <JmTableBody>
               {loading ? (
                 <SuppliersSkeletonRows />
               ) : suppliers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    등록된 거래처가 없습니다
-                  </TableCell>
-                </TableRow>
+                <JmTableRow className="hover:bg-transparent">
+                  <JmTableCell colSpan={7} className="text-center py-10 text-[var(--jm-text-muted)] text-sm">
+                    {appliedSearch ? (
+                      <>
+                        <span className="text-[var(--jm-text)] font-medium">
+                          &ldquo;{appliedSearch}&rdquo;
+                        </span>{" "}
+                        에 해당하는 거래처가 없습니다
+                      </>
+                    ) : (
+                      "등록된 거래처가 없습니다"
+                    )}
+                  </JmTableCell>
+                </JmTableRow>
               ) : (
                 suppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="font-medium">
+                  <JmTableRow key={supplier.id}>
+                    <JmTableCell className="font-medium px-3 py-2 text-[var(--jm-text)]">
                       {supplier.name}
-                    </TableCell>
-                    <TableCell>{supplier.businessNumber || "-"}</TableCell>
-                    <TableCell>{supplier.representative || "-"}</TableCell>
-                    <TableCell>{supplier.phone || "-"}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          supplier.paymentMethod === "CREDIT"
-                            ? "destructive"
-                            : "default"
-                        }
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)] tabular-nums">
+                      {supplier.businessNumber || "-"}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">
+                      {supplier.representative || "-"}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">
+                      {supplier.phone || "-"}
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2">
+                      <JmBadge
+                        variant={supplier.paymentMethod === "CREDIT" ? "danger" : "default"}
+                        size="sm"
+                        shape="square"
                       >
                         {paymentLabel(supplier.paymentMethod)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={supplier.isActive ? "default" : "secondary"}
+                      </JmBadge>
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2">
+                      <JmBadge
+                        variant={supplier.isActive ? "success" : "default"}
+                        size="sm"
+                        shape="square"
                       >
                         {supplier.isActive ? "활성" : "비활성"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
+                      </JmBadge>
+                    </JmTableCell>
+                    <JmTableCell className="px-3 py-2">
                       <div className="flex gap-1">
                         <Link href={`/suppliers/${supplier.id}`}>
-                          <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <JmIconButton aria-label="상세 보기" size="sm" variant="ghost">
+                            <Eye />
+                          </JmIconButton>
                         </Link>
-                        <Button
+                        <JmIconButton
+                          aria-label="수정"
+                          size="sm"
                           variant="ghost"
-                          size="icon"
                           onClick={() => openEdit(supplier)}
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
+                          <Pencil />
+                        </JmIconButton>
+                        <JmIconButton
+                          aria-label="삭제"
+                          size="sm"
                           variant="ghost"
-                          size="icon"
                           onClick={() => handleDelete(supplier.id)}
                           disabled={deleteMutation.isPending && deleteMutation.variables === supplier.id}
                         >
                           {deleteMutation.isPending && deleteMutation.variables === supplier.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="animate-spin" />
                           ) : (
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 />
                           )}
-                        </Button>
+                        </JmIconButton>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </JmTableCell>
+                  </JmTableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+            </JmTableBody>
+          </JmTable>
+        </div>
       </div>
 
       <QuickSupplierSheet
@@ -251,6 +292,6 @@ export default function SuppliersPage() {
         onCreated={invalidate}
         onUpdated={invalidate}
       />
-    </>
+    </JmScope>
   );
 }
