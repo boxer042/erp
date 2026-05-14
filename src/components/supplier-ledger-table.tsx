@@ -91,7 +91,9 @@ function buildDateGroups(
 /**
  * 거래처 원장 표 (공용).
  * - 거래처 ledger 페이지(전체 보기)와 거래처 상세 ledger 탭(단일) 양쪽에서 재사용.
- * - 색상 룰: 잔액 양수(과지급) 만 빨강 표시. 그 외 기본색.
+ * - 색상 룰: 잔액 음수(과지급, 비정상) 만 빨강 표시. 양수(미지급)·0 은 기본색.
+ *   부호 의미 — balance = 매입(차변) - 결제(대변).
+ *   양수 = 미지급(정상), 음수 = 과지급(비정상, 시정 필요).
  */
 export function SupplierLedgerTable({
   entries,
@@ -164,8 +166,8 @@ export function SupplierLedgerTable({
             <JmTableCell
               className={cn(
                 "px-2 py-1.5 text-right font-medium tabular-nums",
-                // 과지급(양수) 만 빨강. 정상 미지급(음수)·0 은 기본
-                opening.amount > 0
+                // 과지급(음수) 만 빨강. 정상 미지급(양수)·0 은 기본
+                opening.amount < 0
                   ? "text-[var(--jm-danger-fg)]"
                   : "text-[var(--jm-text)]",
               )}
@@ -243,7 +245,7 @@ export function SupplierLedgerTable({
                   <JmTableCell
                     className={cn(
                       "px-2 py-1.5 text-right font-medium tabular-nums",
-                      parseFloat(e.balance) > 0 && "text-[var(--jm-danger-fg)]",
+                      parseFloat(e.balance) < 0 && "text-[var(--jm-danger-fg)]",
                     )}
                   >
                     ₩{formatAmount(e.balance)}

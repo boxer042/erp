@@ -268,11 +268,11 @@ export default function SupplierDetailPage() {
     supplier.paymentMethod;
 
   const outstandingNum = parseFloat(supplier.outstandingBalance);
-  // 잔액 색상 룰 — 거래처원장과 통일: 음수(미지급)는 정상, 양수(과지급)만 빨강
+  // 잔액 색상 룰 — 거래처원장과 통일: 양수(미지급)는 정상, 음수(과지급)만 빨강
   const outstandingHint =
-    outstandingNum < 0
+    outstandingNum > 0
       ? "갚을 돈"
-      : outstandingNum > 0
+      : outstandingNum < 0
         ? "과지급"
         : "잔액 없음";
 
@@ -333,8 +333,9 @@ export default function SupplierDetailPage() {
               hint={outstandingHint}
               size="sm"
               positiveIsGood={false}
+              // 과지급(음수) 만 위험 강조
               className={
-                outstandingNum > 0
+                outstandingNum < 0
                   ? "ring-2 ring-[var(--jm-danger-fg)]/30"
                   : undefined
               }

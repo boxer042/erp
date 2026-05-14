@@ -559,8 +559,8 @@ export default function SupplierLedgerPage() {
             ) : (
               filteredSummaries.map((s) => {
                 const bal = s.currentBalance;
-                // 정상 미지급(음수)·0 → 기본색. 과지급(양수, 비정상) → 빨강 강조
-                const balColor = bal > 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text-muted)]";
+                // 정상 미지급(양수)·0 → 기본색. 과지급(음수, 비정상) → 빨강 강조
+                const balColor = bal < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text-muted)]";
                 return (
                   <div
                     key={s.supplierId}
@@ -591,8 +591,8 @@ export default function SupplierLedgerPage() {
             const openingTotal = selectedSupplierSummary
               ? selectedSupplierSummary.openingBalance
               : filteredSummaries.reduce((s, sup) => s + sup.openingBalance, 0);
-            // 과지급(양수) 만 빨강. 정상 미지급(음수)·0 은 기본색
-            const balanceClass = totalBalance > 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]";
+            // 과지급(음수) 만 빨강. 정상 미지급(양수)·0 은 기본색
+            const balanceClass = totalBalance < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]";
             return (
               <div className="min-h-10 px-4 border-b border-[var(--jm-border)] flex items-center flex-wrap gap-x-4 gap-y-1 py-1 text-xs text-[var(--jm-text-muted)] shrink-0">
                 <button
@@ -644,7 +644,7 @@ export default function SupplierLedgerPage() {
               <div>
                 <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">현재 잔액</p>
                 <p className={cn("text-sm font-medium tabular-nums",
-                  selectedSupplierSummary.currentBalance > 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]")}>
+                  selectedSupplierSummary.currentBalance < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]")}>
                   ₩{formatAmount(selectedSupplierSummary.currentBalance)}
                 </p>
               </div>
