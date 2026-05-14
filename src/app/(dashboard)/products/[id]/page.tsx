@@ -36,6 +36,8 @@ import {
   ProductKpiCards,
   ProductMappingsTable,
   ProductMovementsTable,
+  ProductPriceHistoryCard,
+  ProductSalesPriceHistoryCard,
   ProductSection,
   ProductSellingCostsTable,
   ProductVariantsCard,
@@ -480,6 +482,24 @@ export default function ProductDetailPage() {
               isLoading={movementsQuery.isPending}
               showVariantColumn={!!product.isCanonical}
             />
+          </ProductSection>
+
+          {/* 7. 가격 변경 이력 — 상품 정가/판매가 수정 시 자동 기록 */}
+          <ProductSection
+            title="가격 변경 이력"
+            description="정가·판매가가 바뀐 시점, 변경자, 사유까지 추적합니다 (최근 100건)"
+            noPadding
+          >
+            <ProductPriceHistoryCard productId={product.id} />
+          </ProductSection>
+
+          {/* 8. 실판매 단가 이력 — 실제 판매된 OrderItem 의 정가/실판매가/할인율 분포 */}
+          <ProductSection
+            title="실판매 단가 이력"
+            description="POS·주문에서 실제 결제된 단가 분포 (최근 100건). 정가와 다르게 할인 판매된 케이스를 한눈에 확인"
+            noPadding
+          >
+            <ProductSalesPriceHistoryCard productId={product.id} />
           </ProductSection>
         </div>
       </div>

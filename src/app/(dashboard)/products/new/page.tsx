@@ -206,6 +206,7 @@ export default async function NewProductPage() {
       id: p.id,
       name: p.name,
       sku: p.sku,
+      spec: p.spec,
       sellingPrice: p.sellingPrice.toString(),
       unitCost: unitCost != null ? String(unitCost) : null,
       supplierUnitPrice,

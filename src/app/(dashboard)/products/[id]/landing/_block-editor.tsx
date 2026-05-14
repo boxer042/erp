@@ -39,6 +39,7 @@ import {
   LANDING_ICON_LABELS,
   LANDING_ICON_NAMES,
 } from "@/lib/landing-icons";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 import { ImageUploadField } from "./_image-upload";
 import { uploadHtml } from "./_helpers";
@@ -2393,7 +2394,7 @@ function HtmlEmbedEditor({ block, onChange }: EditorProps<HtmlEmbedBlock>) {
                 setHeightStr(String(block.heightPx));
               }
             }}
-            onFocus={(e) => e.currentTarget.select()}
+            onFocus={focusCaretEnd}
             disabled={block.autoHeight}
           />
         </Field>

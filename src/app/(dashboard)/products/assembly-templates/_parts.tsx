@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -111,7 +112,7 @@ export function TemplatesView() {
     queryKey: queryKeys.products.list({ scope: "assembly-templates-all" }),
     queryFn: async () => {
       const data = await apiGet<Array<{
-        id: string; name: string; sku: string;
+        id: string; name: string; sku: string; spec: string | null;
         sellingPrice: string; unitCost: string | null;
         unitOfMeasure: string; isSet: boolean;
       }>>("/api/products?isBulk=all");
@@ -119,6 +120,7 @@ export function TemplatesView() {
         id: p.id,
         name: p.name,
         sku: p.sku,
+        spec: p.spec,
         sellingPrice: p.sellingPrice,
         unitCost: p.unitCost,
         unitOfMeasure: p.unitOfMeasure,
@@ -430,7 +432,7 @@ export function TemplatesView() {
                   inputMode="numeric"
                   value={formatComma(defaultLaborCost)}
                   onChange={(e) => setDefaultLaborCost(parseComma(e.target.value))}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                   className="max-w-[200px]"
                   placeholder="선택"
                 />
@@ -502,7 +504,7 @@ export function TemplatesView() {
                               inputMode="decimal"
                               value={s.defaultQuantity}
                               onChange={(e) => updateSlot(idx, { defaultQuantity: e.target.value })}
-                              onFocus={(e) => e.currentTarget.select()}
+                              onFocus={focusCaretEnd}
                               className="w-full h-7 bg-transparent text-sm px-2 text-right outline-none focus:bg-muted rounded tabular-nums"
                             />
                           </td>

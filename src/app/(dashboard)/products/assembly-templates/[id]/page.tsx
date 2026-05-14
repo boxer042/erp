@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -116,7 +117,7 @@ export default function TemplateDetailPage({
     queryKey: queryKeys.products.list({ scope: "assembly-templates" }),
     queryFn: async () => {
       const data = await apiGet<Array<{
-        id: string; name: string; sku: string;
+        id: string; name: string; sku: string; spec: string | null;
         sellingPrice: string; unitCost: string | null;
         unitOfMeasure: string; isSet: boolean;
       }>>("/api/products");
@@ -124,6 +125,7 @@ export default function TemplateDetailPage({
         id: p.id,
         name: p.name,
         sku: p.sku,
+        spec: p.spec,
         sellingPrice: p.sellingPrice,
         unitCost: p.unitCost,
         unitOfMeasure: p.unitOfMeasure,
@@ -495,7 +497,7 @@ export default function TemplateDetailPage({
                                   ),
                                 )
                               }
-                              onFocus={(e) => e.currentTarget.select()}
+                              onFocus={focusCaretEnd}
                               className="w-full h-7 bg-transparent text-sm px-2 text-right outline-none focus:bg-muted rounded tabular-nums"
                             />
                           </td>

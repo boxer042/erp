@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 import { computeShippingPerUnitDisplay } from "@/lib/incoming-shipping";
 import { computeSupplierProductAvgShipping } from "@/lib/cost-utils";
 import { productSchema } from "@/lib/validators/product";
@@ -843,10 +844,26 @@ export async function PUT(
   }
 
   const data = parsed.data;
+  const user = await getCurrentUser();
 
   const isSet = data.productType === "SET" || data.productType === "ASSEMBLED";
   const isOptionParent = data.productType === "OPTION_PARENT";
   const newSellingPrice = isOptionParent ? 0 : parseFloat(data.sellingPrice);
+  const newListPrice = isOptionParent
+    ? 0
+    : parseFloat(data.listPrice ?? data.sellingPrice);
+
+  // 가격 변경 이력 — 현재 DB 값 미리 조회 (업데이트 후 diff 비교용)
+  const before = await prisma.product.findUnique({
+    where: { id },
+    select: { listPrice: true, sellingPrice: true },
+  });
+  const oldListPrice = before ? Number(before.listPrice) : 0;
+  const oldSellingPrice = before ? Number(before.sellingPrice) : 0;
+  const reason =
+    typeof body.priceChangeReason === "string" && body.priceChangeReason.trim().length > 0
+      ? body.priceChangeReason.trim()
+      : null;
 
   const product = await prisma.$transaction(async (tx) => {
     const updated = await tx.product.update({
@@ -864,7 +881,7 @@ export async function PUT(
         productType: data.productType,
         taxType: data.taxType,
         taxRate: parseFloat(data.taxRate),
-        listPrice: isOptionParent ? 0 : parseFloat(data.listPrice ?? data.sellingPrice),
+        listPrice: newListPrice,
         sellingPrice: newSellingPrice,
         isSet,
         isBulk: data.isBulk ?? false,
@@ -886,6 +903,49 @@ export async function PUT(
         asResponsible: data.asResponsible ?? null,
       },
     });
+
+    // 가격 변경 이력 — listPrice / sellingPrice 가 실제로 바뀐 경우에만 row 생성
+    const historyRows: Array<{
+      productId: string;
+      field: string;
+      oldPrice: number;
+      newPrice: number;
+      changeAmount: number;
+      changePercent: number;
+      reason: string | null;
+      changedById: string | null;
+    }> = [];
+    if (oldListPrice !== newListPrice) {
+      const diff = newListPrice - oldListPrice;
+      const pct = oldListPrice > 0 ? (diff / oldListPrice) * 100 : 0;
+      historyRows.push({
+        productId: id,
+        field: "LIST",
+        oldPrice: oldListPrice,
+        newPrice: newListPrice,
+        changeAmount: diff,
+        changePercent: Math.round(pct * 100) / 100,
+        reason,
+        changedById: user?.id ?? null,
+      });
+    }
+    if (oldSellingPrice !== newSellingPrice) {
+      const diff = newSellingPrice - oldSellingPrice;
+      const pct = oldSellingPrice > 0 ? (diff / oldSellingPrice) * 100 : 0;
+      historyRows.push({
+        productId: id,
+        field: "SELLING",
+        oldPrice: oldSellingPrice,
+        newPrice: newSellingPrice,
+        changeAmount: diff,
+        changePercent: Math.round(pct * 100) / 100,
+        reason,
+        changedById: user?.id ?? null,
+      });
+    }
+    if (historyRows.length > 0) {
+      await tx.productPriceHistory.createMany({ data: historyRows });
+    }
 
     // 벌크 SKU 가격 자동 동기화 — 병 가격 ÷ containerSize
     if (updated.bulkProductId && updated.containerSize) {
