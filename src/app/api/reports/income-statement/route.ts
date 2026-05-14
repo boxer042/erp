@@ -1,0 +1,319 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { guardAdmin } from "@/lib/api-auth";
+
+// 손익계산서 — 공급가액 기준 매출·매출원가·판관비·영업이익 집계 (V3: 총액주의 + 부분환불 비례차감)
+//
+// V3 정책 (회계 정석):
+//   - 매출은 발생 시점 기준 (재고 차감되어 매출 인식된 모든 주문)
+//   - 환불·교환·매출취소는 별도 "매출 차감" 라인으로 분리 표시
+//   - 부분 환불은 OrderItem.refundedAmount 비율로 수수료/판매비용/원가까지 일관 차감
+//   - -EX 새 주문 제외 정책 제거 (원본 EXCHANGED 차감과 짝맞춤)
+//
+// 매출 발생 status:
+//   PREPARING / PREPARING_PACKED / SHIPPED / COMPLETED (정상)
+//   RETURN_REQUESTED~RETURN_INSPECTED (반품 진행중 — 매출은 발생함)
+//   RETURNED / EXCHANGED (반품·교환 완료 — 매출 발생 + 동시 차감)
+//
+// 매출 차감 4분류:
+//   - refund:    status = RETURNED
+//   - exchange:  status = EXCHANGED
+//   - cancel:    paymentStatus = SALES_CANCELLED (외상 반품)
+//   - partial:   활성 주문의 Σ OrderItem.refundedAmount (공급가액 환산)
+//
+// 매출원가 (V3 — 부분환불 비례 차감):
+//   - lotConsumptions 있음: 그대로 사용 (시스템이 부분환불 시 LotConsumption 도 갱신한다고 가정)
+//   - lotConsumptions 없고 unitCostSnapshot 있음: 부분환불 비율(1 - refundRatio) 적용
+//   - 전액 차감(RETURNED/EXCHANGED/SALES_CANCELLED): lotConsumptions 만 (복원된 부분은 0)
+//
+// 수수료/판매비용 (V3 — 부분환불 비례 차감):
+//   - 전액 차감 주문: 0 (매출 발생 안 한 효과)
+//   - 부분환불: (1 - refundRatio) 비율 적용
+//   - 정상: 100% 그대로
+
+const REVENUE_BEARING_STATUSES = [
+  "PREPARING",
+  "PREPARING_PACKED",
+  "SHIPPED",
+  "COMPLETED",
+  "RETURN_REQUESTED",
+  "RETURN_ACCEPTED",
+  "RETURN_PICKING",
+  "RETURN_COLLECTED",
+  "RETURN_INSPECTED",
+  "RETURNED",
+  "EXCHANGED",
+] as const;
+
+interface RevenueBreakdown {
+  product: number;
+  repair: number;
+  rental: number;
+  total: number; // 총 매출액 (차감 전)
+}
+
+interface DeductionBreakdown {
+  refund: number; // RETURNED
+  exchange: number; // EXCHANGED
+  cancel: number; // paymentStatus=SALES_CANCELLED
+  partial: number; // 부분 환불
+  total: number; // 매출 차감 합계
+}
+
+interface OpexBreakdown {
+  channelCommission: number;
+  cardFee: number;
+  sellingCost: number;
+  categories: { category: string; amount: number; isTaxable?: boolean }[];
+  generalTotal: number;
+  total: number;
+}
+
+interface VatStatus {
+  outputVat: number;
+  inputVat: number;
+  estimatedPayment: number;
+}
+
+interface PeriodReport {
+  revenue: RevenueBreakdown;
+  deductions: DeductionBreakdown;
+  netRevenue: number; // 순 매출액
+  costOfGoodsSold: number;
+  grossProfit: number; // 순매출 − 매출원가
+  operatingExpenses: OpexBreakdown;
+  operatingIncome: number;
+  vat: VatStatus;
+  missingCostCount: number;
+}
+
+async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
+  const [orders, incomings, expenses] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        status: { in: [...REVENUE_BEARING_STATUSES] },
+        orderDate: { gte: from, lt: to },
+      },
+      select: {
+        id: true,
+        status: true,
+        paymentStatus: true,
+        repairTicketId: true,
+        rentalId: true,
+        taxAmount: true,
+        items: {
+          select: {
+            quantity: true,
+            totalPrice: true,
+            refundedAmount: true,
+            unitCostSnapshot: true,
+            channelCommissionRateSnapshot: true,
+            cardFeeRateSnapshot: true,
+            sellingCostSnapshot: true,
+            product: { select: { taxType: true, taxRate: true } },
+            lotConsumptions: { select: { quantity: true, unitCost: true } },
+          },
+        },
+      },
+    }),
+    prisma.incoming.findMany({
+      where: {
+        status: "CONFIRMED",
+        incomingDate: { gte: from, lt: to },
+      },
+      select: { taxAmount: true },
+    }),
+    prisma.expense.findMany({
+      where: { date: { gte: from, lt: to }, recoverable: false },
+      select: { category: true, amount: true, isTaxable: true },
+    }),
+  ]);
+
+  const revenue: RevenueBreakdown = { product: 0, repair: 0, rental: 0, total: 0 };
+  const deductions: DeductionBreakdown = {
+    refund: 0,
+    exchange: 0,
+    cancel: 0,
+    partial: 0,
+    total: 0,
+  };
+  let costOfGoodsSold = 0;
+  let channelCommission = 0;
+  let cardFee = 0;
+  let sellingCostTotal = 0;
+  let missingCostCount = 0;
+  let outputVat = 0;
+
+  for (const order of orders) {
+    outputVat += Number(order.taxAmount);
+
+    const isRepair = order.repairTicketId !== null;
+    const isRental = order.rentalId !== null;
+
+    // 매출 차감 분류
+    const isReturned = order.status === "RETURNED";
+    const isExchanged = order.status === "EXCHANGED";
+    const isSalesCancelled = order.paymentStatus === "SALES_CANCELLED";
+    const isFullyDeducted = isReturned || isExchanged || isSalesCancelled;
+
+    for (const item of order.items) {
+      const qty = Number(item.quantity);
+      const totalPrice = Number(item.totalPrice);
+      const refundedAmount = Number(item.refundedAmount);
+      const taxRate =
+        item.product?.taxType === "TAXABLE" ? Number(item.product.taxRate) : 0;
+      const supplyRevenue = taxRate > 0 ? totalPrice / (1 + taxRate) : totalPrice;
+      const supplyRefunded = taxRate > 0 ? refundedAmount / (1 + taxRate) : refundedAmount;
+
+      // 부분환불 비율 (활성 주문에만 적용 — 0~1 사이)
+      const refundRatio =
+        !isFullyDeducted && refundedAmount > 0 && totalPrice > 0
+          ? Math.min(1, refundedAmount / totalPrice)
+          : 0;
+      const effectiveRatio = 1 - refundRatio; // 환불 안 된 비율
+
+      // 매출 (총액 — 발생 시점 기준)
+      if (isRepair) revenue.repair += supplyRevenue;
+      else if (isRental) revenue.rental += supplyRevenue;
+      else revenue.product += supplyRevenue;
+
+      // 매출 차감 분류
+      if (isFullyDeducted) {
+        if (isSalesCancelled) deductions.cancel += supplyRevenue;
+        else if (isReturned) deductions.refund += supplyRevenue;
+        else if (isExchanged) deductions.exchange += supplyRevenue;
+      } else if (refundedAmount > 0) {
+        deductions.partial += supplyRefunded;
+      }
+
+      // 매출원가
+      if (item.lotConsumptions.length > 0) {
+        // lotConsumptions 는 시스템이 부분환불 시 LotConsumption 도 함께 갱신한다고 가정
+        for (const lc of item.lotConsumptions) {
+          costOfGoodsSold += Number(lc.quantity) * Number(lc.unitCost);
+        }
+      } else if (!isFullyDeducted && item.unitCostSnapshot != null) {
+        // unitCostSnapshot fallback — 부분환불 비율 적용 (스냅샷은 주문 시점이라 환불 미반영)
+        costOfGoodsSold += Number(item.unitCostSnapshot) * qty * effectiveRatio;
+      } else if (!isFullyDeducted && item.product) {
+        missingCostCount += 1;
+      }
+      // isFullyDeducted 인데 lotConsumptions 도 없으면: 복원된 상태 → 원가 0 (정합성)
+
+      // 수수료·판매비용 — 활성 주문에 부분환불 비율 적용, 전액 차감 주문은 0
+      if (!isFullyDeducted) {
+        const commRate = item.channelCommissionRateSnapshot
+          ? Number(item.channelCommissionRateSnapshot)
+          : 0;
+        const cardRate = item.cardFeeRateSnapshot
+          ? Number(item.cardFeeRateSnapshot)
+          : 0;
+        channelCommission += totalPrice * commRate * effectiveRatio;
+        cardFee += totalPrice * cardRate * effectiveRatio;
+        sellingCostTotal +=
+          (item.sellingCostSnapshot ? Number(item.sellingCostSnapshot) * qty : 0) *
+          effectiveRatio;
+      }
+    }
+  }
+
+  revenue.total = revenue.product + revenue.repair + revenue.rental;
+  deductions.total =
+    deductions.refund + deductions.exchange + deductions.cancel + deductions.partial;
+  const netRevenue = revenue.total - deductions.total;
+
+  // 일반 경비
+  const opexMap = new Map<string, { amount: number; taxableSum: number }>();
+  let inputVatFromExpenses = 0;
+  for (const e of expenses) {
+    const raw = Number(e.amount);
+    const net = e.isTaxable ? raw / 1.1 : raw;
+    if (e.isTaxable) inputVatFromExpenses += raw - net;
+    const prev = opexMap.get(e.category) ?? { amount: 0, taxableSum: 0 };
+    prev.amount += net;
+    if (e.isTaxable) prev.taxableSum += net;
+    opexMap.set(e.category, prev);
+  }
+  const categories = Array.from(opexMap.entries())
+    .map(([category, v]) => ({
+      category,
+      amount: Math.round(v.amount),
+      isTaxable: v.taxableSum > v.amount / 2,
+    }))
+    .sort((a, b) => b.amount - a.amount);
+
+  const generalTotal = categories.reduce((s, c) => s + c.amount, 0);
+  const opexTotal = generalTotal + channelCommission + cardFee + sellingCostTotal;
+
+  const inputVatFromIncoming = incomings.reduce((s, i) => s + Number(i.taxAmount), 0);
+  const inputVat = inputVatFromIncoming + inputVatFromExpenses;
+
+  const grossProfit = netRevenue - costOfGoodsSold;
+  const operatingIncome = grossProfit - opexTotal;
+
+  return {
+    revenue: {
+      product: Math.round(revenue.product),
+      repair: Math.round(revenue.repair),
+      rental: Math.round(revenue.rental),
+      total: Math.round(revenue.total),
+    },
+    deductions: {
+      refund: Math.round(deductions.refund),
+      exchange: Math.round(deductions.exchange),
+      cancel: Math.round(deductions.cancel),
+      partial: Math.round(deductions.partial),
+      total: Math.round(deductions.total),
+    },
+    netRevenue: Math.round(netRevenue),
+    costOfGoodsSold: Math.round(costOfGoodsSold),
+    grossProfit: Math.round(grossProfit),
+    operatingExpenses: {
+      channelCommission: Math.round(channelCommission),
+      cardFee: Math.round(cardFee),
+      sellingCost: Math.round(sellingCostTotal),
+      categories,
+      generalTotal: Math.round(generalTotal),
+      total: Math.round(opexTotal),
+    },
+    operatingIncome: Math.round(operatingIncome),
+    vat: {
+      outputVat: Math.round(outputVat),
+      inputVat: Math.round(inputVat),
+      estimatedPayment: Math.round(outputVat - inputVat),
+    },
+    missingCostCount,
+  };
+}
+
+export async function GET(request: NextRequest) {
+  const [, deny] = await guardAdmin();
+  if (deny) return deny;
+
+  const { searchParams } = new URL(request.url);
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const from = fromParam ? new Date(fromParam) : monthStart;
+  const to = toParam ? new Date(toParam) : monthEnd;
+
+  const periodMs = to.getTime() - from.getTime();
+  const prevTo = from;
+  const prevFrom = new Date(from.getTime() - periodMs);
+
+  const [current, previous] = await Promise.all([
+    aggregatePeriod(from, to),
+    aggregatePeriod(prevFrom, prevTo),
+  ]);
+
+  return NextResponse.json({
+    period: { from, to },
+    prevPeriod: { from: prevFrom, to: prevTo },
+    current,
+    previous,
+  });
+}
