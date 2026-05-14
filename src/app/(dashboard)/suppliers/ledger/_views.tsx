@@ -91,7 +91,8 @@ export function ItemsView({
             </JmTableCell>
             <JmTableCell className={cn(
               "px-2 py-1.5 text-right font-medium tabular-nums",
-              selectedSupplierSummary.openingBalance > 0
+              // 과지급(음수) 만 빨강. 정상 미지급(양수)·0 은 기본
+              selectedSupplierSummary.openingBalance < 0
                 ? "text-[var(--jm-danger-fg)]"
                 : "text-[var(--jm-text)]",
             )}>
@@ -154,7 +155,8 @@ export function ItemsView({
                     </JmTableCell>
                     <JmTableCell className={cn(
                       "px-2 py-1.5 text-right font-medium tabular-nums",
-                      parseFloat(p.balance) > 0 && "text-[var(--jm-danger-fg)]",
+                      // 과지급(음수) 만 빨강
+                      parseFloat(p.balance) < 0 && "text-[var(--jm-danger-fg)]",
                     )}>
                       ₩{formatAmount(p.balance)}
                     </JmTableCell>
@@ -198,7 +200,8 @@ export function ItemsView({
                   <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
                   <JmTableCell className={cn(
                     "px-2 py-1.5 text-right font-medium tabular-nums",
-                    row.balance !== null && row.balance > 0 && "text-[var(--jm-danger-fg)]",
+                    // 과지급(음수) 만 빨강
+                    row.balance !== null && row.balance < 0 && "text-[var(--jm-danger-fg)]",
                   )}>
                     {row.balance !== null ? `₩${formatAmount(row.balance)}` : ""}
                   </JmTableCell>
