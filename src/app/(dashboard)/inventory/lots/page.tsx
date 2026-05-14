@@ -1,21 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { SupplierCombobox } from "@/components/supplier-combobox";
-import { AlertTriangle } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  JmBadge,
+  JmCheckbox,
+  JmIconButton,
+  JmScope,
+  JmSelect,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 
 interface Lot {
   id: string;
@@ -50,25 +56,63 @@ const sourceLabels: Record<string, string> = {
   SET_PRODUCE: "세트조립",
 };
 
+const sourceJmVariants: Record<string, "info" | "success" | "warning" | "accent"> = {
+  INCOMING: "info",
+  INITIAL: "success",
+  ADJUSTMENT: "warning",
+  SET_PRODUCE: "accent",
+};
+
 const formatWon = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
-const formatQty = (v: string | number) => parseFloat(String(v)).toLocaleString("ko-KR");
+const formatQty = (v: string | number) =>
+  parseFloat(String(v)).toLocaleString("ko-KR");
+
+const MAPPED_OPTIONS = [
+  { value: "all", label: "전체" },
+  { value: "mapped", label: "매핑" },
+  { value: "orphan", label: "미매핑" },
+];
+
+const SOURCE_OPTIONS = [
+  { value: "all", label: "모든 소스" },
+  { value: "INCOMING", label: "입고" },
+  { value: "INITIAL", label: "기초" },
+  { value: "ADJUSTMENT", label: "조정" },
+  { value: "SET_PRODUCE", label: "세트조립" },
+];
 
 function LotsSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-20" /></div></TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-        </TableRow>
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-12" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-12" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-16" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-20" />
+            </div>
+          </JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-12 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -76,9 +120,12 @@ function LotsSkeletonRows({ rows = 8 }: { rows?: number }) {
 
 export default function InventoryLotsPage() {
   const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
   const [supplierId, setSupplierId] = useState("");
   const [mapped, setMapped] = useState<"all" | "mapped" | "orphan">("all");
-  const [source, setSource] = useState<"all" | "INCOMING" | "INITIAL" | "ADJUSTMENT" | "SET_PRODUCE">("all");
+  const [source, setSource] = useState<
+    "all" | "INCOMING" | "INITIAL" | "ADJUSTMENT" | "SET_PRODUCE"
+  >("all");
   const [hasRemaining, setHasRemaining] = useState(false);
 
   const lotsQuery = useQuery({
@@ -94,6 +141,7 @@ export default function InventoryLotsPage() {
   });
   const lots = lotsQuery.data ?? [];
   const loading = lotsQuery.isPending;
+  const refreshing = lotsQuery.isFetching && !loading;
   const fetchLots = () => queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
 
   const suppliersQuery = useQuery({
@@ -113,165 +161,190 @@ export default function InventoryLotsPage() {
   );
 
   return (
-    <div className="flex h-full flex-col">
-      <DataTableToolbar
-        onRefresh={fetchLots}
-        loading={loading}
-        filters={
-          <div className="flex items-center gap-2">
-            <div className="w-[200px]">
-              <SupplierCombobox
-                suppliers={suppliers}
-                value={supplierId}
-                onChange={(id) => setSupplierId(id)}
-                onCreateNew={() => {}}
-                clearable
-                placeholder="전체 거래처"
-              />
-            </div>
-            <Select value={mapped} onValueChange={(v) => setMapped(v as typeof mapped)}>
-              <SelectTrigger className="h-[30px] w-[110px] text-[13px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                <SelectItem value="mapped">매핑</SelectItem>
-                <SelectItem value="orphan">미매핑</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={source} onValueChange={(v) => setSource(v as typeof source)}>
-              <SelectTrigger className="h-[30px] w-[110px] text-[13px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">모든 소스</SelectItem>
-                <SelectItem value="INCOMING">입고</SelectItem>
-                <SelectItem value="INITIAL">기초</SelectItem>
-                <SelectItem value="ADJUSTMENT">조정</SelectItem>
-                <SelectItem value="SET_PRODUCE">세트조립</SelectItem>
-              </SelectContent>
-            </Select>
-            <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
-              <Checkbox
-                checked={hasRemaining}
-                onCheckedChange={(c) => setHasRemaining(c === true)}
-              />
-              잔량만
-            </label>
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+        {/* 툴바 */}
+        <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2 shrink-0">
+          <div className="w-[200px]">
+            <SupplierCombobox
+              suppliers={suppliers}
+              value={supplierId}
+              onChange={(id) => setSupplierId(id)}
+              onCreateNew={() => {}}
+              clearable
+              placeholder="전체 거래처"
+            />
           </div>
-        }
-      />
+          <JmSelect
+            size="sm"
+            className="w-[110px]"
+            options={MAPPED_OPTIONS}
+            value={mapped}
+            onChange={(v) => setMapped(v as typeof mapped)}
+          />
+          <JmSelect
+            size="sm"
+            className="w-[110px]"
+            options={SOURCE_OPTIONS}
+            value={source}
+            onChange={(v) => setSource(v as typeof source)}
+          />
+          <label className="flex items-center gap-1.5 text-jm-sm text-[var(--jm-text-muted)] cursor-pointer select-none">
+            <JmCheckbox
+              checked={hasRemaining}
+              onCheckedChange={(c) => setHasRemaining(c === true)}
+            />
+            잔량만
+          </label>
+          <div className="ml-auto">
+            <JmIconButton
+              aria-label="새로고침"
+              size="sm"
+              variant="ghost"
+              onClick={fetchLots}
+              disabled={loading}
+            >
+              <RefreshCw className={refreshing ? "animate-spin" : ""} />
+            </JmIconButton>
+          </div>
+        </div>
 
-      {/* 요약 */}
-      <div className="flex items-center gap-4 border-b border-border px-5 py-2.5 text-[13px]">
-        <div>
-          <span className="text-muted-foreground">총 로트: </span>
-          <span className="font-medium">{lots.length}건</span>
-        </div>
-        <div>
-          <span className="text-muted-foreground">잔량 원가합계: </span>
-          <span className="font-medium">{formatWon(totalRemainingValue)}</span>
-        </div>
-        {orphanLots.length > 0 && (
+        {/* 요약 */}
+        <div className="min-h-10 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-1 text-jm-xs text-[var(--jm-text-muted)] shrink-0">
           <div>
-            <span className="text-muted-foreground">미매핑: </span>
-            <span className="font-medium text-warning">
-              {orphanLots.length}건 · {formatWon(orphanRemainingValue)}
+            총 로트:{" "}
+            <span className="font-medium text-[var(--jm-text)] tabular-nums">
+              {lots.length}건
             </span>
           </div>
-        )}
-      </div>
+          <span className="text-[var(--jm-text-muted)]/50">|</span>
+          <div>
+            잔량 원가합계:{" "}
+            <span className="font-medium text-[var(--jm-text)] tabular-nums">
+              {formatWon(totalRemainingValue)}
+            </span>
+          </div>
+          {orphanLots.length > 0 && (
+            <>
+              <span className="text-[var(--jm-text-muted)]/50">|</span>
+              <div>
+                미매핑:{" "}
+                <span className="font-medium text-[var(--jm-warning-fg)] tabular-nums">
+                  {orphanLots.length}건 · {formatWon(orphanRemainingValue)}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
 
-      <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>수령일</TableHead>
-              <TableHead>거래처</TableHead>
-              <TableHead>공급상품</TableHead>
-              <TableHead>매핑 판매상품</TableHead>
-              <TableHead className="text-right">수령</TableHead>
-              <TableHead className="text-right">잔량</TableHead>
-              <TableHead className="text-right">단가</TableHead>
-              <TableHead className="text-right">잔량 원가</TableHead>
-              <TableHead>소스</TableHead>
-              <TableHead>메모</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <LotsSkeletonRows />
-            ) : lots.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">로트가 없습니다</TableCell>
-              </TableRow>
-            ) : (
-              lots.map((lot) => {
-                const remainingValue = parseFloat(lot.remainingQty) * parseFloat(lot.unitCost);
-                return (
-                  <TableRow key={lot.id}>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(lot.receivedAt).toLocaleDateString("ko-KR")}
-                    </TableCell>
-                    <TableCell>
-                      {lot.supplierProduct ? (
-                        lot.supplierProduct.supplier.name
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {lot.supplierProduct ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium">{lot.supplierProduct.name}</span>
-                          {lot.supplierProduct.supplierCode && (
-                            <span className="text-xs text-muted-foreground">
-                              {lot.supplierProduct.supplierCode}
+        {/* 테이블 */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <JmTable className="min-w-[1100px]">
+            <JmTableHeader className="sticky top-0 z-10">
+              <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">수령일</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">거래처</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">공급상품</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">매핑 판매상품</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">수령</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">잔량</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">단가</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">잔량 원가</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">소스</JmTableHead>
+                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">메모</JmTableHead>
+              </JmTableRow>
+            </JmTableHeader>
+            <JmTableBody>
+              {loading ? (
+                <LotsSkeletonRows />
+              ) : lots.length === 0 ? (
+                <JmTableRow className="hover:bg-transparent">
+                  <JmTableCell
+                    colSpan={10}
+                    className="text-center py-10 text-[var(--jm-text-muted)] text-sm"
+                  >
+                    로트가 없습니다
+                  </JmTableCell>
+                </JmTableRow>
+              ) : (
+                lots.map((lot) => {
+                  const remainingValue =
+                    parseFloat(lot.remainingQty) * parseFloat(lot.unitCost);
+                  return (
+                    <JmTableRow key={lot.id}>
+                      <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)] tabular-nums">
+                        {new Date(lot.receivedAt).toLocaleDateString("ko-KR")}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-[var(--jm-text)]">
+                        {lot.supplierProduct ? (
+                          lot.supplierProduct.supplier.name
+                        ) : (
+                          <span className="text-[var(--jm-text-muted)]">-</span>
+                        )}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2">
+                        {lot.supplierProduct ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-[var(--jm-text)]">
+                              {lot.supplierProduct.name}
                             </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {lot.product ? (
-                        <div className="flex items-center gap-1.5">
-                          <span>{lot.product.name}</span>
-                          <span className="text-xs text-muted-foreground">{lot.product.sku}</span>
-                        </div>
-                      ) : (
-                        <Badge variant="warning">
-                          <AlertTriangle className="size-3 mr-1" />
-                          미매핑
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatQty(lot.receivedQty)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatQty(lot.remainingQty)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatWon(parseFloat(lot.unitCost))}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatWon(remainingValue)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {sourceLabels[lot.source]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{lot.memo || "-"}</TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                            {lot.supplierProduct.supplierCode && (
+                              <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                                {lot.supplierProduct.supplierCode}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[var(--jm-text-muted)]">-</span>
+                        )}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2">
+                        {lot.product ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[var(--jm-text)]">{lot.product.name}</span>
+                            <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                              {lot.product.sku}
+                            </span>
+                          </div>
+                        ) : (
+                          <JmBadge variant="warning" size="sm" shape="square">
+                            <AlertTriangle className="size-3 mr-1" />
+                            미매핑
+                          </JmBadge>
+                        )}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
+                        {formatQty(lot.receivedQty)}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)] font-medium">
+                        {formatQty(lot.remainingQty)}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
+                        {formatWon(parseFloat(lot.unitCost))}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
+                        {formatWon(remainingValue)}
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2">
+                        <JmBadge
+                          variant={sourceJmVariants[lot.source] ?? "default"}
+                          size="sm"
+                          shape="square"
+                        >
+                          {sourceLabels[lot.source]}
+                        </JmBadge>
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)] text-jm-xs">
+                        {lot.memo || "-"}
+                      </JmTableCell>
+                    </JmTableRow>
+                  );
+                })
+              )}
+            </JmTableBody>
+          </JmTable>
+        </div>
       </div>
-    </div>
+    </JmScope>
   );
 }

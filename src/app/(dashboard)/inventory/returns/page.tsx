@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
@@ -859,7 +860,7 @@ export default function SupplierReturnsPage() {
                       type="text" inputMode="numeric"
                       value={formatComma(returnCostSupply)}
                       onChange={(e) => { const s = parseComma(e.target.value); setReturnCostSupply(s); setReturnCostTax(String(Math.round(Number(s) * 0.1))); }}
-                      onFocus={(e) => e.currentTarget.select()}
+                      onFocus={focusCaretEnd}
                       placeholder="0"
                       className="w-[110px] px-3 py-1.5 text-right bg-transparent outline-none focus:bg-muted/50 tabular-nums"
                     />
@@ -871,7 +872,7 @@ export default function SupplierReturnsPage() {
                       type="text" inputMode="numeric"
                       value={formatComma(returnCostTax)}
                       onChange={(e) => setReturnCostTax(parseComma(e.target.value))}
-                      onFocus={(e) => e.currentTarget.select()}
+                      onFocus={focusCaretEnd}
                       placeholder="0"
                       className="w-[90px] px-3 py-1.5 text-right bg-transparent outline-none focus:bg-muted/50 tabular-nums"
                     />
@@ -1016,7 +1017,7 @@ export default function SupplierReturnsPage() {
                               inputMode="numeric"
                               value={formatComma(item.unitPrice)}
                               onChange={(e) => updateItem(idx, "unitPrice", parseComma(e.target.value))}
-                              onFocus={(e) => { if (e.target.value === "0") updateItem(idx, "unitPrice", ""); else e.currentTarget.select(); }}
+                              onFocus={(e) => { if (e.target.value === "0") updateItem(idx, "unitPrice", ""); else focusCaretEnd(e); }}
                               disabled={isEmptyRow}
                               className="w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30 tabular-nums"
                             />

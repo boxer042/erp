@@ -21,6 +21,12 @@ export const statusVariants: Record<string, "default" | "secondary" | "destructi
   CANCELLED: "destructive",
 };
 
+export const statusJmVariants: Record<string, "warning" | "success" | "danger" | "default"> = {
+  PENDING: "warning",
+  CONFIRMED: "success",
+  CANCELLED: "danger",
+};
+
 export const shippingToSupply = (total: string, isTaxable: boolean) => {
   const n = parseFloat(total || "0");
   if (!n) return "";

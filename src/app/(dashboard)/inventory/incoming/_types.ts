@@ -13,12 +13,15 @@ export interface SupplierProduct {
   supplierCode: string | null;
   unitPrice: string;
   unitOfMeasure: string;
+  /** 매핑 존재 여부 — 행마다 dot 표시 용도 */
+  hasMapping?: boolean;
 }
 
 export interface Incoming {
   id: string;
   incomingNo: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  paymentStatus: "UNPAID" | "PAID";
   incomingDate: string;
   totalAmount: string;
   memo: string | null;
@@ -49,6 +52,7 @@ export interface IncomingDetail {
   id: string;
   incomingNo: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  paymentStatus: "UNPAID" | "PAID";
   incomingDate: string;
   totalAmount: string;
   taxAmount: string;
