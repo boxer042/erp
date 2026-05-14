@@ -26,7 +26,7 @@ import { JmScrollArea } from "./scroll-area";
  *         <JmSidebarFooter>...</JmSidebarFooter>
  *       </JmSidebar>
  *       <main className="flex-1 min-w-0">
- *         <JmSidebarTrigger className="sm:hidden" />
+ *         <JmSidebarTrigger className="lg:hidden" />
  *         ...
  *       </main>
  *     </div>
@@ -216,15 +216,21 @@ export const JmSidebar = React.forwardRef<HTMLElement, JmSidebarProps>(
 
     return (
       <JmSidebarVisualContext.Provider value={visualValue}>
-        {/* 모바일 backdrop */}
-        {mobileOpen && (
-          <button
-            type="button"
-            aria-label="사이드바 닫기"
-            onClick={() => setMobileOpen(false)}
-            className="fixed inset-0 z-40 bg-black/40 sm:hidden"
-          />
-        )}
+        {/* 모바일 backdrop — 항상 렌더, opacity 로 fade in/out. 사이드바 슬라이드와 동기화. */}
+        <button
+          type="button"
+          aria-label="사이드바 닫기"
+          tabIndex={mobileOpen ? 0 : -1}
+          aria-hidden={!mobileOpen}
+          onClick={() => setMobileOpen(false)}
+          className={cn(
+            "fixed inset-0 z-40 bg-black/40 lg:hidden",
+            "transition-opacity duration-300 ease-out",
+            mobileOpen
+              ? "opacity-100"
+              : "pointer-events-none opacity-0",
+          )}
+        />
         {/* OUTER — layout 점유. 데스크톱에서만 자리 차지. */}
         <aside
           ref={ref}
@@ -244,8 +250,8 @@ export const JmSidebar = React.forwardRef<HTMLElement, JmSidebarProps>(
           className={cn(
             // 모바일: display:contents (layout 점유 0, 그러나 children 은 부모 flex 의 자식처럼 동작 — 우리 inner 는 fixed 라 무관)
             // 데스크톱: in-flow block + outer 폭 reserve, inner 의 absolute 기준점
-            "contents sm:block sm:relative sm:shrink-0 sm:w-[var(--jm-sidebar-w-outer)]",
-            "sm:transition-[width] sm:duration-200 sm:ease-out",
+            "contents lg:block lg:relative lg:shrink-0 lg:w-[var(--jm-sidebar-w-outer)]",
+            "lg:transition-[width] lg:duration-200 lg:ease-out",
             className,
           )}
           {...props}
@@ -266,23 +272,23 @@ export const JmSidebar = React.forwardRef<HTMLElement, JmSidebarProps>(
                 ? "border-r border-[var(--jm-border)]"
                 : "border-l border-[var(--jm-border)]",
               // 데스크톱: absolute, inner 폭으로 변동
-              "sm:absolute sm:inset-y-0 sm:z-30 sm:w-[var(--jm-sidebar-w-inner)]",
-              isLeft ? "sm:left-0" : "sm:right-0",
+              "lg:absolute lg:inset-y-0 lg:z-30 lg:w-[var(--jm-sidebar-w-inner)]",
+              isLeft ? "lg:left-0" : "lg:right-0",
               // expand-on-hover hover 시 그림자
               isExpandOnHover &&
                 hoverExpanded &&
-                "sm:shadow-[var(--jm-shadow-lg)]",
+                "lg:shadow-[var(--jm-shadow-lg)]",
               // 모바일: fixed overlay
               "fixed inset-y-0 z-50 w-[var(--jm-sidebar-w-mobile)]",
               isLeft ? "left-0" : "right-0",
-              "shadow-[var(--jm-shadow-lg)] sm:shadow-none",
-              // 모바일 슬라이드
+              "shadow-[var(--jm-shadow-lg)] lg:shadow-none",
+              // 모바일 슬라이드 — backdrop 과 동일한 duration/easing 으로 동기화
               mobileOpen
                 ? "translate-x-0"
                 : isLeft
-                  ? "-translate-x-full sm:translate-x-0"
-                  : "translate-x-full sm:translate-x-0",
-              "transition-[transform,width] duration-200 ease-out",
+                  ? "-translate-x-full lg:translate-x-0"
+                  : "translate-x-full lg:translate-x-0",
+              "transition-[transform,width] duration-300 ease-out lg:duration-200",
               "overflow-hidden",
             )}
           >
@@ -317,22 +323,23 @@ export const JmSidebarHeader = React.forwardRef<
 JmSidebarHeader.displayName = "JmSidebarHeader";
 
 /**
- * 스크롤 가능한 본문. JmScrollArea 로 감싸서 **overlay 스크롤바** (콘텐츠 위에 떠 있음, 폭 잠식 안 함).
- * collapsed (64px) 모드에서도 스크롤바가 영역 안 잡아먹는 게 핵심.
+ * 스크롤 가능한 본문. **JmScrollArea 가 직접 flex-1 min-h-0** 으로 자리 잡아
+ * 헤더·푸터 사이 남는 영역을 정확히 차지 (푸터는 항상 바닥 고정 유지).
+ * overlay 스크롤바 (콘텐츠 폭 잠식 0, collapsed 64px 에서도 안전).
  */
 export const JmSidebarBody = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, children, ...props }, ref) => (
-  <div ref={ref} className={cn("flex-1 min-h-0", className)} {...props}>
-    <JmScrollArea
-      className="h-full"
-      viewportClassName="px-2 py-3"
-      thumbSize={5}
-    >
+  <JmScrollArea
+    className={cn("flex-1 min-h-0", className)}
+    viewportClassName="px-2 py-3"
+    thumbSize={5}
+  >
+    <div ref={ref} {...props}>
       {children}
-    </JmScrollArea>
-  </div>
+    </div>
+  </JmScrollArea>
 ));
 JmSidebarBody.displayName = "JmSidebarBody";
 
@@ -438,7 +445,7 @@ const itemClasses = (active: boolean | undefined, collapsed: boolean) =>
   cn(
     "group flex w-full items-center gap-2.5 rounded-lg px-2.5 outline-none transition-colors",
     "text-left text-jm-sm font-medium",
-    "focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]",
+    "focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]",
     collapsed ? "h-10 justify-center px-0" : "h-9",
     active
       ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
@@ -545,7 +552,7 @@ export const JmSidebarTrigger = React.forwardRef<
       className={cn(
         "inline-flex size-9 items-center justify-center rounded-lg text-[var(--jm-text-muted)] outline-none transition-colors",
         "hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
-        "focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]",
+        "focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]",
         className,
       )}
       {...props}

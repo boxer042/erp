@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/jm/lib/cn";
 
 const iconButtonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] active:scale-95 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] active:scale-95 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {

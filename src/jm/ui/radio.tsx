@@ -33,7 +33,7 @@ export const JmRadio = React.forwardRef<HTMLButtonElement, JmRadioProps>(
     <RadioPrimitive.Root
       ref={ref}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full border border-[var(--jm-border-strong)] bg-[var(--jm-surface)] transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] hover:border-[var(--jm-text-muted)] disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:border-[var(--jm-action)]",
+        "inline-flex shrink-0 items-center justify-center rounded-full border border-[var(--jm-border-strong)] bg-[var(--jm-surface)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] hover:border-[var(--jm-text-muted)] disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:border-[var(--jm-action)]",
         sizeClasses[size],
         className,
       )}

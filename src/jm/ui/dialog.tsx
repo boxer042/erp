@@ -61,7 +61,7 @@ export function JmDialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             aria-label="닫기"
-            className="absolute right-3 top-3 z-10 inline-flex size-8 items-center justify-center rounded-full text-[var(--jm-text-muted)] transition-colors hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] outline-none"
+            className="absolute right-3 top-3 z-10 inline-flex size-8 items-center justify-center rounded-full text-[var(--jm-text-muted)] transition-colors hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] outline-none"
           >
             <X className="size-4" />
           </DialogPrimitive.Close>

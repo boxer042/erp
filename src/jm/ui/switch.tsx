@@ -32,7 +32,7 @@ export const JmSwitch = React.forwardRef<HTMLButtonElement, JmSwitchProps>(
     <SwitchPrimitive.Root
       ref={ref}
       className={cn(
-        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-[var(--jm-border-strong)] transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:bg-[var(--jm-action)]",
+        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-[var(--jm-border-strong)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:bg-[var(--jm-action)]",
         trackSize[size],
         className,
       )}

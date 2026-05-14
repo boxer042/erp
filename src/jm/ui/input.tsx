@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/jm/lib/cn";
 
 const inputVariants = cva(
-  "w-full border bg-[var(--jm-bg)] text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none transition-colors focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)] focus:ring-4 focus:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
+  "w-full border bg-[var(--jm-bg)] text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none transition-colors focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       size: {

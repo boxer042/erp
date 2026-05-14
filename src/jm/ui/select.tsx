@@ -80,7 +80,7 @@ export function JmSelect<T extends string = string>({
           <PopoverPrimitive.Trigger
             disabled={disabled}
             className={cn(
-              "relative flex w-full items-center overflow-hidden border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-4 pr-10 text-left text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
+              "relative flex w-full items-center overflow-hidden border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-4 pr-10 text-left text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
               heightClass,
               radiusClass,
               textClass,
@@ -122,7 +122,7 @@ export function JmSelect<T extends string = string>({
       <PopoverPrimitive.Trigger
         disabled={disabled}
         className={cn(
-          "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full font-medium transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
           heightClass,
           textClass,
           // padding — size 별

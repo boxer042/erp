@@ -38,7 +38,7 @@ export const JmAccordionTrigger = React.forwardRef<
   <AccordionPrimitive.Trigger
     ref={ref}
     className={cn(
-      "group/jm-acc flex w-full items-center justify-between gap-3 py-3 text-left text-jm-base font-medium text-[var(--jm-text)] outline-none transition-colors hover:text-[var(--jm-text)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]",
+      "group/jm-acc flex w-full items-center justify-between gap-3 py-3 text-left text-jm-base font-medium text-[var(--jm-text)] outline-none transition-colors hover:text-[var(--jm-text)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]",
       className,
     )}
     {...props}

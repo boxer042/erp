@@ -3,7 +3,9 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { GlobalLoadingBar } from "./global-loading-bar";
+
+// 로딩 바는 영역별 layout 에서 <JmLoadingBar /> 로 직접 마운트 — jm 토큰 cascade 가 필요해
+// QueryClientProvider 만 여기서 담당.
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -25,7 +27,6 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
-      <GlobalLoadingBar />
       {children}
       {process.env.NODE_ENV === "development" ? (
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />

@@ -63,7 +63,7 @@ export const JmSlider = React.forwardRef<HTMLDivElement, JmSliderProps>(
               key={i}
               index={i}
               className={cn(
-                "block rounded-full border-2 border-[var(--jm-action)] bg-[var(--jm-surface)] shadow-[var(--jm-shadow-sm)] outline-none transition-transform focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50",
+                "block rounded-full border-2 border-[var(--jm-action)] bg-[var(--jm-surface)] shadow-[var(--jm-shadow-sm)] outline-none transition-transform focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50",
                 thumbSize,
               )}
             />

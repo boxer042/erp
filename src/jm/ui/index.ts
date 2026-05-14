@@ -42,6 +42,7 @@ export {
   type JmTableToolbarMoreProps,
 } from "./table-toolbar";
 export { JmScrollArea, type JmScrollAreaProps } from "./scroll-area";
+export { JmLoadingBar, type JmLoadingBarProps } from "./loading-bar";
 export {
   JmSidebarProvider,
   JmSidebar,

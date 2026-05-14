@@ -3,25 +3,83 @@
 import * as React from "react";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { DayPicker } from "react-day-picker";
+import { DayPicker, type Matcher } from "react-day-picker";
 import { ko } from "date-fns/locale";
 import { cn } from "@/jm/lib/cn";
 
 import "react-day-picker/style.css";
 
 /**
- * `.rdp-root` 가 자체 `--rdp-accent-color: blue` 를 재선언하므로 wrapper override 가 안 먹힘.
- * DayPicker 의 root inline style 로 박아야 specificity 우위.
- */
-const dayPickerRootStyle: React.CSSProperties = {
-  ["--rdp-accent-color" as string]: "var(--jm-text)",
-};
-
-/**
  * 단일 날짜 선택 — react-day-picker 기반.
  * popover 통합 trigger 와 인라인 위젯(JmCalendar) 두 가지 제공.
- * peer dependency: react-day-picker, date-fns
+ *
+ * 주의: day-picker 9.x default css 의 specificity 가 (0,3,0) 이라 tailwind class 로
+ * margin/width 등 layout 속성을 못 이김. inline `styles` prop 으로 강제하는 게 유일한 방법.
  */
+
+const CELL = 36;
+
+const dayPickerStyles: Partial<Record<string, React.CSSProperties>> = {
+  root: {
+    ["--rdp-accent-color" as string]: "var(--jm-text)",
+    // navLayout="around" 일 때 caption 양쪽에 nav button 자리 비워주는 변수
+    ["--rdp-nav_button-width" as string]: "28px",
+    ["--rdp-nav_button-height" as string]: "28px",
+  },
+  months: { display: "flex", gap: 16 },
+  month: {
+    position: "relative", // navLayout="around" 의 button absolute 기준점
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  month_caption: {
+    height: CELL,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // ⚠️ button_previous/next 는 day-picker 9.x 가 style prop 을 forward 하지 않음 (버그).
+  // 위치는 classNames 에서 `!` prefix (!important) 로 강제해야 함.
+  weekdays: {},
+  weekday: {
+    width: CELL,
+    height: CELL,
+    padding: 0,
+    textAlign: "center",
+  },
+  week: {},
+  day: {
+    width: CELL,
+    height: CELL,
+    padding: 0,
+    textAlign: "center",
+  },
+  day_button: {
+    width: CELL,
+    height: CELL,
+    border: 0,
+    padding: 0,
+  },
+};
+
+const dayPickerClassNames: Partial<Record<string, string>> = {
+  caption_label: "tabular-nums text-jm-base font-semibold text-[var(--jm-text)]",
+  button_previous:
+    "!absolute !left-0 !top-0 !size-7 inline-flex items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
+  button_next:
+    "!absolute !right-0 !top-0 !size-7 inline-flex items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
+  weekday: "text-jm-2xs font-medium text-[var(--jm-text-muted)]",
+  day: "text-jm-sm tabular-nums",
+  day_button:
+    "inline-flex items-center justify-center rounded-lg text-[var(--jm-text)] outline-none hover:bg-[var(--jm-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:pointer-events-none disabled:text-[var(--jm-text-disabled)]",
+  selected:
+    "[&>button]:bg-[var(--jm-action)] [&>button]:text-[var(--jm-action-fg)] [&>button]:hover:bg-[var(--jm-action-hover)]",
+  today: "[&>button]:font-bold [&>button]:underline",
+  outside: "[&>button]:text-[var(--jm-text-subtle)]",
+  disabled: "opacity-30",
+  hidden: "invisible",
+};
 
 function formatDate(d: Date): string {
   const yyyy = d.getFullYear();
@@ -43,6 +101,12 @@ export interface JmDatePickerProps {
   fromDate?: Date;
   /** 선택 가능한 최대 날짜 */
   toDate?: Date;
+  /**
+   * 추가로 선택 불가능한 날짜 매처. fromDate/toDate 와 함께 적용된다.
+   * 함수 형태 `(date: Date) => boolean` 또는 react-day-picker `Matcher`/`Matcher[]` 모두 허용.
+   * 예: occupied 날짜 범위들 비활성화.
+   */
+  disabledDates?: Matcher | Matcher[];
 }
 
 export function JmDatePicker({
@@ -54,6 +118,7 @@ export function JmDatePicker({
   disabled,
   fromDate,
   toDate,
+  disabledDates,
 }: JmDatePickerProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -65,13 +130,24 @@ export function JmDatePicker({
 
   const display = value ? formatDate(value) : null;
 
+  const mergedDisabled = React.useMemo<Matcher | Matcher[] | undefined>(() => {
+    const base: Matcher[] = [];
+    if (fromDate) base.push({ before: fromDate });
+    if (toDate) base.push({ after: toDate });
+    if (disabledDates) {
+      if (Array.isArray(disabledDates)) base.push(...disabledDates);
+      else base.push(disabledDates);
+    }
+    return base.length === 0 ? undefined : base;
+  }, [fromDate, toDate, disabledDates]);
+
   return (
     <div className={cn("relative", heightClass, className)}>
       <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
         <PopoverPrimitive.Trigger
           disabled={disabled}
           className={cn(
-            "relative flex w-full items-center gap-2 overflow-hidden border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-4 pr-3 text-left text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
+            "relative flex w-full items-center gap-2 overflow-hidden border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-4 pr-3 text-left text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
             heightClass,
             radiusClass,
             textClass,
@@ -110,12 +186,9 @@ export function JmDatePicker({
                 }}
                 showOutsideDays
                 weekStartsOn={0}
-                disabled={
-                  fromDate || toDate
-                    ? { before: fromDate ?? new Date(-8640000000000000), after: toDate ?? new Date(8640000000000000) }
-                    : undefined
-                }
-                style={dayPickerRootStyle}
+                navLayout="around"
+                disabled={mergedDisabled}
+                styles={dayPickerStyles}
                 classNames={dayPickerClassNames}
               />
             </PopoverPrimitive.Popup>
@@ -136,6 +209,8 @@ export interface JmCalendarProps {
   toDate?: Date;
   /** 표시할 월 수 (가로 나란히). 기본 1 */
   numberOfMonths?: number;
+  /** 추가로 비활성화할 날짜 매처. fromDate/toDate 와 함께 적용된다. */
+  disabledDates?: Matcher | Matcher[];
 }
 
 export function JmCalendar({
@@ -145,7 +220,19 @@ export function JmCalendar({
   fromDate,
   toDate,
   numberOfMonths = 1,
+  disabledDates,
 }: JmCalendarProps) {
+  const mergedDisabled = React.useMemo<Matcher | Matcher[] | undefined>(() => {
+    const base: Matcher[] = [];
+    if (fromDate) base.push({ before: fromDate });
+    if (toDate) base.push({ after: toDate });
+    if (disabledDates) {
+      if (Array.isArray(disabledDates)) base.push(...disabledDates);
+      else base.push(disabledDates);
+    }
+    return base.length === 0 ? undefined : base;
+  }, [fromDate, toDate, disabledDates]);
+
   return (
     <div
       className={cn(
@@ -161,43 +248,11 @@ export function JmCalendar({
         numberOfMonths={numberOfMonths}
         showOutsideDays
         weekStartsOn={0}
-        disabled={
-          fromDate || toDate
-            ? { before: fromDate ?? new Date(-8640000000000000), after: toDate ?? new Date(8640000000000000) }
-            : undefined
-        }
-        style={dayPickerRootStyle}
+        navLayout="around"
+        disabled={mergedDisabled}
+        styles={dayPickerStyles}
         classNames={dayPickerClassNames}
       />
     </div>
   );
 }
-
-// ─── day-picker 9.x — class slot 오버라이드. jm 토큰 적용 ─────────────────
-// 단일 모드라 range_start / range_middle / range_end 는 사용 안 함
-
-const dayPickerClassNames: Partial<Record<string, string>> = {
-  months: "flex gap-4",
-  month: "flex flex-col gap-2",
-  month_caption:
-    "flex h-9 items-center justify-center text-jm-base font-semibold text-[var(--jm-text)]",
-  caption_label: "tabular-nums",
-  nav: "flex items-center gap-1",
-  button_previous:
-    "absolute left-3 top-3 inline-flex size-7 items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
-  button_next:
-    "absolute right-3 top-3 inline-flex size-7 items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
-  weekdays: "grid grid-cols-7",
-  weekday:
-    "h-8 text-center text-jm-2xs font-medium text-[var(--jm-text-muted)]",
-  week: "grid grid-cols-7",
-  day: "relative size-9 p-0 text-center text-jm-sm tabular-nums",
-  day_button:
-    "inline-flex size-9 items-center justify-center rounded-lg text-[var(--jm-text)] outline-none hover:bg-[var(--jm-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:pointer-events-none disabled:text-[var(--jm-text-disabled)]",
-  selected:
-    "[&>button]:bg-[var(--jm-action)] [&>button]:text-[var(--jm-action-fg)] [&>button]:hover:bg-[var(--jm-action-hover)]",
-  today: "[&>button]:font-bold [&>button]:underline",
-  outside: "[&>button]:text-[var(--jm-text-subtle)]",
-  disabled: "opacity-30",
-  hidden: "invisible",
-};

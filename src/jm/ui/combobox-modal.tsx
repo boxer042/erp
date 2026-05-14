@@ -96,7 +96,7 @@ export function JmComboboxModal<T>({
             <div className="flex items-center gap-2 px-3 py-2">
               <DialogPrimitive.Close
                 aria-label="닫기"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] outline-none"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] outline-none"
               >
                 <ArrowLeft className="size-5" />
               </DialogPrimitive.Close>
@@ -112,7 +112,7 @@ export function JmComboboxModal<T>({
                     onQueryChange?.(e.target.value);
                   }}
                   placeholder={placeholder}
-                  className="h-11 w-full rounded-xl bg-[var(--jm-surface-muted)] pl-9 pr-3 text-jm-md text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus:bg-[var(--jm-bg)] focus:ring-4 focus:ring-[var(--jm-ring)]"
+                  className="h-11 w-full rounded-xl bg-[var(--jm-surface-muted)] pl-9 pr-3 text-jm-md text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus:bg-[var(--jm-bg)] focus:ring-2 focus:ring-[var(--jm-ring)]"
                 />
               </div>
               {query && (

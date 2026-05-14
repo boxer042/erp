@@ -43,7 +43,7 @@ export const JmSearchInput = React.forwardRef<HTMLInputElement, JmSearchInputPro
           type="search"
           value={value}
           className={cn(
-            "w-full border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none transition-colors focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)] focus:ring-4 focus:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-search-cancel-button]:hidden",
+            "w-full border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none transition-colors focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)] focus:ring-2 focus:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-search-cancel-button]:hidden",
             heightClass,
             radiusClass,
             textClass,

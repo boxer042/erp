@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
+  MonitorSmartphone,
   Package,
   PackageSearch,
   Truck,
@@ -39,6 +40,7 @@ import {
   SlidersHorizontal,
   QrCode,
   ClipboardSignature,
+  Scale,
   ScrollText,
   Sun,
   Moon,
@@ -87,6 +89,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { id: "home", label: "대시보드", href: "/", icon: LayoutDashboard },
+      { id: "pos", label: "POS", href: "/pos", icon: MonitorSmartphone },
     ],
   },
   {
@@ -143,6 +146,8 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { id: "expenses", label: "경비", href: "/expenses", icon: WalletMinimal },
+      { id: "income-statement", label: "손익계산서", href: "/reports/income-statement", icon: FileSpreadsheet },
+      { id: "balance-sheet", label: "재무상태표", href: "/reports/balance-sheet", icon: Scale },
       { id: "margin-report", label: "마진 리포트", href: "/reports/margin", icon: TrendingUp },
       { id: "option-funnel", label: "옵션 funnel", href: "/reports/option-funnel", icon: TrendingUp },
     ],
@@ -187,7 +192,7 @@ const modeOptions: { mode: JmSidebarMode; icon: React.ElementType; label: string
 // ─── 모바일 사이드바 트리거 (글로벌 헤더에서 사용) ─────────────────────
 export function MobileSidebarTrigger({ className }: { className?: string }) {
   return (
-    <JmSidebarTrigger className={`md:hidden ${className ?? ""}`.trim()} />
+    <JmSidebarTrigger className={`lg:hidden ${className ?? ""}`.trim()} />
   );
 }
 

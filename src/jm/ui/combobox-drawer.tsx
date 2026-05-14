@@ -28,9 +28,11 @@ export interface JmComboboxDrawerProps<T> {
   emptyText?: string;
 
   /**
-   * 시트 최대 높이. 기본 "90dvh".
+   * 시트 높이. 기본 "90dvh" (고정).
    * dvh(dynamic viewport height) = 모바일 가상 키보드가 올라오면 자동 축소.
    * vh 대신 dvh 를 써야 키보드가 시트를 가리지 않음.
+   * 고정 높이로 두는 이유: onQueryChange(서버 필터) 모드에서 items 가 비어있다가
+   * 채워질 때 popup 크기가 흔들리는 것을 방지 — 검색 워크스페이스는 안정적이어야 함.
    */
   height?: string;
 }
@@ -98,8 +100,9 @@ export function JmComboboxDrawer<T>({
         />
         <DialogPrimitive.Popup
           data-jm-scope
-          // 핵심: bottom-0 + max-height: dvh → 가상키보드 올라오면 시트가 자동으로 같이 짧아짐
-          style={{ maxHeight: height }}
+          // 핵심: bottom-0 + height: dvh → 가상키보드 올라오면 시트가 자동으로 같이 짧아짐.
+          // height 를 직접 지정해 콘텐츠 크기에 따라 popup 이 흔들리지 않게 함 (onQueryChange 모드 안정성).
+          style={{ height }}
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-3xl bg-[var(--jm-surface)] text-[var(--jm-text)] font-[family-name:var(--jm-font-sans)] shadow-[var(--jm-shadow-lg)] outline-none",
             "transition-transform duration-300 ease-out",
@@ -143,7 +146,7 @@ export function JmComboboxDrawer<T>({
                   onQueryChange?.(e.target.value);
                 }}
                 placeholder={placeholder}
-                className="h-11 w-full rounded-xl bg-[var(--jm-surface-muted)] pl-9 pr-9 text-jm-md text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus:bg-[var(--jm-bg)] focus:ring-4 focus:ring-[var(--jm-ring)]"
+                className="h-11 w-full rounded-xl bg-[var(--jm-surface-muted)] pl-9 pr-9 text-jm-md text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus:bg-[var(--jm-bg)] focus:ring-2 focus:ring-[var(--jm-ring)]"
               />
               {query && (
                 <button

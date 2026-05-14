@@ -127,7 +127,7 @@ export const JmNumberInput = React.forwardRef<HTMLInputElement, JmNumberInputPro
     return (
       <div
         className={cn(
-          "relative flex w-full items-center border bg-[var(--jm-bg)] text-[var(--jm-text)] transition-colors focus-within:border-[var(--jm-border-strong)] focus-within:bg-[var(--jm-surface)] focus-within:ring-4 focus-within:ring-[var(--jm-ring)]",
+          "relative flex w-full items-center border bg-[var(--jm-bg)] text-[var(--jm-text)] transition-colors focus-within:border-[var(--jm-border-strong)] focus-within:bg-[var(--jm-surface)] focus-within:ring-2 focus-within:ring-[var(--jm-ring)]",
           tone === "invalid"
             ? "border-[var(--jm-danger-solid)] focus-within:border-[var(--jm-danger-solid)]"
             : "border-[var(--jm-border)]",

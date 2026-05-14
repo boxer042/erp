@@ -11,6 +11,85 @@ import "react-day-picker/style.css";
 
 export type { DateRange };
 
+/**
+ * day-picker 9.x 의 default css (`.rdp-root[data-nav-layout="around"] .rdp-month_caption`
+ * 등) 가 specificity (0,3,0) 이라 tailwind class (0,1,0) 로는 못 이김.
+ * width / margin / padding 같은 layout 속성은 모두 inline `styles` prop 으로 강제.
+ * inline style 은 specificity 무관 우선이라 무조건 적용된다.
+ *
+ * classNames 는 색·폰트·radius 등 시각만 담당.
+ */
+
+const CELL = 36;
+
+const dayPickerStyles: Partial<Record<string, React.CSSProperties>> = {
+  // root — accent + nav button 변수
+  root: {
+    ["--rdp-accent-color" as string]: "var(--jm-text)",
+    // navLayout="around" 일 때 caption 양쪽에 nav button 자리 비워주는 변수.
+    // 28px 로 통일 → caption margin 도 자동 28 + grid (= 7×36=252) 와 폭 일치
+    ["--rdp-nav_button-width" as string]: "28px",
+    ["--rdp-nav_button-height" as string]: "28px",
+  },
+  months: { display: "flex", gap: 16 },
+  month: {
+    position: "relative", // navLayout="around" 의 button absolute 기준점
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  month_caption: {
+    height: CELL,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // ⚠️ button_previous/next 는 day-picker 9.x 가 style prop 을 forward 하지 않음 (버그).
+  // 위치는 classNames 에서 `!` prefix (!important) 로 강제해야 함.
+  weekdays: {},
+  weekday: {
+    width: CELL,
+    height: CELL,
+    padding: 0,
+    textAlign: "center",
+  },
+  week: {},
+  day: {
+    width: CELL,
+    height: CELL,
+    padding: 0,
+    textAlign: "center",
+  },
+  day_button: {
+    width: CELL,
+    height: CELL,
+    border: 0,
+    padding: 0,
+  },
+};
+
+const dayPickerClassNames: Partial<Record<string, string>> = {
+  caption_label: "tabular-nums text-jm-base font-semibold text-[var(--jm-text)]",
+  button_previous:
+    "!absolute !left-0 !top-0 !size-7 inline-flex items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
+  button_next:
+    "!absolute !right-0 !top-0 !size-7 inline-flex items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
+  weekday: "text-jm-2xs font-medium text-[var(--jm-text-muted)]",
+  day: "text-jm-sm tabular-nums",
+  day_button:
+    "inline-flex items-center justify-center rounded-lg text-[var(--jm-text)] outline-none hover:bg-[var(--jm-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:pointer-events-none disabled:text-[var(--jm-text-disabled)]",
+  selected:
+    "[&>button]:bg-[var(--jm-action)] [&>button]:text-[var(--jm-action-fg)] [&>button]:hover:bg-[var(--jm-action-hover)]",
+  range_start: "[&>button]:rounded-r-none",
+  range_end: "[&>button]:rounded-l-none",
+  range_middle:
+    "[&>button]:rounded-none [&>button]:bg-[var(--jm-surface-muted)] [&>button]:text-[var(--jm-text)] [&>button]:hover:bg-[var(--jm-border)]",
+  today: "[&>button]:font-bold [&>button]:underline",
+  outside: "[&>button]:text-[var(--jm-text-subtle)]",
+  disabled: "opacity-30",
+  hidden: "invisible",
+};
+
 export interface JmDateRangePickerProps {
   value?: DateRange;
   onChange: (range: DateRange | undefined) => void;
@@ -63,7 +142,7 @@ export function JmDateRangePicker({
         <PopoverPrimitive.Trigger
           disabled={disabled}
           className={cn(
-            "relative flex w-full items-center gap-2 overflow-hidden border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-4 pr-3 text-left text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
+            "relative flex w-full items-center gap-2 overflow-hidden border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-4 pr-3 text-left text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
             heightClass,
             radiusClass,
             textClass,
@@ -100,7 +179,8 @@ export function JmDateRangePicker({
                 numberOfMonths={numberOfMonths}
                 showOutsideDays
                 weekStartsOn={0}
-                style={{ ["--rdp-accent-color" as string]: "var(--jm-text)" } as React.CSSProperties}
+                navLayout="around"
+                styles={dayPickerStyles}
                 classNames={dayPickerClassNames}
               />
             </PopoverPrimitive.Popup>
@@ -110,33 +190,3 @@ export function JmDateRangePicker({
     </div>
   );
 }
-
-/** day-picker 9.x — class slot 오버라이드. jm 토큰 적용. */
-const dayPickerClassNames: Partial<Record<string, string>> = {
-  months: "flex gap-4",
-  month: "flex flex-col gap-2",
-  month_caption: "flex h-9 items-center justify-center text-jm-base font-semibold text-[var(--jm-text)]",
-  caption_label: "tabular-nums",
-  nav: "flex items-center gap-1",
-  button_previous:
-    "absolute left-3 top-3 inline-flex size-7 items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
-  button_next:
-    "absolute right-3 top-3 inline-flex size-7 items-center justify-center rounded-lg text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]",
-  weekdays: "grid grid-cols-7",
-  weekday:
-    "h-8 text-center text-jm-2xs font-medium text-[var(--jm-text-muted)]",
-  week: "grid grid-cols-7",
-  day: "relative size-9 p-0 text-center text-jm-sm tabular-nums",
-  day_button:
-    "inline-flex size-9 items-center justify-center rounded-lg text-[var(--jm-text)] outline-none hover:bg-[var(--jm-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:pointer-events-none disabled:text-[var(--jm-text-disabled)]",
-  selected:
-    "[&>button]:bg-[var(--jm-action)] [&>button]:text-[var(--jm-action-fg)] [&>button]:hover:bg-[var(--jm-action-hover)]",
-  range_start: "[&>button]:rounded-r-none",
-  range_end: "[&>button]:rounded-l-none",
-  range_middle:
-    "[&>button]:rounded-none [&>button]:bg-[var(--jm-surface-muted)] [&>button]:text-[var(--jm-text)] [&>button]:hover:bg-[var(--jm-border)]",
-  today: "[&>button]:font-bold [&>button]:underline",
-  outside: "[&>button]:text-[var(--jm-text-subtle)]",
-  disabled: "opacity-30",
-  hidden: "invisible",
-};

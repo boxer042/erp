@@ -171,3 +171,12 @@
     --jm-shadow-lg: 0 8px 24px oklch(0 0 0 / 0.6);
   }
 }
+
+/* ─── jm loading bar — JmLoadingBar 가 사용. 화면 최상단 fixed slide 애니메이션. */
+@keyframes jm-loading-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.jm-loading-bar-anim {
+  animation: jm-loading-slide 1.0s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}

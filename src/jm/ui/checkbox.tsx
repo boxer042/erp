@@ -29,7 +29,7 @@ export const JmCheckbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      "group/jm-cb inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface)] transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] hover:border-[var(--jm-text-muted)] disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:border-[var(--jm-action)] data-[checked]:bg-[var(--jm-action)] data-[indeterminate]:border-[var(--jm-action)] data-[indeterminate]:bg-[var(--jm-action)]",
+      "group/jm-cb inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] hover:border-[var(--jm-text-muted)] disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:border-[var(--jm-action)] data-[checked]:bg-[var(--jm-action)] data-[indeterminate]:border-[var(--jm-action)] data-[indeterminate]:bg-[var(--jm-action)]",
       sizeClasses[size],
       className,
     )}

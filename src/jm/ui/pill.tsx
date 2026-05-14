@@ -7,7 +7,7 @@ import { cn } from "@/jm/lib/cn";
  * `active` boolean 으로 선택 상태 표시.
  */
 const pillVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       size: {

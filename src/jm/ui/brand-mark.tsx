@@ -137,7 +137,7 @@ export const JmBrandMark = React.forwardRef<HTMLElement, JmBrandMarkProps>(
       icon ? dims.iconBox : dims.text,
       shapeMap[shape],
       getToneClass(tone, variant),
-      href && "outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] hover:opacity-90",
+      href && "outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] hover:opacity-90",
       className,
     );
 

@@ -54,7 +54,7 @@ export const JmTabsTrigger = React.forwardRef<
   <TabsPrimitive.Tab
     ref={ref}
     className={cn(
-      "group/jm-tab relative inline-flex h-9 items-center justify-center gap-1.5 px-4 text-jm-sm font-medium text-[var(--jm-text-muted)] transition-colors outline-none hover:text-[var(--jm-text)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
+      "group/jm-tab relative inline-flex h-9 items-center justify-center gap-1.5 px-4 text-jm-sm font-medium text-[var(--jm-text-muted)] transition-colors outline-none hover:text-[var(--jm-text)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)] disabled:cursor-not-allowed disabled:opacity-50",
       // line variant — 하단 인디케이터
       "data-[parent-variant=line]:rounded-none",
       // pill variant — 활성 시 흰 배경
