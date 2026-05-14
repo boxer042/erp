@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { repairPartUpdateSchema } from "@/lib/validators/repair-ticket";
 import { consumeRepairPart, restoreRepairPart } from "@/lib/repair-inventory";
+import {
+  applyUsageDelta,
+  snapshotTicketUsage,
+} from "@/lib/repair-diagnosis-usage";
 import { Prisma } from "@prisma/client";
 
 // 부속 행 수정 — 수량/단가/할인/상태(USED↔LOST) 업데이트
@@ -41,6 +45,8 @@ export async function PATCH(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const before = await snapshotTicketUsage(tx, ticket.id);
+
       const oldQty = Number(part.quantity);
       const newQty = data.quantity != null ? Number(data.quantity) : oldQty;
       const newPrice = data.unitPrice != null ? Number(data.unitPrice) : Number(part.unitPrice);
@@ -89,6 +95,10 @@ export async function PATCH(
         include: { product: { select: { id: true, name: true, sku: true } } },
       });
 
+      // status USED↔LOST 변경 시 set 이 바뀌므로 delta 적용
+      const after = await snapshotTicketUsage(tx, ticket.id);
+      await applyUsageDelta(tx, before, after);
+
       return updated;
     });
 
@@ -129,6 +139,7 @@ export async function DELETE(
 
   try {
     await prisma.$transaction(async (tx) => {
+      const before = await snapshotTicketUsage(tx, ticket.id);
       if (part.consumedAt) {
         await restoreRepairPart(tx, part.id, {
           ticketId: ticket.id,
@@ -140,6 +151,8 @@ export async function DELETE(
         });
       }
       await tx.repairPart.delete({ where: { id: partId } });
+      const after = await snapshotTicketUsage(tx, ticket.id);
+      await applyUsageDelta(tx, before, after);
     });
     return NextResponse.json({ success: true });
   } catch (e) {

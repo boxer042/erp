@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { calcRepairTotals, genApprovalToken } from "@/lib/repair";
 import { restoreRepairPart } from "@/lib/repair-inventory";
+import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
 import type {
   RepairApprovalMethod,
   OrderPaymentMethod,
@@ -188,6 +189,16 @@ export async function POST(
           approvalTokenExpiresAt: null,
         },
       });
+
+      // 세트 학습 — 확정된 케이스의 (진단, 부속 묶음, 공임 묶음) 통계 누적.
+      // 실패해도 픽업/결제 자체엔 영향 없게 silent.
+      try {
+        await prisma.$transaction(async (tx) => {
+          await learnDiagnosisPartSet(tx, id);
+        });
+      } catch {
+        /* 통계 실패는 무시 */
+      }
 
       if (paymentMethod === "UNPAID" && ticket.customerId) {
         const last = await prisma.customerLedger.findFirst({

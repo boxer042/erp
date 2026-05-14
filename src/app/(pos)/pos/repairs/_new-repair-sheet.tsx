@@ -2,9 +2,22 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import {
+  JmButton,
+  JmDrawer,
+  JmDrawerBody,
+  JmDrawerContent,
+  JmDrawerFooter,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmInput,
+  JmSearchInput,
+  JmSectionLabel,
+  JmTextarea,
+} from "@/jm";
 
 interface Customer {
   id: string;
@@ -21,17 +34,11 @@ interface Props {
 }
 
 /**
- * 새 수리 시작 — 바텀 시트 (raw HTML, shadcn 0개).
- * 단순화: 고객(검색·새 등록), 유형(즉시/맡김), 기기 정보(자유 입력),
- *          증상. 진단비/매핑 등 디테일은 상세 페이지에서.
+ * 새 수리 시작 — JmDrawer 기반.
+ * 단순화: 고객(검색·새 등록), 유형(즉시/맡김), 기기 정보(자유 입력), 증상.
+ * 진단비/매핑 등 디테일은 상세 페이지에서.
  */
-export function NewRepairSheet(props: Props) {
-  if (!props.open) return null;
-  return <NewRepairSheetBody {...props} />;
-}
-
-function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
-  useBodyScrollLock();
+export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: Props) {
   // 즉시수리가 더 흔해서 디폴트
   const [type, setType] = useState<"ON_SITE" | "DROP_OFF">("ON_SITE");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -81,47 +88,14 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
       toast.error(err instanceof ApiError ? err.message : "생성 실패"),
   });
 
-  if (!open) return null;
-
   return (
-    <>
-      {/* 백드롭 */}
-      <button
-        type="button"
-        onClick={() => onOpenChange(false)}
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        aria-label="닫기"
-      />
+    <JmDrawer open={open} onOpenChange={onOpenChange}>
+      <JmDrawerContent side="bottom" size="lg" dragHandle>
+        <JmDrawerHeader>
+          <JmDrawerTitle>새 수리</JmDrawerTitle>
+        </JmDrawerHeader>
 
-      {/* 바텀 시트 */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col rounded-t-3xl bg-[var(--jm-surface)] shadow-2xl">
-        {/* 핸들 */}
-        <div className="flex shrink-0 justify-center pt-3">
-          <div className="h-1 w-10 rounded-full bg-[var(--jm-border-strong)]" />
-        </div>
-
-        {/* 헤더 */}
-        <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-3">
-          <h2 className="text-[18px] font-bold text-[var(--jm-text)]">새 수리</h2>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
-            aria-label="닫기"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M5 5l10 10M15 5l-10 10"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* 본문 */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+        <JmDrawerBody>
           <div className="flex flex-col gap-5">
             {/* 유형 — 큰 토글 */}
             <Section label="유형">
@@ -146,10 +120,10 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
               {selectedCustomer ? (
                 <div className="flex items-center justify-between rounded-xl bg-[var(--jm-surface-muted)] px-4 py-3">
                   <div className="flex flex-col">
-                    <span className="text-[15px] font-semibold text-[var(--jm-text)]">
+                    <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                       {selectedCustomer.name}
                     </span>
-                    <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
+                    <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                       {selectedCustomer.phone}
                     </span>
                   </div>
@@ -159,29 +133,27 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
                       setSelectedCustomer(null);
                       setCustomerSearch("");
                     }}
-                    className="text-[12px] font-medium text-[var(--jm-text-muted)] underline-offset-2 hover:underline"
+                    className="text-jm-2xs font-medium text-[var(--jm-text-muted)] underline-offset-2 hover:underline"
                   >
                     변경
                   </button>
                 </div>
               ) : (
                 <>
-                  <input
-                    type="text"
-                    inputMode="search"
+                  <JmSearchInput
+                    size="lg"
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
                     placeholder="이름 또는 전화 검색"
-                    className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
                   />
                   {customerSearch.length > 0 && (
                     <div className="mt-2 flex flex-col gap-1">
                       {customersQuery.isPending ? (
-                        <div className="px-3 py-2 text-[13px] text-[var(--jm-text-subtle)]">
+                        <div className="px-3 py-2 text-jm-sm text-[var(--jm-text-subtle)]">
                           검색 중…
                         </div>
                       ) : customersQuery.data?.length === 0 ? (
-                        <div className="rounded-xl bg-[var(--jm-bg)] px-3 py-3 text-[13px] text-[var(--jm-text-muted)]">
+                        <div className="rounded-xl bg-[var(--jm-bg)] px-3 py-3 text-jm-sm text-[var(--jm-text-muted)]">
                           일치하는 고객 없음 — 미등록으로 진행하거나 고객 페이지에서 등록하세요
                         </div>
                       ) : (
@@ -192,10 +164,10 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
                             onClick={() => setSelectedCustomer(c)}
                             className="flex items-center justify-between rounded-xl px-3 py-2.5 text-left hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
                           >
-                            <span className="text-[14px] font-medium text-[var(--jm-text)]">
+                            <span className="text-jm-sm font-medium text-[var(--jm-text)]">
                               {c.name}
                             </span>
-                            <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
+                            <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                               {c.phone}
                             </span>
                           </button>
@@ -209,47 +181,43 @@ function NewRepairSheetBody({ onOpenChange, onCreated, posSessionId }: Props) {
 
             {/* 기기 */}
             <Section label="기기" optional>
-              <input
-                type="text"
+              <JmInput
+                size="lg"
                 value={device}
                 onChange={(e) => setDevice(e.target.value)}
                 placeholder="예: Sony A7M4 (Black)"
-                className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
               />
-              <p className="mt-1.5 text-[12px] text-[var(--jm-text-muted)]">
+              <p className="mt-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
                 상세 페이지에서 시리얼 코드/카탈로그 매핑으로 정밀화 가능
               </p>
             </Section>
 
             {/* 증상 */}
             <Section label="증상" optional>
-              <textarea
+              <JmTextarea
                 value={symptom}
                 onChange={(e) => setSymptom(e.target.value)}
                 placeholder="고객이 호소하는 증상"
                 rows={3}
-                className="w-full resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
               />
             </Section>
           </div>
-        </div>
+        </JmDrawerBody>
 
-        {/* 하단 액션 — sticky */}
-        <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
-          <button
-            type="button"
+        <JmDrawerFooter>
+          <JmButton
+            variant="cta"
+            size="lg"
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+            className="w-full"
           >
-            {createMutation.isPending && (
-              <Spinner className="size-4 text-white" />
-            )}
+            {createMutation.isPending && <Loader2 className="size-4 animate-spin" />}
             {type === "ON_SITE" ? "즉시 수리 시작" : "맡김 접수"}
-          </button>
-        </div>
-      </div>
-    </>
+          </JmButton>
+        </JmDrawerFooter>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }
 
@@ -265,9 +233,7 @@ function Section({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-          {label}
-        </span>
+        <JmSectionLabel>{label}</JmSectionLabel>
         {optional && (
           <span className="text-[10px] text-[var(--jm-text-subtle)]">선택</span>
         )}
@@ -299,37 +265,11 @@ function TypeOption({
       }`}
     >
       <span
-        className={`text-[16px] font-semibold ${active ? "text-[var(--jm-text)]" : ""}`}
+        className={`text-jm-base font-semibold ${active ? "text-[var(--jm-text)]" : ""}`}
       >
         {title}
       </span>
-      <span className="text-[12px] text-[var(--jm-text-muted)]">{desc}</span>
+      <span className="text-jm-2xs text-[var(--jm-text-muted)]">{desc}</span>
     </button>
-  );
-}
-
-function Spinner({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={`animate-spin ${className}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-        opacity="0.25"
-      />
-      <path
-        d="M12 2a10 10 0 0 1 10 10"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

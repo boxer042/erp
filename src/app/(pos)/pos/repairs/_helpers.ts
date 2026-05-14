@@ -1,5 +1,6 @@
 import type { RepairStatus, RepairTicketDetail } from "./_types";
 import { calcRepairTotals as libCalc } from "@/lib/repair";
+import { DEFAULT_TAX_RATE } from "@/lib/constants";
 
 export function calcFinal(ticket: RepairTicketDetail): number {
   return libCalc({
@@ -35,25 +36,21 @@ export function nextActions(
   type: "ON_SITE" | "DROP_OFF",
   canSendToCart = false,
 ): ActionDef[] {
+  // 하단 sticky 액션 바는 "다음 단계 진행" 만 노출. 취소/거절 같은 destructive 액션은 헤더 kebab 메뉴.
   const list: ActionDef[] = [];
   if (status === "RECEIVED") {
     if (type === "DROP_OFF") {
       list.push({ action: "diagnose", label: "진단 시작", primary: true });
     }
     list.push({ action: "start", label: "수리 시작", primary: type === "ON_SITE" });
-    list.push({ action: "cancel", label: "취소", destructive: true });
   } else if (status === "DIAGNOSING") {
     list.push({ action: "quote", label: "견적 확정", primary: true });
-    list.push({ action: "cancel", label: "취소", destructive: true });
   } else if (status === "QUOTED") {
     list.push({ action: "approve", label: "고객 승인", primary: true });
-    list.push({ action: "cancel", label: "거절", destructive: true });
   } else if (status === "APPROVED") {
     list.push({ action: "start", label: "수리 시작", primary: true });
-    list.push({ action: "cancel", label: "취소", destructive: true });
   } else if (status === "REPAIRING") {
     list.push({ action: "ready", label: "수리 완료", primary: true });
-    list.push({ action: "cancel", label: "취소", destructive: true });
   } else if (status === "READY") {
     if (canSendToCart) {
       // v2 흐름: 카트에 라인 추가 → 다른 상품/임대와 함께 한 번에 결제
@@ -73,4 +70,22 @@ export function pad2(n: number): string {
 export function fmtKRW(n: number | string): string {
   const v = typeof n === "string" ? Number(n) : n;
   return `₩${(Number.isFinite(v) ? v : 0).toLocaleString("ko-KR")}`;
+}
+
+/**
+ * 부가세 포함 표시 — DB 저장값은 세전(공급가액) 이지만 사용자에게는 부가세 포함으로 노출.
+ * 수리 항목은 부속·공임·진단비 모두 TAXABLE 가정 (10% VAT).
+ * 면세 부속이 도입되면 part.product.taxType 을 받아 분기 필요.
+ */
+export function fmtKRWInc(n: number | string): string {
+  const v = typeof n === "string" ? Number(n) : n;
+  const gross = Math.round((Number.isFinite(v) ? v : 0) * (1 + DEFAULT_TAX_RATE));
+  return `₩${gross.toLocaleString("ko-KR")}`;
+}
+
+/** 세액만 표시 — 공급가액(세전) × 0.1 */
+export function fmtKRWTax(n: number | string): string {
+  const v = typeof n === "string" ? Number(n) : n;
+  const tax = Math.round((Number.isFinite(v) ? v : 0) * DEFAULT_TAX_RATE);
+  return `₩${tax.toLocaleString("ko-KR")}`;
 }

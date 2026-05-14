@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -463,7 +464,7 @@ export default function RepairServicesPage() {
                   className="text-right"
                   value={formatComma(presetForm.unitRate)}
                   onChange={(e) => setPresetForm({ ...presetForm, unitRate: parseComma(e.target.value) })}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                 />
               </FieldRow>
               <FieldRow label="메모">
@@ -561,7 +562,7 @@ export default function RepairServicesPage() {
                         inputMode="numeric"
                         value={formatComma(laborAddForm.unitRate)}
                         onChange={(e) => setLaborAddForm({ ...laborAddForm, unitRate: parseComma(e.target.value) })}
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                       />
                       <Button size="sm" variant="outline" className="h-8" onClick={addLaborToPkg}>
                         <Plus className="h-3.5 w-3.5" />
@@ -627,7 +628,7 @@ export default function RepairServicesPage() {
                         inputMode="numeric"
                         value={formatComma(partAddForm.unitPrice)}
                         onChange={(e) => setPartAddForm({ ...partAddForm, unitPrice: parseComma(e.target.value) })}
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                       />
                       <Button size="sm" variant="outline" className="h-8" onClick={addPartToPkg}>
                         <Plus className="h-3.5 w-3.5" />

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { repairLaborSchema } from "@/lib/validators/repair-ticket";
+import {
+  applyUsageDelta,
+  snapshotTicketUsage,
+  updateLaborUsageRate,
+} from "@/lib/repair-diagnosis-usage";
 
 export async function PATCH(
   request: NextRequest,
@@ -20,7 +25,7 @@ export async function PATCH(
 
   const labor = await prisma.repairLabor.findUnique({
     where: { id: laborId },
-    include: { repairTicket: { select: { status: true } } },
+    include: { repairTicket: { select: { id: true, status: true, diagnosisTemplateId: true } } },
   });
   if (!labor) return NextResponse.json({ error: "찾을 수 없음" }, { status: 404 });
   if (
@@ -37,15 +42,32 @@ export async function PATCH(
   const newHours = data.hours ?? Number(labor.hours);
   const newRate = data.unitRate ?? Number(labor.unitRate);
 
-  const updated = await prisma.repairLabor.update({
-    where: { id: laborId },
-    data: {
-      name: newName,
-      hours: newHours,
-      unitRate: newRate,
-      totalPrice: newHours * newRate,
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    const before = await snapshotTicketUsage(tx, labor.repairTicket.id);
+    const u = await tx.repairLabor.update({
+      where: { id: laborId },
+      data: {
+        name: newName,
+        hours: newHours,
+        unitRate: newRate,
+        totalPrice: newHours * newRate,
+      },
+    });
+    // name 이 바뀌면 set 이 바뀜 → delta 적용
+    const after = await snapshotTicketUsage(tx, labor.repairTicket.id);
+    await applyUsageDelta(tx, before, after);
+    // unitRate 가 바뀌었으면 추천 단가 갱신
+    if (labor.repairTicket.diagnosisTemplateId && newRate !== Number(labor.unitRate)) {
+      await updateLaborUsageRate(
+        tx,
+        labor.repairTicket.diagnosisTemplateId,
+        newName,
+        newRate,
+      );
+    }
+    return u;
   });
+
   return NextResponse.json(updated);
 }
 
@@ -59,7 +81,7 @@ export async function DELETE(
   const { laborId } = await params;
   const labor = await prisma.repairLabor.findUnique({
     where: { id: laborId },
-    include: { repairTicket: { select: { status: true } } },
+    include: { repairTicket: { select: { id: true, status: true } } },
   });
   if (!labor) return NextResponse.json({ error: "찾을 수 없음" }, { status: 404 });
   if (
@@ -71,6 +93,11 @@ export async function DELETE(
       { status: 400 },
     );
   }
-  await prisma.repairLabor.delete({ where: { id: laborId } });
+  await prisma.$transaction(async (tx) => {
+    const before = await snapshotTicketUsage(tx, labor.repairTicket.id);
+    await tx.repairLabor.delete({ where: { id: laborId } });
+    const after = await snapshotTicketUsage(tx, labor.repairTicket.id);
+    await applyUsageDelta(tx, before, after);
+  });
   return NextResponse.json({ success: true });
 }

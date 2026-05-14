@@ -78,7 +78,9 @@ export interface RepairTicketDetail {
   receivedAt: string;
   pickedUpAt: string | null;
   symptom: string | null;
+  symptomTemplateId: string | null;
   diagnosis: string | null;
+  diagnosisTemplateId: string | null;
   repairNotes: string | null;
   diagnosisFee: string;
   totalDiscount: string;

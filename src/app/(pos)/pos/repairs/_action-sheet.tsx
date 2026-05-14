@@ -7,7 +7,14 @@ import { Loader2, UserCircle2, Wrench, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { useSessions } from "@/components/pos/sessions-context";
-import { BottomSheet } from "../_components/bottom-sheet";
+import {
+  JmBadge,
+  JmDrawer,
+  JmDrawerBody,
+  JmDrawerContent,
+  JmDrawerHeader,
+  JmDrawerTitle,
+} from "@/jm";
 import { STATUS_META, type RepairTicketRow, type RepairTicketDetail } from "./_types";
 import { calcFinal } from "./_helpers";
 
@@ -138,73 +145,77 @@ function Body({
     !!ticket.customer || ticket.id; // 일단 항상 시도, 실패 시 toast
 
   return (
-    <BottomSheet
-      open
-      onOpenChange={(v) => !v && onClose()}
-      title={customerName}
-    >
-      <div className="flex flex-col gap-3 pb-2">
-        {/* 티켓 요약 */}
-        <div className="flex items-center justify-between rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
-          <div className="flex flex-col">
-            <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
-              {ticket.ticketNo}
-            </span>
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <span className={`size-2 rounded-full ${meta.dot}`} />
-              <span className="text-[13px] font-semibold text-[var(--jm-text)]">
-                {meta.label}
-              </span>
-              {ticket.type === "ON_SITE" && (
-                <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                  즉시
+    <JmDrawer open onOpenChange={(v) => !v && onClose()}>
+      <JmDrawerContent side="bottom" size="md" dragHandle>
+        <JmDrawerHeader>
+          <JmDrawerTitle>{customerName}</JmDrawerTitle>
+        </JmDrawerHeader>
+
+        <JmDrawerBody>
+          <div className="flex flex-col gap-3 pb-2">
+            {/* 티켓 요약 */}
+            <div className="flex items-center justify-between rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
+              <div className="flex flex-col">
+                <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
+                  {ticket.ticketNo}
+                </span>
+                <div className="mt-0.5 flex items-center gap-1.5">
+                  <span className={`size-2 rounded-full ${meta.dot}`} />
+                  <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
+                    {meta.label}
+                  </span>
+                  {ticket.type === "ON_SITE" && (
+                    <JmBadge variant="solid" size="sm" shape="square">
+                      즉시
+                    </JmBadge>
+                  )}
+                </div>
+              </div>
+              {ticket.symptom && (
+                <span className="line-clamp-2 max-w-[60%] text-right text-jm-2xs text-[var(--jm-text-muted)]">
+                  {ticket.symptom}
                 </span>
               )}
             </div>
-          </div>
-          {ticket.symptom && (
-            <span className="line-clamp-2 max-w-[60%] text-right text-[12px] text-[var(--jm-text-muted)]">
-              {ticket.symptom}
-            </span>
-          )}
-        </div>
 
-        {/* 액션 메뉴 */}
-        <div className="flex flex-col gap-2">
-          {ticket.status === "READY" && (
-            <ActionButton
-              icon={<CreditCard className="size-5" />}
-              label="결제로 이동"
-              hint="수리 합계를 카트에 추가하고 고객 페이지로"
-              variant="cta"
-              onClick={() => resurrectMutation.mutate("checkout")}
-              pending={pending === "checkout"}
-              disabled={resurrectMutation.isPending}
-            />
-          )}
-          <ActionButton
-            icon={<UserCircle2 className="size-5" />}
-            label="이 고객 카드 열기"
-            hint="그리드에 합류하고 작업 화면으로"
-            onClick={() => resurrectMutation.mutate("open")}
-            pending={pending === "open"}
-            disabled={resurrectMutation.isPending || !canOpenCustomer}
-          />
-          <ActionButton
-            icon={<Wrench className="size-5" />}
-            label="수리 상세 보기"
-            hint="이 수리 티켓의 상세 페이지로"
-            onClick={() => {
-              setPending("detail");
-              router.push(`/pos/repairs/${ticket.id}`);
-              onClose();
-            }}
-            pending={pending === "detail"}
-            disabled={resurrectMutation.isPending}
-          />
-        </div>
-      </div>
-    </BottomSheet>
+            {/* 액션 메뉴 */}
+            <div className="flex flex-col gap-2">
+              {ticket.status === "READY" && (
+                <ActionButton
+                  icon={<CreditCard className="size-5" />}
+                  label="결제로 이동"
+                  hint="수리 합계를 카트에 추가하고 고객 페이지로"
+                  variant="cta"
+                  onClick={() => resurrectMutation.mutate("checkout")}
+                  pending={pending === "checkout"}
+                  disabled={resurrectMutation.isPending}
+                />
+              )}
+              <ActionButton
+                icon={<UserCircle2 className="size-5" />}
+                label="이 고객 카드 열기"
+                hint="그리드에 합류하고 작업 화면으로"
+                onClick={() => resurrectMutation.mutate("open")}
+                pending={pending === "open"}
+                disabled={resurrectMutation.isPending || !canOpenCustomer}
+              />
+              <ActionButton
+                icon={<Wrench className="size-5" />}
+                label="수리 상세 보기"
+                hint="이 수리 티켓의 상세 페이지로"
+                onClick={() => {
+                  setPending("detail");
+                  router.push(`/pos/repairs/${ticket.id}`);
+                  onClose();
+                }}
+                pending={pending === "detail"}
+                disabled={resurrectMutation.isPending}
+              />
+            </div>
+          </div>
+        </JmDrawerBody>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }
 
@@ -246,10 +257,10 @@ function ActionButton({
         {pending ? <Loader2 className="size-5 animate-spin" /> : icon}
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[14px] font-semibold">{label}</span>
+        <span className="text-jm-sm font-semibold">{label}</span>
         {hint && (
           <span
-            className={`text-[11px] ${
+            className={`text-jm-2xs ${
               variant === "cta" ? "text-white/70" : "text-[var(--jm-text-muted)]"
             }`}
           >

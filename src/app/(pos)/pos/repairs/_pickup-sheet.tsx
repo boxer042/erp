@@ -1,8 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { fmtKRW } from "./_helpers";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { Check, Loader2 } from "lucide-react";
+import {
+  JmButton,
+  JmDrawer,
+  JmDrawerBody,
+  JmDrawerContent,
+  JmDrawerFooter,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmSectionLabel,
+} from "@/jm";
+import { fmtKRWInc } from "./_helpers";
 
 type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
 const PAYMENTS: { value: PaymentMethod; label: string; sub?: string }[] = [
@@ -21,70 +31,40 @@ interface Props {
   loading?: boolean;
 }
 
-export function PickupSheet(props: Props) {
-  // open=false 일 땐 컴포넌트 자체가 언마운트 → useState 초기화 자동
-  if (!props.open) return null;
-  return <PickupSheetBody {...props} />;
-}
-
-function PickupSheetBody({
+export function PickupSheet({
+  open,
   onOpenChange,
   finalAmount,
   warrantyMonths,
   onConfirm,
   loading,
 }: Props) {
-  useBodyScrollLock();
   const [method, setMethod] = useState<PaymentMethod>("CARD");
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => !loading && onOpenChange(false)}
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        aria-label="닫기"
-      />
-      <div className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col rounded-t-3xl bg-[var(--jm-surface)] shadow-2xl">
-        <div className="flex shrink-0 justify-center pt-3">
-          <div className="h-1 w-10 rounded-full bg-[var(--jm-border-strong)]" />
-        </div>
-        <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-3">
-          <h2 className="text-[18px] font-bold text-[var(--jm-text)]">픽업 / 결제</h2>
-          <button
-            type="button"
-            onClick={() => !loading && onOpenChange(false)}
-            disabled={loading}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)] disabled:opacity-50"
-            aria-label="닫기"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M5 5l10 10M15 5l-10 10"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
+    <JmDrawer
+      open={open}
+      onOpenChange={(v) => !loading && onOpenChange(v)}
+    >
+      <JmDrawerContent side="bottom" size="lg" dragHandle>
+        <JmDrawerHeader>
+          <JmDrawerTitle>픽업 / 결제</JmDrawerTitle>
+        </JmDrawerHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+        <JmDrawerBody>
           {/* 금액 강조 */}
           <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
-            <div className="text-[12px] font-semibold uppercase tracking-wider text-white/60">
+            <div className="text-jm-2xs font-semibold uppercase tracking-wider text-white/60">
               청구 금액
             </div>
             <div className="mt-1 text-[40px] font-bold tabular-nums leading-none">
-              {fmtKRW(finalAmount)}
+              {fmtKRWInc(finalAmount)}
             </div>
           </div>
 
           {/* 결제수단 — 큰 버튼 */}
           <div className="mt-5 flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-              결제수단
-            </span>
+            <JmSectionLabel>결제수단</JmSectionLabel>
             <div className="grid grid-cols-2 gap-2">
               {PAYMENTS.map((p) => {
                 const active = method === p.value;
@@ -99,15 +79,11 @@ function PickupSheetBody({
                         : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                     }`}
                   >
-                    <span
-                      className={`text-[16px] font-semibold ${
-                        active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
-                      }`}
-                    >
+                    <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                       {p.label}
                     </span>
                     {p.sub && (
-                      <span className="text-[11px] text-[var(--jm-text-muted)]">{p.sub}</span>
+                      <span className="text-jm-2xs text-[var(--jm-text-muted)]">{p.sub}</span>
                     )}
                   </button>
                 );
@@ -116,54 +92,26 @@ function PickupSheetBody({
           </div>
 
           {warrantyMonths != null && warrantyMonths > 0 && (
-            <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--jm-success-bg)] px-3 py-2.5 text-[12px] text-emerald-900">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M3 7l3 3 5-6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--jm-success-bg)] px-3 py-2.5 text-jm-2xs text-[var(--jm-success-fg)]">
+              <Check className="size-3.5" />
               수리 보증 {warrantyMonths}개월 자동 적용
             </div>
           )}
-        </div>
+        </JmDrawerBody>
 
-        <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
-          <button
-            type="button"
+        <JmDrawerFooter>
+          <JmButton
+            variant="cta"
+            size="lg"
             onClick={() => onConfirm(method)}
             disabled={loading}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+            className="w-full"
           >
-            {loading && (
-              <svg
-                className="size-4 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  opacity="0.25"
-                />
-                <path
-                  d="M12 2a10 10 0 0 1 10 10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-              </svg>
-            )}
-            {fmtKRW(finalAmount)} 결제 완료
-          </button>
-        </div>
-      </div>
-    </>
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            {fmtKRWInc(finalAmount)} 결제 완료
+          </JmButton>
+        </JmDrawerFooter>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }

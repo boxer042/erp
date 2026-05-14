@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -1038,7 +1039,7 @@ function FeesAndTotalsSection({
               inputMode={totalDiscount.trim().endsWith("%") ? "decimal" : "numeric"}
               value={formatDiscountDisplay(totalDiscount)}
               onChange={(e) => setTotalDiscount(normalizeDiscountInput(e.target.value))}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               disabled={readonly}
               className="h-9 text-right tabular-nums"
               placeholder="0"

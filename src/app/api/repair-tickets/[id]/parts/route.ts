@@ -4,6 +4,10 @@ import { guardUser } from "@/lib/api-auth";
 import { repairPartCreateSchema } from "@/lib/validators/repair-ticket";
 import { consumeRepairPart } from "@/lib/repair-inventory";
 import { Prisma } from "@prisma/client";
+import {
+  applyUsageDelta,
+  snapshotTicketUsage,
+} from "@/lib/repair-diagnosis-usage";
 
 // 수리 티켓에 부속 추가 — 추가 즉시 FIFO 재고 차감
 export async function POST(
@@ -23,7 +27,7 @@ export async function POST(
 
   const ticket = await prisma.repairTicket.findUnique({
     where: { id },
-    select: { id: true, ticketNo: true, status: true },
+    select: { id: true, ticketNo: true, status: true, diagnosisTemplateId: true },
   });
   if (!ticket) {
     return NextResponse.json({ error: "수리 티켓을 찾을 수 없습니다" }, { status: 404 });
@@ -45,11 +49,15 @@ export async function POST(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // 진단↔부속 frequency 추천 — 변경 전 snapshot
+      const before = await snapshotTicketUsage(tx, id);
+
       // 같은 productId 행이 이미 있으면 수량 증가 (카트 패턴)
       const existing = await tx.repairPart.findFirst({
         where: { repairTicketId: id, productId: data.productId, status: data.status },
       });
 
+      let resultPart;
       if (existing) {
         const additionalQty = data.quantity;
         // 추가 분량만큼 FIFO 차감
@@ -63,7 +71,7 @@ export async function POST(
         // 수량/총액 업데이트 (existing.consumedAt은 consumeRepairPart에서 갱신됨)
         const newQty = new Prisma.Decimal(existing.quantity).plus(additionalQty);
         const newTotal = newQty.times(existing.unitPrice);
-        const updated = await tx.repairPart.update({
+        resultPart = await tx.repairPart.update({
           where: { id: existing.id },
           data: {
             quantity: newQty,
@@ -71,34 +79,39 @@ export async function POST(
           },
           include: { product: { select: { id: true, name: true, sku: true } } },
         });
-        return updated;
+      } else {
+        // 신규 행
+        const part = await tx.repairPart.create({
+          data: {
+            repairTicketId: id,
+            productId: data.productId,
+            quantity: data.quantity,
+            unitPrice: data.unitPrice,
+            totalPrice: data.quantity * data.unitPrice,
+            discount: data.discount,
+            status: data.status,
+          },
+        });
+
+        await consumeRepairPart(tx, part.id, {
+          ticketId: ticket.id,
+          ticketNo: ticket.ticketNo,
+          productId: product.id,
+          productName: product.name,
+          quantity: data.quantity,
+        });
+
+        resultPart = await tx.repairPart.findUnique({
+          where: { id: part.id },
+          include: { product: { select: { id: true, name: true, sku: true } } },
+        });
       }
 
-      // 신규 행
-      const part = await tx.repairPart.create({
-        data: {
-          repairTicketId: id,
-          productId: data.productId,
-          quantity: data.quantity,
-          unitPrice: data.unitPrice,
-          totalPrice: data.quantity * data.unitPrice,
-          discount: data.discount,
-          status: data.status,
-        },
-      });
+      // 변경 후 snapshot → delta 적용 (set semantics, 토글·중복 추가에 robust)
+      const after = await snapshotTicketUsage(tx, id);
+      await applyUsageDelta(tx, before, after);
 
-      await consumeRepairPart(tx, part.id, {
-        ticketId: ticket.id,
-        ticketNo: ticket.ticketNo,
-        productId: product.id,
-        productName: product.name,
-        quantity: data.quantity,
-      });
-
-      return tx.repairPart.findUnique({
-        where: { id: part.id },
-        include: { product: { select: { id: true, name: true, sku: true } } },
-      });
+      return resultPart;
     });
 
     return NextResponse.json(result, { status: 201 });
