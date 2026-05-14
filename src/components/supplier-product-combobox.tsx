@@ -40,7 +40,7 @@ export function SupplierProductCombobox({
 }: SupplierProductComboboxProps) {
   const selected = supplierProducts.find((s) => s.id === value);
   const selectedLabel = selected
-    ? `${selected.name}${selected.spec ? ` (${selected.spec})` : ""}`
+    ? `${selected.name}${selected.spec ? ` · ${selected.spec}` : ""}`
     : undefined;
 
   return (
@@ -52,23 +52,29 @@ export function SupplierProductCombobox({
         const lower = q.toLowerCase();
         return (
           s.name.toLowerCase().includes(lower) ||
-          (s.supplierCode?.toLowerCase().includes(lower) ?? false)
+          (s.supplierCode?.toLowerCase().includes(lower) ?? false) ||
+          (s.spec?.toLowerCase().includes(lower) ?? false)
         );
       }}
       onSelect={(s) => onChange(s)}
       onCreateNew={onCreateNew}
       selectedLabel={selectedLabel}
       placeholder={placeholder}
-      searchPlaceholder="품명 또는 품번 검색..."
+      searchPlaceholder="품명·규격·품번 검색..."
       mobileTitle="공급상품 선택"
       disabled={disabled}
       renderItem={(s) => (
         <>
-          <span className="flex-1">{s.name}{s.spec ? ` (${s.spec})` : ""}</span>
+          <span className="flex-1 truncate">
+            {s.name}
+            {s.spec && (
+              <span className="ml-1 text-muted-foreground">· {s.spec}</span>
+            )}
+          </span>
           {s.supplierCode && (
-            <span className="text-xs text-muted-foreground mr-2">{s.supplierCode}</span>
+            <span className="text-xs text-muted-foreground mr-2 shrink-0">{s.supplierCode}</span>
           )}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground shrink-0">
             ₩{parseFloat(s.unitPrice).toLocaleString("ko-KR")}
           </span>
         </>

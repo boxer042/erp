@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -228,7 +229,7 @@ function InlineShippingEditor({
               inputMode="numeric"
               value={formatComma(draft)}
               onChange={(e) => setDraft(parseComma(e.target.value))}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               placeholder="비우면 분배 적용"
               className="h-8"
             />

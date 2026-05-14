@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -304,7 +305,7 @@ function ProductInfoEditSheetContent({
                             warrantyMonths: e.target.value.replace(/\D/g, ""),
                           }))
                         }
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                         placeholder="0"
                         className="h-8 w-20 text-right tabular-nums"
                       />

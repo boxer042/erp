@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
@@ -158,7 +159,7 @@ export function ProductBulkCard({ product }: ProductBulkCardProps) {
                   onChange={(e) =>
                     setForm((p) => ({ ...p, containerSize: e.target.value.replace(/[^\d.]/g, "") }))
                   }
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
                   placeholder="4000"
                 />
               </div>

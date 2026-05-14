@@ -23,3 +23,5 @@ export { ProductChannelMarginCard } from "./product-channel-margin-card";
 export { ComponentIncomingInfoSections } from "./component-incoming-info-sections";
 export type { ComponentIncomingInfoRow } from "./component-incoming-info-sections";
 export { VariantHistorySheet } from "./variant-history-sheet";
+export { ProductPriceHistoryCard } from "./product-price-history-card";
+export { ProductSalesPriceHistoryCard } from "./product-sales-price-history-card";

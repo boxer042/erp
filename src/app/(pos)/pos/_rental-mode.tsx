@@ -280,8 +280,11 @@ function RentalSheetBody({
       staleTime: 1000 * 30,
     })),
   });
-  const occupiedRanges = useMemo(() => {
-    const all = occupancyQueries.flatMap((q) => q.data ?? []);
+  const occupiedRanges = useMemo<{ start: Date; end: Date }[]>(() => {
+    const all = occupancyQueries.flatMap(
+      (q) =>
+        (q.data ?? []) as { id: string; startDate: string; endDate: string }[],
+    );
     return all
       .map((r) => ({
         start: stripTime(new Date(r.startDate)),
@@ -294,7 +297,7 @@ function RentalSheetBody({
   // 선택 구간이 점유 구간과 겹치면 카트 추가 차단
   const startD = stripTime(new Date(startDate));
   const endD = stripTime(new Date(endDate));
-  const overlap = useMemo(
+  const overlap = useMemo<{ start: Date; end: Date } | undefined>(
     () =>
       occupiedRanges.find(
         (r) =>

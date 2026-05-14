@@ -16,7 +16,12 @@ export const orderItemSchema = z.object({
   entryProductId: z.string().nullable().optional(),
 });
 
-export const fulfillmentTypeSchema = z.enum(["PICKUP", "DELIVERY", "SHIPPING"]);
+export const fulfillmentTypeSchema = z.enum([
+  "IN_STORE", // 매장 즉시판매 (POS 결제 + 즉시 인도)
+  "PICKUP",   // 매장 픽업 대기 (결제 후 추후 방문 수령)
+  "DELIVERY", // 자체 배달
+  "SHIPPING", // 택배
+]);
 export const shippingPaymentTypeSchema = z.enum([
   "PREPAID",       // 손님 결제 시 함께 (자사몰/일반 POS 택배)
   "COD",           // 착불 (받는 사람이 택배기사에게)
@@ -40,7 +45,7 @@ export const orderSchema = z.object({
   recipientPhone: z.string().optional(),
   shippingAddress: z.string().optional(),
   orderDate: z.string().min(1, "주문일을 입력해주세요"),
-  fulfillmentType: fulfillmentTypeSchema.default("PICKUP"),
+  fulfillmentType: fulfillmentTypeSchema.default("IN_STORE"),
   expectedShipDate: z.string().optional(),  // YYYY-MM-DD
   paymentMethod: orderPaymentMethodSchema.optional(),
   discountAmount: z.string().default("0"),

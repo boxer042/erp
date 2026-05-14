@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState, isValidElement, cloneElement, type ReactElement } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X, ChevronRight, Package, Wrench, Layers, Cpu, Palette } from "lucide-react";
@@ -341,7 +342,7 @@ export function CostList({
                   const v = cost.costType === "FIXED" ? parseComma(e.target.value) : e.target.value;
                   onChange((prev) => prev.map((c, i) => i === idx ? { ...c, value: v } : c));
                 }}
-                onFocus={(e) => e.currentTarget.select()}
+                onFocus={focusCaretEnd}
                 className="h-7 text-[12px] text-right border-0 bg-transparent focus-visible:ring-0 px-1"
               />
             </td>
@@ -438,7 +439,7 @@ export function CostList({
                   const v = cost.costType === "FIXED" ? parseComma(e.target.value) : e.target.value;
                   onChange((prev) => prev.map((c, i) => i === idx ? { ...c, value: v } : c));
                 }}
-                onFocus={(e) => e.currentTarget.select()}
+                onFocus={focusCaretEnd}
                 className="h-9 flex-1 text-right text-[13px]"
               />
             </div>

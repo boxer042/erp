@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -1212,7 +1213,7 @@ export function NewProductForm({
                         placeholder="0"
                         value={formatComma(baseCost)}
                         onChange={(e) => setBaseCost(parseComma(e.target.value))}
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                         className="h-7 w-28 ml-auto text-right text-[12px]"
                       />
                     </td>
@@ -1314,7 +1315,7 @@ export function NewProductForm({
               max="100"
               value={lastEdited === "rate" ? targetMargin : marginRate.toFixed(1)}
               onChange={(e) => { setTargetMargin(e.target.value); setLastEdited("rate"); }}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               className={`h-9 pr-6 text-right text-[13px] ${marginAmount < 0 ? "text-red-400" : ""}`}
             />
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">%</span>
@@ -1330,7 +1331,7 @@ export function NewProductForm({
             placeholder="0"
             value={formatComma(lastEdited === "amount" ? targetMarginAmount : (marginAmount !== 0 ? Math.round(marginAmount).toString() : ""))}
             onChange={(e) => { setTargetMarginAmount(parseComma(e.target.value)); setLastEdited("amount"); }}
-            onFocus={(e) => e.currentTarget.select()}
+            onFocus={focusCaretEnd}
             className={`h-9 flex-1 text-right text-[13px] ${marginAmount < 0 ? "text-red-400" : ""}`}
           />
         </div>
@@ -1352,7 +1353,7 @@ export function NewProductForm({
               placeholder="0"
               value={formatComma(lastEdited === "supply" ? manualSupplyPrice : (supplyPrice > 0 ? supplyPrice.toString() : ""))}
               onChange={(e) => { setManualSupplyPrice(parseComma(e.target.value)); setLastEdited("supply"); }}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               className="h-7 text-center text-[15px] font-bold border-0 bg-transparent focus-visible:ring-1 px-0"
             />
           </div>
@@ -1374,7 +1375,7 @@ export function NewProductForm({
               placeholder="0"
               value={formatComma(lastEdited === "price" ? manualVatPrice : (vatPrice > 0 ? vatPrice.toString() : ""))}
               onChange={(e) => { setManualVatPrice(parseComma(e.target.value)); setLastEdited("price"); }}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               className="h-7 text-center text-[15px] font-bold border-0 bg-transparent focus-visible:ring-1 px-0"
             />
           </div>
@@ -1475,7 +1476,7 @@ export function NewProductForm({
                           inputMode="decimal"
                           value={row.lastEdited === "rate" ? row.targetRate : realMarginRate.toFixed(1)}
                           onChange={(e) => updateRow(idx, { targetRate: e.target.value, lastEdited: "rate" })}
-                          onFocus={(e) => e.currentTarget.select()}
+                          onFocus={focusCaretEnd}
                           className="h-8 pr-6 text-right text-[12px]"
                         />
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">%</span>
@@ -1490,7 +1491,7 @@ export function NewProductForm({
                         placeholder="0"
                         value={formatComma(row.lastEdited === "amount" ? row.targetAmount : (realMargin > 0 ? Math.round(realMargin).toString() : ""))}
                         onChange={(e) => updateRow(idx, { targetAmount: parseComma(e.target.value), lastEdited: "amount" })}
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                         className="h-8 flex-1 text-right text-[12px]"
                       />
                     </div>
@@ -1503,7 +1504,7 @@ export function NewProductForm({
                         placeholder={offlineVatPrice > 0 ? formatComma(String(offlineVatPrice)) : "0"}
                         value={formatComma(row.lastEdited === "price" || row.lastEdited === null ? row.price : String(channelVatPrice))}
                         onChange={(e) => updateRow(idx, { price: parseComma(e.target.value), lastEdited: "price" })}
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                         className="h-8 flex-1 text-right text-[12px] font-medium"
                       />
                     </div>
@@ -1767,7 +1768,7 @@ export function NewProductForm({
                                     setMapping((prev) => ({ ...prev, conversionRate: "1" }));
                                   }
                                 }}
-                                onFocus={(e) => e.currentTarget.select()}
+                                onFocus={focusCaretEnd}
                                 className="h-9 w-28"
                               />
                               <p className="text-[12px] text-muted-foreground">공급상품 1개 → 판매상품 <span className="text-foreground font-medium">{mapping.conversionRate || "1"}</span>개</p>
@@ -1992,7 +1993,7 @@ export function NewProductForm({
                                     const v = e.target.value;
                                     if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) setContainerSize(v);
                                   }}
-                                  onFocus={(e) => e.currentTarget.select()}
+                                  onFocus={focusCaretEnd}
                                   className="h-9 flex-1"
                                 />
                                 <Select value={newBulkUnit} onValueChange={(v) => setNewBulkUnit(v ?? "mL")}>
@@ -2080,7 +2081,7 @@ export function NewProductForm({
                                   warrantyMonths: e.target.value.replace(/\D/g, ""),
                                 }))
                               }
-                              onFocus={(e) => e.currentTarget.select()}
+                              onFocus={focusCaretEnd}
                               className="h-7 w-16 text-right text-[13px]"
                             />
                             <span className="text-[11px] text-muted-foreground">개월 보증</span>
@@ -2545,7 +2546,7 @@ export function NewProductForm({
                                           ),
                                         )
                                       }
-                                      onFocus={(e) => e.currentTarget.select()}
+                                      onFocus={focusCaretEnd}
                                       className="h-8 text-[13px]"
                                     />
                                   </div>
@@ -2588,7 +2589,7 @@ export function NewProductForm({
                                           ),
                                         )
                                       }
-                                      onFocus={(e) => e.currentTarget.select()}
+                                      onFocus={focusCaretEnd}
                                       className="h-8 text-[13px]"
                                     />
                                   </div>

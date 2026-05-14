@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -182,7 +183,7 @@ function ProductCostsEditSheetContent({
                           : e.target.value;
                       update(row.rowId, { value: v });
                     }}
-                    onFocus={(e) => e.currentTarget.select()}
+                    onFocus={focusCaretEnd}
                     className="h-9"
                   />
                 </FieldSm>

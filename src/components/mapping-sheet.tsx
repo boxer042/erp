@@ -17,6 +17,7 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { formatComma, parseComma, genClientId } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { useIsCompactDevice } from "@/hooks/use-mobile";
 import {
   JmBadge,
@@ -676,7 +677,7 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
                   const v = costType === "FIXED" ? parseComma(e.target.value) : e.target.value;
                   setValue(v);
                 }}
-                onFocus={(e) => e.currentTarget.select()}
+                onFocus={focusCaretEnd}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd(); }}
                 className="h-8 text-[13px]"
               />

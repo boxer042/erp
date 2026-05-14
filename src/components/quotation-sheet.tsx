@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -465,7 +466,7 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
                               inputMode="decimal"
                               value={it.quantity}
                               onChange={(e) => updateItem(idx, { quantity: e.target.value })}
-                              onFocus={(e) => e.currentTarget.select()}
+                              onFocus={focusCaretEnd}
                             />
                           </td>
                           <td className="px-3 py-1.5">
@@ -474,7 +475,7 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
                               inputMode="numeric"
                               value={formatComma(it.unitPrice)}
                               onChange={(e) => updateItem(idx, { unitPrice: parseComma(e.target.value) })}
-                              onFocus={(e) => e.currentTarget.select()}
+                              onFocus={focusCaretEnd}
                             />
                           </td>
                           <td className="px-3 py-1.5">
@@ -483,7 +484,7 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
                               inputMode={it.discount.trim().endsWith("%") ? "decimal" : "numeric"}
                               value={formatDiscountDisplay(it.discount)}
                               onChange={(e) => updateItem(idx, { discount: normalizeDiscountInput(e.target.value) })}
-                              onFocus={(e) => e.currentTarget.select()}
+                              onFocus={focusCaretEnd}
                               placeholder=""
                               disabled={p === 0}
                             />

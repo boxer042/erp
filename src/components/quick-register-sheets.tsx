@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -443,7 +444,7 @@ export function QuickSupplierProductSheet({
               inputMode="numeric"
               value={formatComma(listPrice)}
               onChange={(e) => setListPrice(parseComma(e.target.value))}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               placeholder="0"
             />
           </FieldRow>
@@ -453,7 +454,7 @@ export function QuickSupplierProductSheet({
               inputMode="numeric"
               value={formatComma(unitPrice)}
               onChange={(e) => setUnitPrice(parseComma(e.target.value))}
-              onFocus={(e) => e.currentTarget.select()}
+              onFocus={focusCaretEnd}
               placeholder="정가와 동일 시 비워두세요"
             />
           </FieldRow>

@@ -3,7 +3,7 @@ import { calcDiscountPerUnit } from "@/lib/utils";
 import type { CartSession } from "@/components/pos/sessions-context";
 
 export type CheckoutAction = "order" | "quotation" | "statement";
-export type FulfillmentType = "PICKUP" | "DELIVERY" | "SHIPPING";
+export type FulfillmentType = "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
 
 export interface ShippingInfo {
   recipientName?: string | null;
@@ -18,10 +18,10 @@ export interface CheckoutPayloadOptions {
   paymentMethod?: "CASH" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
   taxInvoiceRequested?: boolean;
   memo?: string | null;
-  /** 출고 방식 — 미지정/PICKUP 시 즉시 종결, DELIVERY/SHIPPING 은 ERP 워크보드 진입 */
+  /** 출고 방식 — 미지정/IN_STORE 시 즉시 종결, PICKUP/DELIVERY/SHIPPING 은 ERP 워크보드 진입 */
   fulfillmentType?: FulfillmentType;
   shipping?: ShippingInfo;
-  /** 배송비 결제 방식 — PICKUP 은 무관. DELIVERY/SHIPPING 만 의미 */
+  /** 배송비 결제 방식 — IN_STORE/PICKUP 은 무관. DELIVERY/SHIPPING 만 의미 */
   shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
 }
 
@@ -70,12 +70,15 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
           })
       : undefined;
 
-  // 수리/임대는 매장 인도라 항상 PICKUP 강제 (UI 에서 토글 안 보임)
+  // 임대만 IN_STORE(즉시판매) 강제 (자산 인계가 매장에서 일어나야 함).
+  // 수리는 사용자 선택 허용 (수리 완료 후 손님이 배송으로 받는 경우 종종 있음).
   const fulfillmentType: FulfillmentType =
-    repairItems.length > 0 || rentalItems.length > 0
-      ? "PICKUP"
-      : opts.fulfillmentType ?? "PICKUP";
-  const shipping = fulfillmentType === "PICKUP" ? null : opts.shipping ?? null;
+    rentalItems.length > 0
+      ? "IN_STORE"
+      : opts.fulfillmentType ?? "IN_STORE";
+  // 매장 인도(IN_STORE/PICKUP)는 배송정보 불필요
+  const isInStore = fulfillmentType === "IN_STORE" || fulfillmentType === "PICKUP";
+  const shipping = isInStore ? null : opts.shipping ?? null;
 
   return {
     action: opts.action,
@@ -94,6 +97,8 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
           sku: i.sku,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
+          // 정가(상품 마스터 listPrice) — 서버가 OrderItem.listPrice 로 보존, 통합 판매내역 상세에서 정가/할인 비교 표시
+          listPrice: i.listPrice ?? null,
           discountPerUnit: calcDiscountPerUnit(i.unitPrice, i.discount),
           taxType: i.taxType,
           isZeroRate: i.isZeroRate ?? false,
@@ -115,6 +120,9 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
         sku: i.sku,
         quantity: i.quantity,
         unitPrice: baseUnitPrice,
+        // 정가(상품 마스터 listPrice) — unitPrice 와 별도로 보존. 가격 다이얼로그로 단가만 깎인 경우에도
+        // 정가/할인 비교가 통합 판매내역 상세에서 보이도록 함.
+        listPrice: i.listPrice ?? null,
         discountPerUnit: calcDiscountPerUnit(baseUnitPrice, i.discount),
         taxType: i.taxType,
         isZeroRate: i.isZeroRate ?? false,

@@ -16,6 +16,8 @@ export const queryKeys = {
     costs: (id: string) => ["products", "costs", id] as const,
     movements: (id: string) => ["products", "movements", id] as const,
     landing: (id: string) => ["products", "landing", id] as const,
+    priceHistory: (id: string) => ["products", "price-history", id] as const,
+    salesStats: (id: string) => ["products", "sales-stats", id] as const,
   },
   incoming: {
     all: ["incoming"] as const,
@@ -45,6 +47,11 @@ export const queryKeys = {
   inventory: {
     all: ["inventory"] as const,
     list: (params?: Record<string, unknown>) => ["inventory", "list", params ?? {}] as const,
+    initial: {
+      all: ["inventory", "initial"] as const,
+      history: (params?: Record<string, unknown>) =>
+        ["inventory", "initial", "history", params ?? {}] as const,
+    },
   },
   channels: {
     all: ["channels"] as const,
@@ -135,6 +142,14 @@ export const queryKeys = {
     margin: (params?: Record<string, unknown>) => ["reports", "margin", params ?? {}] as const,
     optionFunnel: (params?: Record<string, unknown>) =>
       ["reports", "option-funnel", params ?? {}] as const,
+    incomeStatement: (params?: Record<string, unknown>) =>
+      ["reports", "income-statement", params ?? {}] as const,
+    incomeStatementDeductions: (params?: Record<string, unknown>) =>
+      ["reports", "income-statement", "deductions", params ?? {}] as const,
+    incomeStatementMonthly: (params?: Record<string, unknown>) =>
+      ["reports", "income-statement", "monthly", params ?? {}] as const,
+    balanceSheet: (params?: Record<string, unknown>) =>
+      ["reports", "balance-sheet", params ?? {}] as const,
   },
   ledger: {
     suppliers: (params?: Record<string, unknown>) => ["ledger", "suppliers", params ?? {}] as const,

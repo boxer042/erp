@@ -7,6 +7,8 @@ export interface ProductOption {
   id: string;
   name: string;
   sku: string;
+  /** 규격 — 같은 이름 상품의 변형 구분 (예: "100ml", "L사이즈") */
+  spec?: string | null;
   sellingPrice: string;
   /** 공식 판매 정가(세전) — 카트 라인 정가 비교에 사용 */
   listPrice?: string;
@@ -52,6 +54,7 @@ const EMPTY_OPTION: ProductOption = {
   id: "",
   name: "",
   sku: "",
+  spec: null,
   sellingPrice: "0",
   unitCost: null,
   unitOfMeasure: "EA",
@@ -75,7 +78,9 @@ export function ProductCombobox({
   }, [products, filterType]);
 
   const selected = items.find((p) => p.id === value);
-  const selectedLabel = selected ? `${selected.name} (${selected.sku})` : undefined;
+  const selectedLabel = selected
+    ? `${selected.name}${selected.spec ? ` · ${selected.spec}` : ""} (${selected.sku})`
+    : undefined;
 
   return (
     <ResponsiveCombobox<ProductOption>
@@ -84,12 +89,16 @@ export function ProductCombobox({
       getItemId={(p) => p.id}
       matches={(p, q) => {
         const lower = q.toLowerCase();
-        return p.name.toLowerCase().includes(lower) || p.sku.toLowerCase().includes(lower);
+        return (
+          p.name.toLowerCase().includes(lower) ||
+          p.sku.toLowerCase().includes(lower) ||
+          (p.spec?.toLowerCase().includes(lower) ?? false)
+        );
       }}
       onSelect={(p) => onChange(p)}
       selectedLabel={selectedLabel}
       placeholder={placeholder}
-      searchPlaceholder="상품명 또는 SKU 검색..."
+      searchPlaceholder="상품명·규격·SKU 검색..."
       mobileTitle="상품 선택"
       clearable={clearable}
       onClear={() => onChange(EMPTY_OPTION)}
@@ -101,7 +110,12 @@ export function ProductCombobox({
               그룹
             </span>
           )}
-          <span className="flex-1 truncate">{p.name}</span>
+          <span className="flex-1 truncate">
+            {p.name}
+            {p.spec && (
+              <span className="ml-1 text-muted-foreground">· {p.spec}</span>
+            )}
+          </span>
           <span className="ml-2 text-xs text-muted-foreground shrink-0">{p.sku}</span>
         </>
       )}

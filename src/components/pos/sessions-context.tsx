@@ -307,6 +307,8 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
+    // unmount/페이지 이동 시 in-flight 요청 cancel 신호 — 서버 ECONNRESET 노이즈 방지
+    const abortController = new AbortController();
 
     const sync = async () => {
       try {
@@ -320,6 +322,7 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal: abortController.signal,
         });
         if (!res.ok) return;
         const payload = (await res.json()) as {
@@ -385,6 +388,8 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       if (debounceTimer) clearTimeout(debounceTimer);
       if (pollTimer) clearInterval(pollTimer);
+      // unmount 시 in-flight 요청 cancel — 서버가 ECONNRESET 안 받게
+      abortController.abort();
       debouncePushRef.current = null;
       forceSyncRef.current = null;
     };

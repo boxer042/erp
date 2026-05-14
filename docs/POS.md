@@ -167,6 +167,39 @@ CANCELLED 는 노출 안 함.
 | 미등록 손님 + 원본 세션 살아있음 | 그 세션 활성화 |
 | 미등록 손님 + 원본 세션 soft-deleted | `deletedAt = null` 풀고 같은 sessionId 유지 → RepairTicket.posSessionId 매칭 보존 |
 
+### 수리 진행 페이지 (`/pos/repairs/[id]`) 구조
+
+리뉴얼 결과 ([page.tsx](../src/app/(pos)/pos/repairs/[id]/page.tsx) 748줄, sub-card 7개로 분리):
+
+```
+[Header: ◀ 뒤로 · 상태칩 · 티켓번호 · 손님·기기 · 진행률 stepper · 내역서 · ⋮ 메뉴]
+  ├─ ⋮ 메뉴: 즉시↔맡김 변경 · 수리 취소 (취소는 액션 바에서 분리됨)
+[Body]
+  ├─ CustomerDeviceCard (고객·담당·접수일)
+  ├─ ProductLinkCard (가져온 기기 — 시리얼·구매내역·상품명·직접입력 4모드)
+  ├─ DiagnosisFeeCard (기본 점검비)
+  ├─ SymptomCard (증상 — JmComboboxDrawer)
+  ├─ DiagnosisCard (진단 — 증상 선택 시 매칭 진단 추천)
+  ├─ NotesCard (수리 메모 — 자유 textarea)
+  ├─ PackagesCard (수리 패키지 빠른 추가)
+  ├─ SetRecommendations (Phase 4 — 자주 함께 사용된 세트 batch 적용)
+  ├─ PartsSection (부속 + 진단 기반 추천 칩)
+  ├─ LaborsSection (공임 + 진단 기반 추천 칩)
+  └─ ReferenceInfoSection (시리얼 이력 + 재수리, collapsible)
+[Sticky Footer]
+  └─ 공급가액 / 부가세(10%) / 청구합계 3분할 + 항목 breakdown + 다음 단계 버튼
+```
+
+**증상·진단 자동 학습** (Phase 1+2): 자유 입력이 `RepairSymptomTemplate` / `RepairDiagnosisTemplate` 마스터로 자동 정규화. 증상 ↔ 진단 페어 occurrenceCount 누적 → 다음 케이스에서 증상 선택 시 자주 매칭된 진단 자동 추천.
+
+**부속·공임 빈도 학습** (Phase 3): 진단이 선택된 ticket 에서 부속·공임 추가/삭제 시 set semantics 로 occurrenceCount 동기화 → 진단 선택 시 자주 쓰인 부속·공임 칩으로 추천 (이미 추가된 항목은 자동 제외).
+
+**세트 매칭 학습** (Phase 4): PICKED_UP 시점에 (진단, 부속 묶음, 공임 묶음) 페어를 `DiagnosisPartSet` 으로 누적. 같은 진단이 반복되면 묶음 카드 노출 → [세트 적용] 한 번에 부속·공임 일괄 추가. 평균 수량·평균 단가도 같이 학습.
+
+**부가세 표시 정책**: DB 저장값은 세전(공급가액). 사용자 시야는 모두 VAT 포함. [`fmtKRWInc`](../src/app/(pos)/pos/repairs/_helpers.ts) / `fmtKRWTax` 헬퍼로 통일. PriceInputDialog 만 세전·세액·VAT포함 3필드 동시 노출 (입력 정확도용).
+
+**즉시↔맡김 변환**: 헤더 ⋮ 메뉴 → "맡김 수리로 변경" / "즉시 수리로 변경" — `RepairTicket.type` 만 update. 부속·공임 등 다른 데이터 영향 없음 (운영 흐름 변화: ON_SITE 가 부속 주문 필요해서 며칠 머무를 때 사용).
+
 ---
 
 ## 6. 임대 도메인

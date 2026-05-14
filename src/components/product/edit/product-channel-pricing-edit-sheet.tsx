@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { Loader2, Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -209,7 +210,7 @@ function ProductChannelPricingEditSheetContent({
                             onChange={(e) =>
                               setRow(ch.id, { vatPrice: parseComma(e.target.value) })
                             }
-                            onFocus={(e) => e.currentTarget.select()}
+                            onFocus={focusCaretEnd}
                             className="h-9 w-40"
                           />
                         </div>

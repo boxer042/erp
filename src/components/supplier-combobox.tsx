@@ -1,6 +1,7 @@
 "use client";
 
-import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { useMemo } from "react";
+import { JmCombobox, type JmComboboxItem } from "@/jm";
 
 interface Supplier {
   id: string;
@@ -15,8 +16,11 @@ interface SupplierComboboxProps {
   onCreateNew: (name: string) => void;
   placeholder?: string;
   clearable?: boolean;
+  /** 트리거 높이 — 기본 sm (h-9), 다른 jm input 과 통일 */
+  size?: "sm" | "md" | "lg";
 }
 
+/** JmCombobox 기반 거래처 선택. */
 export function SupplierCombobox({
   suppliers,
   value,
@@ -24,36 +28,46 @@ export function SupplierCombobox({
   onCreateNew,
   placeholder = "거래처 선택...",
   clearable = true,
+  size = "sm",
 }: SupplierComboboxProps) {
-  const selected = suppliers.find((s) => s.id === value);
+  const items = useMemo<JmComboboxItem[]>(
+    () =>
+      suppliers.map((s) => ({
+        id: s.id,
+        label: s.name,
+        description: s.businessNumber ?? undefined,
+      })),
+    [suppliers],
+  );
 
   return (
-    <ResponsiveCombobox<Supplier>
-      items={suppliers}
+    <JmCombobox
+      items={items}
       value={value}
-      getItemId={(s) => s.id}
-      matches={(s, q) => {
-        const lower = q.toLowerCase();
-        return (
-          s.name.toLowerCase().includes(lower) ||
-          (s.businessNumber?.toLowerCase().includes(lower) ?? false)
-        );
-      }}
-      onSelect={(s) => onChange(s.id, s.name)}
+      size={size}
+      onChange={(item) => onChange(item.id, item.label)}
       onCreateNew={onCreateNew}
-      selectedLabel={selected?.name}
       placeholder={placeholder}
       searchPlaceholder="거래처 검색..."
-      mobileTitle="거래처 선택"
+      emptyMessage="거래처가 없습니다"
       clearable={clearable}
       onClear={() => onChange("", "")}
-      renderItem={(s) => (
-        <>
-          <span>{s.name}</span>
-          {s.businessNumber && (
-            <span className="ml-auto text-xs text-muted-foreground">{s.businessNumber}</span>
+      matches={(item, q) => {
+        const lower = q.toLowerCase();
+        return (
+          item.label.toLowerCase().includes(lower) ||
+          (item.description?.toLowerCase().includes(lower) ?? false)
+        );
+      }}
+      renderItem={(item) => (
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="truncate text-[var(--jm-text)]">{item.label}</span>
+          {item.description && (
+            <span className="ml-auto shrink-0 text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
+              {item.description}
+            </span>
           )}
-        </>
+        </span>
       )}
     />
   );

@@ -56,7 +56,7 @@ export function isValidBusinessNumber(value: string): boolean {
   return checkDigit === parseInt(d[9], 10);
 }
 
-/** 전화번호 표시: 01012345678 → 010-1234-5678, 0212345678 → 02-1234-5678 */
+/** 전화번호 표시: 01012345678 → 010-1234-5678, 0212345678 → 02-1234-5678, 15880000 → 1588-0000 */
 export function formatPhone(value: string): string {
   const d = digitsOnly(value);
   // 02 지역번호
@@ -65,6 +65,10 @@ export function formatPhone(value: string): string {
     if (d.length <= 5) return `${d.slice(0, 2)}-${d.slice(2)}`;
     if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}`;
     return `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6, 10)}`;
+  }
+  // 8자리 대표번호 — 15XX/16XX/18XX (콜센터/대표번호) → 1588-0000 형식
+  if (d.length === 8 && /^(15|16|18)/.test(d)) {
+    return `${d.slice(0, 4)}-${d.slice(4)}`;
   }
   // 010, 011, 031 등 3자리
   if (d.length <= 3) return d;
