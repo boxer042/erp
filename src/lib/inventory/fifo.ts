@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export type FifoConsumption = {
   lotId: string;
@@ -11,18 +12,61 @@ export type FifoResult = {
   unitCostAvg: number;
 };
 
+/**
+ * 회사 설정 "재고 부족 판매 허용"(CompanyInfo.allowNegativeStock) 조회.
+ * 설정 row 가 없으면 기본 ON (true). 트랜잭션 시작 전에 1회 호출해 결과를 fifoConsume 에 전달.
+ */
+export async function isOversellAllowed(): Promise<boolean> {
+  const c = await prisma.companyInfo.findUnique({
+    where: { id: "singleton" },
+    select: { allowNegativeStock: true },
+  });
+  return c?.allowNegativeStock ?? true;
+}
+
+/**
+ * 재고 부족분(소진할 로트가 없는 수량)의 추정 원가.
+ * 1순위: 가장 최근 입고 로트 단가 → 2순위: 거래처 매입단가(매핑 환산) → 없으면 0.
+ */
+async function estimateUnitCost(
+  tx: Prisma.TransactionClient,
+  productId: string,
+): Promise<number> {
+  const lastLot = await tx.inventoryLot.findFirst({
+    where: { productId },
+    orderBy: { receivedAt: "desc" },
+    select: { unitCost: true },
+  });
+  if (lastLot) return Number(lastLot.unitCost);
+
+  const mapping = await tx.productMapping.findFirst({
+    where: { productId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      conversionRate: true,
+      supplierProduct: { select: { unitPrice: true } },
+    },
+  });
+  if (mapping) {
+    const rate = Number(mapping.conversionRate) || 1;
+    return Number(mapping.supplierProduct.unitPrice) / rate;
+  }
+  return 0;
+}
+
 export async function fifoConsume(
   tx: Prisma.TransactionClient,
   productId: string,
   qty: number,
   displayName: string,
+  allowOversell = false,
 ): Promise<FifoResult> {
   const lots = await tx.inventoryLot.findMany({
     where: { productId, remainingQty: { gt: 0 } },
     orderBy: { receivedAt: "asc" },
   });
   const available = lots.reduce((s, l) => s + Number(l.remainingQty), 0);
-  if (available < qty) {
+  if (available < qty && !allowOversell) {
     throw new Error(
       `재고 부족 (${displayName}): 필요 ${qty}, 가용 ${available}. 실사보정으로 재고를 맞춘 뒤 다시 시도해주세요.`,
     );
@@ -45,6 +89,29 @@ export async function fifoConsume(
     totalCost += take * Number(lot.unitCost);
     need -= take;
   }
+  // 재고 부족분 — 음수 재고 허용 시 적자(deficit) 로트를 만들어 소진.
+  // 로트는 remainingQty 가 음수가 되어 (받은 적 없는 재고를 판 표시),
+  // Inventory.quantity 와 Σ remainingQty 가 함께 음수로 정합. 추후 재고조정으로 정산.
+  if (need > 0) {
+    const estCost = await estimateUnitCost(tx, productId);
+    const deficitLot = await tx.inventoryLot.create({
+      data: {
+        productId,
+        receivedQty: 0,
+        remainingQty: 0,
+        unitCost: estCost,
+        source: "ADJUSTMENT",
+        receivedAt: new Date(),
+      },
+    });
+    await tx.inventoryLot.update({
+      where: { id: deficitLot.id },
+      data: { remainingQty: { decrement: need } },
+    });
+    consumptions.push({ lotId: deficitLot.id, quantity: need, unitCost: estCost });
+    totalCost += need * estCost;
+    need = 0;
+  }
   return { consumptions, unitCostAvg: totalCost / qty };
 }
 
@@ -57,6 +124,7 @@ export async function ensureBulkStock(
   bulkProductId: string,
   requiredQty: number,
   displayName: string,
+  allowOversell = false,
 ): Promise<void> {
   // 대상이 벌크 SKU가 아니면 분할 인프라가 적용되지 않으므로 즉시 종료.
   // (모든 fifoConsume 호출 앞에서 안전하게 호출 가능하도록 가드)
@@ -150,9 +218,10 @@ export async function ensureBulkStock(
     shortage -= addedQty;
   }
 
-  if (shortage > 0) {
+  if (shortage > 0 && !allowOversell) {
     throw new Error(
       `벌크 재고 부족 (${displayName}): ${shortage} 부족. 판매 SKU 입고 후 재시도해주세요.`,
     );
   }
+  // allowOversell 이면 남은 부족분은 막지 않음 — 이어지는 fifoConsume 이 적자 로트로 처리한다.
 }

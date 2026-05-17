@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { repairPartUpdateSchema } from "@/lib/validators/repair-ticket";
 import { consumeRepairPart, restoreRepairPart } from "@/lib/repair-inventory";
+import { isOversellAllowed } from "@/lib/inventory/fifo";
 import {
   applyUsageDelta,
   snapshotTicketUsage,
@@ -43,6 +44,8 @@ export async function PATCH(
     );
   }
 
+  const allowOversell = await isOversellAllowed();
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const before = await snapshotTicketUsage(tx, ticket.id);
@@ -60,7 +63,7 @@ export async function PATCH(
           productId: part.productId,
           productName: part.product.name,
           quantity: delta,
-        });
+        }, allowOversell);
       } else if (newQty < oldQty) {
         // 부분 복원 — 단순화: 전체 복원 후 새 수량으로 재차감
         await restoreRepairPart(tx, part.id, {
@@ -78,7 +81,7 @@ export async function PATCH(
             productId: part.productId,
             productName: part.product.name,
             quantity: newQty,
-          });
+          }, allowOversell);
         }
       }
 

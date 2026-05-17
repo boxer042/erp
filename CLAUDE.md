@@ -1086,7 +1086,9 @@ PERCENTAGE 항목은 이미 비율이므로 VAT 변환 불필요.
 1. `LotConsumption`이 있으면 `Σ(quantity × unitCost)`를 사용 (FIFO 실제값)
 2. 없으면 `unitCostSnapshot × quantity`로 폴백 (PR2 이전 주문)
 
-**재고 부족 처리**: 주문 확정 시 로트 잔량이 부족하면 에러로 확정 차단. 실사보정으로 재고를 맞춘 뒤 재확정하는 흐름.
+**재고 부족 처리**: `CompanyInfo.allowNegativeStock` 설정으로 분기 (설정 페이지 토글, 기본 ON).
+- **OFF**: 주문 확정·POS 결제·수리 부속 차감 시 로트 잔량이 부족하면 에러로 차단. 실사보정으로 재고를 맞춘 뒤 재시도하는 흐름.
+- **ON** (기본): 재고가 부족해도 차단하지 않음. 부족분만큼 `fifoConsume` 이 **적자(deficit) 로트**를 생성 — `source=ADJUSTMENT`, `remainingQty` 음수, `unitCost` 는 추정 원가(최근 로트 단가 → 거래처 매입단가 → 0). `Inventory.quantity` 와 Σ`remainingQty` 가 함께 음수로 정합. 추후 재고조정(실사보정)으로 정산. 차단 가드는 `isOversellAllowed()` 로 트랜잭션 진입 전 1회 조회해 `fifoConsume`/`ensureBulkStock` 에 `allowOversell` 로 전달.
 
 ### 배송비 VAT 처리 정책 ⚠️
 `Incoming.shippingCost`는 사용자가 입력한 **VAT 포함 금액**으로 저장된다.

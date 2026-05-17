@@ -49,16 +49,18 @@ export async function consumeRepairPart(
   tx: Prisma.TransactionClient,
   partId: string,
   args: ConsumePartArgs,
+  allowOversell = false,
 ): Promise<{ unitCostAvg: number }> {
   const { ticketId, ticketNo, productId, productName, quantity } = args;
 
-  await ensureBulkStock(tx, productId, quantity, `수리: ${productName}`);
+  await ensureBulkStock(tx, productId, quantity, `수리: ${productName}`, allowOversell);
 
   const { consumptions, unitCostAvg } = await fifoConsume(
     tx,
     productId,
     quantity,
     `수리: ${productName}`,
+    allowOversell,
   );
 
   // N+1 방지 — createMany 로 한 번에 적재

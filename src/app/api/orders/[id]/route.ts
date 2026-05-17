@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { computeSellingCostPerUnit } from "@/lib/selling-cost";
-import { fifoConsume, ensureBulkStock } from "@/lib/inventory/fifo";
+import { fifoConsume, ensureBulkStock, isOversellAllowed } from "@/lib/inventory/fifo";
 import { orderUpdateSchema } from "@/lib/validators/order";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
@@ -609,6 +609,8 @@ export async function PUT(
         sellingCostsByProduct.set(sc.productId, arr);
       }
 
+      const allowOversell = await isOversellAllowed();
+
       await prisma.$transaction(async (tx) => {
         await tx.order.update({ where: { id }, data: { status: "PREPARING" } });
 
@@ -619,12 +621,13 @@ export async function PUT(
           qty: number,
           displayName: string,
         ) => {
-          await ensureBulkStock(tx, productId, qty, displayName);
+          await ensureBulkStock(tx, productId, qty, displayName, allowOversell);
           const { consumptions, unitCostAvg } = await fifoConsume(
             tx,
             productId,
             qty,
             displayName,
+            allowOversell,
           );
           if (consumptions.length > 0) {
             await tx.lotConsumption.createMany({
@@ -649,8 +652,10 @@ export async function PUT(
             const finishedInv = await tx.inventory.findUnique({
               where: { productId: item.product.id },
             });
+            // 완제품 재고가 음수(이미 초과판매)일 수 있으므로 0 으로 clamp —
+            // 부족분(componentQty)이 orderQty 를 넘지 않게 한다.
             const finishedAvailable = finishedInv
-              ? Math.min(orderQty, Number(finishedInv.quantity))
+              ? Math.max(0, Math.min(orderQty, Number(finishedInv.quantity)))
               : 0;
             const componentQty = orderQty - finishedAvailable;
 

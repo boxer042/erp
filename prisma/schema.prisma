@@ -1727,6 +1727,7 @@ model CompanyInfo {
   businessItem                String?  @map("business_item")
   defaultRepairWarrantyMonths Int?     @map("default_repair_warranty_months") // 수리 보증 기본값 (개월)
   defaultDiagnosisFee         Decimal? @map("default_diagnosis_fee") @db.Decimal(15, 2) // 새 수리 접수 시 자동 채울 진단비
+  allowNegativeStock          Boolean  @default(true) @map("allow_negative_stock") // 재고 부족 시에도 판매 허용 (음수 재고 — 추후 재고조정으로 정산)
   updatedAt                   DateTime @updatedAt @map("updated_at")
 
   bankAccounts CompanyBankAccount[]

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { repairPartCreateSchema } from "@/lib/validators/repair-ticket";
 import { consumeRepairPart } from "@/lib/repair-inventory";
+import { isOversellAllowed } from "@/lib/inventory/fifo";
 import { Prisma } from "@prisma/client";
 import {
   applyUsageDelta,
@@ -47,6 +48,8 @@ export async function POST(
     return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 });
   }
 
+  const allowOversell = await isOversellAllowed();
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 진단↔부속 frequency 추천 — 변경 전 snapshot
@@ -67,7 +70,7 @@ export async function POST(
           productId: product.id,
           productName: product.name,
           quantity: additionalQty,
-        });
+        }, allowOversell);
         // 수량/총액 업데이트 (existing.consumedAt은 consumeRepairPart에서 갱신됨)
         const newQty = new Prisma.Decimal(existing.quantity).plus(additionalQty);
         const newTotal = newQty.times(existing.unitPrice);
@@ -99,7 +102,7 @@ export async function POST(
           productId: product.id,
           productName: product.name,
           quantity: data.quantity,
-        });
+        }, allowOversell);
 
         resultPart = await tx.repairPart.findUnique({
           where: { id: part.id },

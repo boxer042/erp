@@ -27,6 +27,7 @@ export const companyInfoSchema = z.object({
     .min(0)
     .nullable()
     .optional(),
+  allowNegativeStock: z.boolean().optional(),
 });
 
 export type CompanyInfoInput = z.infer<typeof companyInfoSchema>;

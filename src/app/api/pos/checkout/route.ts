@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { ensureBulkStock } from "@/lib/inventory/fifo";
+import { ensureBulkStock, fifoConsume, isOversellAllowed } from "@/lib/inventory/fifo";
 import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
 
 type Action = "order" | "quotation" | "statement";
@@ -442,6 +442,8 @@ export async function POST(request: NextRequest) {
             return d;
           })();
 
+  const allowOversell = await isOversellAllowed();
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const orderHeader = await tx.order.create({
@@ -536,32 +538,32 @@ export async function POST(request: NextRequest) {
       // 이후 로직(FIFO/labelCodes 매칭/RepairTicket 등)이 사용하는 order 객체 — 기존 구조 유지
       const order = { ...orderHeader, items: createdItems };
 
-      const fifoConsume = async (productId: string, orderItemId: string, qty: number, name: string) => {
-        await ensureBulkStock(tx, productId, qty, name);
-        const lots = await tx.inventoryLot.findMany({
-          where: { productId, remainingQty: { gt: 0 } },
-          orderBy: { receivedAt: "asc" },
-        });
-        const available = lots.reduce((s, l) => s + Number(l.remainingQty), 0);
-        if (available < qty) {
-          throw new Error(`재고 부족 (${name}): 필요 ${qty}, 가용 ${available}`);
-        }
-        let need = qty;
-        let totalCost = 0;
-        for (const lot of lots) {
-          if (need <= 0) break;
-          const take = Math.min(need, Number(lot.remainingQty));
-          await tx.inventoryLot.update({
-            where: { id: lot.id },
-            data: { remainingQty: { decrement: take } },
+      // 공용 FIFO 헬퍼 위임 — 재고 부족 시 allowOversell 이면 적자 로트로 처리.
+      const consumeForOrderItem = async (
+        productId: string,
+        orderItemId: string,
+        qty: number,
+        name: string,
+      ) => {
+        await ensureBulkStock(tx, productId, qty, name, allowOversell);
+        const { consumptions, unitCostAvg } = await fifoConsume(
+          tx,
+          productId,
+          qty,
+          name,
+          allowOversell,
+        );
+        if (consumptions.length > 0) {
+          await tx.lotConsumption.createMany({
+            data: consumptions.map((c) => ({
+              orderItemId,
+              lotId: c.lotId,
+              quantity: c.quantity,
+              unitCost: c.unitCost,
+            })),
           });
-          await tx.lotConsumption.create({
-            data: { orderItemId, lotId: lot.id, quantity: take, unitCost: lot.unitCost },
-          });
-          totalCost += take * Number(lot.unitCost);
-          need -= take;
         }
-        return totalCost / qty;
+        return unitCostAvg;
       };
 
       for (const item of order.items) {
@@ -575,7 +577,7 @@ export async function POST(request: NextRequest) {
           let setUnitCost = 0;
           for (const comp of product.setComponents) {
             const deductQty = Number(item.quantity) * Number(comp.quantity);
-            const cuc = await fifoConsume(comp.componentId, item.id, deductQty, `세트 ${comp.component.name}`);
+            const cuc = await consumeForOrderItem(comp.componentId, item.id, deductQty, `세트 ${comp.component.name}`);
             setUnitCost += cuc * Number(comp.quantity);
             const inv = await tx.inventory.update({
               where: { productId: comp.componentId },
@@ -595,7 +597,7 @@ export async function POST(request: NextRequest) {
           }
           unitCostSnapshot = setUnitCost;
         } else {
-          unitCostSnapshot = await fifoConsume(product.id, item.id, Number(item.quantity), product.name);
+          unitCostSnapshot = await consumeForOrderItem(product.id, item.id, Number(item.quantity), product.name);
           const inv = await tx.inventory.update({
             where: { productId: product.id },
             data: { quantity: { decrement: Number(item.quantity) } },

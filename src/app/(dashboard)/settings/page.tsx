@@ -61,6 +61,7 @@ interface CompanyInfoData {
   businessItem: string | null;
   defaultRepairWarrantyMonths: number | null;
   defaultDiagnosisFee: string | number | null;
+  allowNegativeStock: boolean;
   bankAccounts: BankAccount[];
 }
 
@@ -75,6 +76,7 @@ const emptyCompanyForm = {
   businessItem: "",
   defaultRepairWarrantyMonths: "",
   defaultDiagnosisFee: "",
+  allowNegativeStock: true,
 };
 
 const emptyBankForm = {
@@ -116,6 +118,7 @@ export default function SettingsPage() {
           companyQuery.data.defaultDiagnosisFee != null
             ? String(companyQuery.data.defaultDiagnosisFee)
             : "",
+        allowNegativeStock: companyQuery.data.allowNegativeStock ?? true,
       });
     }
   }, [companyQuery.data, companyDirty]);
@@ -382,6 +385,22 @@ export default function SettingsPage() {
             <div className="md:col-span-2">
               <CompanyField label="주소" value={companyForm.address} onChange={(v) => setCompanyField("address", v)} />
             </div>
+          </div>
+          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2.5">
+            <div className="space-y-0.5 pr-4">
+              <div className="text-[13px] font-medium">재고 부족 시에도 판매 허용</div>
+              <div className="text-[11px] text-muted-foreground">
+                켜면 재고가 없어도 POS 결제·주문 출고대기·수리 부속 차감이 막히지 않습니다.
+                부족분은 음수 재고로 기록되며, 추후 재고조정(실사보정)으로 정산하세요.
+              </div>
+            </div>
+            <Switch
+              checked={companyForm.allowNegativeStock}
+              onCheckedChange={(v) => {
+                setCompanyForm((p) => ({ ...p, allowNegativeStock: v }));
+                setCompanyDirty(true);
+              }}
+            />
           </div>
           <div className="flex justify-end">
             <Button

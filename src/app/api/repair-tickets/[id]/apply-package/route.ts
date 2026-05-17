@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { consumeRepairPart } from "@/lib/repair-inventory";
+import { isOversellAllowed } from "@/lib/inventory/fifo";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -53,6 +54,8 @@ export async function POST(
     return NextResponse.json({ error: "패키지를 찾을 수 없습니다" }, { status: 404 });
   }
 
+  const allowOversell = await isOversellAllowed();
+
   try {
     await prisma.$transaction(async (tx) => {
       // 1) 부속 — 즉시 차감
@@ -74,7 +77,7 @@ export async function POST(
           productId: pp.productId,
           productName: pp.product.name,
           quantity: qty,
-        });
+        }, allowOversell);
       }
       // 2) 공임 — createMany 로 한 번에 적재 (N+1 방지)
       if (pkg.labors.length > 0) {
