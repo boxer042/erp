@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { JmCombobox, type JmComboboxItem } from "@/jm";
+import { normalizeSearch } from "@/lib/utils";
 
 export interface ProductOption {
   id: string;
@@ -106,12 +107,12 @@ export function ProductCombobox({
       onClear={() => onChange(EMPTY_OPTION)}
       disabled={disabled}
       matches={(item, q) => {
-        const lower = q.toLowerCase();
+        const nq = normalizeSearch(q);
         const p = item.product;
         return (
-          p.name.toLowerCase().includes(lower) ||
-          p.sku.toLowerCase().includes(lower) ||
-          (p.spec?.toLowerCase().includes(lower) ?? false)
+          normalizeSearch(p.name).includes(nq) ||
+          normalizeSearch(p.sku).includes(nq) ||
+          (p.spec ? normalizeSearch(p.spec).includes(nq) : false)
         );
       }}
       renderItem={(item) => {

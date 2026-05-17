@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CornerDownLeft, Loader2, Plus, Search, X } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, normalizeSearch } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   JmBadge,
@@ -79,20 +79,20 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
   }, [open]);
 
   const trimmed = search.trim();
-  const lower = trimmed.toLowerCase();
+  const nq = normalizeSearch(search);
   const filtered = products.filter((p) => {
     if (!trimmed) return true;
     return (
-      p.name.toLowerCase().includes(lower) ||
-      (p.supplierCode?.toLowerCase().includes(lower) ?? false) ||
-      (p.spec?.toLowerCase().includes(lower) ?? false)
+      normalizeSearch(p.name).includes(nq) ||
+      (p.supplierCode ? normalizeSearch(p.supplierCode).includes(nq) : false) ||
+      (p.spec ? normalizeSearch(p.spec).includes(nq) : false)
     );
   });
-  const hasExactMatch = products.some((p) => p.name.toLowerCase() === lower);
+  const hasExactMatch = products.some((p) => normalizeSearch(p.name) === nq);
 
   const matchingPending = pendingNewProducts
     ? pendingNewProducts.filter(
-        (p) => p.rowIndex !== rowIndex && p.name.toLowerCase().includes(lower),
+        (p) => p.rowIndex !== rowIndex && normalizeSearch(p.name).includes(nq),
       )
     : [];
 

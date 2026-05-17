@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { JmCombobox, type JmComboboxItem } from "@/jm";
+import { normalizeSearch } from "@/lib/utils";
 
 interface SupplierProductCostItem {
   id: string;
@@ -67,12 +68,12 @@ export function SupplierProductCombobox({
       emptyMessage="공급상품이 없습니다"
       disabled={disabled}
       matches={(item, q) => {
-        const lower = q.toLowerCase();
+        const nq = normalizeSearch(q);
         const s = item.sp;
         return (
-          s.name.toLowerCase().includes(lower) ||
-          (s.supplierCode?.toLowerCase().includes(lower) ?? false) ||
-          (s.spec?.toLowerCase().includes(lower) ?? false)
+          normalizeSearch(s.name).includes(nq) ||
+          (s.supplierCode ? normalizeSearch(s.supplierCode).includes(nq) : false) ||
+          (s.spec ? normalizeSearch(s.spec).includes(nq) : false)
         );
       }}
       renderItem={(item) => {

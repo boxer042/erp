@@ -145,6 +145,12 @@ export function toCSV<T>(
   return "\uFEFF" + header + "\n" + body;
 }
 
+// 검색 비교용 정규화 — 소문자 + 모든 공백 제거.
+// "고압 분무기" 와 "고압분무기" 가 같은 검색어로 매칭되도록.
+export function normalizeSearch(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, "");
+}
+
 // 할인 입력 정규화 — % 붙으면 0~100% 캡, 아니면 콤마 제거한 정수 문자열
 export function normalizeDiscountInput(raw: string): string {
   const trimmed = raw.trim();

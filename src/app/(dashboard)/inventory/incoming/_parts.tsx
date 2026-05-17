@@ -32,7 +32,7 @@ import {
   JmTooltip,
 } from "@/jm";
 import { focusCaretEnd } from "@/jm/lib/focus";
-import { formatComma, parseComma } from "@/lib/utils";
+import { formatComma, parseComma, normalizeSearch } from "@/lib/utils";
 import { useIsCompactDevice } from "@/hooks/use-mobile";
 import { MobileInlineCellProductSearch } from "@/components/inline-cell-product-search-mobile";
 import type { SupplierProduct } from "./_types";
@@ -293,11 +293,11 @@ export function InlineCellProductSearch({
   }
 
   const filtered = products.filter((p) => {
-    const q = search.toLowerCase();
+    const q = normalizeSearch(search);
     return (
-      p.name.toLowerCase().includes(q) ||
-      (p.supplierCode?.toLowerCase().includes(q) ?? false) ||
-      (p.spec?.toLowerCase().includes(q) ?? false)
+      normalizeSearch(p.name).includes(q) ||
+      (p.supplierCode ? normalizeSearch(p.supplierCode).includes(q) : false) ||
+      (p.spec ? normalizeSearch(p.spec).includes(q) : false)
     );
   });
 
@@ -401,14 +401,14 @@ export function InlineCellProductSearch({
                 pendingNewProducts.filter(
                   (p) =>
                     p.rowIndex !== rowIndex &&
-                    p.name.toLowerCase().includes(search.toLowerCase()),
+                    normalizeSearch(p.name).includes(normalizeSearch(search)),
                 ).length > 0 && (
                   <CommandGroup heading="이미 입력된 신규 항목">
                     {pendingNewProducts
                       .filter(
                         (p) =>
                           p.rowIndex !== rowIndex &&
-                          p.name.toLowerCase().includes(search.toLowerCase()),
+                          normalizeSearch(p.name).includes(normalizeSearch(search)),
                       )
                       .map((p) => (
                         <CommandItem
