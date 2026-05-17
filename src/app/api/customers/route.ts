@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { customerSchema } from "@/lib/validators/customer";
 import { guardUser } from "@/lib/api-auth";
 import { recordAudit } from "@/lib/audit";
+import { formatPhone } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -86,10 +87,12 @@ export async function POST(request: NextRequest) {
 
   // 개인이면 기업 전용 fields 강제 null 처리 (UI 에서 잔재 들어와도 정리)
   const isBusiness = data.type === "BUSINESS";
+  // 이름 미입력(개인) 시 전화번호를 이름으로 사용 — 목록·인쇄물 등 모든 표시처가 빈 이름을 안 보게
+  const resolvedName = data.name.trim() || formatPhone(data.phone);
   const customer = await prisma.customer.create({
     data: {
       type: data.type,
-      name: data.name,
+      name: resolvedName,
       phone: data.phone,
       email: data.email || null,
       memo: data.memo || null,

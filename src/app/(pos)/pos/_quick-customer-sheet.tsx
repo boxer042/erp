@@ -144,7 +144,9 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
       toast.error(err instanceof ApiError ? err.message : "등록 실패"),
   });
 
-  const valid = name.trim().length > 0 && digitsOnly(phone).length >= 6;
+  // 개인은 이름 없이도 등록 가능 — 전화번호만 필수. 기업은 상호 필수.
+  const valid =
+    (!isBusiness || name.trim().length > 0) && digitsOnly(phone).length >= 6;
 
   return (
     <BottomSheet
@@ -204,13 +206,13 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
           </div>
         </div>
 
-        <Field label={isBusiness ? "상호" : "이름"}>
+        <Field label={isBusiness ? "상호" : "이름 (선택)"}>
           <input
             type="text"
             autoFocus={!looksLikePhone}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={isBusiness ? "(주)대한기계" : "홍길동"}
+            placeholder={isBusiness ? "(주)대한기계" : "모르면 비워두세요"}
             className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
           />
         </Field>

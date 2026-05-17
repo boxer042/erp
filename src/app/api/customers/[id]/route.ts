@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { customerSchema } from "@/lib/validators/customer";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
+import { formatPhone } from "@/lib/utils";
 
 export async function GET(
   _request: NextRequest,
@@ -75,11 +76,13 @@ export async function PUT(
     };
   }
 
+  // 이름 미입력(개인) 시 전화번호를 이름으로 사용
+  const resolvedName = data.name.trim() || formatPhone(data.phone);
   const customer = await prisma.customer.update({
     where: { id },
     data: {
       type: data.type,
-      name: data.name,
+      name: resolvedName,
       phone: data.phone,
       email: data.email ?? null,
       memo: data.memo ?? null,
@@ -103,7 +106,7 @@ export async function PUT(
     entity: "Customer",
     entityId: id,
     action: "UPDATE",
-    meta: { name: data.name, type: data.type },
+    meta: { name: resolvedName, type: data.type },
   });
 
   return NextResponse.json(customer);

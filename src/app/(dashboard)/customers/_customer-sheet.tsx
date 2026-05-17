@@ -102,7 +102,7 @@ function CustomerSheetForm({ editTarget, onClose, onSaved }: FormProps) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!form.name.trim()) throw new Error("이름/상호를 입력해주세요");
+      if (isBusiness && !form.name.trim()) throw new Error("상호를 입력해주세요");
       if (!form.phone.trim()) throw new Error("연락처를 입력해주세요");
 
       const payload = {
@@ -243,7 +243,11 @@ function CustomerSheetForm({ editTarget, onClose, onSaved }: FormProps) {
           <section className="space-y-3">
             <JmSectionLabel>기본 정보</JmSectionLabel>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <JmFormField label={isBusiness ? "상호" : "이름"} required>
+              <JmFormField
+                label={isBusiness ? "상호" : "이름"}
+                required={isBusiness}
+                hint={isBusiness ? undefined : "모르면 비워둬도 됩니다 (전화번호로 식별)"}
+              >
                 <JmInput
                   value={form.name}
                   onChange={(e) => update("name", e.target.value)}
