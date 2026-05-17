@@ -1,6 +1,5 @@
 import { Pencil } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { JmBadge, JmButton } from "@/jm";
 import {
   TAX_TYPE_LABELS,
   PRODUCT_TYPE_LABELS,
@@ -27,8 +26,10 @@ interface FieldItem {
 function CustomerField({ label, value, full }: FieldItem) {
   return (
     <div className={`space-y-1 ${full ? "sm:col-span-2" : ""}`}>
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-sm">{value || <span className="text-muted-foreground">-</span>}</dd>
+      <dt className="text-jm-2xs font-medium text-[var(--jm-text-muted)]">{label}</dt>
+      <dd className="text-jm-sm text-[var(--jm-text)]">
+        {value || <span className="text-[var(--jm-text-muted)]">-</span>}
+      </dd>
     </div>
   );
 }
@@ -37,10 +38,14 @@ function AdminField({ label, value, full }: FieldItem) {
   const isEmpty = value == null || value === "" || value === false;
   return (
     <div className={`flex ${full ? "col-span-2 items-start" : "items-center"} gap-2`}>
-      <span className={`text-muted-foreground w-28 shrink-0 ${full ? "pt-0.5" : ""}`}>
+      <span
+        className={`text-[var(--jm-text-muted)] w-28 shrink-0 ${full ? "pt-0.5" : ""}`}
+      >
         {label}
       </span>
-      <span className={isEmpty ? "text-muted-foreground" : ""}>
+      <span
+        className={isEmpty ? "text-[var(--jm-text-muted)]" : "text-[var(--jm-text)]"}
+      >
         {isEmpty ? "-" : value}
       </span>
     </div>
@@ -56,7 +61,14 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
 
   const adminFields: FieldItem[] = [
     { label: "상품명", value: product.name },
-    { label: "SKU", value: <Badge variant="outline">{product.sku}</Badge> },
+    {
+      label: "SKU",
+      value: (
+        <JmBadge variant="outline" size="sm" shape="square">
+          {product.sku}
+        </JmBadge>
+      ),
+    },
     {
       label: "카테고리",
       value: product.category?.name ?? null,
@@ -68,9 +80,9 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
     {
       label: "상품유형",
       value: (
-        <Badge variant="secondary">
+        <JmBadge variant="default" size="sm" shape="square">
           {PRODUCT_TYPE_LABELS[product.productType] ?? product.productType}
-        </Badge>
+        </JmBadge>
       ),
     },
     { label: "단위", value: product.unitOfMeasure },
@@ -78,11 +90,17 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
       label: "세금유형",
       value: (
         <div className="flex items-center gap-1">
-          <Badge variant={product.taxType === "TAXABLE" ? "secondary" : "outline"}>
+          <JmBadge
+            variant={product.taxType === "TAXABLE" ? "default" : "outline"}
+            size="sm"
+            shape="square"
+          >
             {TAX_TYPE_LABELS[product.taxType] ?? product.taxType}
-          </Badge>
+          </JmBadge>
           {product.zeroRateEligible && (
-            <Badge variant="outline">영세율 가능</Badge>
+            <JmBadge variant="outline" size="sm" shape="square">
+              영세율 가능
+            </JmBadge>
           )}
         </div>
       ),
@@ -91,9 +109,11 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
       label: "개별추적",
       value: product.trackable ? (
         <div className="flex items-center gap-1">
-          <Badge variant="default">시리얼 라벨 발번</Badge>
+          <JmBadge variant="info" size="sm" shape="square">
+            시리얼 라벨 발번
+          </JmBadge>
           {product.warrantyMonths != null && product.warrantyMonths > 0 && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-jm-xs text-[var(--jm-text-muted)]">
               보증 {product.warrantyMonths}개월
             </span>
           )}
@@ -109,7 +129,9 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
           {displayList != null ? `₩${fmtPrice(displayList)} / ` : ""}
           <span className="font-medium">₩{fmtPrice(displayVat)}</span>
           {product.taxType === "TAXABLE" && (
-            <span className="text-xs text-muted-foreground ml-1.5">(VAT 포함)</span>
+            <span className="text-jm-xs text-[var(--jm-text-muted)] ml-1.5">
+              (VAT 포함)
+            </span>
           )}
         </span>
       ),
@@ -126,9 +148,13 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
       label: "상태",
       value:
         product.isActive === false ? (
-          <Badge variant="destructive">비활성</Badge>
+          <JmBadge variant="danger" size="sm" shape="square">
+            비활성
+          </JmBadge>
         ) : (
-          <Badge variant="secondary">활성</Badge>
+          <JmBadge variant="success" size="sm" shape="square">
+            활성
+          </JmBadge>
         ),
     },
     { label: "메모", value: product.memo, full: true },
@@ -145,7 +171,7 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
     {
       label: "판매가",
       value: (
-        <span className="tabular-nums font-medium text-base">
+        <span className="tabular-nums font-medium text-jm-base">
           ₩{fmtPrice(displayVat)}
         </span>
       ),
@@ -157,10 +183,10 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
       title="기본 정보"
       actions={
         onEdit ? (
-          <Button size="sm" variant="outline" className="h-7" onClick={onEdit}>
-            <Pencil className="h-3 w-3 mr-1" />
-            편집
-          </Button>
+          <JmButton size="sm" variant="outline" onClick={onEdit}>
+            <Pencil />
+            <span>편집</span>
+          </JmButton>
         ) : undefined
       }
     >
@@ -171,7 +197,7 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
           ))}
         </dl>
       ) : (
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[13px]">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-jm-sm">
           {adminFields.map((f) => (
             <AdminField key={f.label} {...f} />
           ))}

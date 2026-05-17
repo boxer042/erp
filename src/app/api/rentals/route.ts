@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
           name: true,
           dailyRate: true,
           depositAmount: true,
+          imageUrl: true,
           product: { select: { imageUrl: true } },
         },
       },
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
     take: 200,
   });
-  // 클라이언트 편의 — asset.imageUrl 으로 펼침
+  // 클라이언트 편의 — asset.imageUrl 우선, 없으면 product.imageUrl 폴백
   const shaped = rentals.map((r) => ({
     ...r,
     asset: {
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       name: r.asset.name,
       dailyRate: r.asset.dailyRate,
       depositAmount: r.asset.depositAmount,
-      imageUrl: r.asset.product?.imageUrl ?? null,
+      imageUrl: r.asset.imageUrl ?? r.asset.product?.imageUrl ?? null,
     },
   }));
   return NextResponse.json(shaped);

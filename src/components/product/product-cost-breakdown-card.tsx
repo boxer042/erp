@@ -1,18 +1,28 @@
 "use client";
 
 import { Pencil } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  JmBadge,
+  JmButton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { ProductSection } from "./product-section";
 import type { ProductDetail } from "./types";
 import { fmtPrice } from "./helpers";
 
-const SOURCE_LABEL: Record<string, { label: string; tone: "default" | "secondary" | "destructive" }> = {
-  LOT: { label: "재고 평균", tone: "default" },
-  SUPPLIER: { label: "매입 단가", tone: "secondary" },
-  BULK_PARENT: { label: "벌크 부모", tone: "secondary" },
-  NONE: { label: "미설정", tone: "destructive" },
+const SOURCE_LABEL: Record<
+  string,
+  { label: string; variant: "info" | "default" | "danger" }
+> = {
+  LOT: { label: "재고 평균", variant: "info" },
+  SUPPLIER: { label: "매입 단가", variant: "default" },
+  BULK_PARENT: { label: "벌크 부모", variant: "default" },
+  NONE: { label: "미설정", variant: "danger" },
 };
 
 interface Props {
@@ -40,27 +50,46 @@ export function ProductCostBreakdownCard({ product, onEdit }: Props) {
       noPadding
       actions={
         onEdit ? (
-          <Button size="sm" variant="outline" className="h-7" onClick={onEdit}>
-            <Pencil className="h-3 w-3 mr-1" />편집
-          </Button>
+          <JmButton size="sm" variant="outline" onClick={onEdit}>
+            <Pencil />
+            <span>편집</span>
+          </JmButton>
         ) : undefined
       }
     >
-      <Table className="min-w-[920px]">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="h-9 px-3 text-xs w-28">슬롯</TableHead>
-            <TableHead className="h-9 px-3 text-xs">구성품</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right w-16">수량</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">공급단가</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">배송비</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">부대비용</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">단가 합</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">소계</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-center w-20">출처</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <JmTable className="min-w-[920px]">
+        <JmTableHeader>
+          <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-28">
+              슬롯
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+              구성품
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium w-16">
+              수량
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              공급단가
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              배송비
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              부대비용
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              단가 합
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              소계
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-center font-medium w-20">
+              출처
+            </JmTableHead>
+          </JmTableRow>
+        </JmTableHeader>
+        <JmTableBody>
           {(() => {
             let sumSupplier = 0;
             let sumShipping = 0;
@@ -76,79 +105,90 @@ export function ProductCostBreakdownCard({ product, onEdit }: Props) {
                   const src = SOURCE_LABEL[b.costSource] ?? SOURCE_LABEL.NONE;
                   const ratio = total > 0 ? (b.subtotal / total) * 100 : 0;
                   return (
-                    <TableRow key={`${b.componentId}-${b.label ?? ""}-${idx}`}>
-                      <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">
+                    <JmTableRow key={`${b.componentId}-${b.label ?? ""}-${idx}`}>
+                      <JmTableCell className="px-3 py-2 text-jm-xs text-[var(--jm-text-muted)]">
                         {b.label?.trim() ? b.label : "-"}
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5">
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2">
                         <div className="flex flex-col">
-                          <span>{b.componentName}</span>
-                          <span className="text-xs text-muted-foreground">{b.componentSku}</span>
+                          <span className="text-[var(--jm-text)]">{b.componentName}</span>
+                          <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                            {b.componentSku}
+                          </span>
                         </div>
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                         {b.quantity.toLocaleString("ko-KR")}
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                         ₩{fmtPrice(Math.round(b.supplierUnitPrice ?? 0))}
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                         {(b.shippingPerUnit ?? 0) > 0
                           ? `₩${fmtPrice(Math.round(b.shippingPerUnit ?? 0))}`
                           : "-"}
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                         {(b.incomingCostPerUnit ?? 0) > 0
                           ? `₩${fmtPrice(Math.round(b.incomingCostPerUnit ?? 0))}`
                           : "-"}
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                         ₩{fmtPrice(Math.round(b.unitCost))}
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-right tabular-nums">
                         <div className="flex flex-col items-end">
-                          <span className={b.costSource === "NONE" ? "text-destructive" : ""}>
+                          <span
+                            className={
+                              b.costSource === "NONE"
+                                ? "text-[var(--jm-danger-fg)]"
+                                : "text-[var(--jm-text)]"
+                            }
+                          >
                             ₩{fmtPrice(Math.round(b.subtotal))}
                           </span>
                           {total > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                               {ratio.toFixed(1)}%
                             </span>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-center">
-                        <Badge variant={src.tone === "default" ? "default" : src.tone === "destructive" ? "destructive" : "secondary"}>
+                      </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-center">
+                        <JmBadge variant={src.variant} size="sm" shape="square">
                           {src.label}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
+                        </JmBadge>
+                      </JmTableCell>
+                    </JmTableRow>
                   );
                 })}
-                <TableRow className="bg-muted/30">
-                  <TableCell className="px-3 py-2.5 font-semibold" colSpan={3}>
+                <JmTableRow className="bg-[var(--jm-surface-muted)]/30">
+                  <JmTableCell
+                    className="px-3 py-2 font-semibold text-[var(--jm-text)]"
+                    colSpan={3}
+                  >
                     구성품 합계
-                  </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                     ₩{fmtPrice(Math.round(sumSupplier))}
-                  </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                     ₩{fmtPrice(Math.round(sumShipping))}
-                  </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                     ₩{fmtPrice(Math.round(sumIncoming))}
-                  </TableCell>
-                  <TableCell />
-                  <TableCell className="px-3 py-2.5 text-right tabular-nums font-semibold">
+                  </JmTableCell>
+                  <JmTableCell />
+                  <JmTableCell className="px-3 py-2 text-right tabular-nums font-semibold text-[var(--jm-text)]">
                     ₩{fmtPrice(Math.round(total))}
-                  </TableCell>
-                  <TableCell />
-                </TableRow>
+                  </JmTableCell>
+                  <JmTableCell />
+                </JmTableRow>
               </>
             );
           })()}
-        </TableBody>
-      </Table>
+        </JmTableBody>
+      </JmTable>
     </ProductSection>
   );
 }

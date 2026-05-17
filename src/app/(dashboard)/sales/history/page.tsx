@@ -553,8 +553,7 @@ export default function SalesHistoryPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
-            <JmTable className="min-w-[1400px]">
+          <JmTable className="min-w-[1400px]">
               <JmTableHeader>
                 <JmTableRow>
                   <JmTableHead className="w-[120px]">일시</JmTableHead>
@@ -691,7 +690,6 @@ export default function SalesHistoryPage() {
                 )}
               </JmTableBody>
             </JmTable>
-          </div>
 
           {/* 페이지네이션 */}
           {pagination && pagination.totalPages > 1 && (

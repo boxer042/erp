@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Pencil, X } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { JmIconButton, JmInput, JmTextarea } from "@/jm";
 
 interface InlineTextEditProps {
   /** 표시되는 현재 값 */
@@ -38,18 +36,6 @@ interface InlineTextEditProps {
 
 /**
  * Pencil 아이콘 토글로 인라인 편집 가능한 텍스트.
- *
- * 표시 모드:
- *   <span>{value}</span> [hover 시 Pencil 아이콘]
- * 편집 모드:
- *   <input value={draft}/> [✓] [×]
- *
- * 사용:
- *   <InlineTextEdit
- *     value={product.name}
- *     productId={product.id}
- *     onSave={(next) => updateProductFields(product.id, { ...current, name: next })}
- *   />
  */
 export function InlineTextEdit({
   value,
@@ -105,32 +91,33 @@ export function InlineTextEdit({
     commaFormat && s ? Number(s.replace(/,/g, "")).toLocaleString("ko-KR") : s;
 
   if (!editing) {
-    const showValue = display ?? (value ? formatDisplay(value) : <span className="text-muted-foreground">{placeholder}</span>);
+    const showValue =
+      display ??
+      (value ? (
+        formatDisplay(value)
+      ) : (
+        <span className="text-[var(--jm-text-muted)]">{placeholder}</span>
+      ));
     return (
       <span className={`group inline-flex items-center gap-1.5 ${className ?? ""}`}>
         <span>{showValue}</span>
         <button
           type="button"
           onClick={startEdit}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
           aria-label="편집"
         >
-          <Pencil className="h-3 w-3" />
+          <Pencil className="size-3" />
         </button>
       </span>
     );
   }
 
-  const InputComp = multiline ? Textarea : Input;
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
       setEditing(false);
-    } else if (
-      e.key === "Enter" &&
-      !multiline &&
-      !e.nativeEvent.isComposing
-    ) {
+    } else if (e.key === "Enter" && !multiline && !e.nativeEvent.isComposing) {
       e.preventDefault();
       saveMutation.mutate();
     }
@@ -138,43 +125,59 @@ export function InlineTextEdit({
 
   return (
     <span className={`inline-flex items-start gap-1.5 ${className ?? ""}`}>
-      <InputComp
-        ref={inputRef as never}
-        value={commaFormat ? formatDisplay(draft) : draft}
-        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-          setDraft(commaFormat ? e.target.value.replace(/,/g, "") : e.target.value)
-        }
-        onKeyDown={handleKey}
-        inputMode={inputMode}
-        className={multiline ? "min-h-[60px]" : "h-8 text-sm"}
-        disabled={saveMutation.isPending}
-      />
+      {multiline ? (
+        <JmTextarea
+          ref={inputRef as React.Ref<HTMLTextAreaElement>}
+          value={commaFormat ? formatDisplay(draft) : draft}
+          onChange={(e) =>
+            setDraft(
+              commaFormat ? e.target.value.replace(/,/g, "") : e.target.value,
+            )
+          }
+          onKeyDown={handleKey}
+          className="min-h-[60px]"
+          disabled={saveMutation.isPending}
+        />
+      ) : (
+        <JmInput
+          ref={inputRef as React.Ref<HTMLInputElement>}
+          size="sm"
+          value={commaFormat ? formatDisplay(draft) : draft}
+          onChange={(e) =>
+            setDraft(
+              commaFormat ? e.target.value.replace(/,/g, "") : e.target.value,
+            )
+          }
+          onKeyDown={handleKey}
+          inputMode={inputMode}
+          disabled={saveMutation.isPending}
+        />
+      )}
       {inputSuffix}
-      <Button
+      <JmIconButton
         type="button"
-        size="icon"
-        className="h-8 w-8 shrink-0"
+        size="sm"
+        variant="solid"
         onClick={() => saveMutation.mutate()}
         disabled={saveMutation.isPending}
         aria-label="저장"
       >
         {saveMutation.isPending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Loader2 className="animate-spin" />
         ) : (
-          <Check className="h-3.5 w-3.5" />
+          <Check />
         )}
-      </Button>
-      <Button
+      </JmIconButton>
+      <JmIconButton
         type="button"
-        size="icon"
+        size="sm"
         variant="outline"
-        className="h-8 w-8 shrink-0"
         onClick={() => setEditing(false)}
         disabled={saveMutation.isPending}
         aria-label="취소"
       >
-        <X className="h-3.5 w-3.5" />
-      </Button>
+        <X />
+      </JmIconButton>
     </span>
   );
 }

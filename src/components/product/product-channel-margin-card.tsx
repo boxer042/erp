@@ -1,6 +1,13 @@
 "use client";
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { ProductSection } from "./product-section";
 import type { ProductDetail } from "./types";
 import { fmtPrice } from "./helpers";
@@ -12,7 +19,8 @@ interface Props {
 export function ProductChannelMarginCard({ product }: Props) {
   const rows = product.estimatedMarginByChannel ?? [];
   if (product.productType !== "ASSEMBLED" || rows.length === 0) return null;
-  if (product.estimatedUnitCost === null || product.estimatedUnitCost === undefined) return null;
+  if (product.estimatedUnitCost === null || product.estimatedUnitCost === undefined)
+    return null;
 
   const cost = Number(product.estimatedUnitCost);
 
@@ -22,58 +30,76 @@ export function ProductChannelMarginCard({ product }: Props) {
       description="채널 가격 × 채널 수수료 + 전사 공통 판매비용 반영"
       noPadding
     >
-      <Table className="min-w-[640px]">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="h-9 px-3 text-xs">채널</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">판매가</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">예상 원가</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">채널 수수료</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">마진</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-right">마진율</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <JmTable className="min-w-[640px]">
+        <JmTableHeader>
+          <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+              채널
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              판매가
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              예상 원가
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              채널 수수료
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              마진
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+              마진율
+            </JmTableHead>
+          </JmTableRow>
+        </JmTableHeader>
+        <JmTableBody>
           {rows.map((r) => {
             const negative = r.estimatedMargin < 0;
             return (
-              <TableRow key={r.channelId}>
-                <TableCell className="px-3 py-2.5">
+              <JmTableRow key={r.channelId}>
+                <JmTableCell className="px-3 py-2">
                   <div className="flex flex-col">
-                    <span>{r.channelName}</span>
-                    <span className="text-xs text-muted-foreground">{r.channelCode}</span>
+                    <span className="text-[var(--jm-text)]">{r.channelName}</span>
+                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                      {r.channelCode}
+                    </span>
                   </div>
-                </TableCell>
-                <TableCell className="px-3 py-2.5 text-right tabular-nums">
+                </JmTableCell>
+                <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                   ₩{fmtPrice(Math.round(r.channelSellingPrice))}
-                </TableCell>
-                <TableCell className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                </JmTableCell>
+                <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                   ₩{fmtPrice(Math.round(cost))}
-                </TableCell>
-                <TableCell className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                </JmTableCell>
+                <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                   ₩{fmtPrice(Math.round(r.channelFeeTotal))}
-                </TableCell>
-                <TableCell
-                  className={`px-3 py-2.5 text-right tabular-nums font-semibold ${
-                    negative ? "text-destructive" : "text-green-600"
+                </JmTableCell>
+                <JmTableCell
+                  className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                    negative
+                      ? "text-[var(--jm-danger-fg)]"
+                      : "text-[var(--jm-success-fg)]"
                   }`}
                 >
                   ₩{fmtPrice(Math.round(r.estimatedMargin))}
-                </TableCell>
-                <TableCell
-                  className={`px-3 py-2.5 text-right tabular-nums ${
-                    negative ? "text-destructive" : "text-green-600"
+                </JmTableCell>
+                <JmTableCell
+                  className={`px-3 py-2 text-right tabular-nums ${
+                    negative
+                      ? "text-[var(--jm-danger-fg)]"
+                      : "text-[var(--jm-success-fg)]"
                   }`}
                 >
                   {r.estimatedMarginRate !== null
                     ? `${r.estimatedMarginRate.toFixed(1)}%`
                     : "-"}
-                </TableCell>
-              </TableRow>
+                </JmTableCell>
+              </JmTableRow>
             );
           })}
-        </TableBody>
-      </Table>
+        </JmTableBody>
+      </JmTable>
     </ProductSection>
   );
 }

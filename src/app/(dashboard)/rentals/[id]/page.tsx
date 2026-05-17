@@ -38,7 +38,6 @@ interface RentalDetail {
     name: string;
     brand: string | null;
     modelNo: string | null;
-    serialNo: string | null;
     dailyRate: string;
     monthlyRate: string;
     depositAmount: string;
@@ -172,9 +171,6 @@ export default function RentalDetailPage({
                 }
               />
               <Row label="자산 번호" value={r.asset.assetNo} mono />
-              {r.asset.serialNo && (
-                <Row label="시리얼" value={r.asset.serialNo} mono />
-              )}
               <Row
                 label="요율"
                 value={

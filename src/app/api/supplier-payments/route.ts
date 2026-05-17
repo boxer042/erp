@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
         amount,
         paymentDate,
         method: data.method,
+        kind: data.kind,
         memo: data.memo || null,
         createdById: user.id,
       },

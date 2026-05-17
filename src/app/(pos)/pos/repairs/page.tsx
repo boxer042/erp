@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, Menu } from "lucide-react";
+import { ChevronLeft, HelpCircle, Menu } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
 import { MenuSheet } from "../_components/menu-sheet";
@@ -121,6 +121,15 @@ export default function RepairsBoardPage() {
               매장 수리 현황
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => router.push("/pos/repairs/help")}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
+            aria-label="도움말"
+            title="수리 시스템 가이드"
+          >
+            <HelpCircle className="size-5" />
+          </button>
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -438,6 +447,14 @@ function TicketRow({
           {ticket.type === "ON_SITE" && (
             <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
               즉시
+            </span>
+          )}
+          {ticket.quoteRejectedAt && (
+            <span
+              className="rounded bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-warning-fg)]"
+              title="견적 거절 — 진단비만 청구"
+            >
+              거절
             </span>
           )}
         </div>

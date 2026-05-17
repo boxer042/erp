@@ -38,10 +38,10 @@ export const statusLabels: Record<string, string> = {
   CANCELLED: "취소",
 };
 
-export const statusVariants: Record<string, "outline" | "default" | "secondary" | "destructive" | "warning" | "success"> = {
+export const statusVariants: Record<string, "default" | "outline" | "solid" | "success" | "warning" | "danger" | "info" | "accent"> = {
   PENDING: "warning",
   CONFIRMED: "success",
-  CANCELLED: "destructive",
+  CANCELLED: "danger",
 };
 
 export const emptyForm = {

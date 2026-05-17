@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { JmBadge, JmIconButton } from "@/jm";
 import type { ProductDetail } from "./types";
 import { InlineTextEdit } from "./edit/inline-text-edit";
 
@@ -45,7 +44,6 @@ export function ProductHeaderBar({
     }
   };
 
-  // 대표 이미지는 페이지 하단 ProductMediaManager에서 관리. 여기서는 시각적 컨텍스트만 표시
   const renderThumb = () => {
     if (!product.imageUrl) return null;
     return (
@@ -54,7 +52,7 @@ export function ProductHeaderBar({
         <img
           src={product.imageUrl}
           alt={product.name}
-          className="h-10 w-10 rounded-md object-cover border border-border"
+          className="h-10 w-10 rounded-md object-cover border border-[var(--jm-border)]"
         />
       </div>
     );
@@ -62,18 +60,18 @@ export function ProductHeaderBar({
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <Button
+      <JmIconButton
         variant="ghost"
-        size="icon"
+        size="sm"
         className="shrink-0"
         aria-label={backLabel}
         onClick={handleBack}
       >
-        <ArrowLeft className="h-4 w-4" />
-      </Button>
+        <ArrowLeft />
+      </JmIconButton>
       {renderThumb()}
       {onSaveName ? (
-        <h2 className="text-lg font-semibold truncate">
+        <h2 className="text-jm-md font-semibold truncate text-[var(--jm-text)]">
           <InlineTextEdit
             value={product.name}
             productId={product.id}
@@ -81,14 +79,38 @@ export function ProductHeaderBar({
           />
         </h2>
       ) : (
-        <h2 className="text-lg font-semibold truncate">{product.name}</h2>
+        <h2 className="text-jm-md font-semibold truncate text-[var(--jm-text)]">
+          {product.name}
+        </h2>
       )}
-      <Badge variant="outline">{product.sku}</Badge>
-      {product.isSet && <Badge>세트</Badge>}
-      {product.productType === "ASSEMBLED" && <Badge>조립</Badge>}
-      {product.isCanonical && <Badge variant="default">대표</Badge>}
-      {product.canonicalProductId && <Badge variant="secondary">변형</Badge>}
-      {product.isBulk && <Badge variant="secondary">벌크원료</Badge>}
+      <JmBadge variant="outline" size="sm" shape="square">
+        {product.sku}
+      </JmBadge>
+      {product.isSet && (
+        <JmBadge variant="info" size="sm" shape="square">
+          세트
+        </JmBadge>
+      )}
+      {product.productType === "ASSEMBLED" && (
+        <JmBadge variant="info" size="sm" shape="square">
+          조립
+        </JmBadge>
+      )}
+      {product.isCanonical && (
+        <JmBadge variant="success" size="sm" shape="square">
+          대표
+        </JmBadge>
+      )}
+      {product.canonicalProductId && (
+        <JmBadge variant="default" size="sm" shape="square">
+          변형
+        </JmBadge>
+      )}
+      {product.isBulk && (
+        <JmBadge variant="default" size="sm" shape="square">
+          벌크원료
+        </JmBadge>
+      )}
       {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
     </div>
   );

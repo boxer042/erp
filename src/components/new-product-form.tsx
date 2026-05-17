@@ -3,27 +3,26 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCheckbox,
+  JmDialog,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmInput,
+  JmSelect,
+  JmTextarea,
+  JmTooltipContent,
+  JmTooltipProvider,
+  JmTooltipRoot,
+  JmTooltipTrigger,
+} from "@/jm";
 import { RefreshCw, Plus, X, Loader2, ChevronLeft, ChevronRight, Calculator, Info } from "lucide-react";
 import { ComponentIncomingInfoSections } from "@/components/product";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { UNITS_OF_MEASURE } from "@/lib/constants";
 import { formatComma, parseComma, cn } from "@/lib/utils";
@@ -214,51 +213,6 @@ export function NewProductForm({
     onError: () => toast.error("라벨 생성 실패"),
   });
 
-  // ── 변형 등록 (멀티 변형 모드) ──
-  type VariantRow = {
-    id: string;
-    name: string;
-    sku: string;
-    components: SetComponentRow[]; // 변형별 구성품 (기본은 위 setComponents 복사)
-    initialQty: string;
-    initialDate: Date;
-    initialLabor: string;
-  };
-  const [variants, setVariants] = useState<VariantRow[]>([]);
-
-  // 메인의 setComponents가 바뀌면 변형들의 components를 동기화
-  // - 새 행 추가 → 변형에도 추가
-  // - 행 삭제 → 변형에서도 같은 mainId 행 삭제
-  // - 행 product 변경 → override=false인 변형 행만 갱신
-  // - 라벨/수량 변경 → 항상 변형에 반영
-  useEffect(() => {
-    setVariants((prev) =>
-      prev.map((v) => {
-        const newComps: SetComponentRow[] = setComponents.map((mainRow) => {
-          const existing = v.components.find((c) => c.mainId === mainRow.id);
-          if (existing?.override) {
-            return {
-              ...existing,
-              label: mainRow.label,
-              slotLabelId: mainRow.slotLabelId ?? null,
-              quantity: mainRow.quantity,
-            };
-          }
-          return {
-            id: existing?.id ?? Math.random().toString(36).slice(2),
-            mainId: mainRow.id,
-            product: mainRow.product,
-            quantity: mainRow.quantity,
-            label: mainRow.label,
-            slotLabelId: mainRow.slotLabelId ?? null,
-            override: false,
-          };
-        });
-        return { ...v, components: newComps };
-      }),
-    );
-  }, [setComponents]);
-
   // ── 조립 템플릿/프리셋 ──
   type TemplateSlot = {
     id: string;
@@ -311,7 +265,7 @@ export function NewProductForm({
   }, [channels.length, productType]);
 
   const getViewport = useCallback((): HTMLElement | null => {
-    return scrollAreaRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null;
+    return scrollAreaRef.current;
   }, []);
 
   const scrollToStep = useCallback((anchor: string) => {
@@ -904,66 +858,6 @@ export function NewProductForm({
       // 가격/매핑은 무관 — 서버에서 sellingPrice=0 강제 처리
     }
 
-    // 변형이 있으면 묶음(canonical+variants) 모드 — 2026-04 부터 deprecated, variants 는 항상 빈 배열
-    if (false && productType === "ASSEMBLED" && variants.length > 0) {
-      if (variants.some((v) => !v.name.trim() || !v.sku.trim())) {
-        toast.error("모든 변형의 이름과 SKU를 입력해주세요");
-        return;
-      }
-      if (variants.some((v) => v.components.some((c) => !c.product))) {
-        toast.error("모든 변형의 구성 상품을 선택해주세요");
-        return;
-      }
-      setSubmitting(true);
-      try {
-        try {
-          await apiMutate("/api/products/grouped", "POST", {
-            canonicalName: form.name,
-            canonicalSku: form.sku,
-            productType: "ASSEMBLED",
-            unitOfMeasure: form.unitOfMeasure,
-            taxType: form.taxType,
-            zeroRateEligible: form.zeroRateEligible,
-            taxRate: form.taxRate,
-            listPrice: getSubmitListPrice(),
-            sellingPrice: getSubmitPrice(),
-            brand: form.brandName || form.brand || undefined,
-            brandId: form.brandId || undefined,
-            modelName: form.modelName || undefined,
-            spec: form.spec || undefined,
-            description: undefined,
-            memo: form.memo || undefined,
-            variants: variants.map((v) => ({
-              name: v.name,
-              sku: v.sku,
-              sellingPrice: undefined,
-              listPrice: undefined,
-              components: v.components
-                .filter((c) => c.product)
-                .map((c) => ({
-                  componentId: c.product!.id,
-                  quantity: c.quantity,
-                  label: c.label ?? null,
-                  slotLabelId: c.slotLabelId ?? null,
-                })),
-              initialAssemblyQty: v.initialQty || undefined,
-              initialAssemblyDate: v.initialDate.toISOString(),
-              initialAssemblyLaborCost: v.initialLabor || undefined,
-            })),
-          });
-        } catch (err) {
-          const message = (err as Error)?.message || "묶음 등록 실패";
-          toast.error(message);
-          return;
-        }
-        toast.success(`대표 + 변형 ${variants.length}개가 등록되었습니다`);
-        router.push("/products");
-        return;
-      } finally {
-        setSubmitting(false);
-      }
-    }
-
     setSubmitting(true);
     const errors: string[] = [];
     try {
@@ -1170,7 +1064,7 @@ export function NewProductForm({
           title="가격 계산기"
           badge={<span className="text-[11px] text-muted-foreground">공급가액 기준</span>}
         />
-        <Card size="sm" className="py-0 gap-0">
+        <JmCard className="overflow-hidden">
         {/* ── 원가 요약 ── */}
         <table className="w-full text-[12px]">
           <tbody className="[&_tr]:border-b [&_tr]:border-border">
@@ -1207,7 +1101,7 @@ export function NewProductForm({
                   <tr>
                     <td className="px-3 py-2 text-muted-foreground">원가 직접 입력</td>
                     <td className="px-3 py-1 text-right">
-                      <Input
+                      <JmInput
                         type="text"
                         inputMode="numeric"
                         placeholder="0"
@@ -1260,21 +1154,21 @@ export function NewProductForm({
               <td className="px-3 py-2.5 text-[13px] font-semibold">
                 <span className="flex items-center gap-1.5">
                   총원가
-              <TooltipProvider delay={100}>
-                <Tooltip>
-                  <TooltipTrigger
+              <JmTooltipProvider delay={100}>
+                <JmTooltipRoot>
+                  <JmTooltipTrigger
                     render={
-                      <button type="button" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="원가 계산식 보기">
+                      <button type="button" className="text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] transition-colors" aria-label="원가 계산식 보기">
                         <Info className="h-3.5 w-3.5" />
                       </button>
                     }
                   />
-                  <TooltipContent side="top" className="max-w-[280px] text-[11px] leading-relaxed">
+                  <JmTooltipContent side="top" className="max-w-[280px] text-jm-2xs leading-relaxed">
                     {isSetOrAssembled ? (
                       <div className="space-y-1">
                         <div className="font-semibold">총원가 계산식</div>
                         <div>= 구성품 공급단가 + 입고 평균 배송비 + 입고 부대비용{productType === "ASSEMBLED" ? " + 조립비용" : ""}{cardFeeRate > 0 && " + 카드수수료"}</div>
-                        <div className="pt-1 border-t border-border mt-1 space-y-0.5 text-[10px] text-muted-foreground">
+                        <div className="pt-1 border-t border-[var(--jm-border)] mt-1 space-y-0.5 text-[10px] opacity-80">
                           <div>• 각 구성품의 공급단가/배송비/부대비용을 (수량 × 단위) 로 합산</div>
                           <div>• 배송비/부대비용 과세분 ÷ 1.1 로 공급가액 환산</div>
                           {productType === "ASSEMBLED" && <div>• 조립비용(과세) ÷ 1.1 로 공급가액 환산</div>}
@@ -1285,7 +1179,7 @@ export function NewProductForm({
                       <div className="space-y-1">
                         <div className="font-semibold">총원가 계산식</div>
                         <div>= 원가 + 입고 평균 배송비 + 입고 부대비용 + 판매비용{cardFeeRate > 0 && " + 카드수수료"}</div>
-                        <div className="pt-1 border-t border-border mt-1 space-y-0.5 text-[10px] text-muted-foreground">
+                        <div className="pt-1 border-t border-[var(--jm-border)] mt-1 space-y-0.5 text-[10px] opacity-80">
                           <div>• 원가 = 공급단가 ÷ 환산비율</div>
                           <div>• 과세 비용은 ÷ 1.1 로 공급가액 환산 후 합산</div>
                           <div>• PERCENTAGE 부대비용은 원가의 %로 적용</div>
@@ -1293,9 +1187,9 @@ export function NewProductForm({
                         </div>
                       </div>
                     )}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                  </JmTooltipContent>
+                </JmTooltipRoot>
+              </JmTooltipProvider>
                 </span>
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums text-[13px] font-semibold">₩{Math.round(totalCost).toLocaleString("ko-KR")}</td>
@@ -1303,12 +1197,12 @@ export function NewProductForm({
           </tfoot>
         </table>
 
-        <CardContent className="py-4 space-y-3 border-t border-border">
+        <JmCardContent className="py-4 space-y-3 border-t border-border">
         {/* ── 마진율 ── */}
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-muted-foreground shrink-0 w-14">마진율</span>
           <div className="relative flex-1">
-            <Input
+            <JmInput
               type="number"
               inputMode="decimal"
               min="0"
@@ -1325,7 +1219,7 @@ export function NewProductForm({
         {/* ── 마진금액 ── */}
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-muted-foreground shrink-0 w-14">마진금액</span>
-          <Input
+          <JmInput
             type="text"
             inputMode="numeric"
             placeholder="0"
@@ -1347,7 +1241,7 @@ export function NewProductForm({
           {/* 공급가액 */}
           <div className="px-2 py-2 text-center border-r border-border">
             <div className="text-[10px] text-muted-foreground mb-1">공급가액</div>
-            <Input
+            <JmInput
               type="text"
               inputMode="numeric"
               placeholder="0"
@@ -1369,7 +1263,7 @@ export function NewProductForm({
           {/* 판매가 */}
           <div className="px-2 py-2 text-center">
             <div className="text-[10px] text-muted-foreground mb-1">판매가</div>
-            <Input
+            <JmInput
               type="text"
               inputMode="numeric"
               placeholder="0"
@@ -1380,7 +1274,7 @@ export function NewProductForm({
             />
           </div>
         </div>
-        </CardContent></Card>
+        </JmCardContent></JmCard>
       </section>
     );
   };
@@ -1435,7 +1329,7 @@ export function NewProductForm({
           title="채널별 가격"
           badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
         />
-        <Card size="sm"><CardContent className="space-y-2">
+        <JmCard><JmCardContent className="space-y-2">
           {channels.map((ch, idx) => {
             const row = channelPrices[idx];
             if (!row) return null;
@@ -1451,7 +1345,7 @@ export function NewProductForm({
             return (
               <div key={ch.id} className="rounded-lg border border-border bg-card overflow-hidden">
                 <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer">
-                  <Checkbox
+                  <JmCheckbox
                     checked={row.enabled}
                     onCheckedChange={(checked) => {
                       const enabled = !!checked;
@@ -1471,7 +1365,7 @@ export function NewProductForm({
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-muted-foreground w-14 shrink-0">마진율</span>
                       <div className="relative flex-1">
-                        <Input
+                        <JmInput
                           type="text"
                           inputMode="decimal"
                           value={row.lastEdited === "rate" ? row.targetRate : realMarginRate.toFixed(1)}
@@ -1485,7 +1379,7 @@ export function NewProductForm({
                     {/* 마진금액 */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-muted-foreground w-14 shrink-0">마진금액</span>
-                      <Input
+                      <JmInput
                         type="text"
                         inputMode="numeric"
                         placeholder="0"
@@ -1498,7 +1392,7 @@ export function NewProductForm({
                     {/* 판매가 */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-muted-foreground w-14 shrink-0">판매가</span>
-                      <Input
+                      <JmInput
                         type="text"
                         inputMode="numeric"
                         placeholder={offlineVatPrice > 0 ? formatComma(String(offlineVatPrice)) : "0"}
@@ -1553,7 +1447,7 @@ export function NewProductForm({
               </div>
             );
           })}
-        </CardContent></Card>
+        </JmCardContent></JmCard>
       </section>
     );
   };
@@ -1647,7 +1541,7 @@ export function NewProductForm({
           )}
 
           {/* 본문 */}
-          <ScrollArea ref={scrollAreaRef} className="flex-1 min-h-0">
+          <div ref={scrollAreaRef} className="flex-1 min-h-0 overflow-y-auto">
             {step === "type" ? (
               <TypeSelectScreen onSelect={handleSelectType} />
             ) : (
@@ -1675,7 +1569,7 @@ export function NewProductForm({
                           title="거래처 매핑"
                           badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
                         />
-                        <Card size="sm"><CardContent className="space-y-3">
+                        <JmCard><JmCardContent className="space-y-3">
                         <Field label="거래처">
                           <SupplierCombobox
                             suppliers={suppliers}
@@ -1694,14 +1588,14 @@ export function NewProductForm({
                         {mapping.supplierId && (
                           <div className="flex items-center gap-4">
                             <label className="flex items-center gap-2 cursor-pointer">
-                              <Checkbox
+                              <JmCheckbox
                                 checked={mapping.isProvisional}
                                 onCheckedChange={(checked) => setMapping((prev) => ({ ...prev, isProvisional: !!checked }))}
                               />
                               <span className="text-[13px] text-muted-foreground">임시 등록 <span className="text-[11px]">(실제 입고 전 어림잡은 정보)</span></span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
-                              <Checkbox
+                              <JmCheckbox
                                 checked={mapping.syncName}
                                 onCheckedChange={(checked) => {
                                   const next = !!checked;
@@ -1752,7 +1646,7 @@ export function NewProductForm({
                             hint={unitMismatch ? `공급상품 단위(${selectedSp!.unitOfMeasure})와 판매상품 단위(${form.unitOfMeasure})가 다릅니다. 환산비율을 확인하세요.` : undefined}
                           >
                             <div className="flex items-center gap-3">
-                              <Input
+                              <JmInput
                                 type="text"
                                 inputMode="decimal"
                                 value={mapping.conversionRate}
@@ -1776,7 +1670,7 @@ export function NewProductForm({
                           </Field>
                           );
                         })()}
-                        </CardContent>
+                        </JmCardContent>
                         {mapping.supplierProductId && (() => {
                           const sp = supplierProducts.find((s) => s.id === mapping.supplierProductId);
                           if (!sp) return null;
@@ -1818,7 +1712,7 @@ export function NewProductForm({
                             </table>
                           );
                         })()}
-                        </Card>
+                        </JmCard>
                       </section>
                     </>
                   )}
@@ -1828,7 +1722,7 @@ export function NewProductForm({
                   {/* 기본 정보 */}
                   <section>
                     <SectionTitle title="기본 정보" />
-                    <Card size="sm"><CardContent className="space-y-3">
+                    <JmCard><JmCardContent className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Field label="상품명" required>
                         <NameAutocomplete
@@ -1838,7 +1732,7 @@ export function NewProductForm({
                         />
                       </Field>
                       <Field label="규격">
-                        <Input
+                        <JmInput
                           placeholder="예: B-55, 3HP (선택)"
                           value={form.spec}
                           onChange={(e) => setForm((prev) => ({ ...prev, spec: e.target.value }))}
@@ -1867,7 +1761,7 @@ export function NewProductForm({
                       </Field>
                       <Field label="SKU" required>
                         <div className="flex gap-1.5">
-                          <Input
+                          <JmInput
                             placeholder="SKU"
                             value={form.sku}
                             onChange={(e) => {
@@ -1876,7 +1770,7 @@ export function NewProductForm({
                             }}
                             className="h-9 flex-1"
                           />
-                          <Button
+                          <JmButton
                             type="button"
                             variant="outline"
                             className="shrink-0 h-9 w-9 p-0"
@@ -1888,27 +1782,26 @@ export function NewProductForm({
                             title="자동 생성"
                           >
                             <RefreshCw className="h-3.5 w-3.5" />
-                          </Button>
+                          </JmButton>
                         </div>
                       </Field>
                     </div>
 
                     <Field label="단위">
-                      <Select value={form.unitOfMeasure} onValueChange={(v) => setForm((prev) => ({ ...prev, unitOfMeasure: v ?? "EA" }))}>
-                        <SelectTrigger className="!h-9 w-full">
-                          <span>{UNITS_OF_MEASURE.find((u) => u.value === form.unitOfMeasure)?.label} ({form.unitOfMeasure})</span>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNITS_OF_MEASURE.map((u) => (
-                            <SelectItem key={u.value} value={u.value}>{u.label} ({u.value})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <JmSelect
+                        size="sm"
+                        value={form.unitOfMeasure}
+                        onChange={(v) => setForm((prev) => ({ ...prev, unitOfMeasure: v || "EA" }))}
+                        options={UNITS_OF_MEASURE.map((u) => ({
+                          value: u.value,
+                          label: `${u.label} (${u.value})`,
+                        }))}
+                      />
                     </Field>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Field label="모델명">
-                        <Input
+                        <JmInput
                           placeholder="모델명 (선택)"
                           value={form.modelName}
                           onChange={(e) => setForm((prev) => ({ ...prev, modelName: e.target.value }))}
@@ -1917,45 +1810,24 @@ export function NewProductForm({
                       </Field>
                       {categories.length > 0 && (
                         <Field label="카테고리">
-                          <Select
+                          <JmSelect
+                            size="sm"
                             value={form.categoryId || "__none__"}
-                            onValueChange={(v) =>
+                            onChange={(v) =>
                               setForm((prev) => ({ ...prev, categoryId: !v || v === "__none__" ? "" : v }))
                             }
-                          >
-                            <SelectTrigger className="!h-9 w-full">
-                              <SelectValue>
-                                {(() => {
-                                  if (!form.categoryId) return "없음";
-                                  for (const cat of categories) {
-                                    if (cat.id === form.categoryId) return cat.name;
-                                    const child = cat.children.find((c) => c.id === form.categoryId);
-                                    if (child) return child.name;
-                                  }
-                                  return "카테고리 선택";
-                                })()}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__">없음</SelectItem>
-                              {categories.map((cat) => (
-                                cat.children.length > 0 ? (
-                                  <SelectGroup key={cat.id}>
-                                    <SelectLabel>{cat.name}</SelectLabel>
-                                    {cat.children.map((child) => (
-                                      <SelectItem key={child.id} value={child.id}>
-                                        {child.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectGroup>
-                                ) : (
-                                  <SelectItem key={cat.id} value={cat.id}>
-                                    {cat.name}
-                                  </SelectItem>
-                                )
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            options={[
+                              { value: "__none__", label: "없음" },
+                              ...categories.flatMap((cat) =>
+                                cat.children.length > 0
+                                  ? cat.children.map((child) => ({
+                                      value: child.id,
+                                      label: `${cat.name} > ${child.name}`,
+                                    }))
+                                  : [{ value: cat.id, label: cat.name }],
+                              ),
+                            ]}
+                          />
                         </Field>
                       )}
                     </div>
@@ -1963,7 +1835,7 @@ export function NewProductForm({
                     {(productType === "FINISHED" || productType === "PARTS") && true && (
                       <div className="space-y-2 rounded-md border border-dashed border-border p-3">
                         <label className="flex items-center gap-2 cursor-pointer">
-                          <Checkbox
+                          <JmCheckbox
                             checked={bulkUsable}
                             onCheckedChange={(v) => {
                               const checked = !!v;
@@ -1984,7 +1856,7 @@ export function NewProductForm({
                           <div className="space-y-2 pl-6">
                             <Field label="용기 용량">
                               <div className="flex items-center gap-1.5">
-                                <Input
+                                <JmInput
                                   type="text"
                                   inputMode="decimal"
                                   placeholder="예: 4000"
@@ -1996,21 +1868,23 @@ export function NewProductForm({
                                   onFocus={focusCaretEnd}
                                   className="h-9 flex-1"
                                 />
-                                <Select value={newBulkUnit} onValueChange={(v) => setNewBulkUnit(v ?? "mL")}>
-                                  <SelectTrigger className="!h-9 w-20">
-                                    <span>{newBulkUnit}</span>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="mL">mL</SelectItem>
-                                    <SelectItem value="L">L</SelectItem>
-                                    <SelectItem value="g">g</SelectItem>
-                                    <SelectItem value="kg">kg</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <JmSelect
+                                  size="sm"
+                                  className="w-20"
+                                  value={newBulkUnit}
+                                  onChange={(v) => setNewBulkUnit(v || "mL")}
+                                  options={[
+                                    { value: "mL", label: "mL" },
+                                    { value: "L", label: "L" },
+                                    { value: "g", label: "g" },
+                                    { value: "kg", label: "kg" },
+                                  ]}
+                                />
+
                               </div>
                             </Field>
                             <Field label="벌크명">
-                              <Input
+                              <JmInput
                                 placeholder="예: 엔진오일 5W-30 (벌크)"
                                 value={newBulkName}
                                 onChange={(e) => {
@@ -2070,7 +1944,7 @@ export function NewProductForm({
                         </button>
                         {form.trackable && (
                           <div className="flex items-center gap-1.5">
-                            <Input
+                            <JmInput
                               type="text"
                               inputMode="numeric"
                               placeholder="0"
@@ -2119,14 +1993,14 @@ export function NewProductForm({
                     </Field>
 
                     <Field label="메모">
-                      <Textarea
+                      <JmTextarea
                         placeholder="메모 (선택)"
                         value={form.memo}
                         onChange={(e) => setForm((prev) => ({ ...prev, memo: e.target.value }))}
                         className="min-h-[60px] resize-none text-[13px]"
                       />
                     </Field>
-                    </CardContent></Card>
+                    </JmCardContent></JmCard>
                   </section>
 
                   {/* 상위 상품 연결 (부속) */}
@@ -2136,7 +2010,7 @@ export function NewProductForm({
                         title="상위 상품 연결"
                         badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
                       />
-                      <Card size="sm" className="py-0">
+                      <JmCard className="overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted text-muted-foreground text-xs">
@@ -2158,7 +2032,7 @@ export function NewProductForm({
                                 />
                               </td>
                               <td className="border-r border-border px-1 py-0.5">
-                                <Input
+                                <JmInput
                                   type="number"
                                   inputMode="decimal"
                                   min="0.0001"
@@ -2193,7 +2067,7 @@ export function NewProductForm({
                           </tr>
                         </tbody>
                       </table>
-                      </Card>
+                      </JmCard>
                     </section>
                   )}
 
@@ -2204,7 +2078,7 @@ export function NewProductForm({
                         title="조립 템플릿"
                         badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
                       />
-                      <Card size="sm"><CardContent className="grid grid-cols-2 gap-3">
+                      <JmCard><JmCardContent className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1">
                           <label className="text-[12px] text-muted-foreground">템플릿</label>
                           <AssemblyTemplateCombobox
@@ -2238,7 +2112,7 @@ export function NewProductForm({
                                 (templates.find((t) => t.id === templateId)?.presets.length ?? 0) === 0
                               }
                             />
-                            <Button
+                            <JmButton
                               type="button"
                               variant="outline"
                               size="sm"
@@ -2247,10 +2121,10 @@ export function NewProductForm({
                               className="shrink-0 h-9"
                             >
                               프리셋으로 저장
-                            </Button>
+                            </JmButton>
                           </div>
                         </div>
-                      </CardContent></Card>
+                      </JmCardContent></JmCard>
                     </section>
                   )}
 
@@ -2261,7 +2135,7 @@ export function NewProductForm({
                     return (
                     <section>
                       <SectionTitle title="구성 상품" />
-                      <Card size="sm" className="py-0">
+                      <JmCard className="overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted text-muted-foreground text-xs">
@@ -2314,7 +2188,7 @@ export function NewProductForm({
                                   />
                                 </td>
                                 <td className="border-r border-border px-1 py-0.5">
-                                  <Input
+                                  <JmInput
                                     type="number"
                                     inputMode="decimal"
                                     min="0.0001"
@@ -2363,273 +2237,10 @@ export function NewProductForm({
                           )}
                         </tbody>
                       </table>
-                      </Card>
+                      </JmCard>
                     </section>
                     );
                   })()}
-
-                  {/* 변형 등록 UI 제거됨 (2026-04) — 변형은 조립실적 등록 시점에 가변 슬롯 부품 조합에 따라 자동 생성됨 */}
-                  {false && productType === "ASSEMBLED" && (
-                    <section>
-                      <SectionTitle
-                        title="변형 등록"
-                        badge={
-                          <span className="text-[11px] text-muted-foreground">
-                            선택사항 — 추가 시 위 상품이 대표가 되고 변형들이 함께 등록됩니다
-                          </span>
-                        }
-                      />
-                      <Card size="sm"><CardContent className="space-y-3">
-                      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-[12px] text-muted-foreground leading-relaxed">
-                        같은 구성이지만 일부 부품만 다른 상품을 함께 등록합니다.
-                        <ul className="mt-1 ml-4 list-disc space-y-0.5">
-                          <li>대표 상품은 고객 노출용 그룹 헤더 — 재고 없음</li>
-                          <li>변형 상품은 실제 재고·로트 단위</li>
-                          <li>위 구성을 자동 상속하며, 슬롯의 ● 표시는 직접 수정된 항목입니다</li>
-                        </ul>
-                      </div>
-                      <div className="space-y-3">
-                        {variants.length === 0 ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => {
-                              const idx = variants.length + 1;
-                              setVariants([
-                                {
-                                  id: Math.random().toString(36).slice(2),
-                                  name: form.name ? `${form.name} 변형${idx}` : "",
-                                  sku: form.sku ? `${form.sku}-V${idx}` : "",
-                                  components: setComponents.map((c) => ({
-                                    ...c,
-                                    id: Math.random().toString(36).slice(2),
-                                    mainId: c.id,
-                                    override: false,
-                                  })),
-                                  initialQty: "0",
-                                  initialDate: new Date(),
-                                  initialLabor: "",
-                                },
-                              ]);
-                            }}
-                          >
-                            <Plus data-icon="inline-start" />
-                            변형 추가하기 (V벨트 사이즈만 다른 묶음 등록 시)
-                          </Button>
-                        ) : (
-                          <>
-                            {variants.map((v, vidx) => (
-                              <div
-                                key={v.id}
-                                className="border border-border rounded-md p-3 space-y-2 bg-muted/10"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-semibold">변형 {vidx + 1}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setVariants((prev) => prev.filter((x) => x.id !== v.id))
-                                    }
-                                    className="text-muted-foreground hover:text-red-400 p-1"
-                                  >
-                                    <X className="size-3.5" />
-                                  </button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] text-muted-foreground">이름 *</label>
-                                    <Input
-                                      value={v.name}
-                                      onChange={(e) =>
-                                        setVariants((prev) =>
-                                          prev.map((x) =>
-                                            x.id === v.id ? { ...x, name: e.target.value } : x,
-                                          ),
-                                        )
-                                      }
-                                      placeholder="예: 고압분무기 + V벨트 B-55"
-                                      className="h-8 text-[13px]"
-                                    />
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] text-muted-foreground">SKU *</label>
-                                    <Input
-                                      value={v.sku}
-                                      onChange={(e) =>
-                                        setVariants((prev) =>
-                                          prev.map((x) =>
-                                            x.id === v.id ? { ...x, sku: e.target.value } : x,
-                                          ),
-                                        )
-                                      }
-                                      placeholder="예: PUMP-B55"
-                                      className="h-8 text-[13px]"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-[11px] text-muted-foreground">
-                                    구성품 (위 상품 구성에서 복사됨, 슬롯별로 다르게 변경 가능)
-                                  </label>
-                                  <div className="border border-border rounded">
-                                    <table className="w-full text-[12px]">
-                                      <tbody>
-                                        {v.components.map((c, cidx) => {
-                                          const mainRow = setComponents[cidx];
-                                          const changed =
-                                            mainRow && mainRow.product?.id !== c.product?.id;
-                                          return (
-                                            <tr
-                                              key={c.id}
-                                              className="border-b border-border last:border-0"
-                                            >
-                                              <td className="px-2 py-1 text-muted-foreground w-[100px]">
-                                                {c.label?.trim() ? (
-                                                  <span className="text-foreground">{c.label}</span>
-                                                ) : (
-                                                  <span className="text-muted-foreground">
-                                                    슬롯 #{cidx + 1}
-                                                  </span>
-                                                )}
-                                                {changed && (
-                                                  <span className="ml-1 text-[10px] text-primary">
-                                                    ●
-                                                  </span>
-                                                )}
-                                              </td>
-                                              <td className="p-1">
-                                                <ProductCombobox
-                                                  products={existingProducts}
-                                                  value={c.product?.id ?? ""}
-                                                  onChange={(p) =>
-                                                    setVariants((prev) =>
-                                                      prev.map((x) => {
-                                                        if (x.id !== v.id) return x;
-                                                        const newComps = x.components.map((cc, i) =>
-                                                          i === cidx
-                                                            ? { ...cc, product: p, override: true }
-                                                            : cc,
-                                                        );
-                                                        return { ...x, components: newComps };
-                                                      }),
-                                                    )
-                                                  }
-                                                  filterType="component"
-                                                />
-                                              </td>
-                                              <td className="px-2 py-1 text-right text-muted-foreground w-[60px]">
-                                                ×{c.quantity}
-                                              </td>
-                                            </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-2">
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] text-muted-foreground">
-                                      초기 조립 수량
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      value={v.initialQty}
-                                      onChange={(e) =>
-                                        setVariants((prev) =>
-                                          prev.map((x) =>
-                                            x.id === v.id ? { ...x, initialQty: e.target.value } : x,
-                                          ),
-                                        )
-                                      }
-                                      onFocus={focusCaretEnd}
-                                      className="h-8 text-[13px]"
-                                    />
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] text-muted-foreground">조립일</label>
-                                    <Popover>
-                                      <PopoverTrigger className="flex h-8 items-center rounded-lg border border-input bg-transparent px-2 text-[13px] hover:bg-accent/50">
-                                        {format(v.initialDate, "yyyy-MM-dd", { locale: ko })}
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                          mode="single"
-                                          selected={v.initialDate}
-                                          onSelect={(d) =>
-                                            d &&
-                                            setVariants((prev) =>
-                                              prev.map((x) =>
-                                                x.id === v.id ? { ...x, initialDate: d } : x,
-                                              ),
-                                            )
-                                          }
-                                        />
-                                      </PopoverContent>
-                                    </Popover>
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] text-muted-foreground">
-                                      조립비 (총액)
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={formatComma(v.initialLabor)}
-                                      onChange={(e) =>
-                                        setVariants((prev) =>
-                                          prev.map((x) =>
-                                            x.id === v.id
-                                              ? { ...x, initialLabor: parseComma(e.target.value) }
-                                              : x,
-                                          ),
-                                        )
-                                      }
-                                      onFocus={focusCaretEnd}
-                                      className="h-8 text-[13px]"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full"
-                              onClick={() => {
-                                const idx = variants.length + 1;
-                                setVariants((prev) => [
-                                  ...prev,
-                                  {
-                                    id: Math.random().toString(36).slice(2),
-                                    name: form.name ? `${form.name} 변형${idx}` : "",
-                                    sku: form.sku ? `${form.sku}-V${idx}` : "",
-                                    components: setComponents.map((c) => ({
-                                      ...c,
-                                      id: Math.random().toString(36).slice(2),
-                                      mainId: c.id,
-                                      override: false,
-                                    })),
-                                    initialQty: "0",
-                                    initialDate: new Date(),
-                                    initialLabor: "",
-                                  },
-                                ]);
-                              }}
-                            >
-                              <Plus data-icon="inline-start" />
-                              변형 추가
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      </CardContent></Card>
-                    </section>
-                  )}
 
                   <GroupHeader step="STEP 3" title="비용" id="np-step-3" />
 
@@ -2640,7 +2251,7 @@ export function NewProductForm({
                         title="조립 비용"
                         badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
                       />
-                      <Card size="sm" className="py-0">
+                      <JmCard className="overflow-hidden">
                         <CostList costs={assemblyCosts} onChange={setAssemblyCosts} addLabel="조립 비용 추가" />
                         {assemblyFixedCost > 0 && (
                           <div className="flex items-center justify-between px-3 py-2 border-t border-border text-[12px]">
@@ -2648,7 +2259,7 @@ export function NewProductForm({
                             <span className="font-semibold tabular-nums">₩{Math.round(assemblyFixedCost).toLocaleString("ko-KR")}</span>
                           </div>
                         )}
-                      </Card>
+                      </JmCard>
                     </section>
                   )}
 
@@ -2701,7 +2312,7 @@ export function NewProductForm({
                             </span>
                           }
                         />
-                        <Card size="sm" className="py-0">
+                        <JmCard className="overflow-hidden">
                           <CostList
                             costs={incomingCosts}
                             onChange={setIncomingCosts}
@@ -2709,7 +2320,7 @@ export function NewProductForm({
                             readOnly
                             emptyLabel="해당 거래처 상품에 등록된 부대비용이 없습니다"
                           />
-                        </Card>
+                        </JmCard>
                       </section>
                     </>
                   )}
@@ -2720,9 +2331,9 @@ export function NewProductForm({
                       title="판매 비용"
                       badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
                     />
-                    <Card size="sm" className="py-0">
+                    <JmCard className="overflow-hidden">
                       <CostList costs={sellingCosts} onChange={setSellingCosts} addLabel="판매 비용 추가" />
-                    </Card>
+                    </JmCard>
                   </section>
 
                   {productType !== "OPTION_PARENT" && (
@@ -2758,19 +2369,19 @@ export function NewProductForm({
 
               </fieldset>
             )}
-        </ScrollArea>
+        </div>
 
         {/* 하단 버튼 */}
         <div className="border-t border-border px-5 py-3.5 flex justify-end gap-2 bg-background shrink-0">
           {step === "type" ? (
-            <Button variant="outline" onClick={handleLeave}>취소</Button>
+            <JmButton variant="outline" onClick={handleLeave}>취소</JmButton>
           ) : (
             <>
-              <Button variant="outline" onClick={handleLeave} disabled={submitting}>취소</Button>
-              <Button onClick={handleSubmit} disabled={submitting}>
+              <JmButton variant="outline" onClick={handleLeave} disabled={submitting}>취소</JmButton>
+              <JmButton onClick={handleSubmit} disabled={submitting}>
                 {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 등록
-              </Button>
+              </JmButton>
             </>
           )}
         </div>
@@ -2817,37 +2428,37 @@ export function NewProductForm({
         }}
       />
 
-      <Dialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>프리셋으로 저장</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm">프리셋명</label>
-            <Input
+      <JmDialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>프리셋으로 저장</JmDialogTitle>
+          </JmDialogHeader>
+          <div className="flex flex-col gap-2 px-6 py-4">
+            <label className="text-jm-sm">프리셋명</label>
+            <JmInput
               value={savePresetName}
               onChange={(e) => setSavePresetName(e.target.value)}
               placeholder="예: 3HP 기본형"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-jm-xs text-[var(--jm-text-muted)]">
               현재 구성 상품 슬롯이 새 프리셋으로 저장됩니다.
             </p>
           </div>
-          <DialogFooter>
-            <Button
+          <JmDialogFooter>
+            <JmButton
               variant="outline"
               onClick={() => setSavePresetOpen(false)}
               disabled={savePresetSubmitting}
             >
               취소
-            </Button>
-            <Button onClick={submitSavePreset} disabled={savePresetSubmitting}>
+            </JmButton>
+            <JmButton onClick={submitSavePreset} disabled={savePresetSubmitting}>
               {savePresetSubmitting ? <Loader2 className="animate-spin" /> : null}
               저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </>
   );
 }

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { JmBadge, JmSkeleton } from "@/jm";
 
 type SalesItem = {
   id: string;
@@ -39,8 +39,7 @@ type SalesStats = {
   };
 };
 
-const fmt = (v: string | number) =>
-  Math.round(Number(v)).toLocaleString("ko-KR");
+const fmt = (v: string | number) => Math.round(Number(v)).toLocaleString("ko-KR");
 
 export function ProductSalesPriceHistoryCard({ productId }: { productId: string }) {
   const query = useQuery<SalesStats>({
@@ -53,11 +52,11 @@ export function ProductSalesPriceHistoryCard({ productId }: { productId: string 
       <div className="px-4 py-4 space-y-3">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
+            <JmSkeleton key={i} className="h-16 w-full" />
           ))}
         </div>
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
+        <JmSkeleton className="h-4 w-full" />
+        <JmSkeleton className="h-4 w-full" />
       </div>
     );
   }
@@ -65,7 +64,7 @@ export function ProductSalesPriceHistoryCard({ productId }: { productId: string 
   const data = query.data;
   if (!data || data.items.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-8 text-center">
+      <p className="text-jm-sm text-[var(--jm-text-muted)] py-8 text-center">
         실판매 단가 이력이 없습니다 (신규 주문부터 누적)
       </p>
     );
@@ -105,9 +104,9 @@ export function ProductSalesPriceHistoryCard({ productId }: { productId: string 
       </div>
 
       {/* 라인별 표 */}
-      <table className="w-full text-[13px]">
+      <table className="w-full text-jm-sm">
         <thead>
-          <tr className="bg-muted text-muted-foreground text-xs border-y border-border">
+          <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-jm-xs border-y border-[var(--jm-border)]">
             <th className="py-2 px-3 text-left font-medium">날짜</th>
             <th className="py-2 px-3 text-left font-medium">주문</th>
             <th className="py-2 px-3 text-left font-medium">고객</th>
@@ -125,49 +124,55 @@ export function ProductSalesPriceHistoryCard({ productId }: { productId: string 
             const qty = Number(it.quantity);
             const diff = list > 0 ? unit - list : 0;
             const pct = list > 0 ? (diff / list) * 100 : 0;
+            const diffColor =
+              diff < 0
+                ? "text-[var(--jm-success-fg)]"
+                : diff > 0
+                  ? "text-[var(--jm-danger-fg)]"
+                  : "text-[var(--jm-text-muted)]";
             return (
-              <tr key={it.id} className="border-b border-border hover:bg-muted/50">
-                <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
+              <tr
+                key={it.id}
+                className="border-b border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]/50"
+              >
+                <td className="px-3 py-2 text-[var(--jm-text-muted)] whitespace-nowrap">
                   {new Date(it.order.orderDate).toLocaleDateString("ko-KR")}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2">
                   <Link
                     href={`/sales/history?id=${it.order.id}`}
-                    className="text-primary hover:underline font-mono text-[12px]"
+                    className="text-[var(--jm-info-fg)] hover:underline font-[family-name:var(--jm-font-mono)] text-jm-xs"
                   >
                     {it.order.orderNo}
                   </Link>
                 </td>
-                <td className="px-3 py-2.5 text-muted-foreground">
+                <td className="px-3 py-2 text-[var(--jm-text-muted)]">
                   {it.order.customerName ?? "-"}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2">
                   {it.order.channel ? (
-                    <Badge variant="outline" className="font-normal">
+                    <JmBadge
+                      variant="outline"
+                      size="sm"
+                      shape="square"
+                      className="font-normal"
+                    >
                       {it.order.channel.name}
-                    </Badge>
+                    </JmBadge>
                   ) : (
-                    <span className="text-muted-foreground">POS</span>
+                    <span className="text-[var(--jm-text-muted)]">POS</span>
                   )}
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                   {qty.toLocaleString("ko-KR")}
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                   {list > 0 ? `₩${fmt(list)}` : "-"}
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums font-medium">
+                <td className="px-3 py-2 text-right tabular-nums font-medium text-[var(--jm-text)]">
                   ₩{fmt(unit)}
                 </td>
-                <td
-                  className={`px-3 py-2.5 text-right tabular-nums ${
-                    diff < 0
-                      ? "text-green-500"
-                      : diff > 0
-                        ? "text-red-500"
-                        : "text-muted-foreground"
-                  }`}
-                >
+                <td className={`px-3 py-2 text-right tabular-nums ${diffColor}`}>
                   {list > 0 && diff !== 0
                     ? `${diff < 0 ? "−" : "+"}₩${fmt(Math.abs(diff))} (${pct.toFixed(1)}%)`
                     : "-"}
@@ -193,17 +198,17 @@ function Kpi({
   tone?: "discount";
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+    <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2">
+      <div className="text-jm-2xs text-[var(--jm-text-muted)]">{label}</div>
       <div
-        className={`text-[14px] font-semibold tabular-nums ${
-          tone === "discount" ? "text-green-600 dark:text-green-400" : ""
+        className={`text-jm-sm font-semibold tabular-nums ${
+          tone === "discount" ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"
         }`}
       >
         {value}
       </div>
       {sub && (
-        <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>
+        <div className="text-jm-2xs text-[var(--jm-text-muted)] mt-0.5">{sub}</div>
       )}
     </div>
   );

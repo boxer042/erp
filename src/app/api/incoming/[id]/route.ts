@@ -5,7 +5,6 @@ import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
 import { incomingSchema } from "@/lib/validators/incoming";
 import { computeShippingNetPerUnit } from "@/lib/incoming-shipping";
 import { recalcIncomingExpense } from "@/lib/incoming-recalc";
-import { ensureMappingForSupplierProducts } from "@/lib/mapping-helpers";
 import { recalcPurchaseOrderProgress } from "@/lib/purchase-order";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
@@ -798,13 +797,10 @@ export async function PUT(
   );
 
   await prisma.$transaction(async (tx) => {
-    // 0. 자동 매핑 안전망 — 매핑 없는 SP에 자동 Product/Mapping 생성
-    const spIdsForEnsure = Array.from(new Set(incoming.items.map((i) => i.supplierProductId)));
-    await ensureMappingForSupplierProducts(tx, spIdsForEnsure);
-
-    // ensure 이후 productMappings 재조회 (트랜잭션 시작 전 incoming.items 캐시는 stale)
+    // 트랜잭션 시작 시점의 매핑 상태를 다시 조회 (incoming.items 캐시는 stale 가능)
+    const spIdsForRefresh = Array.from(new Set(incoming.items.map((i) => i.supplierProductId)));
     const refreshedSps = await tx.supplierProduct.findMany({
-      where: { id: { in: spIdsForEnsure } },
+      where: { id: { in: spIdsForRefresh } },
       select: {
         id: true,
         productMappings: { select: { productId: true, conversionRate: true } },

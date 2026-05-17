@@ -10,30 +10,31 @@ import { ko } from "date-fns/locale";
 import { Pencil, Trash2, Loader2, ExternalLink, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell,
-} from "@/components/ui/table";
+  JmBadge,
+  JmButton,
+  JmCheckbox,
+  JmDatePicker,
+  JmDateRangePicker,
+  JmDialog,
+  JmDialogContent,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmIconButton,
+  JmInput,
+  JmSelect,
+  JmSkeleton,
+  JmSpinner,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableFooter,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { cn } from "@/lib/utils";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { formatComma, parseComma, toCSV, downloadCSV } from "@/lib/utils";
@@ -121,7 +122,6 @@ export default function ExpensesPage() {
   const [removeExistingReceipt, setRemoveExistingReceipt] = useState(false);
   const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
 
-  // 선택한 파일의 로컬 미리보기 URL (Blob URL — unmount/변경 시 revoke)
   useEffect(() => {
     if (!pendingReceiptFile) {
       setPendingPreviewUrl(null);
@@ -135,7 +135,6 @@ export default function ExpensesPage() {
   const isImageByUrl = (url: string) => /\.(jpe?g|png|webp|gif|heic)(\?|#|$)/i.test(url);
   const isImageByMime = (mime: string) => mime.startsWith("image/");
 
-  // 저장된 영수증 표시명 — attachmentName 우선, 없으면 URL에서 basename 추정, UUID-only면 "영수증"
   const getDisplayName = (name: string | null, url: string | null) => {
     if (name) return name;
     if (!url) return "영수증";
@@ -197,7 +196,6 @@ export default function ExpensesPage() {
     }
   }, []);
 
-  // INVENTORY_USAGE 카테고리 진입 시 상품/고객 목록 로드
   useEffect(() => {
     if (formOpen && form.category === "INVENTORY_USAGE") {
       if (products.length === 0) fetchProducts();
@@ -205,7 +203,6 @@ export default function ExpensesPage() {
     }
   }, [formOpen, form.category, products.length, customers.length, fetchProducts, fetchCustomers]);
 
-  // 금액 프리뷰 — 상품/수량 변경 시 FIFO 비용 조회
   useEffect(() => {
     if (form.category !== "INVENTORY_USAGE") { setUsagePreview(null); return; }
     if (!usageProductId || !usageQuantity) { setUsagePreview(null); return; }
@@ -289,7 +286,6 @@ export default function ExpensesPage() {
     setTotal(expensesQuery.data?.total ?? 0);
   }, [expensesQuery.data?.total]);
 
-  // 필터 변경 시 페이지 1로 초기화
   useEffect(() => { setPage(1); }, [from, to, search, categoryFilter]);
 
   const loadIncomings = useCallback(async () => {
@@ -359,7 +355,6 @@ export default function ExpensesPage() {
   };
 
   const openEdit = async (e: Expense) => {
-    // 내 상품 사용 경비는 수정 불가
     if (e.referenceType === "INVENTORY_MOVEMENT") {
       toast.error("내 상품 사용 경비는 수정할 수 없습니다");
       return;
@@ -466,12 +461,10 @@ export default function ExpensesPage() {
           return;
         }
 
-        // 영수증 처리 — 저장 시점에 Storage 업로드/삭제
         let finalAttachmentUrl = form.attachmentUrl;
         let finalAttachmentPath = form.attachmentPath;
         let finalAttachmentName = form.attachmentName;
 
-        // 1) 교체 또는 제거를 위해 기존 파일이 있으면 Storage에서 삭제
         const willReplaceOrRemove = pendingReceiptFile !== null || removeExistingReceipt;
         if (willReplaceOrRemove && form.attachmentPath) {
           await apiMutate("/api/expenses/upload", "DELETE", { path: form.attachmentPath });
@@ -480,7 +473,6 @@ export default function ExpensesPage() {
           finalAttachmentName = "";
         }
 
-        // 2) 신규 파일 업로드
         if (pendingReceiptFile) {
           const fd = new FormData();
           fd.append("file", pendingReceiptFile);
@@ -515,7 +507,6 @@ export default function ExpensesPage() {
           });
         } catch (err) {
           toast.error(err instanceof ApiError ? err.message : "저장 실패");
-          // 방금 업로드한 파일이 있었다면 롤백
           if (pendingReceiptFile && finalAttachmentPath) {
             await apiMutate("/api/expenses/upload", "DELETE", { path: finalAttachmentPath });
           }
@@ -545,7 +536,6 @@ export default function ExpensesPage() {
     }
   };
 
-  // 서버에서 이미 카테고리 필터 적용 — 클라이언트 필터 제거 (페이지네이션 일관성)
   const filtered = expenses;
 
   const filteredTotal =
@@ -564,7 +554,6 @@ export default function ExpensesPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleExport = async () => {
-    // 현재 필터 조건 전체 데이터 받아오기 (페이지네이션 무시, 최대 500)
     const params = new URLSearchParams();
     if (from) params.set("from", format(from, "yyyy-MM-dd"));
     if (to) {
@@ -612,44 +601,44 @@ export default function ExpensesPage() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       <DataTableToolbar
         search={{ value: search, onChange: setSearch, onSearch: fetchData, placeholder: "설명 검색" }}
         onRefresh={fetchData}
         onAdd={openCreate}
         filters={
-          <Button
+          <JmButton
             variant="outline"
             size="sm"
-            className="h-[30px] text-[13px]"
             onClick={handleExport}
             disabled={loading || total === 0}
           >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            CSV
-          </Button>
+            <Download />
+            <span>CSV</span>
+          </JmButton>
         }
         addLabel="경비 추가"
         loading={loading}
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* 왼쪽: 캘린더 + 카테고리별 합계 */}
-        <div className="w-64 flex-shrink-0 border-r border-border flex flex-col overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* 왼쪽: 기간 필터 + 카테고리별 합계 */}
+        <aside className="w-64 flex-shrink-0 border-r border-[var(--jm-border)] flex flex-col overflow-hidden">
           {/* 기간 프리셋 */}
-          <div className="px-3 pt-2 flex flex-wrap gap-1 shrink-0">
+          <div className="px-3 pt-3 flex flex-wrap gap-1 shrink-0">
             {(["thisMonth", "lastMonth", "last3", "all"] as const).map((p) => {
               const labels = { thisMonth: "이번달", lastMonth: "지난달", last3: "최근3개월", all: "전체" };
               const active = currentPresetLabel === labels[p];
               return (
                 <button
                   key={p}
+                  type="button"
                   onClick={() => applyPreset(p)}
                   className={cn(
-                    "px-2 h-6 rounded text-[11px] border transition-colors",
+                    "px-2 h-6 rounded text-jm-2xs border transition-colors",
                     active
-                      ? "bg-primary/10 border-primary/40 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)]"
+                      : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
                   )}
                 >
                   {labels[p]}
@@ -658,226 +647,280 @@ export default function ExpensesPage() {
             })}
           </div>
 
-          {/* 달력 */}
-          <div className="px-1 pt-1 shrink-0">
-            <Calendar
-              mode="range"
-              selected={{ from, to }}
-              onSelect={(range) => {
+          {/* 기간 선택 */}
+          <div className="px-3 pt-2 shrink-0">
+            <JmDateRangePicker
+              size="sm"
+              value={{ from, to }}
+              onChange={(range) => {
                 setFrom(range?.from);
                 setTo(range?.to);
               }}
-              numberOfMonths={1}
-              locale={ko}
-              className="w-full"
+              placeholder="기간 선택"
             />
           </div>
 
-          {/* 기간 합계 + 카테고리 목록 */}
-          <div className="border-t border-border p-3 shrink-0 space-y-0.5">
-            <p className="text-xs text-muted-foreground">기간 합계</p>
-            <p className="text-lg font-bold tabular-nums">₩{formatPrice(periodTotals.all)}</p>
+          {/* 기간 합계 */}
+          <div className="border-t border-[var(--jm-border)] mt-3 p-3 shrink-0 space-y-0.5">
+            <p className="text-jm-2xs text-[var(--jm-text-muted)]">기간 합계</p>
+            <p className="text-jm-md font-bold tabular-nums text-[var(--jm-text)]">
+              ₩{formatPrice(periodTotals.all)}
+            </p>
             {periodTotals.recoverable > 0 && (
               <>
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 tabular-nums">회수예정 ₩{formatPrice(periodTotals.recoverable)}</p>
-                <p className="text-[11px] text-muted-foreground tabular-nums">실비용 ₩{formatPrice(periodTotals.net)}</p>
+                <p className="text-jm-2xs text-[var(--jm-warning-fg)] tabular-nums">
+                  회수예정 ₩{formatPrice(periodTotals.recoverable)}
+                </p>
+                <p className="text-jm-2xs text-[var(--jm-text-muted)] tabular-nums">
+                  실비용 ₩{formatPrice(periodTotals.net)}
+                </p>
               </>
             )}
           </div>
-          <div className="py-1 overflow-y-auto flex-1">
+
+          {/* 카테고리 목록 */}
+          <div className="py-1 overflow-y-auto flex-1 min-h-0 border-t border-[var(--jm-border)]">
             <button
-              className={`w-full text-left px-3 py-2.5 text-sm flex justify-between items-center hover:bg-muted/50 ${categoryFilter === "ALL" ? "bg-muted font-medium" : ""}`}
+              type="button"
+              className={cn(
+                "w-full text-left px-3 py-2.5 text-jm-sm flex justify-between items-center transition-colors",
+                categoryFilter === "ALL"
+                  ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] font-medium"
+                  : "text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
+              )}
               onClick={() => setCategoryFilter("ALL")}
             >
               <span>전체</span>
-              <span className="tabular-nums text-xs text-muted-foreground">₩{formatPrice(periodTotals.all)}</span>
+              <span className="tabular-nums text-jm-2xs text-[var(--jm-text-muted)]">
+                ₩{formatPrice(periodTotals.all)}
+              </span>
             </button>
             {CATEGORIES.map((cat) => {
               const s = summary.find((x) => x.category === cat);
-              const total = s?.total ?? 0;
+              const t = s?.total ?? 0;
               return (
                 <button
                   key={cat}
-                  className={`w-full text-left px-3 py-2.5 text-sm flex justify-between items-center hover:bg-muted/50 ${categoryFilter === cat ? "bg-muted font-medium" : ""}`}
+                  type="button"
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 text-jm-sm flex justify-between items-center transition-colors",
+                    categoryFilter === cat
+                      ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] font-medium"
+                      : "text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
+                  )}
                   onClick={() => setCategoryFilter(cat)}
                 >
                   <span>{CATEGORY_LABELS[cat]}</span>
-                  <span className={`tabular-nums text-xs ${total > 0 ? "text-foreground" : "text-muted-foreground"}`}>
-                    {total > 0 ? `₩${formatPrice(total)}` : "-"}
+                  <span
+                    className={cn(
+                      "tabular-nums text-jm-2xs",
+                      t > 0 ? "text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]",
+                    )}
+                  >
+                    {t > 0 ? `₩${formatPrice(t)}` : "-"}
                   </span>
                 </button>
               );
             })}
           </div>
-        </div>
+        </aside>
 
         {/* 오른쪽: 경비 목록 */}
-        <div className="flex-1 overflow-y-auto min-w-0">
-          <Table className="min-w-[800px]">
-            <TableHeader>
-              <TableRow className="bg-muted hover:bg-muted">
-                <TableHead className="px-3 text-xs text-muted-foreground font-medium">날짜</TableHead>
-                <TableHead className="px-3 text-xs text-muted-foreground font-medium">카테고리</TableHead>
-                <TableHead className="px-3 text-xs text-muted-foreground font-medium">설명</TableHead>
-                <TableHead className="px-3 text-xs text-muted-foreground font-medium">결제</TableHead>
-                <TableHead className="px-3 text-xs text-muted-foreground font-medium">메모</TableHead>
-                <TableHead className="px-3 text-right text-xs text-muted-foreground font-medium">금액</TableHead>
-                <TableHead className="px-3 w-16"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={`sk-${i}`} className="hover:bg-transparent">
-                    <TableCell className="px-3 py-2.5"><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell className="px-3 py-2.5"><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell className="px-3 py-2.5"><Skeleton className="h-4 w-48" /></TableCell>
-                    <TableCell className="px-3 py-2.5"><Skeleton className="h-4 w-12" /></TableCell>
-                    <TableCell className="px-3 py-2.5"><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell className="px-3 py-2.5 text-right"><div className="flex justify-end"><Skeleton className="h-4 w-20" /></div></TableCell>
-                    <TableCell className="px-3 py-2.5 text-right"><div className="flex gap-1 justify-end"><Skeleton className="h-7 w-7 rounded-md" /><Skeleton className="h-7 w-7 rounded-md" /></div></TableCell>
-                  </TableRow>
-                ))
-              ) : filtered.length === 0 ? (
-                <TableRow className="hover:bg-transparent"><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">경비 내역이 없습니다</TableCell></TableRow>
-              ) : (
-                filtered.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="px-3 py-2.5 text-muted-foreground">
-                      {format(new Date(e.date), "yyyy.MM.dd", { locale: ko })}
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5">
-                      {CATEGORY_LABELS[e.category] ?? e.category}
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5 whitespace-normal">
-                      {e.description}
-                      {e.recoverable && (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">회수예정</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5 text-muted-foreground text-xs">
-                      {e.paymentMethod ? (PAYMENT_METHOD_LABELS[e.paymentMethod] ?? e.paymentMethod) : "-"}
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5 text-muted-foreground text-xs whitespace-normal">{e.memo ?? ""}</TableCell>
-                    <TableCell className={`px-3 py-2.5 text-right tabular-nums font-medium ${e.recoverable ? "text-muted-foreground line-through" : ""}`}>
-                      ₩{formatPrice(parseFloat(e.amount))}
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5 text-right">
-                      <div className="flex gap-1 justify-end">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        {!e.referenceType && (
-                          <Button
-                            size="icon"
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <JmTable className="min-w-[800px]">
+              <JmTableHeader>
+                <JmTableRow className="bg-[var(--jm-surface-muted)] hover:bg-[var(--jm-surface-muted)]">
+                  <JmTableHead>날짜</JmTableHead>
+                  <JmTableHead>카테고리</JmTableHead>
+                  <JmTableHead>설명</JmTableHead>
+                  <JmTableHead>결제</JmTableHead>
+                  <JmTableHead>메모</JmTableHead>
+                  <JmTableHead className="text-right">금액</JmTableHead>
+                  <JmTableHead className="w-16" />
+                </JmTableRow>
+              </JmTableHeader>
+              <JmTableBody>
+                {loading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <JmTableRow key={`sk-${i}`} className="hover:bg-transparent">
+                      <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+                      <JmTableCell><JmSkeleton className="h-4 w-16" /></JmTableCell>
+                      <JmTableCell><JmSkeleton className="h-4 w-48" /></JmTableCell>
+                      <JmTableCell><JmSkeleton className="h-4 w-12" /></JmTableCell>
+                      <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+                      <JmTableCell className="text-right">
+                        <div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div>
+                      </JmTableCell>
+                      <JmTableCell className="text-right">
+                        <div className="flex gap-1 justify-end">
+                          <JmSkeleton className="h-7 w-7 rounded-md" />
+                          <JmSkeleton className="h-7 w-7 rounded-md" />
+                        </div>
+                      </JmTableCell>
+                    </JmTableRow>
+                  ))
+                ) : filtered.length === 0 ? (
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell colSpan={7} className="text-center py-8 text-[var(--jm-text-muted)]">
+                      경비 내역이 없습니다
+                    </JmTableCell>
+                  </JmTableRow>
+                ) : (
+                  filtered.map((e) => (
+                    <JmTableRow key={e.id}>
+                      <JmTableCell className="text-[var(--jm-text-muted)]">
+                        {format(new Date(e.date), "yyyy.MM.dd", { locale: ko })}
+                      </JmTableCell>
+                      <JmTableCell>
+                        {CATEGORY_LABELS[e.category] ?? e.category}
+                      </JmTableCell>
+                      <JmTableCell className="whitespace-normal">
+                        {e.description}
+                        {e.recoverable && (
+                          <JmBadge variant="warning" size="sm" className="ml-2">
+                            회수예정
+                          </JmBadge>
+                        )}
+                      </JmTableCell>
+                      <JmTableCell className="text-[var(--jm-text-muted)] text-jm-xs">
+                        {e.paymentMethod ? (PAYMENT_METHOD_LABELS[e.paymentMethod] ?? e.paymentMethod) : "-"}
+                      </JmTableCell>
+                      <JmTableCell className="text-[var(--jm-text-muted)] text-jm-xs whitespace-normal">
+                        {e.memo ?? ""}
+                      </JmTableCell>
+                      <JmTableCell
+                        className={cn(
+                          "text-right tabular-nums font-medium",
+                          e.recoverable && "text-[var(--jm-text-muted)] line-through",
+                        )}
+                      >
+                        ₩{formatPrice(parseFloat(e.amount))}
+                      </JmTableCell>
+                      <JmTableCell className="text-right">
+                        <div className="flex gap-1 justify-end">
+                          <JmIconButton
+                            size="sm"
                             variant="ghost"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget(e.id)}
+                            aria-label="수정"
+                            onClick={() => openEdit(e)}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                            <Pencil />
+                          </JmIconButton>
+                          {!e.referenceType && (
+                            <JmIconButton
+                              size="sm"
+                              variant="ghost"
+                              aria-label="삭제"
+                              className="text-[var(--jm-danger-fg)]"
+                              onClick={() => setDeleteTarget(e.id)}
+                            >
+                              <Trash2 />
+                            </JmIconButton>
+                          )}
+                        </div>
+                      </JmTableCell>
+                    </JmTableRow>
+                  ))
+                )}
+              </JmTableBody>
+              {filtered.length > 0 && (
+                <JmTableFooter>
+                  <JmTableRow className="hover:bg-[var(--jm-surface-muted)]">
+                    <JmTableCell colSpan={5} className="text-jm-xs text-[var(--jm-text-muted)]">
+                      {total}건 중 {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
+                    </JmTableCell>
+                    <JmTableCell className="text-right tabular-nums">
+                      <div className="flex flex-col items-end gap-0.5">
+                        <div className="font-bold">총 지출 ₩{formatPrice(filteredTotal)}</div>
+                        {filteredRecoverable > 0 && (
+                          <>
+                            <div className="text-jm-xs text-[var(--jm-warning-fg)]">
+                              회수예정 ₩{formatPrice(filteredRecoverable)}
+                            </div>
+                            <div className="text-jm-xs text-[var(--jm-text-muted)]">
+                              실비용 ₩{formatPrice(filteredNet)}
+                            </div>
+                          </>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                    </JmTableCell>
+                    <JmTableCell />
+                  </JmTableRow>
+                </JmTableFooter>
               )}
-            </TableBody>
-            {filtered.length > 0 && (
-              <TableFooter>
-                <TableRow className="hover:bg-muted/50">
-                  <TableCell colSpan={5} className="px-3 py-2.5 text-xs text-muted-foreground">
-                    {total}건 중 {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
-                  </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right tabular-nums">
-                    <div className="flex flex-col items-end gap-0.5">
-                      <div className="font-bold">총 지출 ₩{formatPrice(filteredTotal)}</div>
-                      {filteredRecoverable > 0 && (
-                        <>
-                          <div className="text-xs text-amber-600 dark:text-amber-400">회수예정 ₩{formatPrice(filteredRecoverable)}</div>
-                          <div className="text-xs text-muted-foreground">실비용 ₩{formatPrice(filteredNet)}</div>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell />
-                </TableRow>
-              </TableFooter>
-            )}
-          </Table>
+            </JmTable>
+          </div>
           {total > PAGE_SIZE && (
-            <div className="flex items-center justify-center gap-2 border-t border-border py-2 text-sm">
-              <Button
+            <div className="flex items-center justify-center gap-2 border-t border-[var(--jm-border)] py-2 shrink-0">
+              <JmIconButton
                 variant="outline"
                 size="sm"
-                className="h-7"
+                aria-label="이전 페이지"
                 disabled={page <= 1 || loading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <span className="text-xs text-muted-foreground tabular-nums">
+                <ChevronLeft />
+              </JmIconButton>
+              <span className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
                 {page} / {totalPages}
               </span>
-              <Button
+              <JmIconButton
                 variant="outline"
                 size="sm"
-                className="h-7"
+                aria-label="다음 페이지"
                 disabled={page >= totalPages || loading}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
+                <ChevronRight />
+              </JmIconButton>
             </div>
           )}
         </div>
       </div>
 
       {/* ── 경비 등록/수정 다이얼로그 ── */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingId ? "경비 수정" : "경비 추가"}</DialogTitle>
-            <DialogDescription className="sr-only">경비를 등록하거나 수정합니다</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2 min-w-0 overflow-hidden">
+      <JmDialog open={formOpen} onOpenChange={setFormOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>{editingId ? "경비 수정" : "경비 추가"}</JmDialogTitle>
+            <JmDialogDescription className="sr-only">경비를 등록하거나 수정합니다</JmDialogDescription>
+          </JmDialogHeader>
+          <div className="px-6 py-4 space-y-3 min-w-0 overflow-y-auto max-h-[70vh]">
             {/* 카테고리 */}
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">카테고리</p>
-              <Select
+              <p className="text-jm-xs text-[var(--jm-text-muted)]">카테고리</p>
+              <JmSelect
+                size="sm"
                 value={form.category}
-                onValueChange={(v) => {
-                  setForm({ ...form, category: v ?? "OTHER", amount: "" });
+                onChange={(v) => {
+                  setForm({ ...form, category: v || "OTHER", amount: "" });
                   setSelectedIncomingId("");
                   setShippingIsTaxable(true);
                   setShippingDeducted(false);
                 }}
-              >
-                <SelectTrigger className="h-9">
-                  <span>{CATEGORY_LABELS[form.category] || form.category}</span>
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] ?? c }))}
+              />
             </div>
 
             {isUsage ? (
               /* ── 내 상품 사용 전용 폼 ── */
               <>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">날짜 <span className="text-destructive">*</span></p>
-                  <Input
-                    type="date"
-                    className="h-9"
-                    value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    날짜 <span className="text-[var(--jm-danger-fg)]">*</span>
+                  </p>
+                  <JmDatePicker
+                    size="sm"
+                    value={form.date ? new Date(`${form.date}T00:00:00`) : undefined}
+                    onChange={(d) => setForm({ ...form, date: d ? format(d, "yyyy-MM-dd") : "" })}
+                    placeholder="날짜 선택"
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">상품 <span className="text-destructive">*</span></p>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    상품 <span className="text-[var(--jm-danger-fg)]">*</span>
+                  </p>
                   <ProductCombobox
                     products={products}
                     value={usageProductId}
@@ -887,11 +930,13 @@ export default function ExpensesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">수량 <span className="text-destructive">*</span></p>
-                  <Input
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    수량 <span className="text-[var(--jm-danger-fg)]">*</span>
+                  </p>
+                  <JmInput
+                    size="sm"
                     type="text"
                     inputMode="decimal"
-                    className="h-9"
                     placeholder="0"
                     value={usageQuantity}
                     onChange={(e) => setUsageQuantity(e.target.value)}
@@ -899,36 +944,38 @@ export default function ExpensesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">용도 <span className="text-destructive">*</span></p>
-                  <Select value={usageReason} onValueChange={(v) => setUsageReason((v ?? "SELF_USE") as UsageReasonKey)}>
-                    <SelectTrigger className="h-9">
-                      <span>{REASON_LABELS[usageReason]}</span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {USAGE_REASONS.map((r) => (
-                        <SelectItem key={r} value={r}>{REASON_LABELS[r]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    용도 <span className="text-[var(--jm-danger-fg)]">*</span>
+                  </p>
+                  <JmSelect
+                    size="sm"
+                    value={usageReason}
+                    onChange={(v) => setUsageReason((v || "SELF_USE") as UsageReasonKey)}
+                    options={USAGE_REASONS.map((r) => ({ value: r, label: REASON_LABELS[r] }))}
+                  />
                 </div>
 
                 {TARGET_REQUIRED_REASONS.includes(usageReason) && (
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                      대상 <span className="text-destructive">*</span>
+                    <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                      대상 <span className="text-[var(--jm-danger-fg)]">*</span>
                     </p>
-                    <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px] w-fit mb-2">
-                      <button
-                        type="button"
-                        className={`px-3 rounded-l-md ${usageTargetType === "supplier" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
-                        onClick={() => { setUsageTargetType("supplier"); setUsageCustomerId(""); }}
-                      >거래처</button>
-                      <button
-                        type="button"
-                        className={`px-3 rounded-r-md border-l border-border ${usageTargetType === "customer" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
-                        onClick={() => { setUsageTargetType("customer"); setForm((prev) => ({ ...prev, supplierId: "" })); }}
-                      >고객</button>
-                    </div>
+                    <ToggleSegment
+                      value={usageTargetType}
+                      onChange={(v) => {
+                        if (v === "supplier") {
+                          setUsageTargetType("supplier");
+                          setUsageCustomerId("");
+                        } else {
+                          setUsageTargetType("customer");
+                          setForm((prev) => ({ ...prev, supplierId: "" }));
+                        }
+                      }}
+                      options={[
+                        { value: "supplier", label: "거래처" },
+                        { value: "customer", label: "고객" },
+                      ]}
+                    />
                     {usageTargetType === "supplier" ? (
                       <SupplierCombobox
                         suppliers={suppliers}
@@ -955,10 +1002,12 @@ export default function ExpensesPage() {
                 )}
 
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">설명 <span className="text-[10px]">(비워두면 자동 생성)</span></p>
-                  <Input
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    설명 <span className="text-[10px]">(비워두면 자동 생성)</span>
+                  </p>
+                  <JmInput
+                    size="sm"
                     type="text"
-                    className="h-9"
                     placeholder="예: 전시용 샘플 2개"
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -966,10 +1015,10 @@ export default function ExpensesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">메모</p>
-                  <Input
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">메모</p>
+                  <JmInput
+                    size="sm"
                     type="text"
-                    className="h-9"
                     placeholder="메모 (선택)"
                     value={form.memo}
                     onChange={(e) => setForm({ ...form, memo: e.target.value })}
@@ -977,15 +1026,15 @@ export default function ExpensesPage() {
                 </div>
 
                 {/* 금액 프리뷰 */}
-                <div className="rounded-md border border-border bg-muted/40 px-3 py-2 space-y-1 text-sm">
+                <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-3 py-2 space-y-1 text-jm-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground text-xs">현재 로트 잔량</span>
+                    <span className="text-[var(--jm-text-muted)] text-jm-xs">현재 로트 잔량</span>
                     <span className="tabular-nums">
                       {usagePreview ? usagePreview.available : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between font-medium">
-                    <span className="text-xs">경비 금액 (FIFO 원가)</span>
+                    <span className="text-jm-xs">경비 금액 (FIFO 원가)</span>
                     <span className="tabular-nums">
                       {usagePreviewLoading
                         ? "계산 중..."
@@ -996,7 +1045,7 @@ export default function ExpensesPage() {
                           : "—"}
                     </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[10px] text-[var(--jm-text-muted)]">
                     등록 시 재고 로트 FIFO 차감 + 경비(자동 계산) 기록. 확정 후 수정·삭제 불가.
                   </p>
                 </div>
@@ -1005,72 +1054,62 @@ export default function ExpensesPage() {
               /* ── 택배비 전용 폼 ── */
               <>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">
-                    입고 거래명세서 <span className="text-destructive">*</span>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    입고 거래명세서 <span className="text-[var(--jm-danger-fg)]">*</span>
                   </p>
                   <div className="flex gap-2">
-                    <Select
-                      value={selectedIncomingId}
-                      onValueChange={(v) => {
-                        setSelectedIncomingId(v ?? "");
-                        const inc = incomings.find((i) => i.id === v);
-                        if (inc && parseFloat(inc.shippingCost) > 0) {
-                          setForm((prev) => ({ ...prev, amount: String(parseFloat(inc.shippingCost)) }));
-                        }
-                      }}
-                      disabled={incomingLocked}
-                    >
-                      <SelectTrigger className="h-9 flex-1">
-                        {loadingIncomings ? (
-                          <Skeleton className="h-4 w-40" />
-                        ) : (
-                          <span className="truncate">
-                            {(() => {
-                              const inc = incomings.find((i) => i.id === selectedIncomingId);
-                              if (!inc) return "입고 선택...";
-                              return `${inc.incomingNo} — ${inc.supplierName} (${format(new Date(inc.incomingDate), "yy.MM.dd", { locale: ko })})`;
-                            })()}
-                          </span>
-                        )}
-                      </SelectTrigger>
-                      <SelectContent>
-                        {incomings.map((i) => {
-                          const existing = parseFloat(i.shippingCost) > 0
-                            ? ` · ₩${formatPrice(parseFloat(i.shippingCost))}`
-                            : "";
-                          return (
-                            <SelectItem key={i.id} value={i.id}>
-                              {i.incomingNo} — {i.supplierName} ({format(new Date(i.incomingDate), "yy.MM.dd", { locale: ko })}){existing}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex-1">
+                      {loadingIncomings ? (
+                        <JmSkeleton className="h-9 w-full" />
+                      ) : (
+                        <JmSelect
+                          size="sm"
+                          value={selectedIncomingId}
+                          onChange={(v) => {
+                            setSelectedIncomingId(v || "");
+                            const inc = incomings.find((i) => i.id === v);
+                            if (inc && parseFloat(inc.shippingCost) > 0) {
+                              setForm((prev) => ({ ...prev, amount: String(parseFloat(inc.shippingCost)) }));
+                            }
+                          }}
+                          disabled={incomingLocked}
+                          placeholder="입고 선택..."
+                          options={incomings.map((i) => {
+                            const existing = parseFloat(i.shippingCost) > 0
+                              ? ` · ₩${formatPrice(parseFloat(i.shippingCost))}`
+                              : "";
+                            return {
+                              value: i.id,
+                              label: `${i.incomingNo} — ${i.supplierName} (${format(new Date(i.incomingDate), "yy.MM.dd", { locale: ko })})${existing}`,
+                            };
+                          })}
+                        />
+                      )}
+                    </div>
                     {selectedIncomingId && (
-                      <Button
+                      <JmIconButton
                         type="button"
-                        size="icon"
+                        size="sm"
                         variant="outline"
-                        className="h-9 w-9 flex-shrink-0"
+                        aria-label="자세히 보기"
                         onClick={() => openDetailModal(selectedIncomingId)}
-                        title="자세히 보기"
                       >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
+                        <ExternalLink />
+                      </JmIconButton>
                     )}
                   </div>
                   {incomingLocked && (
-                    <p className="text-xs text-muted-foreground">입고에 연결된 택배비입니다</p>
+                    <p className="text-jm-xs text-[var(--jm-text-muted)]">입고에 연결된 택배비입니다</p>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">
-                    택배비 금액 <span className="text-destructive">*</span>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    택배비 금액 <span className="text-[var(--jm-danger-fg)]">*</span>
                   </p>
-                  <Input
+                  <JmInput
+                    size="sm"
                     type="text"
                     inputMode="numeric"
-                    className="h-9"
                     placeholder="0"
                     value={formatComma(form.amount)}
                     onChange={(e) => setForm({ ...form, amount: parseComma(e.target.value) })}
@@ -1078,21 +1117,20 @@ export default function ExpensesPage() {
                   />
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px]">
-                    <button
-                      type="button"
-                      className={`px-2.5 rounded-l-md ${shippingIsTaxable ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
-                      onClick={() => setShippingIsTaxable(true)}
-                    >과세</button>
-                    <button
-                      type="button"
-                      className={`px-2.5 rounded-r-md border-l border-border ${!shippingIsTaxable ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
-                      onClick={() => setShippingIsTaxable(false)}
-                    >면세</button>
-                  </div>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox checked={shippingDeducted} onCheckedChange={(v) => setShippingDeducted(!!v)} />
-                    거래처 차감
+                  <ToggleSegment
+                    value={shippingIsTaxable ? "taxable" : "free"}
+                    onChange={(v) => setShippingIsTaxable(v === "taxable")}
+                    options={[
+                      { value: "taxable", label: "과세" },
+                      { value: "free", label: "면세" },
+                    ]}
+                  />
+                  <label className="flex items-center gap-2 text-jm-sm cursor-pointer">
+                    <JmCheckbox
+                      checked={shippingDeducted}
+                      onCheckedChange={(v) => setShippingDeducted(v === true)}
+                    />
+                    <span className="text-[var(--jm-text)]">거래처 차감</span>
                   </label>
                 </div>
               </>
@@ -1100,20 +1138,24 @@ export default function ExpensesPage() {
               /* ── 일반 경비 폼 ── */
               <>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">날짜 <span className="text-destructive">*</span></p>
-                  <Input
-                    type="date"
-                    className="h-9"
-                    value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    날짜 <span className="text-[var(--jm-danger-fg)]">*</span>
+                  </p>
+                  <JmDatePicker
+                    size="sm"
+                    value={form.date ? new Date(`${form.date}T00:00:00`) : undefined}
+                    onChange={(d) => setForm({ ...form, date: d ? format(d, "yyyy-MM-dd") : "" })}
+                    placeholder="날짜 선택"
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">금액 (VAT 포함, 원) <span className="text-destructive">*</span></p>
-                  <Input
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    금액 (VAT 포함, 원) <span className="text-[var(--jm-danger-fg)]">*</span>
+                  </p>
+                  <JmInput
+                    size="sm"
                     type="text"
                     inputMode="numeric"
-                    className="h-9"
                     placeholder="0"
                     value={formatComma(form.amount)}
                     onChange={(e) => setForm({ ...form, amount: parseComma(e.target.value) })}
@@ -1121,17 +1163,21 @@ export default function ExpensesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">설명 <span className="text-destructive">*</span></p>
-                  <Input
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    설명 <span className="text-[var(--jm-danger-fg)]">*</span>
+                  </p>
+                  <JmInput
+                    size="sm"
                     type="text"
-                    className="h-9"
                     placeholder="경비 내용을 입력하세요"
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">거래처 <span className="text-[10px]">(선택)</span></p>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    거래처 <span className="text-[10px]">(선택)</span>
+                  </p>
                   <SupplierCombobox
                     suppliers={suppliers}
                     value={form.supplierId}
@@ -1144,68 +1190,63 @@ export default function ExpensesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">부가세</p>
-                  <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px] w-fit">
-                    <button
-                      type="button"
-                      className={`px-3 rounded-l-md ${form.isTaxable ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
-                      onClick={() => setForm({ ...form, isTaxable: true })}
-                    >과세</button>
-                    <button
-                      type="button"
-                      className={`px-3 rounded-r-md border-l border-border ${!form.isTaxable ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
-                      onClick={() => setForm({ ...form, isTaxable: false })}
-                    >면세</button>
-                  </div>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">부가세</p>
+                  <ToggleSegment
+                    value={form.isTaxable ? "taxable" : "free"}
+                    onChange={(v) => setForm({ ...form, isTaxable: v === "taxable" })}
+                    options={[
+                      { value: "taxable", label: "과세" },
+                      { value: "free", label: "면세" },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">결제수단</p>
-                  <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px] w-fit overflow-hidden">
-                    {[
-                      { k: "", l: "미지정" },
-                      { k: "CASH", l: "현금" },
-                      { k: "CARD", l: "카드" },
-                      { k: "TRANSFER", l: "계좌이체" },
-                    ].map((opt, i) => (
-                      <button
-                        key={opt.k}
-                        type="button"
-                        className={`px-3 ${i > 0 ? "border-l border-border" : ""} ${form.paymentMethod === opt.k ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
-                        onClick={() => setForm({ ...form, paymentMethod: opt.k })}
-                      >{opt.l}</button>
-                    ))}
-                  </div>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">결제수단</p>
+                  <ToggleSegment
+                    value={form.paymentMethod || "_none"}
+                    onChange={(v) => setForm({ ...form, paymentMethod: v === "_none" ? "" : v })}
+                    options={[
+                      { value: "_none", label: "미지정" },
+                      { value: "CASH", label: "현금" },
+                      { value: "CARD", label: "카드" },
+                      { value: "TRANSFER", label: "계좌이체" },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">회수예정</p>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer h-[30px]">
-                    <Checkbox
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">회수예정</p>
+                  <label className="flex items-center gap-2 text-jm-sm cursor-pointer">
+                    <JmCheckbox
                       checked={form.recoverable}
-                      onCheckedChange={(v) => setForm({ ...form, recoverable: !!v })}
+                      onCheckedChange={(v) => setForm({ ...form, recoverable: v === true })}
                     />
-                    <span className="text-muted-foreground">거래처 차감 등으로 돌려받을 금액 (손익에서 제외)</span>
+                    <span className="text-[var(--jm-text-muted)]">
+                      거래처 차감 등으로 돌려받을 금액 (손익에서 제외)
+                    </span>
                   </label>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">메모</p>
-                  <Input
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">메모</p>
+                  <JmInput
+                    size="sm"
                     type="text"
-                    className="h-9"
                     placeholder="메모 (선택)"
                     value={form.memo}
                     onChange={(e) => setForm({ ...form, memo: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">영수증 <span className="text-[10px]">(선택, JPG/PNG/WebP/PDF, 최대 10MB · 저장 시 업로드)</span></p>
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                    영수증 <span className="text-[10px]">(선택, JPG/PNG/WebP/PDF, 최대 10MB · 저장 시 업로드)</span>
+                  </p>
                   {pendingReceiptFile && pendingPreviewUrl ? (
-                    <div className="flex items-start gap-3 rounded-md border border-border border-dashed px-3 py-2 min-w-0">
+                    <div className="flex items-start gap-3 rounded-md border border-dashed border-[var(--jm-border)] px-3 py-2 min-w-0">
                       {isImageByMime(pendingReceiptFile.type) ? (
                         <a href={pendingPreviewUrl} target="_blank" rel="noreferrer" className="block shrink-0">
                           <img
                             src={pendingPreviewUrl}
                             alt="영수증 미리보기"
-                            className="h-20 w-20 rounded border border-border object-cover"
+                            className="h-20 w-20 rounded border border-[var(--jm-border)] object-cover"
                           />
                         </a>
                       ) : (
@@ -1213,35 +1254,35 @@ export default function ExpensesPage() {
                           href={pendingPreviewUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex h-20 w-20 shrink-0 items-center justify-center rounded border border-border bg-muted text-[11px] text-muted-foreground"
+                          className="flex h-20 w-20 shrink-0 items-center justify-center rounded border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-2xs text-[var(--jm-text-muted)]"
                         >
                           PDF
                         </a>
                       )}
-                      <div className="flex-1 min-w-0 text-sm">
+                      <div className="flex-1 min-w-0 text-jm-sm">
                         <div className="truncate" title={pendingReceiptFile.name}>
                           {pendingReceiptFile.name}
                         </div>
-                        <div className="text-[10px] text-muted-foreground">저장 시 업로드</div>
+                        <div className="text-[10px] text-[var(--jm-text-muted)]">저장 시 업로드</div>
                       </div>
-                      <Button
+                      <JmIconButton
                         type="button"
                         variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0"
+                        size="sm"
+                        aria-label="첨부 제거"
                         onClick={() => setPendingReceiptFile(null)}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                        <Trash2 />
+                      </JmIconButton>
                     </div>
                   ) : form.attachmentUrl && !removeExistingReceipt ? (
-                    <div className="flex items-start gap-3 rounded-md border border-border px-3 py-2 min-w-0">
+                    <div className="flex items-start gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2 min-w-0">
                       {isImageByUrl(form.attachmentUrl) ? (
                         <a href={form.attachmentUrl} target="_blank" rel="noreferrer" className="block shrink-0">
                           <img
                             src={form.attachmentUrl}
                             alt="영수증"
-                            className="h-20 w-20 rounded border border-border object-cover"
+                            className="h-20 w-20 rounded border border-[var(--jm-border)] object-cover"
                           />
                         </a>
                       ) : (
@@ -1249,12 +1290,12 @@ export default function ExpensesPage() {
                           href={form.attachmentUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex h-20 w-20 shrink-0 items-center justify-center rounded border border-border bg-muted text-[11px] text-muted-foreground"
+                          className="flex h-20 w-20 shrink-0 items-center justify-center rounded border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-2xs text-[var(--jm-text-muted)]"
                         >
                           PDF
                         </a>
                       )}
-                      <div className="flex-1 min-w-0 text-sm">
+                      <div className="flex-1 min-w-0 text-jm-sm">
                         <div className="truncate" title={getDisplayName(form.attachmentName, form.attachmentUrl)}>
                           {getDisplayName(form.attachmentName, form.attachmentUrl)}
                         </div>
@@ -1262,24 +1303,24 @@ export default function ExpensesPage() {
                           href={form.attachmentUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[11px] text-primary underline"
+                          className="text-jm-2xs text-[var(--jm-info-fg)] underline"
                         >
                           새 탭에서 열기
                         </a>
                       </div>
-                      <Button
+                      <JmIconButton
                         type="button"
                         variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0"
+                        size="sm"
+                        aria-label="첨부 제거"
                         onClick={() => setRemoveExistingReceipt(true)}
-                        title="제거 (저장 시 적용)"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                        <Trash2 />
+                      </JmIconButton>
                     </div>
                   ) : (
-                    <Input
+                    <JmInput
+                      size="sm"
                       type="file"
                       accept="image/jpeg,image/png,image/webp,application/pdf"
                       onChange={(e) => {
@@ -1294,78 +1335,79 @@ export default function ExpensesPage() {
                         }
                         e.target.value = "";
                       }}
-                      className="h-9 text-sm"
                     />
                   )}
                 </div>
               </>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>취소</Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="animate-spin" /> : null}
+          <JmDialogFooter>
+            <JmButton variant="ghost" onClick={() => setFormOpen(false)} disabled={saving}>
+              취소
+            </JmButton>
+            <JmButton variant="cta" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               <span>{saving ? "저장 중..." : "저장"}</span>
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
       {/* ── 입고 상세 모달 ── */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-5 py-4 border-b border-border flex-shrink-0">
+      <JmDialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <JmDialogContent size="xl" className="max-h-[90vh] flex flex-col p-0">
+          <JmDialogHeader className="px-5 py-4 border-b border-[var(--jm-border)] flex-shrink-0">
             <div className="flex items-center gap-2">
-              <DialogTitle>
+              <JmDialogTitle>
                 {incomingDetail ? incomingDetail.incomingNo : "입고 상세"}
-              </DialogTitle>
+              </JmDialogTitle>
               {incomingDetail && (
-                <Badge variant={statusVariants[incomingDetail.status] ?? "outline"}>
+                <JmBadge variant={statusVariants[incomingDetail.status] ?? "outline"} size="sm">
                   {statusLabels[incomingDetail.status] ?? incomingDetail.status}
-                </Badge>
+                </JmBadge>
               )}
             </div>
-            <DialogDescription className="sr-only">입고 거래명세서 상세 내역</DialogDescription>
-          </DialogHeader>
+            <JmDialogDescription className="sr-only">입고 거래명세서 상세 내역</JmDialogDescription>
+          </JmDialogHeader>
 
           {loadingDetail ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="animate-spin text-muted-foreground" />
+              <JmSpinner />
             </div>
           ) : incomingDetail ? (
-            <ScrollArea className="flex-1 min-h-0">
+            <div className="flex-1 overflow-y-auto min-h-0">
               {/* 헤더 정보 */}
-              <div className="px-5 py-3 border-b border-border grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+              <div className="px-5 py-3 border-b border-[var(--jm-border)] grid grid-cols-2 gap-x-8 gap-y-1 text-jm-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">거래처</span>
+                  <span className="text-[var(--jm-text-muted)]">거래처</span>
                   <span className="font-medium">{incomingDetail.supplier.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">입고일</span>
+                  <span className="text-[var(--jm-text-muted)]">입고일</span>
                   <span>{format(new Date(incomingDetail.incomingDate), "yyyy년 M월 d일", { locale: ko })}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">등록자</span>
+                  <span className="text-[var(--jm-text-muted)]">등록자</span>
                   <span>{incomingDetail.createdBy.name}</span>
                 </div>
                 {incomingDetail.memo && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">메모</span>
+                    <span className="text-[var(--jm-text-muted)]">메모</span>
                     <span>{incomingDetail.memo}</span>
                   </div>
                 )}
               </div>
 
               {/* 품목 테이블 */}
-              <table className="w-full text-sm">
+              <table className="w-full text-jm-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted sticky top-0">
-                    <th className="h-8 px-3 text-left text-xs text-muted-foreground font-medium">품명</th>
-                    <th className="h-8 px-3 text-left text-xs text-muted-foreground font-medium">품번</th>
-                    <th className="h-8 px-3 text-right text-xs text-muted-foreground font-medium">수량</th>
-                    <th className="h-8 px-3 text-right text-xs text-muted-foreground font-medium">단가</th>
-                    <th className="h-8 px-3 text-right text-xs text-muted-foreground font-medium">공급가액</th>
-                    <th className="h-8 px-3 text-right text-xs text-muted-foreground font-medium">세액</th>
+                  <tr className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)] sticky top-0">
+                    <th className="h-8 px-3 text-left text-jm-xs text-[var(--jm-text-muted)] font-medium">품명</th>
+                    <th className="h-8 px-3 text-left text-jm-xs text-[var(--jm-text-muted)] font-medium">품번</th>
+                    <th className="h-8 px-3 text-right text-jm-xs text-[var(--jm-text-muted)] font-medium">수량</th>
+                    <th className="h-8 px-3 text-right text-jm-xs text-[var(--jm-text-muted)] font-medium">단가</th>
+                    <th className="h-8 px-3 text-right text-jm-xs text-[var(--jm-text-muted)] font-medium">공급가액</th>
+                    <th className="h-8 px-3 text-right text-jm-xs text-[var(--jm-text-muted)] font-medium">세액</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1375,9 +1417,9 @@ export default function ExpensesPage() {
                     const totalPrice = parseFloat(item.totalPrice);
                     const tax = Math.round(totalPrice * 0.1);
                     return (
-                      <tr key={item.id} className="border-b border-border hover:bg-muted/50">
+                      <tr key={item.id} className="border-b border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]">
                         <td className="px-3 py-2">{item.supplierProduct.name}</td>
-                        <td className="px-3 py-2 text-muted-foreground text-xs">
+                        <td className="px-3 py-2 text-[var(--jm-text-muted)] text-jm-xs">
                           {item.supplierProduct.supplierCode ?? "-"}
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
@@ -1389,7 +1431,7 @@ export default function ExpensesPage() {
                         <td className="px-3 py-2 text-right tabular-nums">
                           ₩{formatPrice(totalPrice)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        <td className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                           ₩{formatPrice(tax)}
                         </td>
                       </tr>
@@ -1404,21 +1446,21 @@ export default function ExpensesPage() {
                 const tax = Math.round(supply * 0.1);
                 const shipping = parseFloat(incomingDetail.shippingCost) || 0;
                 return (
-                  <div className="border-t border-border bg-muted grid grid-cols-4 text-sm">
-                    <div className="border-r border-border px-3 py-2.5 flex justify-between">
-                      <span className="text-xs text-muted-foreground">품목수</span>
+                  <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)] grid grid-cols-4 text-jm-sm">
+                    <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">품목수</span>
                       <span>{incomingDetail.items.length}건</span>
                     </div>
-                    <div className="border-r border-border px-3 py-2.5 flex justify-between">
-                      <span className="text-xs text-muted-foreground">공급가액</span>
+                    <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">공급가액</span>
                       <span className="tabular-nums">₩{formatPrice(supply)}</span>
                     </div>
-                    <div className="border-r border-border px-3 py-2.5 flex justify-between">
-                      <span className="text-xs text-muted-foreground">세액</span>
+                    <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">세액</span>
                       <span className="tabular-nums">₩{formatPrice(tax)}</span>
                     </div>
                     <div className="px-3 py-2.5 flex justify-between">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">
                         택배비{incomingDetail.shippingDeducted ? " · 차감" : ""}
                       </span>
                       <span className="tabular-nums">{shipping > 0 ? `₩${formatPrice(shipping)}` : "-"}</span>
@@ -1426,30 +1468,34 @@ export default function ExpensesPage() {
                   </div>
                 );
               })()}
-            </ScrollArea>
+            </div>
           ) : (
-            <div className="py-12 text-center text-muted-foreground text-sm">불러오기 실패</div>
+            <div className="py-12 text-center text-[var(--jm-text-muted)] text-jm-sm">불러오기 실패</div>
           )}
-        </DialogContent>
-      </Dialog>
+        </JmDialogContent>
+      </JmDialog>
 
       {/* ── 삭제 확인 ── */}
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>경비 삭제</DialogTitle>
-            <DialogDescription className="sr-only">경비 항목을 삭제합니다</DialogDescription>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">이 경비 항목을 삭제하시겠습니까?</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>취소</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
+      <JmDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <JmDialogContent size="sm">
+          <JmDialogHeader>
+            <JmDialogTitle>경비 삭제</JmDialogTitle>
+            <JmDialogDescription className="sr-only">경비 항목을 삭제합니다</JmDialogDescription>
+          </JmDialogHeader>
+          <p className="px-6 py-4 text-jm-sm text-[var(--jm-text-muted)]">
+            이 경비 항목을 삭제하시겠습니까?
+          </p>
+          <JmDialogFooter>
+            <JmButton variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              취소
+            </JmButton>
+            <JmButton variant="danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 />}
               <span>{deleting ? "삭제 중..." : "삭제"}</span>
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
       <QuickSupplierSheet
         open={quickSupplierOpen}
@@ -1462,6 +1508,38 @@ export default function ExpensesPage() {
           fetchSuppliers();
         }}
       />
+    </div>
+  );
+}
+
+/** 작은 segmented toggle — 다이얼로그 폼 전용 */
+function ToggleSegment<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="inline-flex h-[30px] rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-jm-xs overflow-hidden">
+      {options.map((opt, i) => (
+        <button
+          key={opt.value}
+          type="button"
+          className={cn(
+            "px-3 transition-colors",
+            i > 0 && "border-l border-[var(--jm-border)]",
+            value === opt.value
+              ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] font-medium"
+              : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
+          )}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }

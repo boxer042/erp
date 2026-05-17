@@ -1,23 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, Loader2, Plus, ChevronsUpDown, Undo2, ArrowRight } from "lucide-react";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { Skeleton } from "@/components/ui/skeleton";
+  ArrowRight,
+  ChevronsUpDown,
+  Loader2,
+  Plus,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { formatComma, parseComma, genClientId } from "@/lib/utils";
+
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { focusCaretEnd } from "@/jm/lib/focus";
+import { formatComma, genClientId, parseComma } from "@/lib/utils";
 import { useIsCompactDevice } from "@/hooks/use-mobile";
 import {
   JmBadge,
@@ -35,14 +32,9 @@ import {
   JmEmpty,
   JmIconButton,
   JmInput,
+  JmSelect,
   JmSkeleton,
   JmSpinner,
-  JmTable,
-  JmTableBody,
-  JmTableCell,
-  JmTableHead,
-  JmTableHeader,
-  JmTableRow,
 } from "@/jm";
 
 // ─── 공통 인터페이스 ─────────────────────────────────────────────────────────
@@ -630,79 +622,104 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[60vh] p-0 flex flex-col">
-        <SheetHeader className="border-b border-border px-5 py-4">
-          <SheetTitle>입고 비용</SheetTitle>
-          <SheetDescription>{supplierProductName}</SheetDescription>
-        </SheetHeader>
+    <JmDrawer open={open} onOpenChange={onOpenChange}>
+      <JmDrawerContent
+        side="bottom"
+        size="md"
+        className="flex flex-col p-0"
+        dragHandle={false}
+      >
+        <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4">
+          <JmDrawerTitle>입고 비용</JmDrawerTitle>
+          <JmDrawerDescription>{supplierProductName}</JmDrawerDescription>
+        </JmDrawerHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {/* 추가 폼 */}
-          <div className="px-5 py-4 border-b border-border space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">새 비용 추가</p>
-            {/* 라벨 행 */}
+          <div className="px-5 py-4 border-b border-[var(--jm-border)] space-y-2">
+            <p className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
+              새 비용 추가
+            </p>
             <div className="grid grid-cols-[1fr_110px_96px_96px_80px_64px] gap-2">
-              <span className="text-xs text-muted-foreground">비용명</span>
-              <span className="text-xs text-muted-foreground">유형</span>
-              <span className="text-xs text-muted-foreground">{costType === "FIXED" ? "금액 (₩)" : "비율 (%)"}</span>
-              <span className="text-xs text-muted-foreground">적용</span>
-              <span className="text-xs text-muted-foreground">부가세</span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">비용명</span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">유형</span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                {costType === "FIXED" ? "금액 (₩)" : "비율 (%)"}
+              </span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">적용</span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">부가세</span>
               <span />
             </div>
-            {/* 입력 행 */}
             <div className="grid grid-cols-[1fr_110px_96px_96px_80px_64px] gap-2 items-center">
-              <Input
+              <JmInput
+                size="sm"
                 placeholder="예: 택배비"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd(); }}
-                className="h-8 text-[13px]"
+                onFocus={focusCaretEnd}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd();
+                }}
               />
-              <Select value={costType} onValueChange={(v) => setCostType((v ?? "FIXED") as "FIXED" | "PERCENTAGE")}>
-                <SelectTrigger className="h-8 w-full text-[13px]">
-                  <span>{costType === "FIXED" ? "고정금액" : "비율(%)"}</span>
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  <SelectItem value="FIXED">고정금액</SelectItem>
-                  <SelectItem value="PERCENTAGE">비율(%)</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
+              <JmSelect
+                size="sm"
+                options={[
+                  { value: "FIXED", label: "고정금액" },
+                  { value: "PERCENTAGE", label: "비율(%)" },
+                ]}
+                value={costType}
+                onChange={(v) => setCostType(v as "FIXED" | "PERCENTAGE")}
+              />
+              <JmInput
+                size="sm"
                 type="text"
                 inputMode={costType === "FIXED" ? "numeric" : "decimal"}
                 placeholder={costType === "FIXED" ? "3,000" : "5"}
                 value={costType === "FIXED" ? formatComma(value) : value}
                 onChange={(e) => {
-                  const v = costType === "FIXED" ? parseComma(e.target.value) : e.target.value;
+                  const v =
+                    costType === "FIXED"
+                      ? parseComma(e.target.value)
+                      : e.target.value;
                   setValue(v);
                 }}
                 onFocus={focusCaretEnd}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd(); }}
-                className="h-8 text-[13px]"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd();
+                }}
               />
-              <Select value={perUnit ? "unit" : "incoming"} onValueChange={(v) => setPerUnit(v === "unit")}>
-                <SelectTrigger className="h-8 w-full text-[13px]">
-                  <span>{perUnit ? "개당" : "입고건당"}</span>
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  <SelectItem value="unit">개당</SelectItem>
-                  <SelectItem value="incoming">입고건당</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={isTaxable ? "taxable" : "exempt"} onValueChange={(v) => setIsTaxable(v === "taxable")}>
-                <SelectTrigger className="h-8 w-full text-[13px]">
-                  <span>{isTaxable ? "과세" : "면세"}</span>
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  <SelectItem value="taxable">과세</SelectItem>
-                  <SelectItem value="exempt">면세</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={handleAdd} disabled={adding} className="w-full">
-                {adding ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-                추가
-              </Button>
+              <JmSelect
+                size="sm"
+                options={[
+                  { value: "unit", label: "개당" },
+                  { value: "incoming", label: "입고건당" },
+                ]}
+                value={perUnit ? "unit" : "incoming"}
+                onChange={(v) => setPerUnit(v === "unit")}
+              />
+              <JmSelect
+                size="sm"
+                options={[
+                  { value: "taxable", label: "과세" },
+                  { value: "exempt", label: "면세" },
+                ]}
+                value={isTaxable ? "taxable" : "exempt"}
+                onChange={(v) => setIsTaxable(v === "taxable")}
+              />
+              <JmButton
+                variant="outline"
+                size="sm"
+                onClick={handleAdd}
+                disabled={adding}
+                className="w-full"
+              >
+                {adding ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Plus className="size-3.5" />
+                )}
+                <span>추가</span>
+              </JmButton>
             </div>
           </div>
 
@@ -710,15 +727,17 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
           {loading ? (
             <div className="space-y-2 px-5 py-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full rounded-md" />
+                <JmSkeleton key={i} className="h-10 w-full rounded-md" />
               ))}
             </div>
           ) : costs.length === 0 && avgShippingCost === null ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">등록된 비용이 없습니다</p>
+            <p className="text-jm-sm text-[var(--jm-text-muted)] py-8 text-center">
+              등록된 비용이 없습니다
+            </p>
           ) : (
-            <table className="w-full text-[13px]">
+            <table className="w-full text-jm-sm">
               <thead>
-                <tr className="bg-muted text-muted-foreground text-xs border-b border-border">
+                <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-jm-xs border-b border-[var(--jm-border)]">
                   <th className="py-2 px-3 text-left font-medium">비용명</th>
                   <th className="py-2 px-3 text-left font-medium">유형</th>
                   <th className="py-2 px-3 text-right font-medium">금액</th>
@@ -729,53 +748,71 @@ export function IncomingCostSheet({ open, onOpenChange, supplierProductId, suppl
               </thead>
               <tbody>
                 {avgShippingCost !== null && (
-                  <tr className="border-b border-border">
-                    <td className="px-3 py-2.5 font-medium text-primary">
+                  <tr className="border-b border-[var(--jm-border)]">
+                    <td className="px-3 py-2.5 font-medium text-[var(--jm-info-fg)]">
                       평균 배송비
-                      <span className="ml-1.5 text-[10px] font-normal text-muted-foreground uppercase tracking-wide">자동</span>
+                      <span className="ml-1.5 text-jm-2xs font-normal text-[var(--jm-text-muted)] uppercase tracking-wide">
+                        자동
+                      </span>
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">고정</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-primary">
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)]">고정</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--jm-info-fg)]">
                       ₩{Math.round(avgShippingCost).toLocaleString("ko-KR")}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">개당</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{avgShippingIsTaxable ? "과세" : "면세"}</td>
-                    <td className="py-2 text-center text-muted-foreground">—</td>
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)]">개당</td>
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)]">
+                      {avgShippingIsTaxable ? "과세" : "면세"}
+                    </td>
+                    <td className="py-2 text-center text-[var(--jm-text-muted)]">—</td>
                   </tr>
                 )}
                 {costs.map((c) => (
-                  <tr key={c.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="px-3 py-2.5 font-medium">{c.name}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{c.costType === "FIXED" ? "고정" : "비율"}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
+                  <tr
+                    key={c.id}
+                    className="border-b border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]/50"
+                  >
+                    <td className="px-3 py-2.5 font-medium text-[var(--jm-text)]">{c.name}</td>
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)]">
+                      {c.costType === "FIXED" ? "고정" : "비율"}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--jm-text)]">
                       {c.costType === "FIXED"
                         ? `₩${parseFloat(c.value).toLocaleString("ko-KR")}`
                         : `${parseFloat(c.value)}%`}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{c.perUnit ? "개당" : "입고건당"}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)]">
+                      {c.perUnit ? "개당" : "입고건당"}
+                    </td>
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)]">
                       {c.isTaxable ? (
-                        <span className="text-foreground">과세</span>
+                        <span className="text-[var(--jm-text)]">과세</span>
                       ) : (
                         <span>면세</span>
                       )}
                     </td>
                     <td className="py-2 text-center">
-                      <Button variant="ghost" size="icon-xs" onClick={() => handleDelete(c.id)}>
+                      <JmIconButton
+                        variant="ghost"
+                        size="sm"
+                        aria-label="비용 삭제"
+                        onClick={() => handleDelete(c.id)}
+                      >
                         <Trash2 className="size-3.5" />
-                      </Button>
+                      </JmIconButton>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-        </ScrollArea>
-
-        <div className="border-t border-border px-5 py-3 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>닫기</Button>
         </div>
-      </SheetContent>
-    </Sheet>
+
+        <div className="border-t border-[var(--jm-border)] px-5 py-3 flex justify-end">
+          <JmButton variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            닫기
+          </JmButton>
+        </div>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }

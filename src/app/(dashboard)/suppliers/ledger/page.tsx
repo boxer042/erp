@@ -18,6 +18,7 @@ import {
   JmScrollArea,
   JmSegmentedControl,
   JmSkeleton,
+  JmSpinner,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -49,6 +50,7 @@ import {
   getCurrentPresetLabel,
 } from "./_helpers";
 import { ItemsView } from "./_views";
+import { IncomingStatementModal } from "./_incoming-modal";
 import {
   SupplierLedgerTable,
   type SupplierLedgerEntry,
@@ -146,8 +148,12 @@ export default function SupplierLedgerPage() {
     amount: string;
     paymentDate: string;
     method: PaymentMethod;
+    kind: "MIXED" | "SUPPLY_ONLY" | "VAT_ONLY";
     memo: string | null;
   } | null>(null);
+
+  // 품목 클릭 → 입고 거래명세서 모달
+  const [viewIncomingId, setViewIncomingId] = useState<string | null>(null);
 
   // 조정 등록/수정 Dialog
   const [adjDialogOpen, setAdjDialogOpen] = useState(false);
@@ -248,6 +254,7 @@ export default function SupplierLedgerPage() {
         amount: string;
         paymentDate: string;
         method: string;
+        kind?: "MIXED" | "SUPPLY_ONLY" | "VAT_ONLY";
         memo: string | null;
       }>(`/api/supplier-payments/${e.referenceId}`).then((p) => {
         setEditingPayment({
@@ -256,6 +263,7 @@ export default function SupplierLedgerPage() {
           amount: p.amount,
           paymentDate: p.paymentDate,
           method: p.method as PaymentMethod,
+          kind: p.kind ?? "MIXED",
           memo: p.memo,
         });
         setPayDialogOpen(true);
@@ -550,7 +558,11 @@ export default function SupplierLedgerPage() {
                 <span className="text-xs text-[var(--jm-text-muted)]">{data.entries.length}건</span>
               </div>
             </div>
-            {filteredSummaries.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-10">
+                <JmSpinner className="text-[var(--jm-text-muted)]" />
+              </div>
+            ) : filteredSummaries.length === 0 ? (
               <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">
                 {isDataEmpty
                   ? "거래처가 없습니다"
@@ -620,12 +632,12 @@ export default function SupplierLedgerPage() {
                 ) : (
                   <>
                     <span>품목: <b className="text-[var(--jm-text)]">{items.length}건</b></span>
-                    <span>결제: <b className="text-[var(--jm-text)]">{paymentsInItems.length}건</b></span>
+                    <span>결제·조정·환급: <b className="text-[var(--jm-text)]">{paymentsInItems.length}건</b></span>
                     <span>합계 합 (VAT 포함): <b className="text-[var(--jm-text)]">₩{formatAmount(items.reduce((s, i) => {
                       const supply = parseFloat(i.totalPrice);
                       return s + (i.supplierProduct.isTaxable ? Math.round(supply * 1.1) : supply);
                     }, 0))}</b></span>
-                    <span>결제 합: <b className="text-[var(--jm-text)]">₩{formatAmount(paymentsInItems.reduce((s, p) => s + parseFloat(p.creditAmount), 0))}</b></span>
+                    <span title="결제 + 조정 + 환급의 대변 합계 (미지급금을 줄인 모든 항목)">결제·조정·환급 합: <b className="text-[var(--jm-text)]">₩{formatAmount(paymentsInItems.reduce((s, p) => s + parseFloat(p.creditAmount), 0))}</b></span>
                   </>
                 )}
                 <span className="text-[var(--jm-text-muted)]/50">|</span>
@@ -660,8 +672,8 @@ export default function SupplierLedgerPage() {
                 <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 매입</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedSupplierSummary.totalPurchase)}</p>
               </div>
-              <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 결제</p>
+              <div title="순수 결제(지급)만 집계 — 조정·환급 제외">
+                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 결제 (지급만)</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedSupplierSummary.totalPayment)}</p>
               </div>
               <div>
@@ -752,7 +764,7 @@ export default function SupplierLedgerPage() {
                 selectedSupplierSummary={selectedSupplierSummary}
                 from={from}
                 onEntryDoubleClick={onEntryDoubleClick}
-                onIncomingDeepLink={(id) => router.push(`/inventory/incoming?incomingId=${id}`)}
+                onIncomingClick={(id) => setViewIncomingId(id)}
                 emptyState={emptyStateHint}
               />
             )}
@@ -786,6 +798,11 @@ export default function SupplierLedgerPage() {
         }
         initialAdjustment={editingAdjustment ?? undefined}
         onSaved={fetchLedger}
+      />
+
+      <IncomingStatementModal
+        incomingId={viewIncomingId}
+        onClose={() => setViewIncomingId(null)}
       />
 
     </JmScope>

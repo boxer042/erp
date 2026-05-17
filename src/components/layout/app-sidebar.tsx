@@ -148,6 +148,7 @@ const navGroups: NavGroup[] = [
       { id: "expenses", label: "경비", href: "/expenses", icon: WalletMinimal },
       { id: "income-statement", label: "손익계산서", href: "/reports/income-statement", icon: FileSpreadsheet },
       { id: "balance-sheet", label: "재무상태표", href: "/reports/balance-sheet", icon: Scale },
+      { id: "vat-filing", label: "부가세 신고 자료", href: "/reports/vat-filing", icon: FileText },
       { id: "margin-report", label: "마진 리포트", href: "/reports/margin", icon: TrendingUp },
       { id: "option-funnel", label: "옵션 funnel", href: "/reports/option-funnel", icon: TrendingUp },
     ],

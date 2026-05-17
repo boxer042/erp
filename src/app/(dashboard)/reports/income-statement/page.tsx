@@ -13,6 +13,7 @@ import {
   JmAlert,
   JmBadge,
   JmButton,
+  jmButtonVariants,
   JmDateRangePicker,
   type DateRange,
   JmDrawer,
@@ -22,7 +23,8 @@ import {
   JmDrawerBody,
   JmDrawerClose,
 } from "@/jm";
-import { Info, FileSpreadsheet, Download, TrendingUp } from "lucide-react";
+import { Info, FileSpreadsheet, Download, TrendingUp, HelpCircle } from "lucide-react";
+import Link from "next/link";
 import { format } from "date-fns";
 import {
   LineChart,
@@ -276,6 +278,13 @@ export default function IncomeStatementPage() {
               <Download className="size-4" />
               CSV
             </JmButton>
+            <Link
+              href="/reports/help"
+              className={jmButtonVariants({ variant: "ghost", size: "sm" })}
+            >
+              <HelpCircle className="size-4" />
+              도움말
+            </Link>
           </div>
         </div>
 

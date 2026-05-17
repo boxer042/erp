@@ -21,6 +21,7 @@ export interface ActionDef {
     | "ready"
     | "pickup"
     | "cart"
+    | "reject_after_quote"
     | "cancel";
   label: string;
   primary?: boolean; // 큰 메인 버튼인지
@@ -44,12 +45,19 @@ export function nextActions(
     }
     list.push({ action: "start", label: "수리 시작", primary: type === "ON_SITE" });
   } else if (status === "DIAGNOSING") {
+    list.push({ action: "reject_after_quote", label: "진단비만" });
     list.push({ action: "quote", label: "견적 확정", primary: true });
   } else if (status === "QUOTED") {
+    list.push({ action: "reject_after_quote", label: "진단비만" });
     list.push({ action: "approve", label: "고객 승인", primary: true });
   } else if (status === "APPROVED") {
     list.push({ action: "start", label: "수리 시작", primary: true });
   } else if (status === "REPAIRING") {
+    // ON_SITE 는 새수리 드로워에서 바로 REPAIRING 진입 → 손님 거절 시 진단비만 청구도 이 단계에서 가능.
+    // DROP_OFF 는 REPAIRING 까지 오면 이미 손님 승인 끝난 상태라 거절 의미 없음.
+    if (type === "ON_SITE") {
+      list.push({ action: "reject_after_quote", label: "진단비만" });
+    }
     list.push({ action: "ready", label: "수리 완료", primary: true });
   } else if (status === "READY") {
     if (canSendToCart) {

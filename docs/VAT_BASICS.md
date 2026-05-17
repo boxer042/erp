@@ -212,15 +212,22 @@
 - `TaxInvoice` 별도 모델 없음 → `Order.taxInvoiceRequested` / `taxInvoicedAt` 마킹만 존재
 - 부가세 신고용 집계 리포트 없음
 
-### 7.3 부가세 후납 처리 방안 (3단계 옵션)
+### 7.3 부가세 후납 처리 — 옵션 B 적용 완료 ✅
+
+`PaymentKind` enum 추가됨 (MIXED / SUPPLY_ONLY / VAT_ONLY). `SupplierPayment` 와 `CustomerPayment` 양쪽에 `kind` 필드 (default MIXED). 잔액 계산엔 영향 없음 — 분류 추적용.
+
+**거래처 결제 / 고객 수금 다이얼로그** 에 "결제 종류" 셀렉터 추가:
+- 전체 (공급가액 + 부가세) — 기본값
+- 공급가액만
+- 부가세만
+
+→ "공급가액만 먼저 받고 부가세는 세금계산서 발행 후 별도" 같은 케이스를 시스템적으로 추적 가능.
+
+**추가 옵션 (필요 시)**:
 
 | 옵션 | 내용 | 작업량 |
 |---|---|---|
-| **A. 현상 유지** | 결제 메모에 "공급가액만 입금" 키워드. 잔액은 거래처 전체 잔액으로 추적. | 0 |
-| **B. 결제 종류 enum 추가** | `PaymentKind` (MIXED/SUPPLY_ONLY/VAT_ONLY). 신고용 보고 가능. | 소 |
-| **C. 거래 단위 부분결제** | Payment 에 `incomingId/orderId` 추가. 거래별 미수/미지급 + 부가세 후납 잔여 추적. | 대 |
-
-**추천**: B 부터 시작. C 는 B2B 비중 커질 때.
+| **C. 거래 단위 부분결제** | Payment 에 `incomingId/orderId` 외래키 추가. 거래별 미수/미지급 + 부가세 후납 잔여 추적. | 대 |
 
 ---
 
@@ -235,8 +242,10 @@
 | 채널수수료 | `OrderItem.channelCommissionRateSnapshot × totalPrice` |
 | 카드수수료 | `OrderItem.cardFeeRateSnapshot × totalPrice` (카드결제 한정) |
 | 일반 판관비 | `Expense.amount` (과세면 ÷ 1.1) — category 별 집계 |
-| 부가세예수금 | `Order.taxAmount` 합계 (기간 내) |
-| 부가세대급금 | `Incoming.taxAmount` 합계 + 과세 `Expense × 0.1 ÷ 1.1` |
+| 부가세예수금 | `Order.taxAmount` 합계 (status ∉ {RETURNED, EXCHANGED}, paymentStatus ≠ SALES_CANCELLED) − `OrderItem.refundedAmount × taxRate` (부분환불 비례 차감, 과세 상품만). 환불·취소 시 부가세도 손님에게 돌려주므로 예수금에서 제외. |
+| 부가세대급금 | `IncomingItem.totalPrice × 0.1` (supplierProduct.isTaxable=true) + `Incoming.shippingCost / 11` (shippingIsTaxable=true) + `IncomingCost` (perUnit=true, isTaxable=true) — FIXED 는 value/11, PERCENTAGE 는 value × unitPrice × 0.1/100 — 모두 × qty − `SupplierReturnItem.totalPrice × 0.1` (반품 차감) + 과세 `Expense × 1/11` |
+| ⚠️ 주의 | `Incoming.taxAmount` 필드는 schema default(0) 으로만 존재하고 실제로 저장되지 않으므로 사용 금지. 반드시 items 에서 계산. |
+| ⚠️ V3 한계 | `IncomingCost.perUnit=false` 는 미반영 (입고 전체 단위라 별도 처리 필요). 대부분 perUnit=true 라 영향 적음. |
 
 ### 교환 새 주문 (-EX) 제외
 마진 리포트와 동일하게 `exchangedFromOrders: { none: {} }` 필터로 매출 중복 방지.
@@ -254,6 +263,16 @@
 
 ---
 
-## 9. 한 줄 요약
+## 9. 시스템 페이지
+
+| 페이지 | 경로 | 용도 |
+|---|---|---|
+| 손익계산서 | `/reports/income-statement` | 기간 손익 (공급가액 기준) — 월/분기/연 + 사용자 지정 + CSV |
+| 재무상태표 | `/reports/balance-sheet` | 시점 잔량 — 자산/부채/자본. 시스템 자동(매출채권·재고·매입채무·부가세) + 수기 입력(현금·비품·차입금·자본금·이익잉여금) + CSV |
+| **부가세 신고 자료** | `/reports/vat-filing` | **분기별 부가세 상세** — 매출/매입 부가세 + 거래처별 + 사업자/개인 분리 + CSV |
+
+부가세 신고 자료는 세무사 / 홈택스 입력용. 분기 토글 → 즉시 자료 생성.
+
+## 10. 한 줄 요약
 
 > **경영 판단 = 공급가액만 / 청구·결제·신고 = 부가세 분리 추적 / 부가세 납부 = 부채 상환 (비용 아님).**

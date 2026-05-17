@@ -7,15 +7,15 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, brand, modelNo, serialNo, productId, dailyRate, monthlyRate, depositAmount, memo, status } = body ?? {};
+  const { name, brand, modelNo, productId, imageUrl, dailyRate, monthlyRate, depositAmount, memo, status } = body ?? {};
   const asset = await prisma.rentalAsset.update({
     where: { id },
     data: {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(brand !== undefined ? { brand: brand?.trim() || null } : {}),
       ...(modelNo !== undefined ? { modelNo: modelNo?.trim() || null } : {}),
-      ...(serialNo !== undefined ? { serialNo: serialNo?.trim() || null } : {}),
       ...(productId !== undefined ? { productId: productId || null } : {}),
+      ...(imageUrl !== undefined ? { imageUrl: imageUrl?.trim() || null } : {}),
       ...(dailyRate !== undefined ? { dailyRate: Number(dailyRate) } : {}),
       ...(monthlyRate !== undefined ? { monthlyRate: Number(monthlyRate) } : {}),
       ...(depositAmount !== undefined ? { depositAmount: Number(depositAmount) } : {}),

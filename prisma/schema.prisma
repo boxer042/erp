@@ -418,17 +418,31 @@ enum LedgerEntryType {
   REFUND
 }
 
+/**
+ * 결제 종류 — 부가세 후납 처리 분류.
+ * - MIXED:       기본 — 공급가액 + 부가세 합산 결제 (일반적 케이스)
+ * - SUPPLY_ONLY: 공급가액만 결제 (세금계산서 발행 지연으로 부가세는 나중에)
+ * - VAT_ONLY:    부가세만 결제 (세금계산서 발행 후 부가세분 별도 송금)
+ * 잔액 계산엔 영향 없음 (모두 단순 차감). 분류는 보고·신고 자료용.
+ */
+enum PaymentKind {
+  MIXED
+  SUPPLY_ONLY
+  VAT_ONLY
+}
+
 model SupplierPayment {
-  id          String   @id @default(uuid())
-  supplierId  String   @map("supplier_id")
-  supplier    Supplier @relation(fields: [supplierId], references: [id])
-  amount      Decimal  @db.Decimal(15, 2)
-  paymentDate DateTime @map("payment_date")
+  id          String      @id @default(uuid())
+  supplierId  String      @map("supplier_id")
+  supplier    Supplier    @relation(fields: [supplierId], references: [id])
+  amount      Decimal     @db.Decimal(15, 2)
+  paymentDate DateTime    @map("payment_date")
   method      String
+  kind        PaymentKind @default(MIXED)
   memo        String?
-  createdById String   @map("created_by_id")
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdById String      @map("created_by_id")
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  createdAt   DateTime    @default(now()) @map("created_at")
 
   @@index([supplierId, paymentDate])
   @@map("supplier_payments")
@@ -507,6 +521,9 @@ model Product {
   landingBlocks      Json?              @map("landing_blocks")
   landingMode        ProductLandingMode @default(BLOCKS) @map("landing_mode")
   singleHtmlUrl      String?            @map("single_html_url")
+  // 사용법·관리 매뉴얼 — landingBlocks 와 동일한 블록 구조(ManualBlock[]). 시리얼 손님 페이지에서 노출.
+  manualBlocks       Json?              @map("manual_blocks")
+  hasManual          Boolean            @default(false) @map("has_manual")
   // 상품정보 고시 (전자상거래법 표시 의무)
   countryOfOrigin    String?            @map("country_of_origin")
   manufacturer       String?
@@ -561,7 +578,7 @@ model Product {
   assemblyTemplateSlotDefaults  AssemblyTemplateSlot[]
   assemblyPresetItems           AssemblyPresetItem[]
 
-  specValues ProductSpecValue[]
+  specValues   ProductSpecValue[]
   priceHistory ProductPriceHistory[]
 
   @@map("products")
@@ -1755,29 +1772,33 @@ enum CustomerType {
 }
 
 model Customer {
-  id              String       @id @default(uuid())
-  type            CustomerType @default(INDIVIDUAL)
+  id                   String       @id @default(uuid())
+  type                 CustomerType @default(INDIVIDUAL)
   // 공통: 개인=이름, 기업=상호
-  name            String
-  phone           String
-  email           String?
-  memo            String?
+  name                 String
+  phone                String
+  email                String?
+  memo                 String?
   // 기업 전용 (type=BUSINESS 일 때 의미)
-  businessNumber  String?      @map("business_number")
-  ceo             String? // 대표자명
-  fax             String?
-  businessType    String?      @map("business_type") // 업태
-  businessItem    String?      @map("business_item") // 종목
+  businessNumber       String?      @map("business_number")
+  ceo                  String? // 대표자명
+  fax                  String?
+  businessType         String?      @map("business_type") // 업태
+  businessItem         String?      @map("business_item") // 종목
   // 주소 — 사업장(기업)/기본(개인) + 배송지 (다를 때만 채움)
-  address         String?
-  shippingAddress String?      @map("shipping_address")
+  address              String?
+  shippingAddress      String?      @map("shipping_address")
   // 기업 담당자 (대표 외 실무 연락처) — 개인은 미사용
-  contactName     String?      @map("contact_name")
-  contactPhone    String?      @map("contact_phone")
-  contactPosition String?      @map("contact_position")
-  isActive        Boolean      @default(true) @map("is_active")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  contactName          String?      @map("contact_name")
+  contactPhone         String?      @map("contact_phone")
+  contactPosition      String?      @map("contact_position")
+  isActive             Boolean      @default(true) @map("is_active")
+  // 시리얼번호 기반 보증·수리·구매내역 조회 서비스 이용 동의 (PIPA)
+  serialServiceConsent Boolean      @default(false) @map("serial_service_consent")
+  consentedAt          DateTime?    @map("consented_at")
+  consentVersion       String?      @map("consent_version") // 동의한 PrivacyPolicyVersion.id
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
 
   quotations  Quotation[]
   statements  Statement[]
@@ -1826,16 +1847,17 @@ model CustomerLedger {
 }
 
 model CustomerPayment {
-  id          String   @id @default(uuid())
-  customerId  String   @map("customer_id")
-  customer    Customer @relation(fields: [customerId], references: [id])
-  amount      Decimal  @db.Decimal(15, 2)
-  paymentDate DateTime @map("payment_date")
+  id          String      @id @default(uuid())
+  customerId  String      @map("customer_id")
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  amount      Decimal     @db.Decimal(15, 2)
+  paymentDate DateTime    @map("payment_date")
   method      String
+  kind        PaymentKind @default(MIXED)
   memo        String?
-  createdById String   @map("created_by_id")
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdById String      @map("created_by_id")
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  createdAt   DateTime    @default(now()) @map("created_at")
 
   @@index([customerId, paymentDate])
   @@map("customer_payments")
@@ -2113,13 +2135,28 @@ enum RepairPartStatus {
 
 // 수리 취소 사유 — 분석/고객응대용
 enum RepairCancelReason {
-  CUSTOMER_DECLINED // 손님이 거절 (견적 본 후 진행 안 함)
+  CUSTOMER_DECLINED // 손님이 거절 — 진단비도 면제 (정상 거절은 quoteRejectReason 사용)
   CUSTOMER_NO_SHOW // 손님 미반환 (맡겼는데 안 찾으러 옴)
   SHOP_GAVE_UP // 매장 포기 (수리 불가 판정)
   PARTS_UNAVAILABLE // 부속 수급 불가
   SOLD_AS_PRODUCT // 수리 대신 상품 구매로 전환 (같은 또는 다른 제품) — 보존 가치 있음
   MISTAKE // 잘못 생성 (실수로 만든 티켓 — 진단·자료 무의미)
   OTHER // 기타 (cancelMemo 참조)
+}
+
+// 견적 거절 사유 — reject_after_quote 액션 (진단비만 청구) 시 기록.
+// 손님 사유와 매장 사유 모두 포함 — 결과(진단비만 청구) 가 같음.
+// cancel 흐름의 PARTS_UNAVAILABLE/SHOP_GAVE_UP 은 "진단비도 안 받음" 케이스라 별개.
+enum QuoteRejectReason {
+  // 손님 사유
+  TOO_EXPENSIVE // 가격 부담 (수리비 자체가 비싸서)
+  NOT_WORTH_IT // 가성비 문제 (새 제품 사는 게 나음)
+  WILL_SHOP_AROUND // 다른 매장 비교 후 결정
+  CHANGED_MIND // 단순 변심
+  // 매장 사유
+  PARTS_UNAVAILABLE // 부속 수급 불가 (진단까진 했는데 부속 못 구함)
+  SHOP_DECLINED // 매장 포기 (장비·시간·복잡도 부족)
+  OTHER // 기타 (quoteRejectMemo 참조)
 }
 
 model RepairTicket {
@@ -2179,6 +2216,10 @@ model RepairTicket {
   cancelReason           RepairCancelReason?      @map("cancel_reason")
   cancelMemo             String?                  @map("cancel_memo") // OTHER 사유 또는 추가 설명
   cancelledAt            DateTime?                @map("cancelled_at")
+  // 견적 거절 정보 — reject_after_quote 액션으로 진단비만 청구한 케이스. 픽업/결제 흐름은 그대로 탐.
+  quoteRejectReason      QuoteRejectReason?       @map("quote_reject_reason")
+  quoteRejectMemo        String?                  @map("quote_reject_memo")
+  quoteRejectedAt        DateTime?                @map("quote_rejected_at")
   // 미등록 손님 추적 — POS 의 어떤 카트 세션에서 만들어졌는지 (등록 손님이면 customerId 로 충분)
   // 클라이언트 sessions.repairTicketIds 추적이 끊겨도 DB 에서 복원 가능. 세션 자체가 사라지면 NULL.
   posSessionId           String?                  @map("pos_session_id")
@@ -2480,23 +2521,30 @@ enum RentalStatus {
 }
 
 model RentalAsset {
-  id            String            @id @default(uuid())
-  assetNo       String            @unique @map("asset_no")
-  name          String
-  brand         String?
-  modelNo       String?           @map("model_no")
-  serialNo      String?           @map("serial_no")
-  productId     String?           @map("product_id")
-  product       Product?          @relation(fields: [productId], references: [id])
-  dailyRate     Decimal           @default(0) @map("daily_rate") @db.Decimal(15, 2)
-  monthlyRate   Decimal           @default(0) @map("monthly_rate") @db.Decimal(15, 2)
-  depositAmount Decimal           @default(0) @map("deposit_amount") @db.Decimal(15, 2)
-  status        RentalAssetStatus @default(AVAILABLE)
-  acquiredAt    DateTime?         @map("acquired_at")
-  memo          String?
-  isActive      Boolean           @default(true) @map("is_active")
-  createdAt     DateTime          @default(now()) @map("created_at")
-  updatedAt     DateTime          @updatedAt @map("updated_at")
+  id                   String            @id @default(uuid())
+  assetNo              String            @unique @map("asset_no")
+  name                 String
+  brand                String?
+  modelNo              String?           @map("model_no")
+  /// 자산 자체 이미지 URL — Product 와 분리. POS 그리드/라벨에서 우선 사용.
+  imageUrl             String?           @map("image_url")
+  productId            String?           @map("product_id")
+  product              Product?          @relation(fields: [productId], references: [id])
+  dailyRate            Decimal           @default(0) @map("daily_rate") @db.Decimal(15, 2)
+  monthlyRate          Decimal           @default(0) @map("monthly_rate") @db.Decimal(15, 2)
+  depositAmount        Decimal           @default(0) @map("deposit_amount") @db.Decimal(15, 2)
+  status               RentalAssetStatus @default(AVAILABLE)
+  acquiredAt           DateTime?         @map("acquired_at")
+  memo                 String?
+  isActive             Boolean           @default(true) @map("is_active")
+  // 임대 QR — 자산번호 기반 영구 출입증. 손님이 QR 찍으면 /r/[token] 사용법 페이지.
+  // 분실 시에만 매장이 재발급. manualBlocks 는 이 자산 전용 사용법(ManualBlock[]).
+  accessToken          String?           @unique @map("access_token")
+  accessTokenRevokedAt DateTime?         @map("access_token_revoked_at")
+  manualBlocks         Json?             @map("manual_blocks")
+  hasManual            Boolean           @default(false) @map("has_manual")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
 
   rentals Rental[]
 
@@ -2587,6 +2635,39 @@ enum ExpenseCategory {
   MAINTENANCE
   INVENTORY_USAGE
   OTHER
+}
+
+/**
+ * 재무상태표 수기 항목 분류 — 시스템이 자동 산출 못 하는 회계 모듈 영역.
+ * 자산: CASH(현금·예금), EQUIPMENT(비품·설비 장부가), OTHER_ASSET
+ * 부채: LOAN(차입금), OTHER_LIABILITY
+ * 자본: CAPITAL(자본금), RETAINED_EARNINGS(이익잉여금 — 전기 누적)
+ */
+enum ManualBalanceCategory {
+  CASH
+  EQUIPMENT
+  OTHER_ASSET
+  LOAN
+  OTHER_LIABILITY
+  CAPITAL
+  RETAINED_EARNINGS
+}
+
+/**
+ * 재무상태표 수기 입력 항목 — 운영자가 직접 등록·갱신하는 현재 시점 잔량.
+ * 매출채권/재고/매입채무처럼 시스템이 자동 산출하는 항목 외의 보강용.
+ */
+model ManualBalanceEntry {
+  id        String                @id @default(uuid())
+  category  ManualBalanceCategory
+  label     String
+  amount    Decimal               @db.Decimal(15, 2)
+  memo      String?
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("manual_balance_entries")
 }
 
 // ============================================================
@@ -2732,32 +2813,54 @@ enum SerialItemStatus {
 }
 
 // 시리얼 라벨 발번 출처. SALE=일반 판매, REPAIR=수리 받으러 온 기기에 부여(시스템 도입 전 판매분 등).
+// 임대 자산은 SerialItem 이 아니라 RentalAsset 자체의 QR(accessToken)로 별도 운영.
 enum SerialItemSource {
   SALE
   REPAIR
 }
 
+// 손님 공개 페이지(/s/[token]) 접근 단계 — SerialAccessLog.stage
+enum SerialAccessStage {
+  PAGE_VIEW // QR 진입 (1단계, 마스킹된 공개 정보)
+  AUTH_SUCCESS // 본인확인 통과 (2단계, 풀공개)
+  AUTH_FAIL // 본인확인 실패
+}
+
+// 본인확인 실패 사유 — SerialAccessLog.failReason (stage=AUTH_FAIL 일 때만)
+enum SerialAccessFailReason {
+  WRONG_NAME
+  WRONG_PHONE
+  RATE_LIMITED
+}
+
 model SerialItem {
-  id           String           @id @default(uuid())
-  code         String           @unique // "YYMMDD-NNNN" — 일별 4자리 시퀀스
+  id                   String           @id @default(uuid())
+  code                 String           @unique // "YYMMDD-NNNN" — 일별 4자리 시퀀스
+  // 손님 공개 페이지(/s/[token]) 출입증. 시리얼 코드와 분리된 추측 불가능한 랜덤 토큰.
+  // 라벨 QR 에만 인쇄됨. 분실·재발급 시 새 토큰 발급 + 이전 토큰 revoke.
+  accessToken          String?          @unique @map("access_token")
+  accessTokenRevokedAt DateTime?        @map("access_token_revoked_at")
+  // 보증만료+N년 경과 후 cron 이 손님 개인정보(이름/전화 등 연결)를 끊고 익명화한 시각.
+  anonymizedAt         DateTime?        @map("anonymized_at")
   // productId 는 nullable — 외부에서 가져온 기기(카탈로그에 없음) 의 수리 라벨은 productId 없이
   // displayName 만으로 식별. 일반 판매 라벨은 productId 가 있고 displayName 은 null.
-  productId    String?          @map("product_id")
-  product      Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
-  displayName  String?          @map("display_name") // 카탈로그 없는 기기명 (예: "Sony A7M4 Black")
-  source       SerialItemSource @default(SALE)
-  orderItemId  String?          @map("order_item_id")
-  orderItem    OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  customerId   String?          @map("customer_id")
-  customer     Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  soldAt       DateTime         @map("sold_at")
-  warrantyEnds DateTime?        @map("warranty_ends")
-  status       SerialItemStatus @default(ACTIVE)
-  memo         String?
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  productId            String?          @map("product_id")
+  product              Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+  displayName          String?          @map("display_name") // 카탈로그 없는 기기명 (예: "Sony A7M4 Black")
+  source               SerialItemSource @default(SALE)
+  orderItemId          String?          @map("order_item_id")
+  orderItem            OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  customerId           String?          @map("customer_id")
+  customer             Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  soldAt               DateTime         @map("sold_at")
+  warrantyEnds         DateTime?        @map("warranty_ends")
+  status               SerialItemStatus @default(ACTIVE)
+  memo                 String?
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
 
   repairTickets RepairTicket[]
+  accessLogs    SerialAccessLog[]
 
   @@index([code])
   @@index([productId])
@@ -2765,6 +2868,33 @@ model SerialItem {
   @@index([orderItemId])
   @@index([source])
   @@map("serial_items")
+}
+
+// 손님 공개 페이지 접근 기록 — PIPA 접근기록 보관 의무(1년+) 충족 + 분쟁 대비.
+model SerialAccessLog {
+  id           String                  @id @default(uuid())
+  serialItemId String                  @map("serial_item_id")
+  serialItem   SerialItem              @relation(fields: [serialItemId], references: [id], onDelete: Cascade)
+  accessToken  String                  @map("access_token") // 사용된 토큰 (revoke 된 토큰 추적용)
+  stage        SerialAccessStage
+  failReason   SerialAccessFailReason? @map("fail_reason")
+  ipHash       String?                 @map("ip_hash") // IP 원본 저장 금지 — SHA-256 해시
+  userAgent    String?                 @map("user_agent")
+  accessedAt   DateTime                @default(now()) @map("accessed_at")
+
+  @@index([serialItemId])
+  @@index([accessedAt])
+  @@map("serial_access_logs")
+}
+
+// 개인정보처리방침 버전 — 손님 동의 버전 관리. 정책 갱신 시 새 row + isCurrent 이전.
+model PrivacyPolicyVersion {
+  id          String   @id // "v1.0", "v1.1" ...
+  content     String // 약관 본문
+  publishedAt DateTime @default(now()) @map("published_at")
+  isCurrent   Boolean  @default(false) @map("is_current")
+
+  @@map("privacy_policy_versions")
 }
 
 // ============================================================

@@ -85,7 +85,9 @@ export const JmTableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-3 text-left align-middle text-jm-xs font-medium text-[var(--jm-text-muted)] [&:has([role=checkbox])]:pr-0",
+      // 가로 스크롤 테이블에서 컬럼이 좁은 화면에서 압축되지 않도록 nowrap 기본.
+      // 줄바꿈이 필요한 셀은 className 으로 whitespace-normal override.
+      "h-10 px-3 text-left align-middle whitespace-nowrap text-jm-xs font-medium text-[var(--jm-text-muted)] [&:has([role=checkbox])]:pr-0",
       className,
     )}
     {...props}
@@ -100,7 +102,9 @@ export const JmTableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      "px-3 py-2.5 align-middle text-[var(--jm-text)] [&:has([role=checkbox])]:pr-0",
+      // 가로 스크롤 테이블에서 컬럼이 좁은 화면에서 압축되지 않도록 nowrap 기본.
+      // 줄바꿈이 필요한 셀은 className 으로 whitespace-normal override.
+      "px-3 py-2.5 align-middle whitespace-nowrap text-[var(--jm-text)] [&:has([role=checkbox])]:pr-0",
       className,
     )}
     {...props}

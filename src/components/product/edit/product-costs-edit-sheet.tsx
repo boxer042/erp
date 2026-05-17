@@ -1,33 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
-import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
 import { diffSellingCosts, type CostInput } from "@/lib/product-mutations";
+import {
+  JmButton,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerDescription,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmIconButton,
+  JmInput,
+  JmSelect,
+} from "@/jm";
 import type { ProductDetail, SellingCostItem } from "../types";
 
 interface ProductCostsEditSheetProps {
@@ -41,14 +34,13 @@ interface ProductCostsEditSheetProps {
 
 export function ProductCostsEditSheet(props: ProductCostsEditSheetProps) {
   return (
-    <Sheet open={props.open} onOpenChange={props.onOpenChange}>
+    <JmDrawer open={props.open} onOpenChange={props.onOpenChange}>
       {props.open && <ProductCostsEditSheetContent {...props} />}
-    </Sheet>
+    </JmDrawer>
   );
 }
 
 interface CostRow extends CostInput {
-  /** UI 행 키 */
   rowId: string;
 }
 
@@ -61,6 +53,21 @@ const newRow = (): CostRow => ({
   isTaxable: true,
 });
 
+const COST_TYPE_OPTIONS = [
+  { value: "FIXED", label: "고정 금액" },
+  { value: "PERCENTAGE", label: "비율 (%)" },
+];
+
+const PER_UNIT_OPTIONS = [
+  { value: "true", label: "개당" },
+  { value: "false", label: "건당" },
+];
+
+const TAX_OPTIONS = [
+  { value: "true", label: "과세 (세금계산서)" },
+  { value: "false", label: "면세" },
+];
+
 function ProductCostsEditSheetContent({
   onOpenChange,
   product,
@@ -69,7 +76,6 @@ function ProductCostsEditSheetContent({
 }: ProductCostsEditSheetProps) {
   const queryClient = useQueryClient();
 
-  // 현재 비용을 행으로 매핑 (해당 channelId 만 필터)
   const initialCosts: SellingCostItem[] = (product.sellingCosts ?? []).filter(
     (c) => c.channelId === channelId,
   );
@@ -124,53 +130,60 @@ function ProductCostsEditSheetContent({
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
     },
     onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : err.message || "저장에 실패했습니다"),
+      toast.error(
+        err instanceof ApiError ? err.message : err.message || "저장에 실패했습니다",
+      ),
   });
 
   const title = channelId ? `${channelName ?? "채널"} 전용 판매비용` : "전사 판매비용";
 
   return (
-    <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-      <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-        <SheetTitle>{title} 편집</SheetTitle>
-        <SheetDescription className="text-xs">
-          비용 항목을 추가/수정/삭제합니다. FIXED 금액은 VAT 포함값으로 입력하면 원가 계산 시 자동으로 공급가액 환산됩니다.
-        </SheetDescription>
-      </SheetHeader>
+    <JmDrawerContent
+      side="bottom"
+      size="xl"
+      className="flex flex-col p-0"
+      dragHandle={false}
+    >
+      <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+        <JmDrawerTitle>{title} 편집</JmDrawerTitle>
+        <JmDrawerDescription className="text-jm-xs">
+          비용 항목을 추가/수정/삭제합니다. FIXED 금액은 VAT 포함값으로 입력하면 원가
+          계산 시 자동으로 공급가액 환산됩니다.
+        </JmDrawerDescription>
+      </JmDrawerHeader>
 
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {rows.map((row) => (
-            <div key={row.rowId} className="rounded-md border border-border p-3 space-y-2">
+            <div
+              key={row.rowId}
+              className="rounded-md border border-[var(--jm-border)] p-3 space-y-2"
+            >
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_140px_auto] gap-2 items-end">
                 <FieldSm label="비용 항목명">
-                  <Input
+                  <JmInput
+                    size="sm"
                     value={row.name}
                     onChange={(e) => update(row.rowId, { name: e.target.value })}
+                    onFocus={focusCaretEnd}
                     placeholder="예: 포장비, 완충재"
-                    className="h-9"
                   />
                 </FieldSm>
                 <FieldSm label="유형">
-                  <Select
+                  <JmSelect
+                    size="sm"
+                    options={COST_TYPE_OPTIONS}
                     value={row.costType}
-                    onValueChange={(v) =>
+                    onChange={(v) =>
                       update(row.rowId, {
                         costType: (v ?? row.costType) as "FIXED" | "PERCENTAGE",
                       })
                     }
-                  >
-                    <SelectTrigger className="!h-9 w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FIXED">고정 금액</SelectItem>
-                      <SelectItem value="PERCENTAGE">비율 (%)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
                 </FieldSm>
                 <FieldSm label={row.costType === "FIXED" ? "금액 (VAT포함)" : "비율(%)"}>
-                  <Input
+                  <JmInput
+                    size="sm"
                     type="text"
                     inputMode={row.costType === "FIXED" ? "numeric" : "decimal"}
                     value={
@@ -184,102 +197,84 @@ function ProductCostsEditSheetContent({
                       update(row.rowId, { value: v });
                     }}
                     onFocus={focusCaretEnd}
-                    className="h-9"
                   />
                 </FieldSm>
-                <Button
+                <JmIconButton
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                  size="sm"
                   onClick={() => remove(row.rowId)}
                   aria-label="행 삭제"
+                  className="text-[var(--jm-danger-fg)]"
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                  <Trash2 />
+                </JmIconButton>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <FieldSm label="적용 단위">
-                  <Select
+                  <JmSelect
+                    size="sm"
+                    options={PER_UNIT_OPTIONS}
                     value={row.perUnit ? "true" : "false"}
-                    onValueChange={(v) =>
+                    onChange={(v) =>
                       update(row.rowId, { perUnit: v === "true" })
                     }
-                  >
-                    <SelectTrigger className="!h-9 w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">개당</SelectItem>
-                      <SelectItem value="false">건당</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
                 </FieldSm>
                 <FieldSm label="과세 여부">
-                  <Select
+                  <JmSelect
+                    size="sm"
+                    options={TAX_OPTIONS}
                     value={row.isTaxable ? "true" : "false"}
-                    onValueChange={(v) =>
+                    onChange={(v) =>
                       update(row.rowId, { isTaxable: v === "true" })
                     }
-                  >
-                    <SelectTrigger className="!h-9 w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">과세 (세금계산서)</SelectItem>
-                      <SelectItem value="false">면세</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
                 </FieldSm>
               </div>
             </div>
           ))}
 
-          <Button
+          <JmButton
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 w-full"
+            className="w-full"
             onClick={addRow}
           >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            비용 항목 추가
-          </Button>
+            <Plus />
+            <span>비용 항목 추가</span>
+          </JmButton>
         </div>
 
-        <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">
-          <Button
+        <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)] flex-shrink-0">
+          <JmButton
             type="button"
-            variant="outline"
+            variant="ghost"
             onClick={() => onOpenChange(false)}
             disabled={saveMutation.isPending}
           >
             취소
-          </Button>
-          <Button
+          </JmButton>
+          <JmButton
             type="button"
+            variant="cta"
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
           >
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-            저장
-          </Button>
+            {saveMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+            <span>저장</span>
+          </JmButton>
         </div>
       </div>
-    </SheetContent>
+    </JmDrawerContent>
   );
 }
 
-function FieldSm({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldSm({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-[11px] text-muted-foreground">{label}</Label>
+      <label className="text-jm-xs text-[var(--jm-text-muted)]">{label}</label>
       {children}
     </div>
   );

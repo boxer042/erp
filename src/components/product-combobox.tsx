@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { JmCombobox, type JmComboboxItem } from "@/jm";
 
 export interface ProductOption {
   id: string;
@@ -37,6 +37,10 @@ export interface ProductOption {
   productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
 }
 
+type ProductItem = JmComboboxItem & {
+  product: ProductOption;
+};
+
 interface ProductComboboxProps {
   products: ProductOption[];
   value: string;
@@ -48,6 +52,7 @@ interface ProductComboboxProps {
   placeholder?: string;
   disabled?: boolean;
   clearable?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
 const EMPTY_OPTION: ProductOption = {
@@ -61,6 +66,7 @@ const EMPTY_OPTION: ProductOption = {
   isSet: false,
 };
 
+/** JmCombobox 기반 판매상품 선택. */
 export function ProductCombobox({
   products,
   value,
@@ -69,56 +75,66 @@ export function ProductCombobox({
   placeholder = "상품 선택...",
   disabled = false,
   clearable = true,
+  size = "sm",
 }: ProductComboboxProps) {
-  const items = useMemo(() => {
+  const items = useMemo<ProductItem[]>(() => {
     // "set" 모드: 세트/조립상품 중 변형(canonicalProductId 가 있는) 은 가림. 대표 또는 단일만.
-    if (filterType === "set") return products.filter((p) => p.isSet && !p.canonicalProductId);
-    if (filterType === "component") return products.filter((p) => !p.isSet);
-    return products;
+    const filtered =
+      filterType === "set"
+        ? products.filter((p) => p.isSet && !p.canonicalProductId)
+        : filterType === "component"
+          ? products.filter((p) => !p.isSet)
+          : products;
+    return filtered.map((p) => ({
+      id: p.id,
+      label: `${p.name}${p.spec ? ` · ${p.spec}` : ""}`,
+      description: p.sku,
+      product: p,
+    }));
   }, [products, filterType]);
 
-  const selected = items.find((p) => p.id === value);
-  const selectedLabel = selected
-    ? `${selected.name}${selected.spec ? ` · ${selected.spec}` : ""} (${selected.sku})`
-    : undefined;
-
   return (
-    <ResponsiveCombobox<ProductOption>
+    <JmCombobox<ProductItem>
       items={items}
       value={value}
-      getItemId={(p) => p.id}
-      matches={(p, q) => {
+      size={size}
+      onChange={(item) => onChange(item.product)}
+      placeholder={placeholder}
+      searchPlaceholder="상품명·규격·SKU 검색..."
+      emptyMessage="상품이 없습니다"
+      clearable={clearable}
+      onClear={() => onChange(EMPTY_OPTION)}
+      disabled={disabled}
+      matches={(item, q) => {
         const lower = q.toLowerCase();
+        const p = item.product;
         return (
           p.name.toLowerCase().includes(lower) ||
           p.sku.toLowerCase().includes(lower) ||
           (p.spec?.toLowerCase().includes(lower) ?? false)
         );
       }}
-      onSelect={(p) => onChange(p)}
-      selectedLabel={selectedLabel}
-      placeholder={placeholder}
-      searchPlaceholder="상품명·규격·SKU 검색..."
-      mobileTitle="상품 선택"
-      clearable={clearable}
-      onClear={() => onChange(EMPTY_OPTION)}
-      disabled={disabled}
-      renderItem={(p) => (
-        <>
-          {p.isCanonical && (
-            <span className="mr-1.5 shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-              그룹
-            </span>
-          )}
-          <span className="flex-1 truncate">
-            {p.name}
-            {p.spec && (
-              <span className="ml-1 text-muted-foreground">· {p.spec}</span>
+      renderItem={(item) => {
+        const p = item.product;
+        return (
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            {p.isCanonical && (
+              <span className="shrink-0 rounded bg-[var(--jm-info-bg)] px-1.5 py-0.5 text-jm-2xs font-semibold text-[var(--jm-info-fg)]">
+                그룹
+              </span>
             )}
+            <span className="flex-1 truncate text-[var(--jm-text)]">
+              {p.name}
+              {p.spec && (
+                <span className="ml-1 text-[var(--jm-text-muted)]">· {p.spec}</span>
+              )}
+            </span>
+            <span className="ml-auto shrink-0 text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
+              {p.sku}
+            </span>
           </span>
-          <span className="ml-2 text-xs text-muted-foreground shrink-0">{p.sku}</span>
-        </>
-      )}
+        );
+      }}
     />
   );
 }

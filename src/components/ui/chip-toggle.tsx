@@ -41,10 +41,10 @@ export function ChipToggle<T extends string>({
             disabled={disabled}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "px-2 h-6 rounded text-[11px] border transition-colors inline-flex items-center disabled:opacity-50 disabled:cursor-not-allowed",
+              "px-2 h-6 rounded text-jm-2xs border transition-colors inline-flex items-center disabled:opacity-50 disabled:cursor-not-allowed",
               selected
-                ? "bg-primary/10 border-primary/40 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground hover:bg-muted",
+                ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)]"
+                : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
             )}
           >
             {opt.label}

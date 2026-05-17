@@ -26,7 +26,14 @@ export interface RepairTotalsInput {
 export interface RepairTotals {
   usedPartsTotal: number;
   laborTotal: number;
+  /** 입력된 진단비 (raw 값) */
   diagnosisFee: number;
+  /**
+   * 실제 청구되는 진단비.
+   * 정책: 수리 진행(부속·공임 합계 > 0) 시 진단비 면제.
+   * 수리 안 했을 때(부속·공임 0건) 만 진단비 청구.
+   */
+  effectiveDiagnosisFee: number;
   subtotal: number;
   discountAmount: number;
   finalTotal: number;
@@ -42,7 +49,13 @@ export function calcRepairTotals(input: RepairTotalsInput): RepairTotals {
     0,
   );
   const diagnosisFee = Number(input.diagnosisFee ?? 0) || 0;
-  const subtotal = usedPartsTotal + laborTotal + diagnosisFee;
+
+  // 진단비 정책: 수리 진행되면 진단비 면제(수리비에 흡수), 수리 안 했을 때만 청구.
+  // 부속·공임 0건 = 진단만 받고 손님 거절/포기 → 진단비 청구.
+  const hasRepairWork = usedPartsTotal > 0 || laborTotal > 0;
+  const effectiveDiagnosisFee = hasRepairWork ? 0 : diagnosisFee;
+
+  const subtotal = usedPartsTotal + laborTotal + effectiveDiagnosisFee;
 
   const td = (input.totalDiscount ?? "0").trim();
   const discountAmount = td.endsWith("%")
@@ -53,6 +66,7 @@ export function calcRepairTotals(input: RepairTotalsInput): RepairTotals {
     usedPartsTotal,
     laborTotal,
     diagnosisFee,
+    effectiveDiagnosisFee,
     subtotal,
     discountAmount,
     finalTotal: Math.max(0, subtotal - discountAmount),

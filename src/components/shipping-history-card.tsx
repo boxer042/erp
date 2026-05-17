@@ -1,23 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query-keys";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Pencil, ExternalLink, Loader2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { formatComma, parseComma } from "@/lib/utils";
+import Link from "next/link";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { ExternalLink, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
+
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import { focusCaretEnd } from "@/jm/lib/focus";
+import { formatComma, parseComma } from "@/lib/utils";
+import {
+  JmBadge,
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmCheckbox,
+  JmInput,
+  JmSkeleton,
+} from "@/jm";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
 type ShippingHistoryRow = {
   incomingItemId: string;
@@ -32,11 +38,14 @@ type ShippingHistoryRow = {
   itemShippingIsTaxable: boolean;
 };
 
-const SOURCE_LABEL: Record<ShippingHistoryRow["source"], { label: string; tone: "primary" | "muted" | "warn" }> = {
-  ITEM: { label: "품목 직접 입력", tone: "primary" },
-  ALLOCATED: { label: "전표 분배", tone: "muted" },
-  DEDUCTED: { label: "거래처 차감", tone: "warn" },
-  ZERO: { label: "0원(미입력)", tone: "muted" },
+const SOURCE_LABEL: Record<
+  ShippingHistoryRow["source"],
+  { label: string; variant: "info" | "default" | "warning" }
+> = {
+  ITEM: { label: "품목 직접 입력", variant: "info" },
+  ALLOCATED: { label: "전표 분배", variant: "default" },
+  DEDUCTED: { label: "거래처 차감", variant: "warning" },
+  ZERO: { label: "0원(미입력)", variant: "default" },
 };
 
 function fmtKrw(n: number) {
@@ -61,19 +70,26 @@ export function ShippingHistoryCard({
   const historyQuery = useQuery({
     queryKey,
     queryFn: () =>
-      apiGet<ShippingHistoryRow[]>(`/api/supplier-products/${supplierProductId}/shipping-history`),
+      apiGet<ShippingHistoryRow[]>(
+        `/api/supplier-products/${supplierProductId}/shipping-history`,
+      ),
   });
   const allRows = historyQuery.data ?? [];
   const rows = typeof limit === "number" ? allRows.slice(0, limit) : allRows;
   // 평균은 거래처 차감(DEDUCTED) 행을 제외 — 우리 부담 운임이 아니므로
   // 0원 행(정기 배송 0원)은 분모에 포함 (실제 우리 부담 0원이 발생한 회차)
   const avgRows = allRows.filter((r) => r.source !== "DEDUCTED");
-  const avgPerUnit = avgRows.length > 0
-    ? avgRows.reduce((s, r) => s + r.perUnitShipping, 0) / avgRows.length
-    : 0;
+  const avgPerUnit =
+    avgRows.length > 0
+      ? avgRows.reduce((s, r) => s + r.perUnitShipping, 0) / avgRows.length
+      : 0;
 
   const editMutation = useMutation({
-    mutationFn: (vars: { incomingItemId: string; itemShippingCost: string | null; itemShippingIsTaxable: boolean }) =>
+    mutationFn: (vars: {
+      incomingItemId: string;
+      itemShippingCost: string | null;
+      itemShippingIsTaxable: boolean;
+    }) =>
       apiMutate(`/api/incoming-items/${vars.incomingItemId}/shipping`, "PATCH", {
         itemShippingCost: vars.itemShippingCost,
         itemShippingIsTaxable: vars.itemShippingIsTaxable,
@@ -85,38 +101,45 @@ export function ShippingHistoryCard({
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "수정 실패"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "수정 실패"),
   });
 
   return (
-    <Card className="bg-card border-border">
+    <JmCard>
       {!hideTitle && (
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+        <JmCardHeader>
+          <JmCardTitle className="flex items-center justify-between">
             <span>
               입고 배송비 이력
-              {productNameById ? null : <span className="ml-1 text-[11px] text-muted-foreground/70">(최근 {rows.length}건)</span>}
+              {productNameById ? null : (
+                <span className="ml-1 text-jm-xs font-normal text-[var(--jm-text-muted)]">
+                  (최근 {rows.length}건)
+                </span>
+              )}
             </span>
             {readOnly && allRows.length > 0 && (
-              <span className="text-[11px] font-normal text-muted-foreground">
+              <span className="text-jm-xs font-normal text-[var(--jm-text-muted)]">
                 평균 ₩{fmtKrw(avgPerUnit)}/개 (VAT포함, 계산기 반영)
               </span>
             )}
-          </CardTitle>
-        </CardHeader>
+          </JmCardTitle>
+        </JmCardHeader>
       )}
-      <CardContent className="px-0 pb-0">
+      <JmCardContent className="px-0 pb-0">
         {historyQuery.isPending ? (
           <div className="px-6 pb-4 space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
+            <JmSkeleton className="h-6 w-full" />
+            <JmSkeleton className="h-6 w-full" />
           </div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">확정된 입고 이력이 없습니다</p>
+          <p className="text-jm-sm text-[var(--jm-text-muted)] py-6 text-center">
+            확정된 입고 이력이 없습니다
+          </p>
         ) : (
-          <table className="w-full text-[13px]">
+          <table className="w-full text-jm-sm">
             <thead>
-              <tr className="bg-muted text-muted-foreground text-xs border-b border-border">
+              <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-jm-xs border-b border-[var(--jm-border)]">
                 <th className="py-2 px-3 text-left font-medium">입고일</th>
                 <th className="py-2 px-3 text-left font-medium">전표</th>
                 <th className="py-2 px-3 text-right font-medium">수량</th>
@@ -130,39 +153,47 @@ export function ShippingHistoryCard({
               {rows.map((r) => {
                 const src = SOURCE_LABEL[r.source];
                 return (
-                  <tr key={r.incomingItemId} className="border-b border-border hover:bg-muted/50">
-                    <td className="px-3 py-2.5 text-muted-foreground tabular-nums">
+                  <tr
+                    key={r.incomingItemId}
+                    className="border-b border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]/50"
+                  >
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)] tabular-nums">
                       {format(new Date(r.incomingDate), "yyyy-MM-dd", { locale: ko })}
                     </td>
                     <td className="px-3 py-2.5">
                       <Link
                         href={`/inventory/incoming?incomingId=${r.incomingId}`}
-                        className="inline-flex items-center gap-1 text-foreground hover:text-primary underline-offset-4 hover:underline"
+                        className="inline-flex items-center gap-1 text-[var(--jm-text)] hover:text-[var(--jm-info-fg)] underline-offset-4 hover:underline"
                       >
                         {r.incomingNo}
                         <ExternalLink className="size-3" />
                       </Link>
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--jm-text-muted)]">
                       {parseFloat(r.quantity).toLocaleString("ko-KR")}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
+                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--jm-text)]">
                       ₩{fmtKrw(r.perUnitShipping)}
                     </td>
                     <td className="px-3 py-2.5">
-                      <Badge
-                        variant={src.tone === "primary" ? "default" : src.tone === "warn" ? "destructive" : "secondary"}
-                        className="text-[10px] font-normal"
+                      <JmBadge
+                        variant={src.variant}
+                        size="sm"
+                        shape="square"
+                        className="font-normal"
                       >
                         {src.label}
-                      </Badge>
+                      </JmBadge>
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground text-xs">
+                    <td className="px-3 py-2.5 text-[var(--jm-text-muted)] text-jm-xs">
                       {r.isTaxable ? "과세" : "면세"}
                     </td>
                     {!readOnly && (
                       <td className="py-2 text-center">
-                        <InlineShippingEditor row={r} onSave={(payload) => editMutation.mutate(payload)} />
+                        <InlineShippingEditor
+                          row={r}
+                          onSave={(payload) => editMutation.mutate(payload)}
+                        />
                       </td>
                     )}
                   </tr>
@@ -171,8 +202,8 @@ export function ShippingHistoryCard({
             </tbody>
           </table>
         )}
-      </CardContent>
-    </Card>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -181,10 +212,16 @@ function InlineShippingEditor({
   onSave,
 }: {
   row: ShippingHistoryRow;
-  onSave: (payload: { incomingItemId: string; itemShippingCost: string | null; itemShippingIsTaxable: boolean }) => void;
+  onSave: (payload: {
+    incomingItemId: string;
+    itemShippingCost: string | null;
+    itemShippingIsTaxable: boolean;
+  }) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(row.itemShippingCost ? String(parseFloat(row.itemShippingCost)) : "");
+  const [draft, setDraft] = useState(
+    row.itemShippingCost ? String(parseFloat(row.itemShippingCost)) : "",
+  );
   const [taxable, setTaxable] = useState(row.itemShippingIsTaxable);
   const handleOpen = (next: boolean) => {
     if (next) {
@@ -212,46 +249,56 @@ function InlineShippingEditor({
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpen}>
-      <PopoverTrigger className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted">
+    <PopoverPrimitive.Root open={open} onOpenChange={handleOpen}>
+      <PopoverPrimitive.Trigger className="p-1 rounded text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] transition-colors">
         <Pencil className="size-3.5" />
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" align="end">
-        <div className="space-y-3">
-          <div className="text-sm font-medium">이 품목 배송비 수정</div>
-          <div className="text-xs text-muted-foreground">
-            값을 입력하면 그 품목 한정 운임으로 적용. 비우면 전표 분배로 되돌립니다.
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">운임 (₩, VAT포함)</label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={formatComma(draft)}
-              onChange={(e) => setDraft(parseComma(e.target.value))}
-              onFocus={focusCaretEnd}
-              placeholder="비우면 분배 적용"
-              className="h-8"
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <Checkbox
-              checked={taxable}
-              onCheckedChange={(c) => setTaxable(c === true)}
-            />
-            <span>과세</span>
-          </label>
-          <div className="flex justify-between gap-2 pt-1">
-            <Button type="button" variant="ghost" size="sm" className="text-xs h-7" onClick={clear}>
-              비우기 (분배)
-            </Button>
-            <Button type="button" size="sm" className="text-xs h-7" onClick={apply}>
-              <Loader2 className="hidden" />
-              적용
-            </Button>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Positioner align="end" sideOffset={4} className="isolate z-50">
+          <PopoverPrimitive.Popup
+            data-jm-scope
+            className="z-50 w-72 rounded-xl bg-[var(--jm-surface)] p-3 ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
+          >
+            <div className="space-y-3">
+              <div className="text-jm-sm font-medium text-[var(--jm-text)]">
+                이 품목 배송비 수정
+              </div>
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">
+                값을 입력하면 그 품목 한정 운임으로 적용. 비우면 전표 분배로 되돌립니다.
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-jm-xs text-[var(--jm-text-muted)]">
+                  운임 (₩, VAT포함)
+                </label>
+                <JmInput
+                  size="sm"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatComma(draft)}
+                  onChange={(e) => setDraft(parseComma(e.target.value))}
+                  onFocus={focusCaretEnd}
+                  placeholder="비우면 분배 적용"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-jm-sm cursor-pointer select-none text-[var(--jm-text)]">
+                <JmCheckbox
+                  checked={taxable}
+                  onCheckedChange={(c) => setTaxable(c === true)}
+                />
+                <span>과세</span>
+              </label>
+              <div className="flex justify-between gap-2 pt-1">
+                <JmButton variant="ghost" size="sm" onClick={clear}>
+                  비우기 (분배)
+                </JmButton>
+                <JmButton variant="cta" size="sm" onClick={apply}>
+                  적용
+                </JmButton>
+              </div>
+            </div>
+          </PopoverPrimitive.Popup>
+        </PopoverPrimitive.Positioner>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }

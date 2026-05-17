@@ -1,6 +1,13 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  JmBadge,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { fmtNumber, formatDateOnly, LOT_SOURCE_LABELS } from "./helpers";
 import type { InventoryLotItem } from "./types";
 
@@ -11,108 +18,148 @@ interface ProductInventoryLotsTableProps {
   showVariantColumn?: boolean;
 }
 
-const SHIPPING_SOURCE_LABEL: Record<NonNullable<InventoryLotItem["shippingSource"]>, string> = {
+const SHIPPING_SOURCE_LABEL: Record<
+  NonNullable<InventoryLotItem["shippingSource"]>,
+  string
+> = {
   ITEM: "직접",
   ALLOCATED: "분배",
   DEDUCTED: "차감",
   ZERO: "0원",
 };
 
-export function ProductInventoryLotsTable({ lots, limit = 5, showVariantColumn }: ProductInventoryLotsTableProps) {
+export function ProductInventoryLotsTable({
+  lots,
+  limit = 5,
+  showVariantColumn,
+}: ProductInventoryLotsTableProps) {
   const slice = lots.slice(0, limit);
   if (slice.length === 0) {
     return (
-      <p className="text-center py-6 text-muted-foreground text-sm">
+      <p className="text-center py-6 text-[var(--jm-text-muted)] text-jm-sm">
         잔여 재고 로트가 없습니다
       </p>
     );
   }
   return (
-    <Table className="min-w-[820px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="h-9 px-3 text-xs">상태</TableHead>
+    <JmTable className="min-w-[820px]">
+      <JmTableHeader>
+        <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            상태
+          </JmTableHead>
           {showVariantColumn && (
-            <TableHead className="h-9 px-3 text-xs">변형</TableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+              변형
+            </JmTableHead>
           )}
-          <TableHead className="h-9 px-3 text-xs">입고일</TableHead>
-          <TableHead className="h-9 px-3 text-xs">전표</TableHead>
-          <TableHead className="h-9 px-3 text-xs">출처</TableHead>
-          <TableHead className="h-9 px-3 text-xs">공급자</TableHead>
-          <TableHead className="h-9 px-3 text-xs text-right">입고수량</TableHead>
-          <TableHead className="h-9 px-3 text-xs text-right">잔량</TableHead>
-          <TableHead className="h-9 px-3 text-xs text-right">단가</TableHead>
-          <TableHead className="h-9 px-3 text-xs text-right">배송비(개당)</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            입고일
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            전표
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            출처
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            공급자
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+            입고수량
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+            잔량
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+            단가
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+            배송비(개당)
+          </JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
         {slice.map((lot) => (
-          <TableRow
+          <JmTableRow
             key={lot.id}
-            className={lot.isCurrentlyConsuming ? "bg-primary/5 hover:bg-primary/10" : undefined}
+            className={
+              lot.isCurrentlyConsuming
+                ? "bg-[var(--jm-info-bg)]/30 hover:bg-[var(--jm-info-bg)]/50"
+                : undefined
+            }
           >
-            <TableCell className="px-3 py-2.5">
+            <JmTableCell className="px-3 py-2">
               {lot.isCurrentlyConsuming ? (
-                <Badge variant="default" className="text-[10px]">사용 중</Badge>
+                <JmBadge variant="info" size="sm" shape="square" className="text-jm-2xs">
+                  사용 중
+                </JmBadge>
               ) : (
-                <Badge variant="outline" className="text-[10px] text-muted-foreground">대기</Badge>
+                <JmBadge
+                  variant="outline"
+                  size="sm"
+                  shape="square"
+                  className="text-jm-2xs text-[var(--jm-text-muted)]"
+                >
+                  대기
+                </JmBadge>
               )}
-            </TableCell>
+            </JmTableCell>
             {showVariantColumn && (
-              <TableCell className="px-3 py-2.5 text-xs">
+              <JmTableCell className="px-3 py-2 text-jm-xs">
                 {lot.variant ? (
-                  <div className="flex flex-col">
-                    <span className="text-foreground">{lot.variant.sku}</span>
-                  </div>
+                  <span className="text-[var(--jm-text)]">{lot.variant.sku}</span>
                 ) : (
-                  <span className="text-muted-foreground">-</span>
+                  <span className="text-[var(--jm-text-muted)]">-</span>
                 )}
-              </TableCell>
+              </JmTableCell>
             )}
-            <TableCell className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+            <JmTableCell className="px-3 py-2 text-jm-xs text-[var(--jm-text-muted)] whitespace-nowrap">
               {formatDateOnly(lot.receivedAt)}
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-xs">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-jm-xs">
               {lot.incomingNo && lot.incomingId ? (
                 <Link
                   href={`/inventory/incoming?incomingId=${lot.incomingId}`}
-                  className="text-foreground hover:text-primary underline-offset-4 hover:underline"
+                  className="text-[var(--jm-text)] hover:text-[var(--jm-info-fg)] underline-offset-4 hover:underline"
                 >
                   {lot.incomingNo}
                 </Link>
               ) : (
-                <span className="text-muted-foreground">-</span>
+                <span className="text-[var(--jm-text-muted)]">-</span>
               )}
-            </TableCell>
-            <TableCell className="px-3 py-2.5">
-              <Badge variant="outline" className="text-[10px]">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2">
+              <JmBadge variant="outline" size="sm" shape="square" className="text-jm-2xs">
                 {LOT_SOURCE_LABELS[lot.source] ?? lot.source}
-              </Badge>
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">
+              </JmBadge>
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-jm-xs text-[var(--jm-text-muted)]">
               {lot.supplierProduct?.supplier.name ?? "-"}
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-right tabular-nums">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
               {fmtNumber(lot.receivedQty)}
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-right tabular-nums font-medium">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-right tabular-nums font-medium text-[var(--jm-text)]">
               {fmtNumber(lot.remainingQty)}
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-right tabular-nums">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
               ₩{fmtNumber(lot.unitCost)}
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-right tabular-nums">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-right tabular-nums">
               {lot.shippingPerUnit && lot.shippingPerUnit > 0 ? (
                 <div className="flex items-center justify-end gap-1.5">
-                  <span>₩{Math.round(lot.shippingPerUnit).toLocaleString("ko-KR")}</span>
+                  <span className="text-[var(--jm-text)]">
+                    ₩{Math.round(lot.shippingPerUnit).toLocaleString("ko-KR")}
+                  </span>
                   {lot.shippingSource && (
                     <span
-                      className={`text-[10px] px-1 py-0.5 rounded ${
+                      className={`text-jm-2xs px-1 py-0.5 rounded ${
                         lot.shippingSource === "ITEM"
-                          ? "bg-primary/10 text-primary"
+                          ? "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)]"
                           : lot.shippingSource === "DEDUCTED"
-                            ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
-                            : "bg-muted text-muted-foreground"
+                            ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
+                            : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
                       }`}
                     >
                       {SHIPPING_SOURCE_LABEL[lot.shippingSource]}
@@ -120,12 +167,12 @@ export function ProductInventoryLotsTable({ lots, limit = 5, showVariantColumn }
                   )}
                 </div>
               ) : (
-                <span className="text-xs text-muted-foreground">—</span>
+                <span className="text-jm-xs text-[var(--jm-text-muted)]">—</span>
               )}
-            </TableCell>
-          </TableRow>
+            </JmTableCell>
+          </JmTableRow>
         ))}
-      </TableBody>
-    </Table>
+      </JmTableBody>
+    </JmTable>
   );
 }

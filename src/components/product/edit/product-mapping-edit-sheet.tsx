@@ -1,27 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
-import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { SupplierProductCombobox } from "@/components/supplier-product-combobox";
 import {
-  QuickSupplierSheet,
   QuickSupplierProductSheet,
+  QuickSupplierSheet,
 } from "@/components/quick-register-sheets";
 import { ApiError, apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -30,6 +19,16 @@ import {
   type ExistingProductMapping,
   type ProductMappingRow,
 } from "@/lib/product-mutations";
+import {
+  JmButton,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerDescription,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmIconButton,
+  JmInput,
+} from "@/jm";
 import type { ProductDetail } from "../types";
 
 interface SupplierLite {
@@ -55,15 +54,14 @@ interface ProductMappingEditSheetProps {
 
 export function ProductMappingEditSheet(props: ProductMappingEditSheetProps) {
   return (
-    <Sheet open={props.open} onOpenChange={props.onOpenChange}>
+    <JmDrawer open={props.open} onOpenChange={props.onOpenChange}>
       {props.open && <ProductMappingEditSheetContent {...props} />}
-    </Sheet>
+    </JmDrawer>
   );
 }
 
 interface RowState {
   rowId: string;
-  /** null = 신규 행 */
   mappingId: string | null;
   supplierId: string;
   supplierName: string;
@@ -88,7 +86,6 @@ function ProductMappingEditSheetContent({
 }: ProductMappingEditSheetProps) {
   const queryClient = useQueryClient();
 
-  // 초기 행: 기존 매핑 모두 표시
   const [rows, setRows] = useState<RowState[]>(() => {
     const existing = product.productMappings ?? [];
     if (existing.length === 0) return [newRow()];
@@ -116,7 +113,6 @@ function ProductMappingEditSheetContent({
 
   const addRow = () => setRows((prev) => [...prev, newRow()]);
 
-  // QuickSheet 상태 — 어느 행 컨텍스트인지 추적
   const [quickSupplierFor, setQuickSupplierFor] = useState<string | null>(null);
   const [quickSupplierName, setQuickSupplierName] = useState("");
   const [quickSpFor, setQuickSpFor] = useState<string | null>(null);
@@ -124,7 +120,6 @@ function ProductMappingEditSheetContent({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // 검증: SP 미선택 행 제거, 같은 SP 중복 차단
       const filled = rows.filter((r) => r.supplierProductId);
       const seen = new Set<string>();
       for (const r of filled) {
@@ -158,18 +153,27 @@ function ProductMappingEditSheetContent({
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
     },
     onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : err.message || "저장에 실패했습니다"),
+      toast.error(
+        err instanceof ApiError ? err.message : err.message || "저장에 실패했습니다",
+      ),
   });
 
   return (
     <>
-      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-        <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-          <SheetTitle>공급자 매핑 편집</SheetTitle>
-          <SheetDescription className="text-xs">
-            이 판매상품을 어느 거래처의 어떤 공급상품으로 환산할지 지정합니다. 한 상품에 여러 공급자 매핑을 둘 수 있습니다. 입고비용은 거래처 상품 상세에서 별도로 관리.
-          </SheetDescription>
-        </SheetHeader>
+      <JmDrawerContent
+        side="bottom"
+        size="xl"
+        className="flex flex-col p-0"
+        dragHandle={false}
+      >
+        <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+          <JmDrawerTitle>공급자 매핑 편집</JmDrawerTitle>
+          <JmDrawerDescription className="text-jm-xs">
+            이 판매상품을 어느 거래처의 어떤 공급상품으로 환산할지 지정합니다. 한
+            상품에 여러 공급자 매핑을 둘 수 있습니다. 입고비용은 거래처 상품 상세에서
+            별도로 관리.
+          </JmDrawerDescription>
+        </JmDrawerHeader>
 
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
@@ -191,38 +195,39 @@ function ProductMappingEditSheetContent({
               />
             ))}
 
-            <Button
+            <JmButton
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 w-full"
+              className="w-full"
               onClick={addRow}
             >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              매핑 추가
-            </Button>
+              <Plus />
+              <span>매핑 추가</span>
+            </JmButton>
           </div>
 
-          <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">
-            <Button
+          <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)] flex-shrink-0">
+            <JmButton
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={saveMutation.isPending}
             >
               취소
-            </Button>
-            <Button
+            </JmButton>
+            <JmButton
               type="button"
+              variant="cta"
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
             >
-              {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              저장
-            </Button>
+              {saveMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              <span>저장</span>
+            </JmButton>
           </div>
         </div>
-      </SheetContent>
+      </JmDrawerContent>
 
       <QuickSupplierSheet
         open={quickSupplierFor !== null}
@@ -290,7 +295,6 @@ function MappingRow({
   onCreateSupplier,
   onCreateSp,
 }: MappingRowProps) {
-  // 거래처가 선택돼야 SP 후보 fetch (행마다 독립적으로)
   const spsQuery = useQuery({
     queryKey: queryKeys.supplierProducts.list({ supplierId: row.supplierId }),
     queryFn: () =>
@@ -301,7 +305,7 @@ function MappingRow({
   });
 
   return (
-    <div className="rounded-md border border-border p-3 space-y-2">
+    <div className="rounded-md border border-[var(--jm-border)] p-3 space-y-2">
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px_auto] gap-2 items-end">
         <FieldSm label="거래처">
           <SupplierCombobox
@@ -311,7 +315,6 @@ function MappingRow({
               onUpdate({
                 supplierId: id,
                 supplierName: name,
-                // 거래처 바뀌면 SP 선택 초기화
                 supplierProductId: "",
                 supplierProductName: "",
               });
@@ -330,13 +333,14 @@ function MappingRow({
             disabled={!row.supplierId}
           />
           {!row.supplierId && (
-            <p className="text-[10px] text-muted-foreground mt-0.5">
+            <p className="text-jm-2xs text-[var(--jm-text-muted)] mt-0.5">
               거래처를 먼저 선택
             </p>
           )}
         </FieldSm>
         <FieldSm label="변환비율">
-          <Input
+          <JmInput
+            size="sm"
             type="text"
             inputMode="decimal"
             value={row.conversionRate}
@@ -347,34 +351,27 @@ function MappingRow({
               }
             }}
             onFocus={focusCaretEnd}
-            className="h-9"
           />
         </FieldSm>
-        <Button
+        <JmIconButton
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+          size="sm"
           onClick={onRemove}
           aria-label="행 삭제"
+          className="text-[var(--jm-danger-fg)]"
         >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+          <Trash2 />
+        </JmIconButton>
       </div>
     </div>
   );
 }
 
-function FieldSm({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldSm({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-[11px] text-muted-foreground">{label}</Label>
+      <label className="text-jm-xs text-[var(--jm-text-muted)]">{label}</label>
       {children}
     </div>
   );

@@ -126,13 +126,29 @@ RECEIVED → DIAGNOSING → QUOTED → APPROVED → REPAIRING → READY → PICK
             (진단중)     (견적     (손님       (작업중)    (픽업    (인계)
                          송부)    승인)                  대기)
 
-         ↓ 어디서든
-      CANCELLED
+         ↓ 어디서든                    ↓ reject_after_quote
+      CANCELLED                      READY (진단비만 청구)
 ```
 
 `type`:
 - **ON_SITE** (즉시수리) — 손님 매장 대기, 보통 RECEIVED → REPAIRING 직진
 - **DROP_OFF** (맡김수리) — 정상 흐름. QUOTED 단계에서 `approvalToken` 으로 손님이 [/repair/approve/[token]](../src/app/repair/approve/[token]/page.tsx) 에서 원격 승인
+
+### 진단비만 청구 거절 (`reject_after_quote`)
+
+손님이 수리를 포기하거나 매장이 부속 수급 불가로 못 할 때, **진단까지 한 작업값(진단비)은 청구**하는 흐름.
+
+- **허용 단계**: DROP_OFF 는 DIAGNOSING/QUOTED, ON_SITE 는 REPAIRING (새수리 드로워가 바로 REPAIRING 진입시키므로)
+- **전이**: 현재 단계 → `READY` 직행 (APPROVED/완료 건너뜀) → 픽업/결제 흐름 그대로
+- **청구 로직**: [`calcRepairTotals`](../src/lib/repair.ts) 의 `effectiveDiagnosisFee` — 부속·공임 0건일 때만 진단비 청구. 거절 케이스는 부속·공임 없으니 진단비만 청구됨
+- **가드**: 부속·공임이 등록돼 있으면 차단 — 차감된 재고 복원이 필요하므로 cancel 흐름(`CUSTOMER_DECLINED`) 사용
+- **사유 기록**: `quoteRejectReason` enum (손님 사유 4 + 매장 사유 2 + OTHER), `quoteRejectMemo`, `quoteRejectedAt`. 어드민 [수리 통계](../src/app/(dashboard)/repairs/stats/page.tsx) 의 "견적 거절 분석" 카드에서 거절률·사유 분포·평균 견적가 집계
+- **하단 버튼**: 해당 단계에서 푸터에 `[진단비만]` (좌, outline) + 기존 primary 버튼 (우) 50/50 분할
+- **cancel 과 구분**: cancel + `CUSTOMER_DECLINED`/`PARTS_UNAVAILABLE` 는 "진단비도 면제하고 CANCELLED", reject 는 "진단비는 청구하고 READY". 두 길 모두 유지
+
+### 헤더 액션 메뉴 (칩 dropdown)
+
+수리 진행 페이지 헤더 좌측의 **상태/타입 칩 자체가 dropdown trigger** ([`_repair-action-menu.tsx`](../src/app/(pos)/pos/repairs/[id]/_repair-action-menu.tsx)). `● 수리중 [즉시] ▾` 클릭 → 즉시↔맡김 변경 / 수리 취소 메뉴. standalone 페이지와 customer 페이지 양쪽이 같은 컴포넌트 사용. readonly(PICKED_UP/CANCELLED) 는 칩만 표시.
 
 ### 수리관리 페이지 섹션 (우선순위 순)
 

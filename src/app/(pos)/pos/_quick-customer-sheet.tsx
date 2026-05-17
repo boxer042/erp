@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
 import { BottomSheet } from "./_components/bottom-sheet";
@@ -82,6 +83,8 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
   const [businessNumber, setBusinessNumber] = useState("");
   /** 사용자가 토글을 직접 만지면 자동 감지 중단 */
   const [autoTypeLocked, setAutoTypeLocked] = useState(false);
+  /** 시리얼 조회 서비스 동의 — 기본 ON, 손님이 거부하면 해제 */
+  const [serialConsent, setSerialConsent] = useState(true);
 
   // 이름 변경 시 자동 감지 (사용자가 토글 직접 안 만졌을 때만)
   useEffect(() => {
@@ -98,6 +101,7 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
     ...(isBusiness && businessNumber
       ? { businessNumber: digitsOnly(businessNumber) }
       : {}),
+    serialServiceConsent: serialConsent,
     ...(allowDuplicate ? { allowDuplicatePhone: true } : {}),
   });
 
@@ -255,6 +259,32 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
             )}
           </Field>
         )}
+
+        {/* 시리얼 조회 서비스 이용 동의 (PIPA) */}
+        <button
+          type="button"
+          onClick={() => setSerialConsent((v) => !v)}
+          className="flex items-start gap-2.5 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3 text-left"
+        >
+          <span
+            className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border ${
+              serialConsent
+                ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-white"
+                : "border-[var(--jm-border-strong)] bg-[var(--jm-bg)]"
+            }`}
+          >
+            {serialConsent && <Check className="size-3.5" strokeWidth={3} />}
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold text-[var(--jm-text)]">
+              시리얼 조회 서비스 이용 동의
+            </span>
+            <span className="text-[11px] leading-relaxed text-[var(--jm-text-muted)]">
+              제품 라벨 QR 로 보증·수리·구매내역을 본인이 조회할 수 있습니다.
+              미동의 시 라벨에 QR 이 인쇄되지 않습니다.
+            </span>
+          </span>
+        </button>
 
         <p className="text-[12px] text-[var(--jm-text-muted)]">
           {isBusiness

@@ -1,34 +1,52 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { PAYMENT_METHODS } from "@/lib/constants";
-import { digitsOnly, formatBusinessNumber, formatPhone, formatComma, parseComma } from "@/lib/utils";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
+import {
+  digitsOnly,
+  formatBusinessNumber,
+  formatComma,
+  formatPhone,
+  parseComma,
+} from "@/lib/utils";
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { NameAutocomplete } from "@/components/new-product-form/parts";
+import {
+  JmButton,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerDescription,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmIconButton,
+  JmInput,
+  JmScrollArea,
+  JmSelect,
+} from "@/jm";
 
 // ─── 공통 필드 행 ───
 
-function FieldRow({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+function FieldRow({
+  label,
+  children,
+  required,
+}: {
+  label: string;
+  children: React.ReactNode;
+  required?: boolean;
+}) {
   return (
     <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-      <Label className="text-right text-[13px] text-muted-foreground shrink-0">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
-      </Label>
+      <label className="text-right text-jm-sm text-[var(--jm-text-muted)] shrink-0">
+        {label}
+        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
+      </label>
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -47,7 +65,13 @@ interface ContactForm {
   memo: string;
 }
 
-const emptyContact = (): ContactForm => ({ name: "", phone: "", email: "", position: "", memo: "" });
+const emptyContact = (): ContactForm => ({
+  name: "",
+  phone: "",
+  email: "",
+  position: "",
+  memo: "",
+});
 
 interface SupplierFormData {
   id?: string;
@@ -68,10 +92,34 @@ interface SupplierFormData {
 }
 
 const emptySupplierForm: SupplierFormData = {
-  name: "", businessNumber: "", representative: "", phone: "", fax: "",
-  email: "", address: "", bankName: "", bankAccount: "", bankHolder: "",
-  paymentMethod: "CREDIT", paymentTermDays: 30, memo: "", contacts: [],
+  name: "",
+  businessNumber: "",
+  representative: "",
+  phone: "",
+  fax: "",
+  email: "",
+  address: "",
+  bankName: "",
+  bankAccount: "",
+  bankHolder: "",
+  paymentMethod: "CREDIT",
+  paymentTermDays: 30,
+  memo: "",
+  contacts: [],
 };
+
+const PAYMENT_METHOD_OPTIONS = PAYMENT_METHODS.map((m) => ({
+  value: m.value,
+  label: m.label,
+}));
+
+const UNIT_OPTIONS = [
+  { value: "EA", label: "EA (개)" },
+  { value: "BOX", label: "BOX (박스)" },
+  { value: "KG", label: "KG" },
+  { value: "L", label: "L (리터)" },
+  { value: "SET", label: "SET (세트)" },
+];
 
 interface QuickSupplierSheetProps {
   open: boolean;
@@ -83,34 +131,40 @@ interface QuickSupplierSheetProps {
 }
 
 export function QuickSupplierSheet({
-  open, onOpenChange, defaultName = "", editData, onCreated, onUpdated,
+  open,
+  onOpenChange,
+  defaultName = "",
+  editData,
+  onCreated,
+  onUpdated,
 }: QuickSupplierSheetProps) {
   const [form, setForm] = useState<SupplierFormData>(emptySupplierForm);
   const [submitting, setSubmitting] = useState(false);
   const isEdit = !!editData?.id;
 
-  // open + defaultName/editData가 변경될 때 form 초기화
   useEffect(() => {
     if (open) {
       setForm(editData ? editData : { ...emptySupplierForm, name: defaultName });
     }
   }, [open, defaultName, editData]);
 
-  const handleOpenChange = (v: boolean) => {
-    onOpenChange(v);
-  };
-
   const update = (field: keyof SupplierFormData, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // 담당자 관리
-  const addContact = () => setForm((prev) => ({ ...prev, contacts: [...prev.contacts, emptyContact()] }));
-  const removeContact = (i: number) => setForm((prev) => ({ ...prev, contacts: prev.contacts.filter((_, idx) => idx !== i) }));
+  const addContact = () =>
+    setForm((prev) => ({ ...prev, contacts: [...prev.contacts, emptyContact()] }));
+  const removeContact = (i: number) =>
+    setForm((prev) => ({
+      ...prev,
+      contacts: prev.contacts.filter((_, idx) => idx !== i),
+    }));
   const updateContact = (i: number, field: keyof ContactForm, value: string) => {
     setForm((prev) => ({
       ...prev,
-      contacts: prev.contacts.map((c, idx) => idx === i ? { ...c, [field]: value } : c),
+      contacts: prev.contacts.map((c, idx) =>
+        idx === i ? { ...c, [field]: value } : c,
+      ),
     }));
   };
 
@@ -154,14 +208,28 @@ export function QuickSupplierSheet({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        const msg = err?.error?.formErrors?.[0] || (typeof err?.error === "string" ? err.error : (isEdit ? "거래처 수정 실패" : "거래처 등록 실패"));
+        const msg =
+          err?.error?.formErrors?.[0] ||
+          (typeof err?.error === "string"
+            ? err.error
+            : isEdit
+              ? "거래처 수정 실패"
+              : "거래처 등록 실패");
         toast.error(msg);
         return;
       }
       const created = await res.json();
-      toast.success(isEdit ? `거래처 "${form.name.trim()}" 수정 완료` : `거래처 "${form.name.trim()}" 등록 완료`);
+      toast.success(
+        isEdit
+          ? `거래처 "${form.name.trim()}" 수정 완료`
+          : `거래처 "${form.name.trim()}" 등록 완료`,
+      );
       onOpenChange(false);
-      if (isEdit) { onUpdated?.(); } else { onCreated({ id: created.id, name: created.name }); }
+      if (isEdit) {
+        onUpdated?.();
+      } else {
+        onCreated({ id: created.id, name: created.name });
+      }
     } catch {
       toast.error("오류가 발생했습니다");
     } finally {
@@ -170,154 +238,238 @@ export function QuickSupplierSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
-        <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-          <SheetTitle>{isEdit ? "거래처 수정" : "거래처 등록"}</SheetTitle>
-          <SheetDescription className="sr-only">{isEdit ? "거래처를 수정합니다" : "새 거래처를 등록합니다"}</SheetDescription>
-        </SheetHeader>
+    <JmDrawer open={open} onOpenChange={onOpenChange}>
+      <JmDrawerContent
+        side="bottom"
+        size="xl"
+        className="flex flex-col p-0"
+        dragHandle={false}
+      >
+        <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+          <JmDrawerTitle>{isEdit ? "거래처 수정" : "거래처 등록"}</JmDrawerTitle>
+          <JmDrawerDescription className="sr-only">
+            {isEdit ? "거래처를 수정합니다" : "새 거래처를 등록합니다"}
+          </JmDrawerDescription>
+        </JmDrawerHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <JmScrollArea className="flex-1 min-h-0">
           <div className="px-5 py-5 space-y-5">
-          {/* 기본 정보 */}
-          <div className="space-y-3">
-            <FieldRow label="거래처명" required>
-              <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} />
-            </FieldRow>
-            <FieldRow label="사업자번호">
-              <Input
-                value={formatBusinessNumber(form.businessNumber)}
-                onChange={(e) => update("businessNumber", digitsOnly(e.target.value))}
-                placeholder="1234567890"
-              />
-            </FieldRow>
-            <FieldRow label="대표자">
-              <Input value={form.representative} onChange={(e) => update("representative", e.target.value)} />
-            </FieldRow>
-            <FieldRow label="전화번호">
-              <Input
-                value={formatPhone(form.phone)}
-                onChange={(e) => update("phone", digitsOnly(e.target.value))}
-                placeholder="0212345678"
-              />
-            </FieldRow>
-            <FieldRow label="FAX">
-              <Input
-                value={formatPhone(form.fax)}
-                onChange={(e) => update("fax", digitsOnly(e.target.value))}
-                placeholder="0212345678"
-              />
-            </FieldRow>
-            <FieldRow label="이메일">
-              <Input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="example@email.com" />
-            </FieldRow>
-            <FieldRow label="사업지 주소">
-              <Input value={form.address} onChange={(e) => update("address", e.target.value)} />
-            </FieldRow>
-            <FieldRow label="은행명">
-              <Input value={form.bankName} onChange={(e) => update("bankName", e.target.value)} placeholder="국민은행" />
-            </FieldRow>
-            <FieldRow label="계좌번호">
-              <Input
-                value={form.bankAccount}
-                onChange={(e) => update("bankAccount", digitsOnly(e.target.value))}
-                placeholder="숫자만 입력"
-              />
-            </FieldRow>
-            <FieldRow label="예금주">
-              <Input value={form.bankHolder} onChange={(e) => update("bankHolder", e.target.value)} />
-            </FieldRow>
-            <FieldRow label="결제 방식">
-              <Select value={form.paymentMethod} onValueChange={(v) => update("paymentMethod", v ?? "CREDIT")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldRow>
-            <FieldRow label="결제 기한 (일)">
-              <Input type="number" min="0" value={form.paymentTermDays} onChange={(e) => update("paymentTermDays", parseInt(e.target.value) || 0)} />
-            </FieldRow>
-            <FieldRow label="메모">
-              <Input value={form.memo} onChange={(e) => update("memo", e.target.value)} placeholder="특이사항" />
-            </FieldRow>
-          </div>
-
-          {/* 담당자 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-medium">담당자</span>
-              <Button variant="ghost" size="sm" className="h-7 text-[12px] text-primary" onClick={addContact}>
-                <Plus className="h-3.5 w-3.5 mr-1" />추가
-              </Button>
+            {/* 기본 정보 */}
+            <div className="space-y-3">
+              <FieldRow label="거래처명" required>
+                <JmInput
+                  size="sm"
+                  autoFocus
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  onFocus={focusCaretEnd}
+                />
+              </FieldRow>
+              <FieldRow label="사업자번호">
+                <JmInput
+                  size="sm"
+                  value={formatBusinessNumber(form.businessNumber)}
+                  onChange={(e) => update("businessNumber", digitsOnly(e.target.value))}
+                  placeholder="1234567890"
+                />
+              </FieldRow>
+              <FieldRow label="대표자">
+                <JmInput
+                  size="sm"
+                  value={form.representative}
+                  onChange={(e) => update("representative", e.target.value)}
+                  onFocus={focusCaretEnd}
+                />
+              </FieldRow>
+              <FieldRow label="전화번호">
+                <JmInput
+                  size="sm"
+                  value={formatPhone(form.phone)}
+                  onChange={(e) => update("phone", digitsOnly(e.target.value))}
+                  placeholder="0212345678"
+                />
+              </FieldRow>
+              <FieldRow label="FAX">
+                <JmInput
+                  size="sm"
+                  value={formatPhone(form.fax)}
+                  onChange={(e) => update("fax", digitsOnly(e.target.value))}
+                  placeholder="0212345678"
+                />
+              </FieldRow>
+              <FieldRow label="이메일">
+                <JmInput
+                  size="sm"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => update("email", e.target.value)}
+                  onFocus={focusCaretEnd}
+                  placeholder="example@email.com"
+                />
+              </FieldRow>
+              <FieldRow label="사업지 주소">
+                <JmInput
+                  size="sm"
+                  value={form.address}
+                  onChange={(e) => update("address", e.target.value)}
+                  onFocus={focusCaretEnd}
+                />
+              </FieldRow>
+              <FieldRow label="은행명">
+                <JmInput
+                  size="sm"
+                  value={form.bankName}
+                  onChange={(e) => update("bankName", e.target.value)}
+                  onFocus={focusCaretEnd}
+                  placeholder="국민은행"
+                />
+              </FieldRow>
+              <FieldRow label="계좌번호">
+                <JmInput
+                  size="sm"
+                  value={form.bankAccount}
+                  onChange={(e) => update("bankAccount", digitsOnly(e.target.value))}
+                  placeholder="숫자만 입력"
+                />
+              </FieldRow>
+              <FieldRow label="예금주">
+                <JmInput
+                  size="sm"
+                  value={form.bankHolder}
+                  onChange={(e) => update("bankHolder", e.target.value)}
+                  onFocus={focusCaretEnd}
+                />
+              </FieldRow>
+              <FieldRow label="결제 방식">
+                <JmSelect
+                  size="sm"
+                  options={PAYMENT_METHOD_OPTIONS}
+                  value={form.paymentMethod}
+                  onChange={(v) => update("paymentMethod", v)}
+                />
+              </FieldRow>
+              <FieldRow label="결제 기한 (일)">
+                <JmInput
+                  size="sm"
+                  type="number"
+                  min="0"
+                  value={String(form.paymentTermDays)}
+                  onChange={(e) =>
+                    update("paymentTermDays", parseInt(e.target.value) || 0)
+                  }
+                />
+              </FieldRow>
+              <FieldRow label="메모">
+                <JmInput
+                  size="sm"
+                  value={form.memo}
+                  onChange={(e) => update("memo", e.target.value)}
+                  onFocus={focusCaretEnd}
+                  placeholder="특이사항"
+                />
+              </FieldRow>
             </div>
 
-            {form.contacts.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-3">등록된 담당자가 없습니다</p>
-            ) : (
-              <div className="-mx-5 border-y border-border">
-                <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="bg-muted text-muted-foreground text-xs">
-                      <th className="py-2 px-3 text-left font-medium">이름</th>
-                      <th className="py-2 px-3 text-left font-medium">휴대폰</th>
-                      <th className="py-2 px-3 text-left font-medium hidden sm:table-cell">직책</th>
-                      <th className="py-2 w-9"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {form.contacts.map((c, i) => (
-                      <tr key={i} className="border-t border-border">
-                        <td className="px-2 py-1">
-                          <Input
-                            value={c.name}
-                            onChange={(e) => updateContact(i, "name", e.target.value)}
-                            className="h-8 text-[13px]"
-                            placeholder="이름 *"
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input
-                            value={formatPhone(c.phone)}
-                            onChange={(e) => updateContact(i, "phone", digitsOnly(e.target.value))}
-                            className="h-8 text-[13px]"
-                            placeholder="01012345678"
-                          />
-                        </td>
-                        <td className="px-2 py-1 hidden sm:table-cell">
-                          <Input
-                            value={c.position}
-                            onChange={(e) => updateContact(i, "position", e.target.value)}
-                            className="h-8 text-[13px]"
-                            placeholder="직책"
-                          />
-                        </td>
-                        <td className="px-1 py-1">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => removeContact(i)}>
-                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* 담당자 */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-jm-sm font-medium text-[var(--jm-text)]">담당자</span>
+                <JmButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={addContact}
+                  className="text-[var(--jm-info-fg)]"
+                >
+                  <Plus />
+                  <span>추가</span>
+                </JmButton>
               </div>
-            )}
-          </div>
-          </div>
-        </ScrollArea>
 
-        <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-          <Button onClick={handleSubmit} disabled={!form.name.trim() || submitting}>
-            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {isEdit ? "수정" : "등록"}
-          </Button>
+              {form.contacts.length === 0 ? (
+                <p className="text-jm-xs text-[var(--jm-text-muted)] text-center py-3">
+                  등록된 담당자가 없습니다
+                </p>
+              ) : (
+                <div className="-mx-5 border-y border-[var(--jm-border)]">
+                  <table className="w-full text-jm-sm">
+                    <thead>
+                      <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-jm-xs">
+                        <th className="py-2 px-3 text-left font-medium">이름</th>
+                        <th className="py-2 px-3 text-left font-medium">휴대폰</th>
+                        <th className="py-2 px-3 text-left font-medium hidden sm:table-cell">
+                          직책
+                        </th>
+                        <th className="py-2 w-9"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.contacts.map((c, i) => (
+                        <tr key={i} className="border-t border-[var(--jm-border)]">
+                          <td className="px-2 py-1">
+                            <JmInput
+                              size="sm"
+                              value={c.name}
+                              onChange={(e) => updateContact(i, "name", e.target.value)}
+                              onFocus={focusCaretEnd}
+                              placeholder="이름 *"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <JmInput
+                              size="sm"
+                              value={formatPhone(c.phone)}
+                              onChange={(e) =>
+                                updateContact(i, "phone", digitsOnly(e.target.value))
+                              }
+                              placeholder="01012345678"
+                            />
+                          </td>
+                          <td className="px-2 py-1 hidden sm:table-cell">
+                            <JmInput
+                              size="sm"
+                              value={c.position}
+                              onChange={(e) =>
+                                updateContact(i, "position", e.target.value)
+                              }
+                              onFocus={focusCaretEnd}
+                              placeholder="직책"
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <JmIconButton
+                              aria-label="담당자 삭제"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removeContact(i)}
+                            >
+                              <Trash2 />
+                            </JmIconButton>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </JmScrollArea>
+
+        <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)] flex-shrink-0">
+          <JmButton variant="ghost" onClick={() => onOpenChange(false)}>
+            취소
+          </JmButton>
+          <JmButton
+            variant="cta"
+            onClick={handleSubmit}
+            disabled={!form.name.trim() || submitting}
+          >
+            {submitting && <Loader2 className="size-4 animate-spin" />}
+            <span>{isEdit ? "수정" : "등록"}</span>
+          </JmButton>
         </div>
-      </SheetContent>
-    </Sheet>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }
 
@@ -336,7 +488,13 @@ interface QuickSupplierProductSheetProps {
 }
 
 export function QuickSupplierProductSheet({
-  open, onOpenChange, supplierId, supplierName, defaultName = "", isProvisional = false, onCreated,
+  open,
+  onOpenChange,
+  supplierId,
+  supplierName,
+  defaultName = "",
+  isProvisional = false,
+  onCreated,
 }: QuickSupplierProductSheetProps) {
   const [name, setName] = useState(defaultName);
   const [supplierCode, setSupplierCode] = useState("");
@@ -365,12 +523,15 @@ export function QuickSupplierProductSheet({
   );
 
   useEffect(() => {
-    if (open) { setName(defaultName); setSupplierCode(""); setUnitOfMeasure("EA"); setListPrice(""); setUnitPrice(""); setIsTaxable(true); }
+    if (open) {
+      setName(defaultName);
+      setSupplierCode("");
+      setUnitOfMeasure("EA");
+      setListPrice("");
+      setUnitPrice("");
+      setIsTaxable(true);
+    }
   }, [open, defaultName]);
-
-  const handleOpenChange = (v: boolean) => {
-    onOpenChange(v);
-  };
 
   const handleSubmit = async () => {
     if (!name.trim() || !supplierId) return;
@@ -401,80 +562,118 @@ export function QuickSupplierProductSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
-        <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-          <SheetTitle>공급상품 등록</SheetTitle>
-          <SheetDescription>거래처: <strong>{supplierName}</strong></SheetDescription>
-        </SheetHeader>
-        <ScrollArea className="flex-1 min-h-0">
+    <JmDrawer open={open} onOpenChange={onOpenChange}>
+      <JmDrawerContent
+        side="bottom"
+        size="xl"
+        className="flex flex-col p-0"
+        dragHandle={false}
+      >
+        <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+          <JmDrawerTitle>공급상품 등록</JmDrawerTitle>
+          <JmDrawerDescription>
+            거래처: <strong className="text-[var(--jm-text)]">{supplierName}</strong>
+          </JmDrawerDescription>
+        </JmDrawerHeader>
+        <JmScrollArea className="flex-1 min-h-0">
           <div className="px-5 py-5 space-y-3">
-          <FieldRow label="상품명" required>
-            <NameAutocomplete
-              autoFocus
-              value={name}
-              onChange={setName}
-              items={nameItems}
-              placeholder="공급상품명을 입력하세요"
-              warningLabel="이미 등록된 공급상품"
-              inputClassName=""
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) handleSubmit();
-              }}
-            />
-          </FieldRow>
-          <FieldRow label="품번">
-            <Input value={supplierCode} onChange={(e) => setSupplierCode(e.target.value)} placeholder="공급자 코드" />
-          </FieldRow>
-          <FieldRow label="단위">
-            <Select value={unitOfMeasure} onValueChange={(v) => setUnitOfMeasure(v ?? "EA")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="EA">EA (개)</SelectItem>
-                <SelectItem value="BOX">BOX (박스)</SelectItem>
-                <SelectItem value="KG">KG</SelectItem>
-                <SelectItem value="L">L (리터)</SelectItem>
-                <SelectItem value="SET">SET (세트)</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldRow>
-          <FieldRow label="정가 (세전)">
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={formatComma(listPrice)}
-              onChange={(e) => setListPrice(parseComma(e.target.value))}
-              onFocus={focusCaretEnd}
-              placeholder="0"
-            />
-          </FieldRow>
-          <FieldRow label="실제 매입 단가 (세전)">
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={formatComma(unitPrice)}
-              onChange={(e) => setUnitPrice(parseComma(e.target.value))}
-              onFocus={focusCaretEnd}
-              placeholder="정가와 동일 시 비워두세요"
-            />
-          </FieldRow>
-          <FieldRow label="부가세">
-            <div className="flex h-8 rounded-md border border-input text-[13px] overflow-hidden w-fit">
-              <button type="button" onClick={() => setIsTaxable(true)} className={`px-3 ${isTaxable ? "bg-muted text-foreground" : "text-muted-foreground"}`}>과세</button>
-              <button type="button" onClick={() => setIsTaxable(false)} className={`px-3 ${!isTaxable ? "bg-muted text-foreground" : "text-muted-foreground"}`}>면세</button>
-            </div>
-          </FieldRow>
+            <FieldRow label="상품명" required>
+              <NameAutocomplete
+                autoFocus
+                value={name}
+                onChange={setName}
+                items={nameItems}
+                placeholder="공급상품명을 입력하세요"
+                warningLabel="이미 등록된 공급상품"
+                inputClassName=""
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim())
+                    handleSubmit();
+                }}
+              />
+            </FieldRow>
+            <FieldRow label="품번">
+              <JmInput
+                size="sm"
+                value={supplierCode}
+                onChange={(e) => setSupplierCode(e.target.value)}
+                onFocus={focusCaretEnd}
+                placeholder="공급자 코드"
+              />
+            </FieldRow>
+            <FieldRow label="단위">
+              <JmSelect
+                size="sm"
+                options={UNIT_OPTIONS}
+                value={unitOfMeasure}
+                onChange={(v) => setUnitOfMeasure(v)}
+              />
+            </FieldRow>
+            <FieldRow label="정가 (세전)">
+              <JmInput
+                size="sm"
+                type="text"
+                inputMode="numeric"
+                value={formatComma(listPrice)}
+                onChange={(e) => setListPrice(parseComma(e.target.value))}
+                onFocus={focusCaretEnd}
+                placeholder="0"
+              />
+            </FieldRow>
+            <FieldRow label="실제 매입 단가 (세전)">
+              <JmInput
+                size="sm"
+                type="text"
+                inputMode="numeric"
+                value={formatComma(unitPrice)}
+                onChange={(e) => setUnitPrice(parseComma(e.target.value))}
+                onFocus={focusCaretEnd}
+                placeholder="정가와 동일 시 비워두세요"
+              />
+            </FieldRow>
+            <FieldRow label="부가세">
+              <div className="flex h-8 rounded-md border border-[var(--jm-border)] text-jm-sm overflow-hidden w-fit">
+                <button
+                  type="button"
+                  onClick={() => setIsTaxable(true)}
+                  className={`px-3 transition-colors ${
+                    isTaxable
+                      ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                      : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                  }`}
+                >
+                  과세
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTaxable(false)}
+                  className={`px-3 transition-colors border-l border-[var(--jm-border)] ${
+                    !isTaxable
+                      ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                      : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                  }`}
+                >
+                  면세
+                </button>
+              </div>
+            </FieldRow>
           </div>
-        </ScrollArea>
-        <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-          <Button onClick={handleSubmit} disabled={!name.trim() || submitting}>
-            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            등록
-          </Button>
+        </JmScrollArea>
+        <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)] flex-shrink-0">
+          <JmButton variant="ghost" onClick={() => onOpenChange(false)}>
+            취소
+          </JmButton>
+          <JmButton
+            variant="cta"
+            onClick={handleSubmit}
+            disabled={!name.trim() || submitting}
+          >
+            {submitting && <Loader2 className="size-4 animate-spin" />}
+            <span>등록</span>
+          </JmButton>
         </div>
-      </SheetContent>
-    </Sheet>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }
 
@@ -514,7 +713,12 @@ interface QuickCustomerSheetProps {
 }
 
 export function QuickCustomerSheet({
-  open, onOpenChange, defaultName = "", editData, onCreated, onUpdated,
+  open,
+  onOpenChange,
+  defaultName = "",
+  editData,
+  onCreated,
+  onUpdated,
 }: QuickCustomerSheetProps) {
   const isEdit = !!editData?.id;
   const [type, setType] = useState<"INDIVIDUAL" | "BUSINESS">("INDIVIDUAL");
@@ -559,10 +763,21 @@ export function QuickCustomerSheet({
         setContactPosition(editData.contactPosition ?? "");
       } else {
         setType("INDIVIDUAL");
-        setName(defaultName); setPhone(""); setEmail(""); setMemo("");
-        setBusinessNumber(""); setCeo(""); setFax(""); setBusinessType(""); setBusinessItem("");
-        setAddress(""); setShippingAddress(""); setShippingDiffers(false);
-        setContactName(""); setContactPhone(""); setContactPosition("");
+        setName(defaultName);
+        setPhone("");
+        setEmail("");
+        setMemo("");
+        setBusinessNumber("");
+        setCeo("");
+        setFax("");
+        setBusinessType("");
+        setBusinessItem("");
+        setAddress("");
+        setShippingAddress("");
+        setShippingDiffers(false);
+        setContactName("");
+        setContactPhone("");
+        setContactPosition("");
       }
     }
   }, [open, defaultName, editData]);
@@ -615,7 +830,6 @@ export function QuickCustomerSheet({
             `같은 전화번호로 이미 등록된 고객이 있습니다:\n\n  ${existing.name}${typeLabel} — ${formatPhone(existing.phone)}\n\n[확인] 기존 고객 사용 (권장)\n[취소] 동명이인으로 새로 등록`,
           );
           if (useExisting) {
-            // 기존 고객으로 진행 — onCreated 콜백에 기존 고객 전달
             toast.success(`기존 고객 "${existing.name}" 사용`);
             onOpenChange(false);
             onCreated({
@@ -695,30 +909,41 @@ export function QuickCustomerSheet({
       } else {
         onCreated({ id: saved.id, name: saved.name, phone: saved.phone });
       }
-    } catch { toast.error("오류가 발생했습니다"); } finally { setSubmitting(false); }
+    } catch {
+      toast.error("오류가 발생했습니다");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
-        <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-          <SheetTitle>{isEdit ? "고객 수정" : "고객 등록"}</SheetTitle>
-          <SheetDescription className="sr-only">{isEdit ? "고객 정보를 수정합니다" : "새 고객을 등록합니다"}</SheetDescription>
-        </SheetHeader>
-        <ScrollArea className="flex-1 min-h-0">
+    <JmDrawer open={open} onOpenChange={onOpenChange}>
+      <JmDrawerContent
+        side="bottom"
+        size="xl"
+        className="flex flex-col p-0"
+        dragHandle={false}
+      >
+        <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+          <JmDrawerTitle>{isEdit ? "고객 수정" : "고객 등록"}</JmDrawerTitle>
+          <JmDrawerDescription className="sr-only">
+            {isEdit ? "고객 정보를 수정합니다" : "새 고객을 등록합니다"}
+          </JmDrawerDescription>
+        </JmDrawerHeader>
+        <JmScrollArea className="flex-1 min-h-0">
           <div className="px-5 py-5 space-y-3">
             {/* 타입 토글 */}
             <FieldRow label="구분" required>
-              <div className="grid grid-cols-2 gap-1.5 rounded-md border border-border bg-muted/40 p-1">
+              <div className="grid grid-cols-2 gap-1.5 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 p-1">
                 {(["INDIVIDUAL", "BUSINESS"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setType(t)}
-                    className={`h-9 rounded text-[13px] font-semibold transition-colors ${
+                    className={`h-9 rounded text-jm-sm font-semibold transition-colors ${
                       type === t
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
+                        : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
                     }`}
                   >
                     {t === "INDIVIDUAL" ? "개인" : "기업/사업자"}
@@ -728,100 +953,128 @@ export function QuickCustomerSheet({
             </FieldRow>
 
             <FieldRow label={isBusiness ? "상호" : "이름"} required>
-              <Input
+              <JmInput
+                size="sm"
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onFocus={focusCaretEnd}
                 placeholder={isBusiness ? "(주)회사명" : "홍길동"}
               />
             </FieldRow>
             <FieldRow label={isBusiness ? "대표 전화" : "연락처"} required>
-              <Input
+              <JmInput
+                size="sm"
                 value={formatPhone(phone)}
                 onChange={(e) => setPhone(digitsOnly(e.target.value))}
                 placeholder="010-0000-0000"
               />
             </FieldRow>
             <FieldRow label="이메일">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <JmInput
+                size="sm"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={focusCaretEnd}
+              />
             </FieldRow>
 
             {/* 기업 전용 섹션 */}
             {isBusiness && (
               <>
-                <div className="pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="pt-2 pb-1 text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   사업자 정보
                 </div>
                 <FieldRow label="사업자번호">
                   <div className="flex flex-col gap-1">
-                    <Input
+                    <JmInput
+                      size="sm"
                       value={formatBusinessNumber(businessNumber)}
                       onChange={(e) => setBusinessNumber(digitsOnly(e.target.value))}
                       placeholder="000-00-00000"
                       className={
                         businessNumber.length > 0 && businessNumber.length !== 10
-                          ? "border-amber-300 focus-visible:border-amber-500"
+                          ? "border-[var(--jm-warning-fg)]/60 focus-visible:border-[var(--jm-warning-fg)]"
                           : ""
                       }
                     />
                     {businessNumber.length > 0 && businessNumber.length < 10 && (
-                      <p className="text-[11px] text-amber-700">
+                      <p className="text-jm-2xs text-[var(--jm-warning-fg)]">
                         {10 - businessNumber.length}자리 더 입력 (10자리 필요)
                       </p>
                     )}
                     {businessNumber.length === 10 && (
-                      <p className="text-[11px] text-emerald-600">
+                      <p className="text-jm-2xs text-[var(--jm-success-fg)]">
                         형식 OK ({formatBusinessNumber(businessNumber)})
                       </p>
                     )}
                     {businessNumber.length > 10 && (
-                      <p className="text-[11px] text-rose-600">
+                      <p className="text-jm-2xs text-[var(--jm-danger-fg)]">
                         10자리 초과 — 앞 10자리만 사용됩니다
                       </p>
                     )}
                   </div>
                 </FieldRow>
                 <FieldRow label="대표자">
-                  <Input value={ceo} onChange={(e) => setCeo(e.target.value)} />
+                  <JmInput
+                    size="sm"
+                    value={ceo}
+                    onChange={(e) => setCeo(e.target.value)}
+                    onFocus={focusCaretEnd}
+                  />
                 </FieldRow>
                 <FieldRow label="팩스">
-                  <Input
+                  <JmInput
+                    size="sm"
                     value={formatPhone(fax)}
                     onChange={(e) => setFax(digitsOnly(e.target.value))}
                     placeholder="02-0000-0000"
                   />
                 </FieldRow>
                 <FieldRow label="업태">
-                  <Input
+                  <JmInput
+                    size="sm"
                     value={businessType}
                     onChange={(e) => setBusinessType(e.target.value)}
+                    onFocus={focusCaretEnd}
                     placeholder="제조업, 도매업 등"
                   />
                 </FieldRow>
                 <FieldRow label="종목">
-                  <Input
+                  <JmInput
+                    size="sm"
                     value={businessItem}
                     onChange={(e) => setBusinessItem(e.target.value)}
+                    onFocus={focusCaretEnd}
                     placeholder="농기계, 부품 등"
                   />
                 </FieldRow>
 
-                <div className="pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="pt-2 pb-1 text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   실무 담당자 (대표 외)
                 </div>
                 <FieldRow label="담당자명">
-                  <Input value={contactName} onChange={(e) => setContactName(e.target.value)} />
+                  <JmInput
+                    size="sm"
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    onFocus={focusCaretEnd}
+                  />
                 </FieldRow>
                 <FieldRow label="담당자 전화">
-                  <Input
+                  <JmInput
+                    size="sm"
                     value={formatPhone(contactPhone)}
                     onChange={(e) => setContactPhone(digitsOnly(e.target.value))}
                   />
                 </FieldRow>
                 <FieldRow label="직책">
-                  <Input
+                  <JmInput
+                    size="sm"
                     value={contactPosition}
                     onChange={(e) => setContactPosition(e.target.value)}
+                    onFocus={focusCaretEnd}
                     placeholder="과장, 대리 등"
                   />
                 </FieldRow>
@@ -829,11 +1082,16 @@ export function QuickCustomerSheet({
             )}
 
             {/* 주소 섹션 */}
-            <div className="pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {isBusiness ? "주소" : "주소"}
+            <div className="pt-2 pb-1 text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+              주소
             </div>
             <FieldRow label={isBusiness ? "사업장 주소" : "주소"}>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+              <JmInput
+                size="sm"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                onFocus={focusCaretEnd}
+              />
             </FieldRow>
             <FieldRow label="배송지 다름">
               <div className="flex items-center gap-2">
@@ -841,7 +1099,9 @@ export function QuickCustomerSheet({
                   type="button"
                   onClick={() => setShippingDiffers((v) => !v)}
                   className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors ${
-                    shippingDiffers ? "bg-emerald-500" : "bg-zinc-300"
+                    shippingDiffers
+                      ? "bg-[var(--jm-success-fg)]"
+                      : "bg-[var(--jm-border)]"
                   }`}
                 >
                   <span
@@ -850,35 +1110,48 @@ export function QuickCustomerSheet({
                     }`}
                   />
                 </button>
-                <span className="text-[12px] text-muted-foreground">
+                <span className="text-jm-xs text-[var(--jm-text-muted)]">
                   배송지가 {isBusiness ? "사업장" : "주소"}와 다름
                 </span>
               </div>
             </FieldRow>
             {shippingDiffers && (
               <FieldRow label="배송지 주소">
-                <Input
+                <JmInput
+                  size="sm"
                   value={shippingAddress}
                   onChange={(e) => setShippingAddress(e.target.value)}
+                  onFocus={focusCaretEnd}
                   placeholder="물건을 받을 주소"
                 />
               </FieldRow>
             )}
 
             <FieldRow label="메모">
-              <Input value={memo} onChange={(e) => setMemo(e.target.value)} />
+              <JmInput
+                size="sm"
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                onFocus={focusCaretEnd}
+              />
             </FieldRow>
           </div>
-        </ScrollArea>
-        <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-          <Button onClick={handleSubmit} disabled={!name.trim() || !phone.trim() || submitting}>
-            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {isEdit ? "수정" : "등록"}
-          </Button>
+        </JmScrollArea>
+        <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)] flex-shrink-0">
+          <JmButton variant="ghost" onClick={() => onOpenChange(false)}>
+            취소
+          </JmButton>
+          <JmButton
+            variant="cta"
+            onClick={handleSubmit}
+            disabled={!name.trim() || !phone.trim() || submitting}
+          >
+            {submitting && <Loader2 className="size-4 animate-spin" />}
+            <span>{isEdit ? "수정" : "등록"}</span>
+          </JmButton>
         </div>
-      </SheetContent>
-    </Sheet>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }
 
@@ -893,7 +1166,12 @@ interface QuickBrandSheetProps {
   onCreated: (brand: { id: string; name: string; logoUrl?: string | null }) => void;
 }
 
-export function QuickBrandSheet({ open, onOpenChange, defaultName = "", onCreated }: QuickBrandSheetProps) {
+export function QuickBrandSheet({
+  open,
+  onOpenChange,
+  defaultName = "",
+  onCreated,
+}: QuickBrandSheetProps) {
   const [name, setName] = useState("");
   const [memo, setMemo] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -912,11 +1190,11 @@ export function QuickBrandSheet({ open, onOpenChange, defaultName = "", onCreate
     }
     setSubmitting(true);
     try {
-      const json = await apiMutate<{ id: string; name: string; logoUrl: string | null }>(
-        "/api/brands",
-        "POST",
-        { name: name.trim(), memo: memo.trim() || null },
-      );
+      const json = await apiMutate<{
+        id: string;
+        name: string;
+        logoUrl: string | null;
+      }>("/api/brands", "POST", { name: name.trim(), memo: memo.trim() || null });
       toast.success("브랜드가 등록되었습니다");
       onCreated({ id: json.id, name: json.name, logoUrl: json.logoUrl });
       onOpenChange(false);
@@ -928,21 +1206,35 @@ export function QuickBrandSheet({ open, onOpenChange, defaultName = "", onCreate
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh]! p-0 flex flex-col">
-        <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-          <SheetTitle>브랜드 등록</SheetTitle>
-          <SheetDescription className="sr-only">새 브랜드를 등록합니다</SheetDescription>
-        </SheetHeader>
-        <ScrollArea className="flex-1 min-h-0">
+    <JmDrawer open={open} onOpenChange={onOpenChange}>
+      <JmDrawerContent
+        side="bottom"
+        size="lg"
+        className="flex flex-col p-0"
+        dragHandle={false}
+      >
+        <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+          <JmDrawerTitle>브랜드 등록</JmDrawerTitle>
+          <JmDrawerDescription className="sr-only">
+            새 브랜드를 등록합니다
+          </JmDrawerDescription>
+        </JmDrawerHeader>
+        <JmScrollArea className="flex-1 min-h-0">
           <div className="px-5 py-5 space-y-3">
             <FieldRow label="브랜드명" required>
-              <Input
+              <JmInput
+                size="sm"
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onFocus={focusCaretEnd}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim() && !submitting) {
+                  if (
+                    e.key === "Enter" &&
+                    !e.nativeEvent.isComposing &&
+                    name.trim() &&
+                    !submitting
+                  ) {
                     e.preventDefault();
                     handleSubmit();
                   }
@@ -950,21 +1242,33 @@ export function QuickBrandSheet({ open, onOpenChange, defaultName = "", onCreate
               />
             </FieldRow>
             <FieldRow label="메모">
-              <Input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
+              <JmInput
+                size="sm"
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                onFocus={focusCaretEnd}
+                placeholder="(선택)"
+              />
             </FieldRow>
-            <p className="text-[11px] text-muted-foreground pl-[132px]">
+            <p className="text-jm-2xs text-[var(--jm-text-muted)] pl-[132px]">
               로고 업로드는 [상품 → 브랜드] 관리 페이지에서 가능합니다
             </p>
           </div>
-        </ScrollArea>
-        <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-          <Button onClick={handleSubmit} disabled={!name.trim() || submitting}>
-            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            등록
-          </Button>
+        </JmScrollArea>
+        <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)] flex-shrink-0">
+          <JmButton variant="ghost" onClick={() => onOpenChange(false)}>
+            취소
+          </JmButton>
+          <JmButton
+            variant="cta"
+            onClick={handleSubmit}
+            disabled={!name.trim() || submitting}
+          >
+            {submitting && <Loader2 className="size-4 animate-spin" />}
+            <span>등록</span>
+          </JmButton>
         </div>
-      </SheetContent>
-    </Sheet>
+      </JmDrawerContent>
+    </JmDrawer>
   );
 }

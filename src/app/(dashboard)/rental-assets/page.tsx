@@ -1,41 +1,66 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
+import { BookOpen, ImagePlus, Loader2, Pencil, Printer, QrCode, Trash2, X } from "lucide-react";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
+  JmBadge,
+  JmButton,
+  JmDatePicker,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmIconButton,
+  JmInput,
+  JmSelect,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
+import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
+import { QuickBrandSheet } from "@/components/quick-register-sheets";
 import { formatComma, parseComma } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
+
+const toYmd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// 임대 요율은 과세 — 세전 저장값을 VAT 포함 금액으로 변환해 표시.
+const withVat = (net: number) => Math.round(net * 1.1);
 
 function RentalAssetsSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-16" /></div></TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
-        </TableRow>
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell><JmSkeleton className="size-10 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-16" /></div></JmTableCell>
+          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-16" /></div></JmTableCell>
+          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-16" /></div></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-12 rounded-full" /></JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end gap-1">
+              {Array.from({ length: 5 }).map((_, k) => (
+                <JmSkeleton key={k} className="h-7 w-7 rounded-md" />
+              ))}
+            </div>
+          </JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -47,7 +72,7 @@ interface Asset {
   name: string;
   brand: string | null;
   modelNo: string | null;
-  serialNo: string | null;
+  imageUrl: string | null;
   dailyRate: string;
   monthlyRate: string;
   depositAmount: string;
@@ -65,18 +90,18 @@ const STATUS_LABEL: Record<string, string> = {
   RETIRED: "폐기",
 };
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive" | "warning" | "success"> = {
+const STATUS_VARIANT: Record<string, "default" | "outline" | "solid" | "success" | "warning" | "danger" | "info" | "accent"> = {
   AVAILABLE: "success",
-  RENTED: "secondary",
+  RENTED: "info",
   MAINTENANCE: "warning",
-  RETIRED: "destructive",
+  RETIRED: "danger",
 };
 
 const emptyForm = {
   name: "",
   brand: "",
   modelNo: "",
-  serialNo: "",
+  imageUrl: "",
   dailyRate: "0",
   monthlyRate: "0",
   depositAmount: "0",
@@ -86,8 +111,11 @@ const emptyForm = {
 };
 
 export default function RentalAssetsPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  // 요율 입력 드로워 — 어느 요율 필드를 편집 중인지
+  const [priceEdit, setPriceEdit] = useState<"daily" | "monthly" | null>(null);
   const [sheet, setSheet] = useState(false);
   const [editAsset, setEditAsset] = useState<Asset | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -97,6 +125,26 @@ export default function RentalAssetsPage() {
     queryFn: () => apiGet<Asset[]>("/api/rental-assets"),
   });
   const loading = assetsQuery.isPending;
+
+  // 브랜드 — 상품등록과 동일하게 콤보박스로 선택. 신규는 QuickBrandSheet 로 등록.
+  const brandsQuery = useQuery({
+    queryKey: queryKeys.brands.all,
+    queryFn: () => apiGet<BrandOption[]>("/api/brands"),
+  });
+  const [quickBrandOpen, setQuickBrandOpen] = useState(false);
+  const [quickBrandDefaultName, setQuickBrandDefaultName] = useState("");
+  // RentalAsset.brand 는 자유입력 문자열 — Brand 테이블에 없는 레거시 값도 옵션으로 합성해 선택 상태 유지
+  const brandOptions = useMemo<BrandOption[]>(() => {
+    const list = brandsQuery.data ?? [];
+    if (form.brand && !list.some((b) => b.name === form.brand)) {
+      return [{ id: `__freetext__${form.brand}`, name: form.brand }, ...list];
+    }
+    return list;
+  }, [brandsQuery.data, form.brand]);
+  const selectedBrandId = useMemo(
+    () => brandOptions.find((b) => b.name === form.brand)?.id ?? "",
+    [brandOptions, form.brand],
+  );
   const assets = useMemo(() => {
     const data = assetsQuery.data ?? [];
     const q = search.trim().toLowerCase();
@@ -121,7 +169,7 @@ export default function RentalAssetsPage() {
       name: a.name,
       brand: a.brand ?? "",
       modelNo: a.modelNo ?? "",
-      serialNo: a.serialNo ?? "",
+      imageUrl: a.imageUrl ?? "",
       dailyRate: String(a.dailyRate),
       monthlyRate: String(a.monthlyRate),
       depositAmount: String(a.depositAmount),
@@ -139,7 +187,7 @@ export default function RentalAssetsPage() {
         name: form.name.trim(),
         brand: form.brand.trim() || null,
         modelNo: form.modelNo.trim() || null,
-        serialNo: form.serialNo.trim() || null,
+        imageUrl: form.imageUrl.trim() || null,
         dailyRate: parseFloat(parseComma(form.dailyRate)) || 0,
         monthlyRate: parseFloat(parseComma(form.monthlyRate)) || 0,
         depositAmount: parseFloat(parseComma(form.depositAmount)) || 0,
@@ -158,6 +206,53 @@ export default function RentalAssetsPage() {
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "저장 실패"),
   });
+
+  // 이미지 업로드 — Supabase Storage product-images 버킷 재사용
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const handleImagePick = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const res = await fetch("/api/products/upload", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(err.error || "업로드 실패");
+        return;
+      }
+      const { url } = (await res.json()) as { url: string };
+      setForm((prev) => ({ ...prev, imageUrl: url }));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // 라벨 출력 — 자산번호 = 라벨 코드. 새 탭으로 인쇄 미리보기 (?auto=1 자동 인쇄).
+  const printLabel = (assetNo: string) => {
+    window.open(
+      `/rental-assets/print?codes=${encodeURIComponent(assetNo)}&auto=1`,
+      "_blank",
+      "noopener",
+    );
+  };
+
+  // 임대 QR 라벨 — 토큰 발급(없으면 생성) 후 사용설명서 QR 라벨 인쇄 탭 오픈
+  const qrMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiMutate<{ accessToken: string }>(`/api/rental-assets/${id}/qr`, "POST"),
+    onSuccess: (_, id) => {
+      window.open(
+        `/rental-assets/${id}/qr-label?auto=1`,
+        "_blank",
+        "noopener",
+      );
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiError ? e.message : "QR 발급에 실패했습니다"),
+  });
+
   const submitting = saveMutation.isPending;
   const save = () => saveMutation.mutate();
 
@@ -175,7 +270,7 @@ export default function RentalAssetsPage() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       <DataTableToolbar
         search={{ value: search, onChange: setSearch, onSearch: () => {}, placeholder: "자산명, 브랜드, 자산번호 검색..." }}
         onRefresh={refresh}
@@ -184,149 +279,409 @@ export default function RentalAssetsPage() {
         loading={loading}
       />
 
-      <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>자산번호</TableHead>
-              <TableHead>자산명</TableHead>
-              <TableHead>브랜드</TableHead>
-              <TableHead>모델 / 시리얼</TableHead>
-              <TableHead className="text-right">일 요율</TableHead>
-              <TableHead className="text-right">월 요율</TableHead>
-              <TableHead className="text-right">보증금</TableHead>
-              <TableHead>상태</TableHead>
-              <TableHead className="w-16"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <JmTable className="min-w-[1000px]">
+          <JmTableHeader>
+            <JmTableRow>
+              <JmTableHead className="w-16" />
+              <JmTableHead>자산번호</JmTableHead>
+              <JmTableHead>자산명</JmTableHead>
+              <JmTableHead>브랜드</JmTableHead>
+              <JmTableHead>모델번호</JmTableHead>
+              <JmTableHead className="text-right">일 요율 (VAT 포함)</JmTableHead>
+              <JmTableHead className="text-right">월 요율 (VAT 포함)</JmTableHead>
+              <JmTableHead className="text-right">보증금</JmTableHead>
+              <JmTableHead>상태</JmTableHead>
+              <JmTableHead className="w-24" />
+            </JmTableRow>
+          </JmTableHeader>
+          <JmTableBody>
             {loading ? (
               <RentalAssetsSkeletonRows />
             ) : assets.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="py-8 text-center text-muted-foreground">등록된 임대 자산이 없습니다</TableCell></TableRow>
+              <JmTableRow className="hover:bg-transparent">
+                <JmTableCell colSpan={10} className="py-8 text-center text-[var(--jm-text-muted)]">
+                  등록된 임대 자산이 없습니다
+                </JmTableCell>
+              </JmTableRow>
             ) : assets.map((a) => (
-              <TableRow key={a.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openEdit(a)}>
-                <TableCell className="font-mono text-xs">{a.assetNo}</TableCell>
-                <TableCell className="font-medium">{a.name}</TableCell>
-                <TableCell className="text-muted-foreground">{a.brand ?? "-"}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {[a.modelNo, a.serialNo].filter(Boolean).join(" / ") || "-"}
-                </TableCell>
-                <TableCell className="text-right">₩{Number(a.dailyRate).toLocaleString("ko-KR")}</TableCell>
-                <TableCell className="text-right">₩{Number(a.monthlyRate).toLocaleString("ko-KR")}</TableCell>
-                <TableCell className="text-right">₩{Number(a.depositAmount).toLocaleString("ko-KR")}</TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANT[a.status] ?? "outline"}>
+              <JmTableRow
+                key={a.id}
+                className="cursor-pointer"
+                onClick={() => openEdit(a)}
+              >
+                <JmTableCell>
+                  {a.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={a.imageUrl}
+                      alt={a.name}
+                      className="size-10 rounded-md border border-[var(--jm-border)] object-cover"
+                    />
+                  ) : (
+                    <div className="flex size-10 items-center justify-center rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-xs font-semibold text-[var(--jm-text-muted)]">
+                      {a.name.charAt(0)}
+                    </div>
+                  )}
+                </JmTableCell>
+                <JmTableCell className="font-[family-name:var(--jm-font-mono)] text-jm-xs">
+                  {a.assetNo}
+                </JmTableCell>
+                <JmTableCell className="font-medium">{a.name}</JmTableCell>
+                <JmTableCell className="text-[var(--jm-text-muted)]">{a.brand ?? "-"}</JmTableCell>
+                <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
+                  {a.modelNo || "-"}
+                </JmTableCell>
+                <JmTableCell className="text-right tabular-nums">
+                  ₩{withVat(Number(a.dailyRate)).toLocaleString("ko-KR")}
+                </JmTableCell>
+                <JmTableCell className="text-right tabular-nums">
+                  ₩{withVat(Number(a.monthlyRate)).toLocaleString("ko-KR")}
+                </JmTableCell>
+                <JmTableCell className="text-right tabular-nums">
+                  ₩{Number(a.depositAmount).toLocaleString("ko-KR")}
+                </JmTableCell>
+                <JmTableCell>
+                  <JmBadge variant={STATUS_VARIANT[a.status] ?? "outline"} size="sm">
                     {STATUS_LABEL[a.status] ?? a.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
+                  </JmBadge>
+                </JmTableCell>
+                <JmTableCell>
                   <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(a); }}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); remove(a.id); }}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <JmIconButton
+                      variant="ghost"
+                      size="sm"
+                      aria-label="라벨 인쇄"
+                      onClick={(e) => { e.stopPropagation(); printLabel(a.assetNo); }}
+                    >
+                      <Printer />
+                    </JmIconButton>
+                    <JmIconButton
+                      variant="ghost"
+                      size="sm"
+                      aria-label="사용설명서"
+                      onClick={(e) => { e.stopPropagation(); router.push(`/rental-assets/${a.id}/manual`); }}
+                    >
+                      <BookOpen />
+                    </JmIconButton>
+                    <JmIconButton
+                      variant="ghost"
+                      size="sm"
+                      aria-label="QR 라벨"
+                      onClick={(e) => { e.stopPropagation(); qrMutation.mutate(a.id); }}
+                    >
+                      <QrCode />
+                    </JmIconButton>
+                    <JmIconButton
+                      variant="ghost"
+                      size="sm"
+                      aria-label="수정"
+                      onClick={(e) => { e.stopPropagation(); openEdit(a); }}
+                    >
+                      <Pencil />
+                    </JmIconButton>
+                    <JmIconButton
+                      variant="ghost"
+                      size="sm"
+                      aria-label="삭제"
+                      className="text-[var(--jm-danger-fg)]"
+                      onClick={(e) => { e.stopPropagation(); remove(a.id); }}
+                    >
+                      <Trash2 />
+                    </JmIconButton>
                   </div>
-                </TableCell>
-              </TableRow>
+                </JmTableCell>
+              </JmTableRow>
             ))}
-          </TableBody>
-        </Table>
+          </JmTableBody>
+        </JmTable>
       </div>
 
-      <Sheet open={sheet} onOpenChange={setSheet}>
-        <SheetContent side="bottom" className="flex h-[90vh] flex-col p-0">
-          <SheetHeader className="border-b border-border px-5 py-4">
-            <SheetTitle>{editAsset ? "임대 자산 수정" : "임대 자산 추가"}</SheetTitle>
-          </SheetHeader>
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="space-y-4 p-5">
-              <FieldRow label="자산명" required>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </FieldRow>
-              <FieldRow label="브랜드">
-                <Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
-              </FieldRow>
-              <FieldRow label="모델번호">
-                <Input value={form.modelNo} onChange={(e) => setForm({ ...form, modelNo: e.target.value })} />
-              </FieldRow>
-              <FieldRow label="시리얼번호">
-                <Input value={form.serialNo} onChange={(e) => setForm({ ...form, serialNo: e.target.value })} />
-              </FieldRow>
-              <FieldRow label="일 요율">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  className="text-right"
-                  value={formatComma(form.dailyRate)}
-                  onChange={(e) => setForm({ ...form, dailyRate: parseComma(e.target.value) })}
-                  onFocus={focusCaretEnd}
-                />
-              </FieldRow>
-              <FieldRow label="월 요율">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  className="text-right"
-                  value={formatComma(form.monthlyRate)}
-                  onChange={(e) => setForm({ ...form, monthlyRate: parseComma(e.target.value) })}
-                  onFocus={focusCaretEnd}
-                />
-              </FieldRow>
-              <FieldRow label="보증금">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  className="text-right"
-                  value={formatComma(form.depositAmount)}
-                  onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })}
-                  onFocus={focusCaretEnd}
-                />
-              </FieldRow>
-              <FieldRow label="취득일">
-                <Input
-                  type="date"
-                  value={form.acquiredAt}
-                  onChange={(e) => setForm({ ...form, acquiredAt: e.target.value })}
-                />
-              </FieldRow>
-              <FieldRow label="상태">
-                <select
-                  className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as AssetStatus })}
-                >
-                  {Object.entries(STATUS_LABEL).map(([val, label]) => (
-                    <option key={val} value={val}>{label}</option>
-                  ))}
-                </select>
-              </FieldRow>
-              <FieldRow label="메모">
-                <Input value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} />
-              </FieldRow>
+      <JmDrawer open={sheet} onOpenChange={setSheet}>
+        <JmDrawerContent side="bottom" size="xl" className="flex flex-col p-0" dragHandle={false}>
+          <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+            <JmDrawerTitle>{editAsset ? "임대 자산 수정" : "임대 자산 추가"}</JmDrawerTitle>
+          </JmDrawerHeader>
+
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="mx-auto max-w-2xl px-5 py-5 space-y-6">
+              {/* ── 자산번호 — 자동 발번. 생성 시엔 저장 후 부여됨 ── */}
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-2.5">
+                <span className="text-jm-xs font-semibold text-[var(--jm-text-muted)]">
+                  자산번호
+                </span>
+                {editAsset ? (
+                  <span className="font-[family-name:var(--jm-font-mono)] text-jm-sm font-semibold text-[var(--jm-text)]">
+                    {editAsset.assetNo}
+                  </span>
+                ) : (
+                  <span className="text-jm-xs text-[var(--jm-text-subtle)]">
+                    저장 시 자동 생성 · RA-YYMMDD-NNNN
+                  </span>
+                )}
+              </div>
+
+              {/* ── 사진 + 자산명 (헤더 블록) ── */}
+              <div className="flex items-start gap-4">
+                <div className="shrink-0">
+                  {form.imageUrl ? (
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={form.imageUrl}
+                        alt="자산 사진"
+                        className="size-24 rounded-lg border border-[var(--jm-border)] object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, imageUrl: "" })}
+                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] text-white shadow hover:scale-110 transition-transform"
+                        aria-label="이미지 제거"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex size-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface)] transition-colors disabled:opacity-50"
+                      disabled={uploading}
+                      aria-label="이미지 업로드"
+                    >
+                      {uploading ? (
+                        <Loader2 className="size-5 animate-spin" />
+                      ) : (
+                        <>
+                          <ImagePlus className="size-5" />
+                          <span className="text-jm-2xs">사진 추가</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleImagePick(f);
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0 space-y-3">
+                  <Field label="자산명" required>
+                    <JmInput
+                      size="sm"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      placeholder="예: 카메라 본체 A세트"
+                    />
+                  </Field>
+                  {form.imageUrl && (
+                    <JmButton
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus />}
+                      <span>사진 변경</span>
+                    </JmButton>
+                  )}
+                </div>
+              </div>
+
+              {/* ── 식별 정보 ── */}
+              <section className="space-y-3">
+                <SectionTitle>식별 정보</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="브랜드">
+                    <BrandCombobox
+                      brands={brandOptions}
+                      value={selectedBrandId}
+                      onChange={(_id, name) => setForm({ ...form, brand: name })}
+                      onCreateNew={(name) => {
+                        setQuickBrandDefaultName(name);
+                        setQuickBrandOpen(true);
+                      }}
+                    />
+                  </Field>
+                  <Field label="모델번호">
+                    <JmInput
+                      size="sm"
+                      value={form.modelNo}
+                      onChange={(e) => setForm({ ...form, modelNo: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              </section>
+
+              {/* ── 요율 ── */}
+              <section className="space-y-3">
+                <SectionTitle>요율 · 보증금</SectionTitle>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="일 요율 (VAT 포함)">
+                    <RateButton
+                      net={parseFloat(parseComma(form.dailyRate)) || 0}
+                      onClick={() => setPriceEdit("daily")}
+                    />
+                  </Field>
+                  <Field label="월 요율 (VAT 포함)">
+                    <RateButton
+                      net={parseFloat(parseComma(form.monthlyRate)) || 0}
+                      onClick={() => setPriceEdit("monthly")}
+                    />
+                  </Field>
+                  <Field label="보증금">
+                    <JmInput
+                      size="sm"
+                      type="text"
+                      inputMode="numeric"
+                      className="text-right"
+                      value={formatComma(form.depositAmount)}
+                      onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })}
+                      onFocus={focusCaretEnd}
+                    />
+                  </Field>
+                </div>
+                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+                  요율은 VAT 포함 금액으로 표시·입력됩니다. 보증금은 부가세 대상이 아닙니다.
+                </p>
+              </section>
+
+              {/* ── 관리 ── */}
+              <section className="space-y-3">
+                <SectionTitle>관리</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="취득일">
+                    <JmDatePicker
+                      size="sm"
+                      value={form.acquiredAt ? new Date(`${form.acquiredAt}T00:00:00`) : undefined}
+                      onChange={(d) => setForm({ ...form, acquiredAt: d ? toYmd(d) : "" })}
+                      placeholder="취득일 선택"
+                    />
+                  </Field>
+                  <Field label="상태">
+                    <JmSelect
+                      size="sm"
+                      value={form.status}
+                      onChange={(v) => setForm({ ...form, status: v as AssetStatus })}
+                      options={Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))}
+                    />
+                  </Field>
+                </div>
+                <Field label="메모">
+                  <JmInput
+                    size="sm"
+                    value={form.memo}
+                    onChange={(e) => setForm({ ...form, memo: e.target.value })}
+                    placeholder="특이사항 (선택)"
+                  />
+                </Field>
+              </section>
             </div>
-          </ScrollArea>
-          <div className="flex justify-end gap-2 border-t border-border bg-background px-5 py-4">
-            <Button variant="outline" onClick={() => setSheet(false)}>취소</Button>
-            <Button onClick={save} disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              {editAsset ? "수정" : "등록"}
-            </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+
+          <div className="flex items-center justify-between gap-2 border-t border-[var(--jm-border)] bg-[var(--jm-bg)] px-5 py-4 flex-shrink-0">
+            <div>
+              {editAsset && (
+                <JmButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => printLabel(editAsset.assetNo)}
+                >
+                  <Printer />
+                  <span>라벨 인쇄</span>
+                </JmButton>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <JmButton variant="ghost" onClick={() => setSheet(false)} disabled={submitting}>
+                취소
+              </JmButton>
+              <JmButton variant="cta" onClick={save} disabled={submitting}>
+                {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+                <span>{editAsset ? "수정" : "등록"}</span>
+              </JmButton>
+            </div>
+          </div>
+        </JmDrawerContent>
+      </JmDrawer>
+
+      <QuickBrandSheet
+        open={quickBrandOpen}
+        onOpenChange={setQuickBrandOpen}
+        defaultName={quickBrandDefaultName}
+        onCreated={(brand) => {
+          setForm((prev) => ({ ...prev, brand: brand.name }));
+          queryClient.invalidateQueries({ queryKey: queryKeys.brands.all });
+          setQuickBrandOpen(false);
+        }}
+      />
+
+      {priceEdit && (
+        <PriceInputDialog
+          open
+          onOpenChange={(v) => !v && setPriceEdit(null)}
+          initialNet={
+            parseFloat(
+              parseComma(priceEdit === "daily" ? form.dailyRate : form.monthlyRate),
+            ) || 0
+          }
+          taxType="TAXABLE"
+          title={priceEdit === "daily" ? "일 요율 입력" : "월 요율 입력"}
+          onSubmit={(net) =>
+            setForm((f) => ({
+              ...f,
+              [priceEdit === "daily" ? "dailyRate" : "monthlyRate"]: String(net),
+            }))
+          }
+        />
+      )}
     </div>
   );
 }
 
-function FieldRow({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+// 요율 입력 트리거 — VAT 포함 금액 표시, 클릭 시 가격 입력 드로워
+function RateButton({ net, onClick }: { net: number; onClick: () => void }) {
   return (
-    <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-      <span className="text-right text-sm text-muted-foreground">
-        {label}{required ? <span className="ml-0.5 text-destructive">*</span> : null}
-      </span>
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-8 w-full items-center justify-end rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm tabular-nums text-[var(--jm-text)] transition-colors hover:bg-[var(--jm-surface-muted)]"
+    >
+      ₩{withVat(net).toLocaleString("ko-KR")}
+    </button>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-jm-xs font-semibold text-[var(--jm-text-muted)]">{children}</span>
+      <div className="h-px flex-1 bg-[var(--jm-border)]" />
+    </div>
+  );
+}
+
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-jm-xs text-[var(--jm-text-muted)]">
+        {label}
+        {required ? <span className="ml-0.5 text-[var(--jm-danger-fg)]">*</span> : null}
+      </label>
       {children}
     </div>
   );

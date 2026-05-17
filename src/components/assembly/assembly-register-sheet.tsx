@@ -1,47 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
 import { Loader2, Plus } from "lucide-react";
-import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import { toast } from "sonner";
+
+import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { formatComma, parseComma } from "@/lib/utils";
+import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import {
+  JmBadge,
+  JmButton,
+  JmDatePicker,
+  JmDialog,
+  JmDialogContent,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmInput,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmTextarea,
+} from "@/jm";
 
 interface ComponentRow {
   componentId: string;
@@ -56,14 +46,20 @@ function ComponentsSkeletonRows({ rows = 3 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-3 w-16" /></TableCell>
-          <TableCell className="p-1"><Skeleton className="h-9 w-full rounded-lg" /></TableCell>
-          <TableCell className="p-1 text-right">
-            <div className="flex justify-end"><Skeleton className="h-9 w-full rounded-lg" /></div>
-          </TableCell>
-          <TableCell className="p-1"><Skeleton className="h-7 w-12 rounded-md" /></TableCell>
-        </TableRow>
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell><JmSkeleton className="h-3 w-16" /></JmTableCell>
+          <JmTableCell className="p-1">
+            <JmSkeleton className="h-9 w-full rounded-lg" />
+          </JmTableCell>
+          <JmTableCell className="p-1 text-right">
+            <div className="flex justify-end">
+              <JmSkeleton className="h-9 w-full rounded-lg" />
+            </div>
+          </JmTableCell>
+          <JmTableCell className="p-1">
+            <JmSkeleton className="h-7 w-12 rounded-md" />
+          </JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -101,17 +97,25 @@ export function AssemblyRegisterSheet({
   const [emptySlotNames, setEmptySlotNames] = useState<string[]>([]);
 
   const [newVariantOpen, setNewVariantOpen] = useState(false);
-  const [newVariantData, setNewVariantData] = useState<{ id: string; name: string; sku: string } | null>(null);
+  const [newVariantData, setNewVariantData] = useState<
+    { id: string; name: string; sku: string } | null
+  >(null);
   const [newVariantSku, setNewVariantSku] = useState("");
   const [newVariantSavingSku, setNewVariantSavingSku] = useState(false);
 
   const fetchProducts = useCallback(async () => {
     try {
-      const data = await apiGet<Array<{
-        id: string; name: string; sku: string;
-        sellingPrice: string; unitCost: string | null;
-        unitOfMeasure: string; isSet: boolean;
-      }>>("/api/products?isBulk=all");
+      const data = await apiGet<
+        Array<{
+          id: string;
+          name: string;
+          sku: string;
+          sellingPrice: string;
+          unitCost: string | null;
+          unitOfMeasure: string;
+          isSet: boolean;
+        }>
+      >("/api/products?isBulk=all");
       setProducts(
         data.map((p) => ({
           id: p.id,
@@ -128,7 +132,6 @@ export function AssemblyRegisterSheet({
     }
   }, []);
 
-  // 시트 열릴 때마다 상품 로드 + 폼 초기화
   const initRef = useRef<string>("");
   useEffect(() => {
     if (!open) return;
@@ -142,7 +145,6 @@ export function AssemblyRegisterSheet({
     initRef.current = initialProductId ?? "";
   }, [open, initialProductId, fetchProducts]);
 
-  // initialProductId 가 있으면 products 로드 후 자동 선택
   const autoSelectedRef = useRef(false);
   useEffect(() => {
     if (!open || !initialProductId || autoSelectedRef.current) return;
@@ -151,10 +153,8 @@ export function AssemblyRegisterSheet({
     if (!match) return;
     autoSelectedRef.current = true;
     handleProductChange(match);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, products, initialProductId]);
 
-  // 시트 닫히면 autoSelected 초기화 (다음에 또 열면 다시 자동 선택)
   useEffect(() => {
     if (!open) autoSelectedRef.current = false;
   }, [open]);
@@ -173,7 +173,12 @@ export function AssemblyRegisterSheet({
           slotId?: string | null;
         }>;
         assemblyTemplate?: {
-          slots?: Array<{ id: string; slotLabelId: string | null; label: string; isVariable: boolean }>;
+          slots?: Array<{
+            id: string;
+            slotLabelId: string | null;
+            label: string;
+            isVariable: boolean;
+          }>;
         };
       };
       try {
@@ -188,8 +193,12 @@ export function AssemblyRegisterSheet({
         slotLabelId?: string | null;
         slotId?: string | null;
       }> = detail.setComponents ?? [];
-      const slots: Array<{ id: string; slotLabelId: string | null; label: string; isVariable: boolean }> =
-        detail.assemblyTemplate?.slots ?? [];
+      const slots: Array<{
+        id: string;
+        slotLabelId: string | null;
+        label: string;
+        isVariable: boolean;
+      }> = detail.assemblyTemplate?.slots ?? [];
       const slotKey = (
         slotId: string | null | undefined,
         slotLabelId: string | null | undefined,
@@ -206,7 +215,8 @@ export function AssemblyRegisterSheet({
       for (const s of slots) {
         variableByKey.set(`SID:${s.id}`, s.isVariable);
         if (s.slotLabelId) variableByKey.set(`LID:${s.slotLabelId}`, s.isVariable);
-        if (s.label && s.label.trim()) variableByKey.set(`LBL:${s.label.trim()}`, s.isVariable);
+        if (s.label && s.label.trim())
+          variableByKey.set(`LBL:${s.label.trim()}`, s.isVariable);
       }
       setComponents(
         setComps.map((c) => {
@@ -229,7 +239,14 @@ export function AssemblyRegisterSheet({
   const addComponent = () =>
     setComponents((prev) => [
       ...prev,
-      { componentId: "", quantity: "1", slotId: null, slotLabelId: null, slotLabel: null, isVariable: true },
+      {
+        componentId: "",
+        quantity: "1",
+        slotId: null,
+        slotLabelId: null,
+        slotLabel: null,
+        isVariable: true,
+      },
     ]);
 
   const removeComponent = (idx: number) =>
@@ -241,24 +258,22 @@ export function AssemblyRegisterSheet({
   const performAssemblySubmit = async (filteredComponents: ComponentRow[]) => {
     setSubmitting(true);
     try {
-      const data = await apiMutate<{ newVariant?: { id: string; name: string; sku: string } | null }>(
-        "/api/assemblies",
-        "POST",
-        {
-          productId,
-          quantity,
-          assembledAt: assembledAt.toISOString(),
-          laborCost: laborCost ? laborCost : undefined,
-          memo: memo || undefined,
-          components: filteredComponents.map((c) => ({
-            componentId: c.componentId,
-            quantity: c.quantity,
-            slotId: c.slotId ?? null,
-            slotLabelId: c.slotLabelId ?? null,
-            slotLabel: c.slotLabel ?? null,
-          })),
-        },
-      );
+      const data = await apiMutate<{
+        newVariant?: { id: string; name: string; sku: string } | null;
+      }>("/api/assemblies", "POST", {
+        productId,
+        quantity,
+        assembledAt: assembledAt.toISOString(),
+        laborCost: laborCost ? laborCost : undefined,
+        memo: memo || undefined,
+        components: filteredComponents.map((c) => ({
+          componentId: c.componentId,
+          quantity: c.quantity,
+          slotId: c.slotId ?? null,
+          slotLabelId: c.slotLabelId ?? null,
+          slotLabel: c.slotLabel ?? null,
+        })),
+      });
       toast.success("조립 실적이 등록되었습니다");
       onOpenChange(false);
       setEmptySlotConfirmOpen(false);
@@ -284,7 +299,9 @@ export function AssemblyRegisterSheet({
     }
     setNewVariantSavingSku(true);
     try {
-      await apiMutate(`/api/products/${newVariantData.id}`, "PATCH", { sku: newVariantSku.trim() });
+      await apiMutate(`/api/products/${newVariantData.id}`, "PATCH", {
+        sku: newVariantSku.trim(),
+      });
       toast.success("변형 SKU 가 변경되었습니다");
       setNewVariantOpen(false);
       setNewVariantData(null);
@@ -315,7 +332,9 @@ export function AssemblyRegisterSheet({
       if (hasComponent && hasQuantity) {
         filledComponents.push(c);
       } else {
-        emptyNames.push(c.slotLabel?.trim() ? `${c.slotLabel} 슬롯` : `${idx + 1}번 행`);
+        emptyNames.push(
+          c.slotLabel?.trim() ? `${c.slotLabel} 슬롯` : `${idx + 1}번 행`,
+        );
       }
     });
 
@@ -343,21 +362,24 @@ export function AssemblyRegisterSheet({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
+      <JmDrawer open={open} onOpenChange={onOpenChange}>
+        <JmDrawerContent
           side="bottom"
-          className="p-0 flex flex-col"
-          style={{ height: "90vh", maxHeight: "90vh" }}
+          size="xl"
+          className="flex flex-col p-0"
+          dragHandle={false}
         >
-          <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-            <SheetTitle>조립 실적 등록</SheetTitle>
-          </SheetHeader>
+          <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+            <JmDrawerTitle>조립 실적 등록</JmDrawerTitle>
+          </JmDrawerHeader>
 
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 flex flex-col gap-4">
               {showProductPicker && (
                 <div className="grid grid-cols-[120px_1fr] items-center gap-2">
-                  <label className="text-sm text-right">조립상품</label>
+                  <label className="text-jm-sm text-right text-[var(--jm-text-muted)]">
+                    조립상품
+                  </label>
                   <ProductCombobox
                     products={products}
                     value={productId}
@@ -369,8 +391,11 @@ export function AssemblyRegisterSheet({
               )}
 
               <div className="grid grid-cols-[120px_1fr] items-center gap-2">
-                <label className="text-sm text-right">조립 수량</label>
-                <Input
+                <label className="text-jm-sm text-right text-[var(--jm-text-muted)]">
+                  조립 수량
+                </label>
+                <JmInput
+                  size="sm"
                   type="text"
                   inputMode="decimal"
                   value={quantity}
@@ -381,20 +406,24 @@ export function AssemblyRegisterSheet({
               </div>
 
               <div className="grid grid-cols-[120px_1fr] items-center gap-2">
-                <label className="text-sm text-right">조립일</label>
-                <Popover>
-                  <PopoverTrigger className="flex h-9 max-w-[240px] items-center rounded-lg border border-input bg-transparent px-3 text-sm hover:bg-accent/50">
-                    {format(assembledAt, "yyyy년 M월 d일", { locale: ko })}
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={assembledAt} onSelect={(d) => d && setAssembledAt(d)} />
-                  </PopoverContent>
-                </Popover>
+                <label className="text-jm-sm text-right text-[var(--jm-text-muted)]">
+                  조립일
+                </label>
+                <div className="max-w-[240px]">
+                  <JmDatePicker
+                    size="sm"
+                    value={assembledAt}
+                    onChange={(d) => d && setAssembledAt(d)}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-[120px_1fr] items-center gap-2">
-                <label className="text-sm text-right">조립비(총액)</label>
-                <Input
+                <label className="text-jm-sm text-right text-[var(--jm-text-muted)]">
+                  조립비(총액)
+                </label>
+                <JmInput
+                  size="sm"
                   type="text"
                   inputMode="numeric"
                   value={formatComma(laborCost)}
@@ -406,145 +435,209 @@ export function AssemblyRegisterSheet({
               </div>
 
               <div className="grid grid-cols-[120px_1fr] items-start gap-2">
-                <label className="text-sm text-right pt-2">메모</label>
-                <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} />
+                <label className="text-jm-sm text-right pt-2 text-[var(--jm-text-muted)]">
+                  메모
+                </label>
+                <JmTextarea
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  rows={2}
+                />
               </div>
 
-              <div className="border-t border-border pt-4">
+              <div className="border-t border-[var(--jm-border)] pt-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">구성품</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={addComponent}>
-                    <Plus data-icon="inline-start" />
-                    구성품 추가
-                  </Button>
+                  <h3 className="font-semibold text-jm-base text-[var(--jm-text)]">
+                    구성품
+                  </h3>
+                  <JmButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addComponent}
+                  >
+                    <Plus />
+                    <span>구성품 추가</span>
+                  </JmButton>
                 </div>
-                <p className="text-[11px] text-muted-foreground mb-2">
-                  가변 슬롯에서 다른 부품을 선택하면 새 변형 SKU 가 자동 생성됩니다.
-                  같은 조합이 이미 있으면 그 SKU 의 재고만 누적됩니다.
+                <p className="text-jm-xs text-[var(--jm-text-muted)] mb-2">
+                  가변 슬롯에서 다른 부품을 선택하면 새 변형 SKU 가 자동 생성됩니다. 같은
+                  조합이 이미 있으면 그 SKU 의 재고만 누적됩니다.
                 </p>
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-32">슬롯</TableHead>
-                      <TableHead>상품</TableHead>
-                      <TableHead className="w-32 text-right">1개당 수량</TableHead>
-                      <TableHead className="w-20"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <JmTable>
+                  <JmTableHeader>
+                    <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-32">
+                        슬롯
+                      </JmTableHead>
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+                        상품
+                      </JmTableHead>
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-32 text-right">
+                        1개당 수량
+                      </JmTableHead>
+                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-20"></JmTableHead>
+                    </JmTableRow>
+                  </JmTableHeader>
+                  <JmTableBody>
                     {componentsLoading ? (
                       <ComponentsSkeletonRows />
                     ) : components.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-4">
+                      <JmTableRow className="hover:bg-transparent">
+                        <JmTableCell
+                          colSpan={4}
+                          className="text-center py-4 text-[var(--jm-text-muted)]"
+                        >
                           조립상품을 선택하면 구성품이 자동 로드됩니다
-                        </TableCell>
-                      </TableRow>
+                        </JmTableCell>
+                      </JmTableRow>
                     ) : (
                       components.map((c, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="text-muted-foreground text-xs">
+                        <JmTableRow key={idx}>
+                          <JmTableCell className="text-[var(--jm-text-muted)] text-jm-xs px-3 py-2">
                             <div className="flex items-center gap-1.5">
                               <span>{c.slotLabel || "-"}</span>
-                              {c.slotLabelId && (
-                                c.isVariable ? (
-                                  <Badge variant="default" className="text-[10px] px-1 py-0">가변</Badge>
+                              {c.slotLabelId &&
+                                (c.isVariable ? (
+                                  <JmBadge
+                                    variant="info"
+                                    size="sm"
+                                    shape="square"
+                                    className="text-jm-2xs px-1 py-0"
+                                  >
+                                    가변
+                                  </JmBadge>
                                 ) : (
-                                  <Badge variant="secondary" className="text-[10px] px-1 py-0">고정</Badge>
-                                )
-                              )}
+                                  <JmBadge
+                                    variant="default"
+                                    size="sm"
+                                    shape="square"
+                                    className="text-jm-2xs px-1 py-0"
+                                  >
+                                    고정
+                                  </JmBadge>
+                                ))}
                             </div>
-                          </TableCell>
-                          <TableCell className="p-1">
+                          </JmTableCell>
+                          <JmTableCell className="p-1">
                             <ProductCombobox
                               products={products}
                               value={c.componentId}
-                              onChange={(p) => updateComponent(idx, { componentId: p.id })}
+                              onChange={(p) =>
+                                updateComponent(idx, { componentId: p.id })
+                              }
                               filterType="component"
                               disabled={!c.isVariable}
                             />
-                          </TableCell>
-                          <TableCell className="p-1 text-right">
-                            <Input
+                          </JmTableCell>
+                          <JmTableCell className="p-1 text-right">
+                            <JmInput
+                              size="sm"
                               type="text"
                               inputMode="decimal"
                               value={c.quantity}
-                              onChange={(e) => updateComponent(idx, { quantity: e.target.value })}
+                              onChange={(e) =>
+                                updateComponent(idx, { quantity: e.target.value })
+                              }
                               onFocus={focusCaretEnd}
                               disabled={!c.isVariable}
                               className="text-right"
                             />
-                          </TableCell>
-                          <TableCell className="p-1">
-                            {(c.slotId || c.slotLabelId || c.slotLabel) ? null : (
-                              <Button type="button" variant="ghost" size="sm" onClick={() => removeComponent(idx)}>
+                          </JmTableCell>
+                          <JmTableCell className="p-1">
+                            {c.slotId || c.slotLabelId || c.slotLabel ? null : (
+                              <JmButton
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeComponent(idx)}
+                              >
                                 삭제
-                              </Button>
+                              </JmButton>
                             )}
-                          </TableCell>
-                        </TableRow>
+                          </JmTableCell>
+                        </JmTableRow>
                       ))
                     )}
-                  </TableBody>
-                </Table>
+                  </JmTableBody>
+                </JmTable>
               </div>
             </div>
 
-            <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)]">
+              <JmButton
+                type="button"
+                variant="ghost"
+                onClick={() => onOpenChange(false)}
+              >
                 취소
-              </Button>
-              <Button type="button" onClick={submitAssembly} disabled={submitting}>
-                {submitting ? <Loader2 className="animate-spin" /> : null}
+              </JmButton>
+              <JmButton
+                type="button"
+                variant="cta"
+                onClick={submitAssembly}
+                disabled={submitting}
+              >
+                {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
                 <span>{submitting ? "처리 중..." : "등록"}</span>
-              </Button>
+              </JmButton>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </JmDrawerContent>
+      </JmDrawer>
 
-      <Dialog open={emptySlotConfirmOpen} onOpenChange={setEmptySlotConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>빈 슬롯 확인</DialogTitle>
-            <DialogDescription>
+      <JmDialog open={emptySlotConfirmOpen} onOpenChange={setEmptySlotConfirmOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>빈 슬롯 확인</JmDialogTitle>
+            <JmDialogDescription>
               <span className="block">{emptySlotNames.join(", ")}이(가) 비었습니다.</span>
-              <span className="block mt-2 text-muted-foreground">
+              <span className="block mt-2 text-[var(--jm-text-muted)]">
                 비어있는 슬롯은 제외하고 저장됩니다. 계속 진행하시겠습니까?
               </span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEmptySlotConfirmOpen(false)} disabled={submitting}>
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <JmDialogFooter>
+            <JmButton
+              variant="ghost"
+              onClick={() => setEmptySlotConfirmOpen(false)}
+              disabled={submitting}
+            >
               취소
-            </Button>
-            <Button onClick={confirmSubmitWithEmptySlots} disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              계속 저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+            <JmButton
+              variant="cta"
+              onClick={confirmSubmitWithEmptySlots}
+              disabled={submitting}
+            >
+              {submitting && <Loader2 className="size-4 animate-spin" />}
+              <span>계속 저장</span>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
-      <Dialog open={newVariantOpen} onOpenChange={setNewVariantOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>새 변형이 자동 생성되었습니다</DialogTitle>
-            <DialogDescription>
+      <JmDialog open={newVariantOpen} onOpenChange={setNewVariantOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>새 변형이 자동 생성되었습니다</JmDialogTitle>
+            <JmDialogDescription>
               가변 슬롯의 새 조합으로 변형 SKU 가 만들어졌어요. SKU 만 수정 가능하며,
-              이름은 부모 상품과 동일하게 유지됩니다 (이름이 달라야 한다면 새 상품으로 등록해주세요).
-            </DialogDescription>
-          </DialogHeader>
+              이름은 부모 상품과 동일하게 유지됩니다 (이름이 달라야 한다면 새 상품으로
+              등록해주세요).
+            </JmDialogDescription>
+          </JmDialogHeader>
           {newVariantData && (
             <div className="space-y-3 py-2">
-              <div className="grid grid-cols-[80px_1fr] items-center gap-2 text-sm">
-                <label className="text-right text-muted-foreground">상품명</label>
-                <Input value={newVariantData.name} disabled />
+              <div className="grid grid-cols-[80px_1fr] items-center gap-2 text-jm-sm">
+                <label className="text-right text-[var(--jm-text-muted)]">상품명</label>
+                <JmInput size="sm" value={newVariantData.name} disabled />
               </div>
-              <div className="grid grid-cols-[80px_1fr] items-center gap-2 text-sm">
-                <label className="text-right text-muted-foreground">SKU</label>
-                <Input
+              <div className="grid grid-cols-[80px_1fr] items-center gap-2 text-jm-sm">
+                <label className="text-right text-[var(--jm-text-muted)]">SKU</label>
+                <JmInput
+                  size="sm"
                   value={newVariantSku}
                   onChange={(e) => setNewVariantSku(e.target.value)}
                   onFocus={focusCaretEnd}
@@ -552,9 +645,9 @@ export function AssemblyRegisterSheet({
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button
-              variant="outline"
+          <JmDialogFooter>
+            <JmButton
+              variant="ghost"
               onClick={() => {
                 setNewVariantOpen(false);
                 setNewVariantData(null);
@@ -562,14 +655,18 @@ export function AssemblyRegisterSheet({
               disabled={newVariantSavingSku}
             >
               자동값 그대로 사용
-            </Button>
-            <Button onClick={confirmNewVariantSku} disabled={newVariantSavingSku}>
-              {newVariantSavingSku ? <Loader2 className="animate-spin" /> : null}
-              확인
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+            <JmButton
+              variant="cta"
+              onClick={confirmNewVariantSku}
+              disabled={newVariantSavingSku}
+            >
+              {newVariantSavingSku && <Loader2 className="size-4 animate-spin" />}
+              <span>확인</span>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </>
   );
 }

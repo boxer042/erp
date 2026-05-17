@@ -16,6 +16,7 @@ import { formatAmount } from "./_helpers";
 import {
   TYPE_JM_VARIANTS,
   TYPE_LABELS,
+  PAYMENT_KIND_LABELS,
   type ItemViewRow,
   type LedgerEntry,
   type SupplierSummary,
@@ -33,7 +34,7 @@ export interface ItemsViewProps {
   selectedSupplierSummary: SupplierSummary | null | undefined;
   from: Date | undefined;
   onEntryDoubleClick: (e: LedgerEntry) => void;
-  onIncomingDeepLink: (incomingId: string) => void;
+  onIncomingClick: (incomingId: string) => void;
   emptyState: React.ReactNode;
 }
 
@@ -43,7 +44,7 @@ export function ItemsView({
   selectedSupplierSummary,
   from,
   onEntryDoubleClick,
-  onIncomingDeepLink,
+  onIncomingClick,
   emptyState,
 }: ItemsViewProps) {
   if (itemDateGroups.length === 0) return <>{emptyState}</>;
@@ -137,7 +138,16 @@ export function ItemsView({
                     <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center">
                       <JmBadge variant={TYPE_JM_VARIANTS[p.type]} size="sm" shape="square">{TYPE_LABELS[p.type]}</JmBadge>
                     </JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)] truncate">{p.description}</JmTableCell>
+                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)] truncate">
+                      <span className="inline-flex items-center gap-1.5">
+                        {p.description}
+                        {p.paymentKind && p.paymentKind !== "MIXED" && (
+                          <JmBadge variant="warning" size="sm" shape="square">
+                            {PAYMENT_KIND_LABELS[p.paymentKind]}
+                          </JmBadge>
+                        )}
+                      </span>
+                    </JmTableCell>
                     <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)]">—</JmTableCell>
                     <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center text-[var(--jm-text-muted)]">—</JmTableCell>
                     <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
@@ -176,8 +186,8 @@ export function ItemsView({
                 <JmTableRow
                   key={it.id}
                   className="cursor-pointer"
-                  title="더블클릭: 입고 상세"
-                  onDoubleClick={() => onIncomingDeepLink(it.incomingId)}
+                  title="클릭: 거래명세서 보기"
+                  onClick={() => onIncomingClick(it.incomingId)}
                 >
                   {!selectedSupplierId && (
                     <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">{it.supplier.name}</JmTableCell>

@@ -51,12 +51,21 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   OTHER: "기타",
 };
 
+// 결제 종류 — 부가세 후납 추적용 (잔액 영향 없음, 분류만)
+export const PAYMENT_KIND = ["MIXED", "SUPPLY_ONLY", "VAT_ONLY"] as const;
+export const PAYMENT_KIND_LABELS: Record<(typeof PAYMENT_KIND)[number], string> = {
+  MIXED: "전체 (공급가액 + 부가세)",
+  SUPPLY_ONLY: "공급가액만",
+  VAT_ONLY: "부가세만",
+};
+
 export const supplierPaymentSchema = z.object({
   supplierId: z.string().min(1, "거래처를 선택해주세요"),
   amount: z.string().min(1, "금액을 입력해주세요")
     .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "금액은 0보다 커야 합니다"),
   paymentDate: z.string().min(1, "결제일을 선택해주세요"),
   method: z.enum(SUPPLIER_PAYMENT_METHODS),
+  kind: z.enum(PAYMENT_KIND).default("MIXED"),
   memo: z.string().optional(),
 });
 
@@ -65,6 +74,7 @@ export const supplierPaymentUpdateSchema = z.object({
     .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "금액은 0보다 커야 합니다"),
   paymentDate: z.string().min(1, "결제일을 선택해주세요"),
   method: z.enum(SUPPLIER_PAYMENT_METHODS),
+  kind: z.enum(PAYMENT_KIND).default("MIXED"),
   memo: z.string().optional(),
 });
 

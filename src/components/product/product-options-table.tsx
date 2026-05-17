@@ -1,12 +1,12 @@
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+  JmBadge,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import type { ProductOptionItem } from "./types";
 
 interface Props {
@@ -19,59 +19,72 @@ interface Props {
 export function ProductOptionsTable({ options }: Props) {
   if (options.length === 0) {
     return (
-      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+      <div className="px-4 py-8 text-center text-jm-sm text-[var(--jm-text-muted)]">
         등록된 고객 옵션이 없습니다
       </div>
     );
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="h-9 px-3 text-xs w-[160px]">슬롯</TableHead>
-          <TableHead className="h-9 px-3 text-xs">값</TableHead>
-          <TableHead className="h-9 px-3 text-xs w-[100px] text-right">
+    <JmTable>
+      <JmTableHeader>
+        <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[160px]">
+            슬롯
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            값
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[100px] text-right">
             추가가
-          </TableHead>
-          <TableHead className="h-9 px-3 text-xs w-[200px]">매핑</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[200px]">
+            매핑
+          </JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
         {options.flatMap((opt) =>
           opt.values.map((v, idx) => (
-            <TableRow key={v.id}>
-              <TableCell className="px-3 py-2.5">
+            <JmTableRow key={v.id}>
+              <JmTableCell className="px-3 py-2">
                 {idx === 0 ? (
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{opt.name}</span>
+                    <span className="font-medium text-jm-sm text-[var(--jm-text)]">
+                      {opt.name}
+                    </span>
                     {opt.required && (
-                      <Badge variant="outline" className="text-[10px]">
+                      <JmBadge
+                        variant="outline"
+                        size="sm"
+                        shape="square"
+                        className="text-jm-2xs"
+                      >
                         필수
-                      </Badge>
+                      </JmBadge>
                     )}
                   </div>
                 ) : null}
-              </TableCell>
-              <TableCell className="px-3 py-2.5 text-sm">{v.label}</TableCell>
-              <TableCell className="px-3 py-2.5 text-sm tabular-nums text-right">
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2 text-jm-sm text-[var(--jm-text)]">
+                {v.label}
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2 text-jm-sm tabular-nums text-right text-[var(--jm-text)]">
                 {Number(v.addPrice) > 0
                   ? `+₩${Number(v.addPrice).toLocaleString("ko-KR")}`
                   : "—"}
-              </TableCell>
-              <TableCell className="px-3 py-2.5 text-xs">
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2 text-jm-xs">
                 {v.mappedProduct ? (
                   <span className="inline-flex flex-wrap items-center gap-1">
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] border-blue-200 text-blue-700"
-                    >
+                    <JmBadge variant="info" size="sm" shape="square" className="text-jm-2xs">
                       Product
-                    </Badge>
-                    {/* SWAP / ADDON mode chip — mappedProductId 있을 때만 의미 */}
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px]"
+                    </JmBadge>
+                    <JmBadge
+                      variant="default"
+                      size="sm"
+                      shape="square"
+                      className="text-jm-2xs"
                       title={
                         v.mappedMode === "SWAP"
                           ? "옵션 선택 시 메인 라인의 productId 가 매핑된 SKU 로 교체됨 (색상·사이즈)"
@@ -79,27 +92,28 @@ export function ProductOptionsTable({ options }: Props) {
                       }
                     >
                       {v.mappedMode}
-                    </Badge>
-                    <span className="font-mono">{v.mappedProduct.sku}</span>
+                    </JmBadge>
+                    <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
+                      {v.mappedProduct.sku}
+                    </span>
                   </span>
                 ) : v.mappedVariant ? (
                   <span className="inline-flex items-center gap-1">
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] border-purple-200 text-purple-700"
-                    >
+                    <JmBadge variant="accent" size="sm" shape="square" className="text-jm-2xs">
                       Variant
-                    </Badge>
-                    <span className="font-mono">{v.mappedVariant.sku}</span>
+                    </JmBadge>
+                    <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
+                      {v.mappedVariant.sku}
+                    </span>
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">단순 텍스트</span>
+                  <span className="text-[var(--jm-text-muted)]">단순 텍스트</span>
                 )}
-              </TableCell>
-            </TableRow>
+              </JmTableCell>
+            </JmTableRow>
           )),
         )}
-      </TableBody>
-    </Table>
+      </JmTableBody>
+    </JmTable>
   );
 }

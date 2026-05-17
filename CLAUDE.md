@@ -1343,6 +1343,29 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 **우선순위 낮음**:
 - **사이드바 메뉴 위치 검토** — `/sales/history` 가 "통합 판매내역"이라는 트랜잭션 추적 정체성을 갖게 됨. 현재 sidebar 카테고리(`sales-history`)가 매출 분석/리포트와 같은 그룹에 있는지 — 정책 결정 후 위치 재배치 검토 (다음 사이드바 일괄 정리 batch 에 합류)
 
+### 대시보드 메인 홈 (2026-05-15 jm 리뉴얼 + 정확성·인터랙티브 batch 후 남은 항목)
+
+전체 작업 카탈로그·우선순위·계산식 단일 출처: [docs/DASHBOARD.md](docs/DASHBOARD.md).
+
+**완료** (정확성·인터랙티브·비즈니스 지표·시각화 확장 batch 1~3):
+- ✅ 매출 정의 `/sales/history` netAmount 와 동기화 (PARTIAL_REFUND 차감 + REFUNDED/SALES_CANCELLED 제외)
+- ✅ 미수금 30일+ 정밀 계산 (customerLedger groupBy _min)
+- ✅ 마진 LotConsumption 우선 + unitCostSnapshot fallback
+- ✅ 비즈니스 지표 5개 (AOV/반품률/재구매율/임대 가동률 + 결제수단 분포 차트)
+- ✅ 기간 토글 (`?period=today|this-week|this-month|last-month|custom` + `?from=&to=`)
+- ✅ 18 KPI 클릭 점프 (`ClickableStat` Link 래핑)
+- ✅ 모바일 컴팩트 + 추가 KPI 토글 (`CollapsibleKpiSection`)
+- ✅ 활성 고객 정의 명확화 (soldOrderWhere 동기)
+- ✅ 마진율 6개월 추이 line + 카테고리별 매출 도넛
+- ✅ 효율 지표 (재고 회전율 / DoI / 수리 공임 비중 / 재수리율)
+- ✅ 도넛 차트 모바일 세로 배치
+- ✅ 역할별 KPI (STAFF 는 재무 지표 숨김) · 새로고침 버튼 · `/help` 가이드 페이지
+- ✅ 세금계산서 발행 대기 KPI · CSV 내보내기 · 요일×시간 매출 히트맵
+
+**남은 항목** (전부 낮음 또는 보류 — 전체 목록은 [docs/DASHBOARD.md](docs/DASHBOARD.md)):
+- 클라이언트 컴포넌트 전환 (`useQuery` + `/api/dashboard/summary`) — ROI 모호, 보류 (server component + router.refresh 로 실용 충분)
+- 새 DB 모델 필요해서 보류 — 위젯 사용자 맞춤화 (사용자 설정 모델) · 매출 목표 게이지 (목표 모델) · 외부 채널 health (last poll 추적)
+
 > 참고 — 2026-04 견적서·거래명세표 도입 당시 MVP에서 제외했던 ① 견적서 → Order/Incoming/PurchaseOrder 전환, ② 견적서 → 거래명세표 전환 UI, ③ 회사 정보 DB 이전(`CompanyInfo` 싱글턴) 은 모두 구현 완료. `/api/quotations/[id]/convert` 와 `/quotations` 페이지 전환 다이얼로그, `/api/company-info` 가 그 결과.
 
 > 참고 — 2026-05-07 주문 시스템 3축 분리(출고·결제·클레임), 반품 흐름 세분화(RETURN_REQUESTED/RETURN_ACCEPTED), 교환 자동화(EXCHANGE_SAME/DIFFERENT + 새 주문 자동 생성 + 양방향 link), 마진 리포트 정합성 (교환 발송 자동 제외), OrderItem 편집 UI(PENDING 한정), customerPayment FIFO 자동 매칭(외상→입금 시 paymentStatus 자동 PAID), 외부 채널 자동화 Phase 1 (`ChannelAdapter`/`MockChannelAdapter`/`ChannelProductMapping`/`PendingChannelOrder` + `/channels/imports` 페이지), Phase 3·4·6+ Phase 2-비의존 부분(SKU 자동 매핑 추천 + Outbound hook + Cron 라우트 `/api/cron/channel-poll` + 운영 대시보드 위젯) 도입 완료. 자세한 설계와 시각 위계는 [docs/ORDERS_SYSTEM.md](docs/ORDERS_SYSTEM.md).
@@ -1356,6 +1379,18 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 > 참고 — 2026-05-10 추가 — 외부 채널·알림 인프라 보강: (1) `ChannelOutboundJob` 모델 + `ChannelOutboundJobStatus`/`ChannelOutboundJobKind` enum 도입 (PUSH_TRACKING/PUSH_STOCK/ACCEPT_RETURN/REJECT_RETURN). 실패한 outbound 가 audit log 뿐 아니라 retry 큐로 자동 enqueue (중복 PENDING 은 lastError·payload 만 갱신). (2) [/api/cron/outbound-retry](src/app/api/cron/outbound-retry/route.ts) 라우트 — PENDING + nextAttemptAt ≤ now 항목을 batch drain, exponential backoff(2^attempts 분), maxAttempts(5) 도달 시 FAILED 종결. 채널 비활성·어댑터 미등록 시 즉시 FAILED. (3) [Solapi 어댑터](src/lib/notifications/solapi.ts) 스캐폴드 — HMAC-SHA256 인증 + SMS 전송 작동. 카카오 알림톡은 PFID 설정 시 자동 분기, 템플릿 매핑은 추후. (4) `dispatch.ts` 환경변수 자동 분기 — `SOLAPI_API_KEY/SECRET/SENDER_PHONE` 설정되면 Solapi, 아니면 Mock 폴백. ENV 미설정 환경은 그대로 dev mock 동작.
 
 > 참고 — 2026-05-12 — 환불 도메인 정식화 + 주문 UX batch + POS 반품·교환 진입: (1) **CustomerRefund 도메인** — Prisma `CustomerRefund` 모델 + `CustomerRefundMethod` enum (CARD_CANCEL/CASH/BANK_TRANSFER/POINTS/OTHER). 지금까지 [반품완료] 누르면 paymentStatus 만 REFUNDED 로 바뀌고 실제 환불 금액·방법·일자가 기록 안 됐음 — 매장이 PG 콘솔/은행에서 손으로 환불 처리해도 시스템엔 "끝났음" 만 남음. 이제 refund API 가 `refundInput` payload 받아 CustomerRefund row 자동 생성 (PAID/REFUND_PENDING 만; UNPAID 는 기존 ledger ADJUSTMENT 그대로). exchange 는 paymentStatus 유지 → 차액은 새 -EX 주문에서 처리되므로 제외. (2) **RefundDialog 확장** — 환불 금액·방법·일자·메모 입력 카드 4종. 진입 + 모드 토글 시 자동 채움 (전체=totalAmount-누적환불, 부분=수량×단가 합); 사용자 자유 수정 가능. UNPAID 면 "외상 매출 취소" 안내. COMPLETED 즉시반품(return 단축경로)도 같은 다이얼로그 사용. (3) **customer/[id]/ledger 환불 노출** — API 응답에 `refunds` 배열, UI 가 `LedgerEntry` 모양으로 변환해 dateGroups 에 인터리브. 가상 타입 `REFUND_LOG` (잔액 무관 표시 + bg-destructive/5). (4) **_detail-sheet 분리 시작** — `_refund-dialog.tsx` 별도 파일 (430줄 self-contained). 부모는 open + initialPartialReturns prefill 만 관리. 3052 → 2926 줄. 다음 dialog (Ship/Claim/Exchange) 분리 시 같은 패턴. (5) **UI/UX 4종** — KPI 카드 로딩 `—` 대시 → `JmSkeleton`, 부분 발송 잔여 초과 검증 (빨강 border + submit 차단), 도움말 "2-2. 워크보드 필터·검색 사용법" 섹션, 모바일 테이블 첫 열 sticky (sm:static). (6) **POS 반품·교환 단축 진입** — `/api/customers/[id]/refundable-orders` (COMPLETED + RETURN_INSPECTED, -EX 새 주문 제외) + `_return-exchange-sheet.tsx` (주문 카드 리스트 → [반품]/[교환] 분기). [반품] 은 워크보드 RefundDialog 재사용. [교환] 은 `ExchangeMiniDialog` (SAME/DIFFERENT 토글) → exchange API → 새 -EX 주문 자동 생성. CustomerActionSheet 에 `onReturnExchange` prop 추가, 등록 고객만 노출. (7) **StatusFlowGuide 제거** — 워크보드·claims 뷰에서 제거 (도움말에 더 상세히 있고 클릭 불가). 도움말 페이지에선 유지. (8) **클레임 뷰 진입점** — `/orders/claims` 가 dead route 였음 (도움말 텍스트로만 언급). 워크보드 우측 액션 영역에 [반품 처리] 버튼 추가.
+
+> 참고 — 2026-05-17 — 대시보드 batch 6 (세금계산서·CSV·히트맵): (1) 세금계산서 발행 대기 KPI — `Order.taxInvoiceRequested && taxInvoicedAt=null && status≠CANCELLED` 카운트 (별도 TaxInvoice 모델 불필요, `/api/tax-invoices/pending` 과 동일 정의). 워크플로 대기 row 4→5개 (`CollapsibleKpiSection` 에 `cols` prop 추가). (2) CSV 내보내기 — `_csv-export.tsx` `CsvButton` (BOM 포함 — Excel 한글), `SectionHeader` 에 `csv` prop. 베스트셀러·VIP·데드스톡 적용. (3) 요일(7)×시간(24) 매출 히트맵 `SalesHeatmap` — 선택 기간 SOLD 주문 시각 집계, opacity 농도 + title 툴팁, ADMIN 전용. (보류: 위젯 맞춤화·매출 목표 게이지는 새 DB 모델 필요, 클라이언트 전환은 ROI 모호.)
+
+> 참고 — 2026-05-16 — 대시보드 batch 5 (권한·새로고침·도움말): (1) 역할별 KPI — `user.role === "ADMIN"` 분기. STAFF 는 사장 KPI·비즈니스/효율 지표·오늘 현금흐름·매출 차트·VIP/거래처 미지급/고객 미수금 테이블 숨김 (재무 민감 정보). 운영 알람·워크플로 대기·최근 주문·재고·감사로그만 노출. (2) `ClickableStat` 을 클라이언트 컴포넌트(`_clickable-stat.tsx`)로 분리 — 서버 컴포넌트 페이지에서 interactive `JmStat`(이벤트 핸들러 보유) 을 렌더하면 "Event handlers cannot be passed to Client Component props" 런타임 에러. `JmStat` 은 `"use client"` 없어 서버 컴포넌트라 interactive 모드를 서버에서 못 씀. (3) 새로고침 — `_refresh-button.tsx` (`router.refresh()` + `useTransition`, "HH:MM 기준" 표시). (4) `/help` 대시보드 가이드 페이지 (`(home)/help/page.tsx`) — KPI 의미·계산식·기간 토글·권한 설명, 헤더 "가이드" 링크 진입.
+
+> 참고 — 2026-05-16 — 대시보드 batch 4 (효율 지표): 효율 지표 KPI row 추가 (5번째 row) — 재고 회전율 (기간 매출원가/재고 자산), 재고 소진일수 DoI (재고 자산÷일평균 매출원가), 수리 공임 비중 (`RepairLabor.totalPrice`/(labor+part)), 재수리율 (`parentRepairTicketId` 있는 티켓/기간 접수). 회전율·DoI 는 기존 `monthlyCost`·`inventoryAssetValue` 재활용 (추가 쿼리 0). 도넛 차트 (`ChannelDonut`) 모바일 세로 배치 (sm 미만 도넛↑범례↓).
+
+> 참고 — 2026-05-15 추가³ — 대시보드 batch 3 (정의·UX·시각화 확장): (1) 활성 고객 정의 → `soldOrderWhere` 와 동기 (정상 매출 거래만, 취소·반품·매출취소 제외). (2) 사용자 지정 기간 `?period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD` — `JmDateRangePicker` 2개월 동시 + `parseYmd`/`formatYmd` 헬퍼 + `periodRange()` custom 분기 (잘못된 범위는 this-month 폴백). (3) 모바일 추가 KPI 토글 `CollapsibleKpiSection` — "더 보기" 버튼 (ChevronDown/Up) 모바일에만 노출, 클릭 시 그리드 펼침. (4) 최근 6개월 마진율 line chart (`MarginTrendLine` recharts) — 단일 OrderItem.findMany (6개월치) 메모리 월별 그룹핑 + itemCost 헬퍼로 LotConsumption 우선. (5) 카테고리별 매출 도넛 — Product.categoryId groupBy. 차트 섹션 단일 → 2 row (추세 2개 / 분포 3개).
+
+> 참고 — 2026-05-15 추가² — 대시보드 정확성 + 인터랙티브 batch: (1) 매출 정의 `/sales/history` netAmount 와 동기화 — `soldOrderWhere` 통일 (`paymentStatus NOT IN [REFUNDED, SALES_CANCELLED]`) + `OrderItem.refundedAmount` 합으로 PARTIAL_REFUND 차감. (2) 마진 계산 LotConsumption 우선 + unitCostSnapshot fallback (`itemCost()` 헬퍼). (3) 미수금 30일+ 정밀 (`customerLedger.groupBy by:customerId _min:createdAt where:type=SALE`). (4) 비즈니스 지표 5개 — 객단가/반품률/재구매율(90일)/임대 가동률 + 결제수단 분포 막대 차트 (`PaymentMixBars`). (5) 기간 토글 — `?period=today|this-week|this-month|last-month`, `_period-toggle.tsx` (JmSegmentedControl) + `periodRange()` 헬퍼 — 매출·이익·AOV·반품률·베스트셀러·VIP·결제수단·신규고객 + delta 비교 기간 동시 전환. (6) 18 KPI 전부 `ClickableStat` 헬퍼로 해당 워크보드 점프 (Link 외부 래핑 + `interactive` prop). (7) 모바일 컴팩트 모드 — 워크플로 대기 + 비즈니스 지표 row 모바일 hidden md:grid.
+
+> 참고 — 2026-05-15 메인 대시보드 (`/`) shadcn → jm 마이그레이션 + 도메인 확장 완료. [dashboard-shell.tsx](src/components/layout/dashboard-shell.tsx) JmScope cascade 본문까지 닿게 정리 (이전엔 로딩바·모바일 헤더만 감쌌음). KPI 6 → 16 (사장 4 + 운영 알람 8 + 워크플로 대기 4), 사장 KPI 는 매출/매출총이익(delta vs 지난달)/영업이익/재고 자산 가치. 오늘 현금흐름 카드 (결제·지급·지출·순). recharts 차트 2개 (7일 매출 AreaChart + 채널 도넛). 빠른 액션 + 글로벌 검색 ⌘K 다이얼로그 6 카테고리. 신규 테이블: 베스트셀러·데드스톡 90d+·VIP 고객·최근 활동(AuditLog). 약 45개 쿼리 Promise.all 병렬. 진입점·우선순위·계산식 전체 카탈로그는 [docs/DASHBOARD.md](docs/DASHBOARD.md).
 
 > 참고 — 2026-05-10 추가² — 모든 backlog 마무리: (1) [Coupang](src/lib/channels/coupang.ts) / [Naver](src/lib/channels/naver.ts) 어댑터 스캐폴드 — HMAC/OAuth 인증 framework 완성, 메서드별 endpoint TODO. registry 가 환경변수 (`COUPANG_VENDOR_ID/ACCESS_KEY/SECRET_KEY` / `NAVER_CLIENT_ID/SECRET`) 설정 시 자동 등록. (2) [Inbound webhook 라우트](src/app/api/webhooks/channels/[code]/route.ts) `/api/webhooks/channels/[code]` — 채널 lookup → adapter.verifyWebhookSignature → parseWebhookEvent → kind 별 dispatch framework. 어댑터 메서드 채워지면 자동 활성화. (3) Solapi 카카오 알림톡 템플릿 매핑 — `KAKAO_TEMPLATE_BY_KIND` 가 환경변수 (`SOLAPI_KAKAO_TPL_ORDER_DELIVERED/RETURN_ACCEPTED/...`) 에서 templateId 자동 lookup. payload.meta.kakaoVars 로 변수 전달. 미설정 kind 는 SMS 폴백. (4) `RETURN_PICKING` enum 추가 — 반품 회수 단계 세분화 (RETURN_ACCEPTED → RETURN_PICKING → RETURN_COLLECTED). `start_picking` 액션 신규, 기존 `collect_return` 은 양쪽 from 허용 (직접 회수 + 라벨 발급 후 도착). 워크보드/상세시트/claims 페이지 라벨·필터 모두 갱신. (5) **메인+옵션+추가구매 동시 매핑** — `ChannelProductMappingComponent` 에 `lineRole` (MAIN/OPTION/ADDON) + `productOptionValueId` 추가. 한 채널 SKU 가 메인·옵션·추가구매 라인 동시 매핑 가능. import.ts 가 lineRole 기반으로 OrderItem.lineRole(MAIN/OPTION_REF/ADDON) + parentItemId 트리 자동 구성 (Order 생성 후 두 패스 — items 생성 → parent link). 단순 1:N 세트 풀이는 기존 동작 유지 (모두 MAIN). (6) `/channels/imports` AddMappingDialog 다중 모드에 **메인/옵션/추가** 라인 역할 셀렉터 추가 — 사용자가 한 채널 SKU 에 메인+옵션+추가구매 라인 동시 등록 가능 (UI 까지 end-to-end 완성).
 

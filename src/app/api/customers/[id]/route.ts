@@ -53,6 +53,28 @@ export async function PUT(
     }
   }
 
+  // 동의 변경 처리 — false→true 전이일 때만 동의일시 갱신, 유지 시 기존값 보존.
+  let consentData: {
+    serialServiceConsent?: boolean;
+    consentedAt?: Date | null;
+    consentVersion?: string | null;
+  } = {};
+  if (data.serialServiceConsent !== undefined) {
+    const before = await prisma.customer.findUnique({
+      where: { id },
+      select: { serialServiceConsent: true, consentedAt: true },
+    });
+    consentData = {
+      serialServiceConsent: data.serialServiceConsent,
+      consentedAt: data.serialServiceConsent
+        ? before?.serialServiceConsent && before.consentedAt
+          ? before.consentedAt
+          : new Date()
+        : null,
+      consentVersion: data.serialServiceConsent ? "v1.0" : null,
+    };
+  }
+
   const customer = await prisma.customer.update({
     where: { id },
     data: {
@@ -71,6 +93,7 @@ export async function PUT(
       contactName: isBusiness ? data.contactName ?? null : null,
       contactPhone: isBusiness ? data.contactPhone ?? null : null,
       contactPosition: isBusiness ? data.contactPosition ?? null : null,
+      ...consentData,
     },
   });
 

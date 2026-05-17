@@ -6,47 +6,29 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   ArrowLeft,
-  ArrowRightLeft,
   ChevronDown,
-  Clock,
   FileText,
   Loader2,
-  MoreVertical,
   Package,
   Plus,
   Search,
   Trash2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { calcRepairTotals } from "@/lib/repair";
 import {
-  JmBadge,
   JmButton,
   JmCard,
   JmComboboxDrawer,
-  JmDrawer,
-  JmDrawerBody,
-  JmDrawerContent,
-  JmDrawerFooter,
-  JmDrawerHeader,
-  JmDrawerTitle,
-  JmDropdownMenu,
-  JmDropdownMenuContent,
-  JmDropdownMenuItem,
-  JmDropdownMenuSeparator,
-  JmDropdownMenuTrigger,
   JmIconButton,
   JmInput,
   JmNumberInput,
   JmSearchInput,
   JmSkeleton,
-  JmTextarea,
 } from "@/jm";
 import {
-  STATUS_META,
   type RepairTicketDetail,
   type RepairPart,
   type RepairLabor,
@@ -58,25 +40,68 @@ import { LaborsSection } from "../_labors-section";
 import { PickupSheet } from "../_pickup-sheet";
 import { SetRecommendations } from "../_set-recommendations";
 import { ProductLinkCard } from "./_product-link-card";
-import {
-  CancelSheet,
-  cancelReasonLabel,
-  HardDeleteButton,
-} from "./_cancel-sheet";
+import { cancelReasonLabel, HardDeleteButton } from "./_cancel-sheet";
 import { DetailSkeleton } from "./_detail-skeleton";
+import { RejectSheet, quoteRejectReasonLabel } from "./_reject-sheet";
+import { RepairTicketActionMenu } from "./_repair-action-menu";
 import { SymptomCard, DiagnosisCard, NotesCard } from "./_notes-cards";
 import { PackagesCard, ReferenceInfoSection } from "./_reference-cards";
 import { Card, Field } from "./_shared";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
+import { QuickCustomerSheet } from "@/app/(pos)/pos/_quick-customer-sheet";
 
-/** 라우트 진입점 — params 받아 RepairDetail 에 위임. */
+/** 라우트 진입점 — params 받아 RepairDetail 에 위임. 미등록 고객 클릭 시 QuickCustomerSheet 띄움. */
 export default function RepairDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <RepairDetail ticketId={id} />;
+  return <StandaloneRepairDetail ticketId={id} />;
+}
+
+function StandaloneRepairDetail({ ticketId }: { ticketId: string }) {
+  const qc = useQueryClient();
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
+
+  // 같은 queryKey 라 RepairDetail 의 ticketQuery 와 cache 공유 — 추가 fetch 없음
+  const ticketQuery = useQuery({
+    queryKey: ["repairs", "detail", ticketId],
+    queryFn: () => apiGet<RepairTicketDetail>(`/api/repair-tickets/${ticketId}`),
+  });
+  const isUnregistered = !ticketQuery.data?.customer;
+
+  const linkCustomer = useMutation({
+    mutationFn: (customerId: string) =>
+      apiMutate(`/api/repair-tickets/${ticketId}`, "PUT", { customerId }),
+    onSuccess: () => {
+      toast.success("고객 연결됨");
+      qc.invalidateQueries({ queryKey: ["repairs", "detail", ticketId] });
+      qc.invalidateQueries({ queryKey: ["repairs"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "연결 실패"),
+  });
+
+  return (
+    <>
+      <RepairDetail
+        ticketId={ticketId}
+        // 미등록일 때만 카드를 클릭 가능하게. 등록 고객은 변경 흐름 미정의 → 비활성.
+        onCustomerClick={
+          isUnregistered ? () => setQuickCustomerOpen(true) : undefined
+        }
+      />
+      <QuickCustomerSheet
+        open={quickCustomerOpen}
+        onOpenChange={setQuickCustomerOpen}
+        onCreated={(c) => {
+          linkCustomer.mutate(c.id);
+          setQuickCustomerOpen(false);
+        }}
+      />
+    </>
+  );
 }
 
 interface RepairDetailProps {
@@ -110,7 +135,8 @@ export function RepairDetail({
   const router = useRouter();
   const qc = useQueryClient();
   const [pickupOpen, setPickupOpen] = useState(false);
-  const [cancelOpen, setCancelOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  // cancelOpen 은 RepairTicketActionMenu (_repair-action-menu.tsx) 가 자체 관리.
 
   const ticketQuery = useQuery({
     queryKey: ["repairs", "detail", id],
@@ -128,21 +154,7 @@ export function RepairDetail({
 
   const goBack = onBack ?? (() => router.push("/pos/repairs"));
 
-  // 즉시↔맡김 타입 변경 — 운영 중 종종 발생 (즉시 시작했지만 부속 필요 → 맡김 전환 등)
-  const typeMutation = useMutation<
-    unknown,
-    Error,
-    "ON_SITE" | "DROP_OFF"
-  >({
-    mutationFn: (nextType) =>
-      apiMutate(`/api/repair-tickets/${id}`, "PUT", { type: nextType }),
-    onSuccess: (_, nextType) => {
-      toast.success(nextType === "ON_SITE" ? "즉시 수리로 변경됨" : "맡김 수리로 변경됨");
-      invalidate();
-    },
-    onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : "변경 실패"),
-  });
+  // 즉시↔맡김 변경 + 수리 취소는 RepairTicketActionMenu (_repair-action-menu.tsx) 가 자체 mutation 처리.
 
   const transitionMutation = useMutation<
     { success: boolean; hardDeleted?: boolean },
@@ -162,19 +174,12 @@ export function RepairDetail({
         start: "수리 시작",
         ready: "수리 완료",
         pickup: "픽업/결제 완료",
-        cancel: "취소 처리됨",
+        reject_after_quote: "진단비만 청구로 진행합니다",
       };
-      // 미등록 + MISTAKE 자동 hard delete 시 — 목록으로 복귀
-      if (vars.action === "cancel" && data.hardDeleted) {
-        toast.success("티켓이 영구 삭제됨");
-        setCancelOpen(false);
-        invalidate();
-        goBack();
-        return;
-      }
+      // cancel 액션은 RepairTicketActionMenu 가 자체 처리. 여기는 출고·결제 단계만.
       toast.success(labels[vars.action] ?? "처리되었습니다");
       setPickupOpen(false);
-      setCancelOpen(false);
+      setRejectOpen(false);
       invalidate();
     },
     onError: (err) =>
@@ -198,7 +203,6 @@ export function RepairDetail({
   }
 
   const t = ticketQuery.data;
-  const meta = STATUS_META[t.status];
   const readonly = t.status === "PICKED_UP" || t.status === "CANCELLED";
   const actions = nextActions(t.status, t.type, !!onAddToCart);
   const finalAmount = calcFinal(t);
@@ -214,15 +218,16 @@ export function RepairDetail({
       setPickupOpen(true);
       return;
     }
+    if (action === "reject_after_quote") {
+      setRejectOpen(true);
+      return;
+    }
     if (action === "cart") {
       // 카트에 라인 추가 — 부모(v2 고객 페이지) 가 처리
       onAddToCart?.(t, finalAmount);
       return;
     }
-    if (action === "cancel") {
-      setCancelOpen(true);
-      return;
-    }
+    // cancel 은 헤더 kebab 메뉴에서 처리 (nextActions 에 더 이상 안 포함)
     transitionMutation.mutate({ action });
   };
 
@@ -237,15 +242,7 @@ export function RepairDetail({
             </JmIconButton>
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex items-center gap-1.5">
-                <span className={`size-2 rounded-full ${meta.dot}`} />
-                <span className="text-jm-2xs font-semibold text-[var(--jm-text)]">
-                  {meta.label}
-                </span>
-                {t.type === "ON_SITE" && (
-                  <JmBadge variant="solid" size="sm" shape="square">
-                    즉시
-                  </JmBadge>
-                )}
+                <RepairTicketActionMenu ticketId={t.id} onChanged={invalidate} />
                 <span className="font-mono text-jm-2xs text-[var(--jm-text-subtle)]">
                   {t.ticketNo}
                 </span>
@@ -266,48 +263,6 @@ export function RepairDetail({
             >
               <FileText className="size-4" />
             </JmIconButton>
-            {!readonly && (
-              <JmDropdownMenu>
-                <JmDropdownMenuTrigger
-                  render={
-                    <JmIconButton
-                      size="md"
-                      variant="ghost"
-                      aria-label="메뉴"
-                    >
-                      <MoreVertical className="size-4" />
-                    </JmIconButton>
-                  }
-                />
-                <JmDropdownMenuContent align="end" sideOffset={8}>
-                  {t.type === "ON_SITE" ? (
-                    <JmDropdownMenuItem
-                      onClick={() => typeMutation.mutate("DROP_OFF")}
-                      disabled={typeMutation.isPending}
-                    >
-                      <Clock className="size-4" />
-                      맡김 수리로 변경
-                    </JmDropdownMenuItem>
-                  ) : (
-                    <JmDropdownMenuItem
-                      onClick={() => typeMutation.mutate("ON_SITE")}
-                      disabled={typeMutation.isPending}
-                    >
-                      <ArrowRightLeft className="size-4" />
-                      즉시 수리로 변경
-                    </JmDropdownMenuItem>
-                  )}
-                  <JmDropdownMenuSeparator />
-                  <JmDropdownMenuItem
-                    danger
-                    onClick={() => setCancelOpen(true)}
-                  >
-                    <X className="size-4" />
-                    수리 취소
-                  </JmDropdownMenuItem>
-                </JmDropdownMenuContent>
-              </JmDropdownMenu>
-            )}
           </div>
         </header>
       )}
@@ -321,7 +276,7 @@ export function RepairDetail({
           {/* 가져온 기기 — 시리얼/구매내역/상품명/직접입력 4모드 */}
           <ProductLinkCard ticket={t} readonly={readonly} onChanged={invalidate} />
 
-          {/* 기본 점검비 — 운영 흐름상 가져온 기기 바로 아래 */}
+          {/* 기본 진단비 + 보증 — 운영 흐름상 가져온 기기 바로 아래. 수리 안 했을 때만 진단비 청구 */}
           <DiagnosisFeeCard ticket={t} readonly={readonly} onSaved={invalidate} />
 
           {/* 증상 — 콤보박스 (기존 템플릿 + 새 입력) */}
@@ -374,19 +329,44 @@ export function RepairDetail({
             />
           )}
 
+          {/* 거절 사유 배지 — READY(post-reject) / PICKED_UP(post-reject) 양쪽 표시.
+              왜 부속/공임 없이 진단비만 청구됐는지 직원이 한눈에 알 수 있도록. */}
+          {t.quoteRejectReason && (
+            <div className="rounded-2xl border-2 border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] px-4 py-3 text-jm-sm text-[var(--jm-warning-fg)]">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-jm-2xs font-bold uppercase tracking-wider">
+                  거절
+                </span>
+                <span className="font-semibold">
+                  {quoteRejectReasonLabel(t.quoteRejectReason)}
+                </span>
+              </div>
+              {t.quoteRejectMemo && (
+                <p className="mt-0.5 text-[12px] opacity-80">{t.quoteRejectMemo}</p>
+              )}
+              {t.quoteRejectedAt && (
+                <p className="mt-0.5 text-[11px] opacity-60">
+                  {format(new Date(t.quoteRejectedAt), "yyyy-MM-dd HH:mm")}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* 종료 상태 메시지 */}
           {readonly && (
             <div className="flex flex-col gap-2">
               <div
                 className={`rounded-2xl border px-4 py-3 text-jm-sm ${
                   t.status === "PICKED_UP"
-                    ? "border-[var(--jm-success-bg)] bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
+                    ? t.quoteRejectReason
+                      ? "border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
+                      : "border-[var(--jm-success-bg)] bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
                     : "border-[var(--jm-danger-bg)] bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]"
                 }`}
               >
                 {t.status === "PICKED_UP"
-                  ? `수리 완료 — ${fmtKRWInc(t.finalAmount)}${
-                      t.repairWarrantyEnds
+                  ? `${t.quoteRejectReason ? "거절·진단비 청구" : "수리 완료"} — ${fmtKRWInc(t.finalAmount)}${
+                      t.repairWarrantyEnds && !t.quoteRejectReason
                         ? ` · 보증 ~${format(
                             new Date(t.repairWarrantyEnds),
                             "yyyy-MM-dd",
@@ -434,7 +414,9 @@ export function RepairDetail({
             </div>
           </div>
 
-          {/* 항목 breakdown — 부속·공임·점검 (VAT 포함 기준) */}
+          {/* 항목 breakdown — 부속·공임·진단비 (VAT 포함 기준).
+              진단비는 수리 안 했을 때만 청구 (effectiveDiagnosisFee 사용).
+              수리 진행되면 입력된 진단비가 있어도 면제됨 — 회색 strike 로 시각화. */}
           {(totals.usedPartsTotal > 0 ||
             totals.laborTotal > 0 ||
             totals.diagnosisFee > 0) && (
@@ -455,10 +437,18 @@ export function RepairDetail({
                   </span>
                 </span>
               )}
-              {totals.diagnosisFee > 0 && (
+              {totals.effectiveDiagnosisFee > 0 && (
                 <span>
-                  점검{" "}
+                  진단{" "}
                   <span className="tabular-nums text-[var(--jm-text-muted)]">
+                    {fmtKRWInc(totals.effectiveDiagnosisFee)}
+                  </span>
+                </span>
+              )}
+              {totals.diagnosisFee > 0 && totals.effectiveDiagnosisFee === 0 && (
+                <span className="text-[var(--jm-text-disabled)] line-through">
+                  진단{" "}
+                  <span className="tabular-nums">
                     {fmtKRWInc(totals.diagnosisFee)}
                   </span>
                 </span>
@@ -498,31 +488,20 @@ export function RepairDetail({
         }
         loading={transitionMutation.isPending}
       />
-
-      {/* 취소 사유 시트 */}
-      <CancelSheet
-        open={cancelOpen}
-        onOpenChange={setCancelOpen}
-        isUnregistered={!t.customer}
-        hasArchivalValue={
-          !!t.customer ||
-          !!t.serialItem ||
-          t.parts.some((p) => p.status === "LOST") ||
-          Number(t.diagnosisFee) > 0
-        }
-        parts={t.parts.map((p) => ({
-          id: p.id,
-          name: p.product.name,
-          status: p.status,
-        }))}
-        onConfirm={(reason, memo) =>
+      {/* 손님 거절 — 진단비만 청구 시트 */}
+      <RejectSheet
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        diagnosisFee={Number(t.diagnosisFee) || 0}
+        onConfirm={(quoteRejectReason, quoteRejectMemo) =>
           transitionMutation.mutate({
-            action: "cancel",
-            payload: { cancelReason: reason, cancelMemo: memo },
+            action: "reject_after_quote",
+            payload: { quoteRejectReason, quoteRejectMemo },
           })
         }
         loading={transitionMutation.isPending}
       />
+      {/* 취소 사유 시트는 RepairTicketActionMenu 내부로 이동 */}
     </div>
   );
 }
@@ -603,8 +582,8 @@ function CustomerDeviceCard({
 
 
 
-// ──── 기본점검비 + 수리 보증 카드 — 가져온 기기 바로 아래 배치 (운영 흐름) ────
-// 전체할인은 제거 — 할인은 POS 카트의 라인 단위 할인 또는 결제 시트에서 처리.
+// ──── 기본 진단비 + 수리 보증 카드 — 가져온 기기 바로 아래 배치 (운영 흐름) ────
+// 진단비 정책: 수리 진행(부속·공임 있음) 시 면제. 수리 안 했을 때(거절·포기) 만 청구.
 // 보증 개월: PICKED_UP 시점부터 N개월. 회사 기본값(CompanyInfo.defaultRepairWarrantyMonths) 으로 prefill.
 function DiagnosisFeeCard({
   ticket,
@@ -618,6 +597,11 @@ function DiagnosisFeeCard({
   const [feeOpen, setFeeOpen] = useState(false);
   const currentFee = Number(ticket.diagnosisFee) || 0;
   const currentWarranty = ticket.repairWarrantyMonths;
+  // 수리가 진행 중이면 진단비 면제 — 부속·공임 합계로 판단
+  const hasRepairWork =
+    ticket.parts.some((p) => p.status === "USED" || (p.status === "LOST" && p.billLost)) ||
+    ticket.labors.length > 0;
+  const isWaived = hasRepairWork && currentFee > 0;
 
   const saveFee = useMutation({
     mutationFn: (net: number) =>
@@ -625,7 +609,7 @@ function DiagnosisFeeCard({
         diagnosisFee: net,
       }),
     onSuccess: () => {
-      toast.success("점검비 저장됨");
+      toast.success("진단비 저장됨");
       onSaved();
     },
     onError: (err) =>
@@ -651,11 +635,11 @@ function DiagnosisFeeCard({
   return (
     <Card>
       <div className="flex flex-col gap-4">
-        {/* 기본 점검비 섹션 */}
+        {/* 기본 진단비 섹션 — 수리 안 했을 때만 청구되는 비용 */}
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
             <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-              기본 점검비
+              기본 진단비
             </span>
             <span className="text-[10px] text-[var(--jm-text-subtle)]">VAT 포함</span>
           </div>
@@ -663,12 +647,23 @@ function DiagnosisFeeCard({
             type="button"
             onClick={() => !readonly && setFeeOpen(true)}
             disabled={readonly}
-            className="flex h-12 items-center justify-end rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-right text-[16px] font-semibold tabular-nums text-[var(--jm-text)] transition-colors hover:bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)] disabled:opacity-70"
+            className={`flex h-12 items-center justify-end rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-right text-[16px] font-semibold tabular-nums transition-colors hover:bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)] disabled:opacity-70 ${
+              isWaived
+                ? "text-[var(--jm-text-disabled)] line-through"
+                : "text-[var(--jm-text)]"
+            }`}
           >
             {currentFee > 0 ? fmtKRWInc(currentFee) : (
               <span className="text-[var(--jm-text-subtle)]">탭하여 입력</span>
             )}
           </button>
+          <p className="text-[11px] text-[var(--jm-text-subtle)]">
+            {isWaived
+              ? "수리 진행 — 진단비 면제 (수리비에 흡수)"
+              : hasRepairWork
+                ? "수리 진행 시 청구 안 됨"
+                : "수리 안 함(거절·포기) 시 청구. 수리 진행되면 자동 면제됩니다."}
+          </p>
         </div>
 
         {/* 수리 보증 섹션 — 픽업 시점부터 시작. 회사 기본값에서 prefill. */}
@@ -707,7 +702,7 @@ function DiagnosisFeeCard({
       <PriceInputDialog
         open={feeOpen}
         onOpenChange={setFeeOpen}
-        title="기본 점검비"
+        title="기본 진단비"
         initialNet={currentFee}
         taxType="TAXABLE"
         onSubmit={(net) => saveFee.mutate(net)}
@@ -718,9 +713,19 @@ function DiagnosisFeeCard({
 
 // ──── 참조 정보 섹션 — 시리얼 이력 + 재수리. 보조 정보라 접힘 기본 ────
 
-// ──── 상태 진행률 — 헤더에 표시 ────
-// ON_SITE 는 RECEIVED → REPAIRING → READY → PICKED_UP (4단계, 진단/견적/승인 생략)
-// DROP_OFF 는 RECEIVED → DIAGNOSING → QUOTED → APPROVED → REPAIRING → READY → PICKED_UP (7단계)
+// ──── 상태 진행률 — 헤더에 표시. 단계 dot + 라벨 + 현재 위치 (n/m) ────
+// ON_SITE: RECEIVED → REPAIRING → READY → PICKED_UP (4단계, 진단/견적/승인 생략)
+// DROP_OFF: RECEIVED → DIAGNOSING → QUOTED → APPROVED → REPAIRING → READY → PICKED_UP (7단계)
+const STEPPER_LABELS: Record<string, string> = {
+  RECEIVED: "접수",
+  DIAGNOSING: "진단",
+  QUOTED: "견적",
+  APPROVED: "승인",
+  REPAIRING: "수리중",
+  READY: "완료",
+  PICKED_UP: "픽업",
+};
+
 function StatusStepperBar({
   status,
   type,
@@ -742,33 +747,54 @@ function StatusStepperBar({
         ];
 
   const currentIndex = steps.indexOf(status);
-  // PICKED_UP 은 마지막 단계
-  const lastIndex = steps.length - 1;
   const activeIdx = Math.max(0, currentIndex);
+  const currentLabel = STEPPER_LABELS[status] ?? status;
 
   return (
-    <div className="mt-1.5 flex items-center gap-0.5">
-      {steps.map((s, i) => {
-        const done = i < activeIdx;
-        const active = i === activeIdx;
-        return (
-          <div key={s} className="flex flex-1 items-center gap-0.5">
+    <div className="mt-1.5 flex flex-col gap-1">
+      {/* 점 + 연결선 — 각 단계별로 dot 표시. 현재 단계는 강조 (큰 원 + 보라) */}
+      <div className="flex items-center">
+        {steps.map((s, i) => {
+          const done = i < activeIdx;
+          const active = i === activeIdx;
+          const isLast = i === steps.length - 1;
+          return (
             <div
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                done
-                  ? "bg-[var(--jm-action)]"
-                  : active
-                  ? "bg-[var(--jm-action)]"
-                  : "bg-[var(--jm-border)]"
-              }`}
-              aria-label={s}
-            />
-            {i === lastIndex && active && (
-              <span className="ml-1 size-1.5 rounded-full bg-[var(--jm-action)]" />
-            )}
-          </div>
-        );
-      })}
+              key={s}
+              className={isLast ? "flex shrink-0 items-center" : "flex flex-1 items-center"}
+            >
+              {/* dot */}
+              <span
+                aria-label={s}
+                className={`shrink-0 rounded-full transition-all ${
+                  active
+                    ? "size-2.5 bg-[var(--jm-action)] ring-2 ring-[var(--jm-action)]/30"
+                    : done
+                      ? "size-2 bg-[var(--jm-action)]"
+                      : "size-2 bg-[var(--jm-border)]"
+                }`}
+              />
+              {/* 연결선 (마지막 단계 제외) */}
+              {!isLast && (
+                <span
+                  className={`h-0.5 flex-1 transition-colors ${
+                    done || active ? "bg-[var(--jm-action)]" : "bg-[var(--jm-border)]"
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {/* 현재 단계 라벨 + 진행률 (n/m) */}
+      <div className="flex items-baseline justify-between gap-2 text-jm-2xs">
+        <span className="font-medium text-[var(--jm-action)]">
+          {currentLabel}
+        </span>
+        <span className="text-[var(--jm-text-subtle)]">
+          {activeIdx + 1}/{steps.length}
+        </span>
+      </div>
     </div>
   );
 }

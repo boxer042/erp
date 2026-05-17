@@ -381,8 +381,7 @@ export default function SupplierProductsPage() {
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <JmTable className="min-w-[1180px]">
+            <JmTable className="min-w-[1180px]">
                 <JmTableHeader>
                   <JmTableRow>
                     <JmTableHead>거래처</JmTableHead>
@@ -573,7 +572,6 @@ export default function SupplierProductsPage() {
                   )}
                 </JmTableBody>
               </JmTable>
-            </div>
           </JmCard>
         </div>
       </div>

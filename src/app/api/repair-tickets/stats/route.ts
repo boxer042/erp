@@ -49,6 +49,10 @@ export async function GET(request: NextRequest) {
     total,
     byStatus,
     byCancelReason,
+    byQuoteRejectReason,
+    quotedCount,
+    rejectedDiagnosisFeeRevenue,
+    avgRejectedQuotedAmount,
     byCategory,
     byProduct,
     avgRepairDays,
@@ -72,6 +76,34 @@ export async function GET(request: NextRequest) {
       by: ["cancelReason"],
       where: { ...dateFilter, status: "CANCELLED", cancelReason: { not: null } },
       _count: true,
+    }),
+    // 진단비만 청구 거절 사유 집계 — 마진/가격 정책 피드백용.
+    // quoteRejectedAt 으로 필터 (READY 직행 또는 PICKED_UP 후) — quoteRejectReason 만 보면
+    // null 사유 거절(사유 미입력) 도 포함되지 않음, 거절 자체가 일어났는지로 필터해야 정확.
+    prisma.repairTicket.groupBy({
+      by: ["quoteRejectReason"],
+      where: { ...dateFilter, quoteRejectedAt: { not: null } },
+      _count: true,
+    }),
+    // 거절률 분모 — 견적 단계 도달했던 티켓 수 (QUOTED 거친 적 있는 케이스)
+    // quotedAt 또는 quoteRejectedAt 이 set 된 경우로 정의 (실제 견적 발생 케이스)
+    prisma.repairTicket.count({
+      where: { ...dateFilter, OR: [{ quotedAt: { not: null } }, { quoteRejectedAt: { not: null } }] },
+    }),
+    // 거절 케이스의 진단비 매출 — 거절했지만 실제 결제된 (PICKED_UP) 만
+    prisma.repairTicket.aggregate({
+      where: {
+        ...dateFilter,
+        quoteRejectedAt: { not: null },
+        status: "PICKED_UP",
+      },
+      _sum: { finalAmount: true },
+      _count: true,
+    }),
+    // 거절된 견적의 평균 견적 금액 — 어떤 금액대에서 거절률이 높은지
+    prisma.repairTicket.aggregate({
+      where: { ...dateFilter, quoteRejectedAt: { not: null }, quotedTotalAmount: { gt: 0 } },
+      _avg: { quotedTotalAmount: true },
     }),
     prisma.repairTicket.groupBy({
       by: ["repairCategoryId"],
@@ -301,6 +333,21 @@ export async function GET(request: NextRequest) {
       reason: g.cancelReason,
       count: g._count,
     })),
+    quoteRejection: {
+      // 거절 사유별 빈도
+      byReason: byQuoteRejectReason.map((g) => ({
+        reason: g.quoteRejectReason,
+        count: g._count,
+      })),
+      // 거절률 = 거절 건수 / 견적 발생 건수
+      quotedCount,
+      rejectedCount: byQuoteRejectReason.reduce((s, g) => s + g._count, 0),
+      // 거절 케이스의 실제 매출 (진단비 합계)
+      rejectedRevenue: Number(rejectedDiagnosisFeeRevenue._sum.finalAmount ?? 0),
+      rejectedPaidCount: rejectedDiagnosisFeeRevenue._count,
+      // 거절된 견적의 평균 견적가 — 어떤 가격대에서 거절이 자주 발생하는지
+      avgQuotedAmount: Number(avgRejectedQuotedAmount._avg.quotedTotalAmount ?? 0),
+    },
     byCategory: byCategory.map((g) => {
       const avg = avgDaysByCategoryId.get(g.repairCategoryId);
       return {

@@ -8,8 +8,8 @@ interface Label {
   source: "SALE" | "REPAIR";
   soldAt: string;
   warrantyEnds: string | null;
-  qrDataUrl: string;
-  qrUrl: string;
+  qrDataUrl: string | null;
+  qrUrl: string | null;
 }
 
 interface CompanyInfo {
@@ -17,17 +17,86 @@ interface CompanyInfo {
   phone: string | null;
 }
 
+export type LabelSize = "small" | "standard" | "large";
+
 interface Props {
   labels: Label[];
   company: CompanyInfo;
   auto: boolean;
+  size: LabelSize;
 }
 
+const SOURCE_BADGE: Record<Label["source"], string | null> = {
+  SALE: null,
+  REPAIR: "수리",
+};
+
 /**
- * Brother QL 62mm × 35mm 라벨 (변경 가능). 한 라벨 = 한 페이지.
- * 강조 우선순위: 상호명 → 연락처 → 코드 → 상품명/날짜
+ * 라벨 사이즈 프리셋 (mm / pt). 한 라벨 = 한 페이지.
+ * 라벨 프린터 용지 규격에 맞춰 선택 — 실제 출력 후 미세조정 가능.
  */
-export function LabelClient({ labels, company, auto }: Props) {
+const SIZE_PRESETS: Record<
+  LabelSize,
+  {
+    label: string;
+    w: number;
+    h: number;
+    pad: number;
+    qr: number;
+    shop: number;
+    phone: number;
+    code: number;
+    name: number;
+    date: number;
+    hint: number;
+    badge: number;
+  }
+> = {
+  small: {
+    label: "소형 38×25mm",
+    w: 38,
+    h: 25,
+    pad: 1.5,
+    qr: 13,
+    shop: 7,
+    phone: 6,
+    code: 8,
+    name: 6,
+    date: 5,
+    hint: 4.5,
+    badge: 4.5,
+  },
+  standard: {
+    label: "표준 62×35mm",
+    w: 62,
+    h: 35,
+    pad: 2,
+    qr: 19,
+    shop: 11,
+    phone: 9,
+    code: 11,
+    name: 8,
+    date: 6.5,
+    hint: 5.5,
+    badge: 6,
+  },
+  large: {
+    label: "대형 90×50mm",
+    w: 90,
+    h: 50,
+    pad: 3,
+    qr: 28,
+    shop: 15,
+    phone: 12,
+    code: 15,
+    name: 11,
+    date: 9,
+    hint: 7.5,
+    badge: 8,
+  },
+};
+
+export function LabelClient({ labels, company, auto, size }: Props) {
   useEffect(() => {
     if (auto) {
       const t = setTimeout(() => window.print(), 200);
@@ -35,11 +104,13 @@ export function LabelClient({ labels, company, auto }: Props) {
     }
   }, [auto]);
 
+  const s = SIZE_PRESETS[size];
+
   return (
     <>
       <style>{`
         @page {
-          size: 62mm 35mm;
+          size: ${s.w}mm ${s.h}mm;
           margin: 0;
         }
         @media print {
@@ -50,9 +121,9 @@ export function LabelClient({ labels, company, auto }: Props) {
           .label-page:last-child { page-break-after: auto; }
         }
         .label-page {
-          width: 62mm;
-          height: 35mm;
-          padding: 2mm;
+          width: ${s.w}mm;
+          height: ${s.h}mm;
+          padding: ${s.pad}mm;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
@@ -67,13 +138,13 @@ export function LabelClient({ labels, company, auto }: Props) {
           border-bottom: 0.3mm solid #000;
         }
         .label-shop {
-          font-size: 11pt;
+          font-size: ${s.shop}pt;
           font-weight: 800;
           line-height: 1.05;
           letter-spacing: -0.01em;
         }
         .label-phone {
-          font-size: 9pt;
+          font-size: ${s.phone}pt;
           font-weight: 700;
           line-height: 1.1;
           margin-top: 0.6mm;
@@ -87,8 +158,8 @@ export function LabelClient({ labels, company, auto }: Props) {
           align-items: center;
         }
         .label-qr {
-          width: 19mm;
-          height: 19mm;
+          width: ${s.qr}mm;
+          height: ${s.qr}mm;
           flex-shrink: 0;
         }
         .label-qr img {
@@ -105,13 +176,13 @@ export function LabelClient({ labels, company, auto }: Props) {
         }
         .label-code {
           font-family: ui-monospace, "SF Mono", monospace;
-          font-size: 11pt;
+          font-size: ${s.code}pt;
           font-weight: 700;
           line-height: 1;
           letter-spacing: 0.02em;
         }
         .label-name {
-          font-size: 8pt;
+          font-size: ${s.name}pt;
           font-weight: 600;
           line-height: 1.15;
           overflow: hidden;
@@ -120,13 +191,19 @@ export function LabelClient({ labels, company, auto }: Props) {
           -webkit-box-orient: vertical;
         }
         .label-date {
-          font-size: 6.5pt;
+          font-size: ${s.date}pt;
           color: #222;
           line-height: 1.2;
         }
+        .label-hint {
+          font-size: ${s.hint}pt;
+          color: #444;
+          line-height: 1.2;
+          margin-top: 0.4mm;
+        }
         .label-source-badge {
           display: inline-block;
-          font-size: 6pt;
+          font-size: ${s.badge}pt;
           font-weight: 700;
           line-height: 1;
           padding: 0.4mm 0.8mm;
@@ -168,7 +245,7 @@ export function LabelClient({ labels, company, auto }: Props) {
           인쇄
         </button>
         <span style={{ fontSize: 13, color: "#666", alignSelf: "center" }}>
-          {labels.length}장 — 라벨 프린터에서 62mm × 35mm로 출력됩니다
+          {labels.length}장 — {s.label} 로 출력됩니다
         </span>
       </div>
 
@@ -187,14 +264,18 @@ export function LabelClient({ labels, company, auto }: Props) {
               {company.phone && <div className="label-phone">{company.phone}</div>}
             </div>
             <div className="label-body">
-              <div className="label-qr">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={l.qrDataUrl} alt={l.code} />
-              </div>
+              {l.qrDataUrl && (
+                <div className="label-qr">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={l.qrDataUrl} alt={l.code} />
+                </div>
+              )}
               <div className="label-text">
                 <div className="label-code">
-                  {l.source === "REPAIR" && (
-                    <span className="label-source-badge">수리</span>
+                  {SOURCE_BADGE[l.source] && (
+                    <span className="label-source-badge">
+                      {SOURCE_BADGE[l.source]}
+                    </span>
                   )}
                   {l.code}
                 </div>
@@ -204,6 +285,9 @@ export function LabelClient({ labels, company, auto }: Props) {
                 </div>
                 {l.warrantyEnds && (
                   <div className="label-date">보증일 : {l.warrantyEnds} 까지</div>
+                )}
+                {l.qrDataUrl && (
+                  <div className="label-hint">QR 스캔 → 보증·수리 조회</div>
                 )}
               </div>
             </div>

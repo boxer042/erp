@@ -8,6 +8,7 @@ import type {
   RepairApprovalMethod,
   OrderPaymentMethod,
   RepairCancelReason,
+  QuoteRejectReason,
 } from "@prisma/client";
 
 type Action =
@@ -18,6 +19,7 @@ type Action =
   | "start"
   | "ready"
   | "pickup"
+  | "reject_after_quote"
   | "cancel";
 
 // 부속·공임 합계 → 수리 보증 만료 = 픽업 시점 + repairWarrantyMonths
@@ -206,11 +208,15 @@ export async function POST(
           orderBy: { date: "desc" },
         });
         const prevBalance = last ? Number(last.balance) : 0;
+        // 거절·진단비 케이스 라벨 분기 — 원장에서 정상 수리 매출과 구분 (사후 분석/정산 시 명확)
+        const description = ticket.quoteRejectedAt
+          ? `수리 ${ticket.ticketNo} (거절·진단비)`
+          : `수리 ${ticket.ticketNo}`;
         await prisma.customerLedger.create({
           data: {
             customerId: ticket.customerId,
             type: "SALE",
-            description: `수리 ${ticket.ticketNo}`,
+            description,
             debitAmount: finalAmt,
             creditAmount: 0,
             balance: prevBalance + finalAmt,
@@ -219,6 +225,61 @@ export async function POST(
           },
         });
       }
+      return NextResponse.json(updated);
+    }
+
+    if (action === "reject_after_quote") {
+      // 손님이 수리를 거절 — 진단비만 청구하고 인계대기로 직행.
+      // 허용 상태:
+      //   - DROP_OFF: DIAGNOSING, QUOTED (승인 전 단계)
+      //   - ON_SITE: REPAIRING (새수리 드로워가 바로 REPAIRING 진입시킴 — 이 단계가 거절 가능 지점)
+      // → READY 로 직행 (APPROVED/완료 건너뜀). 픽업/결제 시 calcRepairTotals 의 effectiveDiagnosisFee 가 진단비만 청구.
+      // 부속·공임이 등록돼 있으면 차감된 재고가 남아있는 상태에서 결제만 빠지므로 차단
+      // (이 경우엔 cancel 액션 + CUSTOMER_DECLINED 사용 — 재고 복원 수행).
+      const allowed =
+        ticket.status === "DIAGNOSING" ||
+        ticket.status === "QUOTED" ||
+        (ticket.status === "REPAIRING" && ticket.type === "ON_SITE");
+      if (!allowed) {
+        return NextResponse.json(
+          {
+            error:
+              "거절 가능한 단계가 아닙니다 (맡김 수리는 진단/견적 단계, 즉시 수리는 수리 진행 단계에서만 가능)",
+          },
+          { status: 400 },
+        );
+      }
+      const hasUsedParts = ticket.parts.some((p) => p.status === "USED");
+      const hasLabors = ticket.labors.length > 0;
+      if (hasUsedParts || hasLabors) {
+        return NextResponse.json(
+          {
+            error:
+              "부속·공임이 등록된 견적은 그냥 거절할 수 없습니다. 부속·공임을 모두 제거하거나 수리 취소를 사용하세요",
+          },
+          { status: 400 },
+        );
+      }
+
+      const quoteRejectReason = (body?.quoteRejectReason as
+        | QuoteRejectReason
+        | undefined) ?? null;
+      const quoteRejectMemo =
+        (body?.quoteRejectMemo as string | undefined)?.trim() || null;
+
+      const updated = await prisma.repairTicket.update({
+        where: { id },
+        data: {
+          status: "READY",
+          readyAt: new Date(),
+          quoteRejectReason,
+          quoteRejectMemo,
+          quoteRejectedAt: new Date(),
+          // 픽업 후 원격 승인 토큰은 더 이상 의미 없음
+          approvalToken: null,
+          approvalTokenExpiresAt: null,
+        },
+      });
       return NextResponse.json(updated);
     }
 
@@ -263,8 +324,9 @@ export async function POST(
         cancelReason === "SOLD_AS_PRODUCT";
       const autoHardDelete = !hasArchivalValue;
 
-      // 거절·취소 — USED 부속만 재고 복원. LOST 는 이미 손실 처리된 부속이므로 그대로 남김
-      // (다시 차감되면 손실 추적이 어긋남). 진단비만 청구.
+      // 취소 — USED 부속만 재고 복원. LOST 는 이미 손실 처리된 부속이므로 그대로 남김
+      // (다시 차감되면 손실 추적이 어긋남). cancel 은 결제 흐름을 안 거치므로 청구 0 —
+      // 진단비를 청구하려면 cancel 이 아니라 reject_after_quote(진단비만 청구) 를 쓴다.
       await prisma.$transaction(async (tx) => {
         for (const part of ticket.parts) {
           if (part.status !== "USED") continue;

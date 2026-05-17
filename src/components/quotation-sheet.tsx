@@ -1,42 +1,57 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { SupplierCombobox } from "@/components/supplier-combobox";
+
+import { apiGet } from "@/lib/api-client";
+import { focusCaretEnd } from "@/jm/lib/focus";
+import {
+  calcDiscountPerUnit,
+  formatComma,
+  formatDiscountDisplay,
+  normalizeDiscountInput,
+  parseComma,
+} from "@/lib/utils";
 import { CustomerCombobox } from "@/components/customer-combobox";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import { SupplierCombobox } from "@/components/supplier-combobox";
 import { SupplierProductCombobox } from "@/components/supplier-product-combobox";
 import {
   QuickCustomerSheet,
-  QuickSupplierSheet,
   QuickSupplierProductSheet,
+  QuickSupplierSheet,
 } from "@/components/quick-register-sheets";
-import { formatComma, parseComma, calcDiscountPerUnit, normalizeDiscountInput, formatDiscountDisplay } from "@/lib/utils";
-import { apiGet } from "@/lib/api-client";
+import {
+  JmButton,
+  JmCheckbox,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerDescription,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmIconButton,
+  JmInput,
+  JmSelect,
+  JmTextarea,
+} from "@/jm";
 
 type QuotationType = "SALES" | "PURCHASE";
-type QuotationStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CONVERTED";
+type QuotationStatus =
+  | "DRAFT"
+  | "SENT"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "CONVERTED";
 
-const QUOTATION_STATUS_LABEL: Record<QuotationStatus, string> = {
-  DRAFT: "초안",
-  SENT: "발송",
-  ACCEPTED: "수락",
-  REJECTED: "거절",
-  EXPIRED: "만료",
-  CONVERTED: "전환",
-};
+const STATUS_OPTIONS = [
+  { value: "DRAFT", label: "초안" },
+  { value: "SENT", label: "발송" },
+  { value: "ACCEPTED", label: "수락" },
+  { value: "REJECTED", label: "거절" },
+  { value: "EXPIRED", label: "만료" },
+];
 
 interface ItemForm {
   rowType: "product" | "free";
@@ -46,10 +61,10 @@ interface ItemForm {
   spec: string;
   unitOfMeasure: string;
   quantity: string;
-  unitPrice: string;      // 할인 전 단가
-  discount: string;       // "10%" | "3000"
+  unitPrice: string;
+  discount: string;
   isTaxable: boolean;
-  isZeroRateEligible: boolean; // 영세율 선택 가능 상품 (zeroRateEligible) — UI 전용
+  isZeroRateEligible: boolean;
   memo: string;
 }
 
@@ -97,7 +112,6 @@ export interface QuotationFormData {
   items: ItemForm[];
 }
 
-// 발행일로부터 한 달 뒤 날짜(YYYY-MM-DD) 반환
 function addOneMonth(isoDate: string): string {
   const d = new Date(isoDate);
   d.setMonth(d.getMonth() + 1);
@@ -120,8 +134,17 @@ const emptyForm = (type: QuotationType): QuotationFormData => {
   };
 };
 
-interface CustomerOption { id: string; name: string; phone?: string | null; businessNumber?: string | null; }
-interface SupplierOption { id: string; name: string; businessNumber?: string | null; }
+interface CustomerOption {
+  id: string;
+  name: string;
+  phone?: string | null;
+  businessNumber?: string | null;
+}
+interface SupplierOption {
+  id: string;
+  name: string;
+  businessNumber?: string | null;
+}
 interface SupplierProductOption {
   id: string;
   name: string;
@@ -139,7 +162,13 @@ interface QuotationSheetProps {
   onSaved: (id: string, quotationNo?: string) => void;
 }
 
-export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: QuotationSheetProps) {
+export function QuotationSheet({
+  open,
+  onOpenChange,
+  type,
+  editData,
+  onSaved,
+}: QuotationSheetProps) {
   const isEdit = !!editData?.id;
   const [form, setForm] = useState<QuotationFormData>(emptyForm(type));
   const [submitting, setSubmitting] = useState(false);
@@ -187,14 +216,16 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
     }));
   };
 
-  const addProductRow = () => setForm((prev) => ({ ...prev, items: [...prev.items, emptyProductItem()] }));
-  const addFreeRow = () => setForm((prev) => ({ ...prev, items: [...prev.items, emptyFreeItem()] }));
-  const removeItem = (idx: number) => setForm((prev) => ({
-    ...prev,
-    items: prev.items.length > 1 ? prev.items.filter((_, i) => i !== idx) : prev.items,
-  }));
+  const addProductRow = () =>
+    setForm((prev) => ({ ...prev, items: [...prev.items, emptyProductItem()] }));
+  const addFreeRow = () =>
+    setForm((prev) => ({ ...prev, items: [...prev.items, emptyFreeItem()] }));
+  const removeItem = (idx: number) =>
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.length > 1 ? prev.items.filter((_, i) => i !== idx) : prev.items,
+    }));
 
-  // 공급가액 = (단가 - 할인) × 수량, 세액은 영세율이 아닌 행만
   const totalDiscount = form.items.reduce((acc, it) => {
     const q = parseFloat(it.quantity || "0");
     const p = parseFloat(it.unitPrice || "0");
@@ -217,7 +248,8 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
 
   const handleSubmit = async () => {
     if (type === "SALES" && !form.customerId) return toast.error("고객을 선택해주세요");
-    if (type === "PURCHASE" && !form.supplierId) return toast.error("거래처를 선택해주세요");
+    if (type === "PURCHASE" && !form.supplierId)
+      return toast.error("거래처를 선택해주세요");
     const validItems = form.items.filter((it) => it.name.trim());
     if (validItems.length === 0) return toast.error("품목을 하나 이상 추가해주세요");
 
@@ -246,9 +278,9 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
             spec: it.spec || undefined,
             unitOfMeasure: it.unitOfMeasure,
             quantity: it.quantity || "0",
-            listPrice: String(p),                 // 할인 전 단가
-            discountAmount: String(discPerUnit),  // 개당 할인액
-            unitPrice: String(actual),            // 실제단가 (할인 후, 세전)
+            listPrice: String(p),
+            discountAmount: String(discPerUnit),
+            unitPrice: String(actual),
             isTaxable: it.isTaxable,
             sortOrder: idx,
             memo: it.memo || undefined,
@@ -262,7 +294,9 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        toast.error(typeof err?.error === "string" ? err.error : isEdit ? "수정 실패" : "등록 실패");
+        toast.error(
+          typeof err?.error === "string" ? err.error : isEdit ? "수정 실패" : "등록 실패",
+        );
         return;
       }
       const saved = await res.json().catch(() => null);
@@ -280,106 +314,137 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="h-[92vh] p-0 flex flex-col">
-          <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-            <SheetTitle>
+      <JmDrawer open={open} onOpenChange={onOpenChange}>
+        <JmDrawerContent
+          side="bottom"
+          size="xl"
+          className="flex flex-col p-0"
+          dragHandle={false}
+        >
+          <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+            <JmDrawerTitle>
               {isEdit ? "견적서 수정" : "견적서 등록"} · {type === "SALES" ? "판매" : "매입"}
-            </SheetTitle>
-            <SheetDescription className="sr-only">견적서 폼</SheetDescription>
-          </SheetHeader>
+            </JmDrawerTitle>
+            <JmDrawerDescription className="sr-only">견적서 폼</JmDrawerDescription>
+          </JmDrawerHeader>
 
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
               {/* 상단 정보 */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-                    <Label className="text-right text-[13px] text-muted-foreground">
-                      {type === "SALES" ? "고객" : "거래처"}<span className="text-red-400 ml-0.5">*</span>
-                    </Label>
+                  <FieldRow label={type === "SALES" ? "고객" : "거래처"} required>
                     {type === "SALES" ? (
                       <CustomerCombobox
                         customers={customers}
                         value={form.customerId}
                         onChange={(id) => setForm((p) => ({ ...p, customerId: id }))}
-                        onCreateNew={(name) => { setQuickCustomerName(name); setQuickCustomerOpen(true); }}
+                        onCreateNew={(name) => {
+                          setQuickCustomerName(name);
+                          setQuickCustomerOpen(true);
+                        }}
                       />
                     ) : (
                       <SupplierCombobox
                         suppliers={suppliers}
                         value={form.supplierId}
                         onChange={(id) => setForm((p) => ({ ...p, supplierId: id }))}
-                        onCreateNew={(name) => { setQuickSupplierName(name); setQuickSupplierOpen(true); }}
+                        onCreateNew={(name) => {
+                          setQuickSupplierName(name);
+                          setQuickSupplierOpen(true);
+                        }}
                       />
                     )}
-                  </div>
-                  <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-                    <Label className="text-right text-[13px] text-muted-foreground">견적 제목</Label>
-                    <Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="예: 4월 정기 발주 견적" />
-                  </div>
-                  <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-                    <Label className="text-right text-[13px] text-muted-foreground">상태</Label>
-                    <Select
+                  </FieldRow>
+                  <FieldRow label="견적 제목">
+                    <JmInput
+                      size="sm"
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, title: e.target.value }))
+                      }
+                      onFocus={focusCaretEnd}
+                      placeholder="예: 4월 정기 발주 견적"
+                    />
+                  </FieldRow>
+                  <FieldRow label="상태">
+                    <JmSelect
+                      size="sm"
+                      options={STATUS_OPTIONS}
                       value={form.status}
-                      onValueChange={(v) => setForm((p) => ({ ...p, status: (v as QuotationStatus) ?? "DRAFT" }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>
-                          {(v: unknown) => QUOTATION_STATUS_LABEL[v as QuotationStatus] ?? String(v ?? "")}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="DRAFT">초안</SelectItem>
-                        <SelectItem value="SENT">발송</SelectItem>
-                        <SelectItem value="ACCEPTED">수락</SelectItem>
-                        <SelectItem value="REJECTED">거절</SelectItem>
-                        <SelectItem value="EXPIRED">만료</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      onChange={(v) =>
+                        setForm((p) => ({ ...p, status: v as QuotationStatus }))
+                      }
+                    />
+                  </FieldRow>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-                    <Label className="text-right text-[13px] text-muted-foreground">견적일자<span className="text-red-400 ml-0.5">*</span></Label>
-                    <Input
+                  <FieldRow label="견적일자" required>
+                    <JmInput
+                      size="sm"
                       type="date"
                       value={form.issueDate}
                       onChange={(e) => {
                         const newIssue = e.target.value;
                         setForm((p) => {
-                          // 유효기간이 이전 발행일 기준 자동 계산값이면 함께 갱신
                           const autoPrev = p.issueDate ? addOneMonth(p.issueDate) : "";
                           const shouldAutoUpdate = !p.validUntil || p.validUntil === autoPrev;
                           return {
                             ...p,
                             issueDate: newIssue,
-                            validUntil: shouldAutoUpdate && newIssue ? addOneMonth(newIssue) : p.validUntil,
+                            validUntil:
+                              shouldAutoUpdate && newIssue
+                                ? addOneMonth(newIssue)
+                                : p.validUntil,
                           };
                         });
                       }}
                     />
-                  </div>
-                  <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-                    <Label className="text-right text-[13px] text-muted-foreground">유효기간</Label>
-                    <Input type="date" value={form.validUntil} onChange={(e) => setForm((p) => ({ ...p, validUntil: e.target.value }))} />
-                  </div>
-                  <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-                    <Label className="text-right text-[13px] text-muted-foreground">결제/납기 조건</Label>
-                    <Input value={form.terms} onChange={(e) => setForm((p) => ({ ...p, terms: e.target.value }))} placeholder="예: 월말 결제, 납기 3일" />
-                  </div>
+                  </FieldRow>
+                  <FieldRow label="유효기간">
+                    <JmInput
+                      size="sm"
+                      type="date"
+                      value={form.validUntil}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, validUntil: e.target.value }))
+                      }
+                    />
+                  </FieldRow>
+                  <FieldRow label="결제/납기 조건">
+                    <JmInput
+                      size="sm"
+                      value={form.terms}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, terms: e.target.value }))
+                      }
+                      onFocus={focusCaretEnd}
+                      placeholder="예: 월말 결제, 납기 3일"
+                    />
+                  </FieldRow>
                 </div>
               </div>
 
               {/* 품목 테이블 */}
-              <div className="-mx-5 border-y border-border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted text-muted-foreground">
+              <div className="-mx-5 border-y border-[var(--jm-border)]">
+                <table className="w-full text-jm-sm">
+                  <thead className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]">
                     <tr>
                       <th className="px-3 py-2 text-center font-normal w-[36px]">#</th>
-                      <th className="px-3 py-2 text-left font-normal" style={{ width: "20%" }}>품명<span className="text-red-400 ml-0.5">*</span></th>
-                      <th className="px-3 py-2 text-left font-normal" style={{ width: "12%" }}>규격</th>
+                      <th
+                        className="px-3 py-2 text-left font-normal"
+                        style={{ width: "20%" }}
+                      >
+                        품명
+                        <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>
+                      </th>
+                      <th
+                        className="px-3 py-2 text-left font-normal"
+                        style={{ width: "12%" }}
+                      >
+                        규격
+                      </th>
                       <th className="px-3 py-2 text-center font-normal w-[56px]">단위</th>
                       <th className="px-3 py-2 text-right font-normal w-[80px]">수량</th>
                       <th className="px-3 py-2 text-right font-normal w-[110px]">단가</th>
@@ -400,35 +465,41 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
                       const lineSupply = q * actualPrice;
                       const lineTax = it.isTaxable ? Math.round(lineSupply * 0.1) : 0;
                       return (
-                        <tr key={idx} className="border-t border-border">
-                          <td className="px-3 py-1.5 text-center text-muted-foreground">{idx + 1}</td>
+                        <tr key={idx} className="border-t border-[var(--jm-border)]">
+                          <td className="px-3 py-1.5 text-center text-[var(--jm-text-muted)]">
+                            {idx + 1}
+                          </td>
                           <td className="px-3 py-1.5">
                             {it.rowType === "product" ? (
                               type === "SALES" ? (
                                 <ProductCombobox
                                   products={products}
                                   value={it.productId || ""}
-                                  onChange={(p) => updateItem(idx, {
-                                    productId: p.id,
-                                    name: p.name,
-                                    isTaxable: p.taxType !== "TAX_FREE",
-                                    isZeroRateEligible: p.zeroRateEligible ?? false,
-                                    unitOfMeasure: p.unitOfMeasure,
-                                    unitPrice: p.sellingPrice,
-                                  })}
+                                  onChange={(pr) =>
+                                    updateItem(idx, {
+                                      productId: pr.id,
+                                      name: pr.name,
+                                      isTaxable: pr.taxType !== "TAX_FREE",
+                                      isZeroRateEligible: pr.zeroRateEligible ?? false,
+                                      unitOfMeasure: pr.unitOfMeasure,
+                                      unitPrice: pr.sellingPrice,
+                                    })
+                                  }
                                   placeholder="상품 선택..."
                                 />
                               ) : (
                                 <SupplierProductCombobox
                                   supplierProducts={supplierProducts}
                                   value={it.supplierProductId || ""}
-                                  onChange={(sp) => updateItem(idx, {
-                                    supplierProductId: sp.id,
-                                    name: sp.name,
-                                    spec: sp.spec || "",
-                                    unitOfMeasure: sp.unitOfMeasure,
-                                    unitPrice: sp.unitPrice,
-                                  })}
+                                  onChange={(sp) =>
+                                    updateItem(idx, {
+                                      supplierProductId: sp.id,
+                                      name: sp.name,
+                                      spec: sp.spec || "",
+                                      unitOfMeasure: sp.unitOfMeasure,
+                                      unitPrice: sp.unitPrice,
+                                    })
+                                  }
                                   onCreateNew={(name) => {
                                     setQuickSpName(name);
                                     setQuickSpItemIdx(idx);
@@ -438,82 +509,114 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
                                 />
                               )
                             ) : (
-                              <Input
-                                className="h-8"
+                              <JmInput
+                                size="sm"
                                 value={it.name}
-                                onChange={(e) => updateItem(idx, { name: e.target.value })}
+                                onChange={(e) =>
+                                  updateItem(idx, { name: e.target.value })
+                                }
+                                onFocus={focusCaretEnd}
                                 placeholder="품명 직접 입력"
                               />
                             )}
                           </td>
                           <td className="px-3 py-1.5">
-                            <Input
-                              className="h-8"
+                            <JmInput
+                              size="sm"
                               value={it.spec}
                               onChange={(e) => updateItem(idx, { spec: e.target.value })}
+                              onFocus={focusCaretEnd}
                             />
                           </td>
                           <td className="px-3 py-1.5">
-                            <Input
-                              className="h-8"
+                            <JmInput
+                              size="sm"
                               value={it.unitOfMeasure}
-                              onChange={(e) => updateItem(idx, { unitOfMeasure: e.target.value })}
+                              onChange={(e) =>
+                                updateItem(idx, { unitOfMeasure: e.target.value })
+                              }
+                              onFocus={focusCaretEnd}
                             />
                           </td>
                           <td className="px-3 py-1.5">
-                            <Input
-                              className="h-8 text-right"
+                            <JmInput
+                              size="sm"
+                              className="text-right"
                               inputMode="decimal"
                               value={it.quantity}
-                              onChange={(e) => updateItem(idx, { quantity: e.target.value })}
+                              onChange={(e) =>
+                                updateItem(idx, { quantity: e.target.value })
+                              }
                               onFocus={focusCaretEnd}
                             />
                           </td>
                           <td className="px-3 py-1.5">
-                            <Input
-                              className="h-8 text-right"
+                            <JmInput
+                              size="sm"
+                              className="text-right"
                               inputMode="numeric"
                               value={formatComma(it.unitPrice)}
-                              onChange={(e) => updateItem(idx, { unitPrice: parseComma(e.target.value) })}
+                              onChange={(e) =>
+                                updateItem(idx, { unitPrice: parseComma(e.target.value) })
+                              }
                               onFocus={focusCaretEnd}
                             />
                           </td>
                           <td className="px-3 py-1.5">
-                            <Input
-                              className={`h-8 text-right ${discPerUnit > 0 ? "text-red-400" : ""}`}
-                              inputMode={it.discount.trim().endsWith("%") ? "decimal" : "numeric"}
+                            <JmInput
+                              size="sm"
+                              className={`text-right ${
+                                discPerUnit > 0 ? "text-[var(--jm-danger-fg)]" : ""
+                              }`}
+                              inputMode={
+                                it.discount.trim().endsWith("%") ? "decimal" : "numeric"
+                              }
                               value={formatDiscountDisplay(it.discount)}
-                              onChange={(e) => updateItem(idx, { discount: normalizeDiscountInput(e.target.value) })}
+                              onChange={(e) =>
+                                updateItem(idx, {
+                                  discount: normalizeDiscountInput(e.target.value),
+                                })
+                              }
                               onFocus={focusCaretEnd}
-                              placeholder=""
                               disabled={p === 0}
                             />
                           </td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">
+                          <td className="px-3 py-1.5 text-right tabular-nums text-[var(--jm-text)]">
                             {actualPrice > 0 ? formatComma(String(Math.round(actualPrice))) : ""}
                           </td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">
-                            {lineSupply > 0 ? `₩${Math.round(lineSupply).toLocaleString("ko-KR")}` : ""}
+                          <td className="px-3 py-1.5 text-right tabular-nums text-[var(--jm-text)]">
+                            {lineSupply > 0
+                              ? `₩${Math.round(lineSupply).toLocaleString("ko-KR")}`
+                              : ""}
                           </td>
-                          <td className="px-3 py-1.5 text-right text-muted-foreground tabular-nums">
+                          <td className="px-3 py-1.5 text-right text-[var(--jm-text-muted)] tabular-nums">
                             {lineTax > 0 ? `₩${lineTax.toLocaleString("ko-KR")}` : ""}
                           </td>
                           <td className="px-3 py-1.5">
                             <div className="flex justify-center">
-                              {(it.isZeroRateEligible || it.rowType === "free") ? (
-                                <Checkbox
+                              {it.isZeroRateEligible || it.rowType === "free" ? (
+                                <JmCheckbox
                                   checked={!it.isTaxable}
-                                  onCheckedChange={(v) => updateItem(idx, { isTaxable: !v })}
+                                  onCheckedChange={(v) =>
+                                    updateItem(idx, { isTaxable: !v })
+                                  }
                                 />
                               ) : !it.isTaxable ? (
-                                <span className="text-[11px] text-muted-foreground">면세</span>
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                                  면세
+                                </span>
                               ) : null}
                             </div>
                           </td>
                           <td className="px-1 py-1.5 text-center">
-                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(idx)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <JmIconButton
+                              aria-label="행 삭제"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removeItem(idx)}
+                            >
+                              <Trash2 />
+                            </JmIconButton>
                           </td>
                         </tr>
                       );
@@ -521,68 +624,102 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
                     <tr>
                       <td colSpan={12} className="px-3 py-2">
                         <div className="flex gap-2">
-                          <Button type="button" variant="outline" size="sm" onClick={addProductRow}>
-                            <Plus className="h-3.5 w-3.5 mr-1" /> 상품 추가
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={addFreeRow}>
-                            <Plus className="h-3.5 w-3.5 mr-1" /> 자유 품명 추가
-                          </Button>
+                          <JmButton
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addProductRow}
+                          >
+                            <Plus />
+                            <span>상품 추가</span>
+                          </JmButton>
+                          <JmButton
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addFreeRow}
+                          >
+                            <Plus />
+                            <span>자유 품명 추가</span>
+                          </JmButton>
                         </div>
                       </td>
                     </tr>
                   </tbody>
                 </table>
 
-                {/* 합계 — 거래명세표 하단 */}
-                <div className="border-t border-border bg-muted">
-                  <div className="grid grid-cols-5 text-sm">
-                    <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">품목수</span>
-                      <span>{form.items.filter((it) => it.name.trim()).length}건</span>
+                {/* 합계 */}
+                <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]">
+                  <div className="grid grid-cols-5 text-jm-sm">
+                    <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">품목수</span>
+                      <span className="text-[var(--jm-text)]">
+                        {form.items.filter((it) => it.name.trim()).length}건
+                      </span>
                     </div>
-                    <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">공급가액</span>
-                      <span className="tabular-nums">₩{Math.round(subtotal).toLocaleString("ko-KR")}</span>
+                    <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">공급가액</span>
+                      <span className="tabular-nums text-[var(--jm-text)]">
+                        ₩{Math.round(subtotal).toLocaleString("ko-KR")}
+                      </span>
                     </div>
-                    <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">세액</span>
-                      <span className="tabular-nums">{tax > 0 ? `₩${Math.round(tax).toLocaleString("ko-KR")}` : ""}</span>
+                    <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">세액</span>
+                      <span className="tabular-nums text-[var(--jm-text)]">
+                        {tax > 0 ? `₩${Math.round(tax).toLocaleString("ko-KR")}` : ""}
+                      </span>
                     </div>
-                    <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">할인합계</span>
-                      <span className={`tabular-nums ${totalDiscount > 0 ? "text-red-400" : ""}`}>
-                        {totalDiscount > 0 ? `-₩${Math.round(totalDiscount).toLocaleString("ko-KR")}` : ""}
+                    <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">할인합계</span>
+                      <span
+                        className={`tabular-nums ${
+                          totalDiscount > 0
+                            ? "text-[var(--jm-danger-fg)]"
+                            : "text-[var(--jm-text)]"
+                        }`}
+                      >
+                        {totalDiscount > 0
+                          ? `-₩${Math.round(totalDiscount).toLocaleString("ko-KR")}`
+                          : ""}
                       </span>
                     </div>
                     <div className="px-3 py-2.5 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">합계금액</span>
-                      <span className="font-bold text-base tabular-nums">₩{Math.round(total).toLocaleString("ko-KR")}</span>
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">합계금액</span>
+                      <span className="font-bold text-jm-base tabular-nums text-[var(--jm-text)]">
+                        ₩{Math.round(total).toLocaleString("ko-KR")}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 메모 */}
-              <div className="grid grid-cols-[120px_1fr] items-start gap-3">
-                <Label className="text-right text-[13px] text-muted-foreground mt-2">비고</Label>
-                <textarea
-                  className="min-h-[60px] w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm"
+              <FieldRow label="비고" alignTop>
+                <JmTextarea
+                  className="min-h-[60px]"
                   value={form.memo}
                   onChange={(e) => setForm((p) => ({ ...p, memo: e.target.value }))}
                 />
-              </div>
+              </FieldRow>
             </div>
 
-            <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-              <Button type="button" onClick={handleSubmit} disabled={submitting}>
-                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                {isEdit ? "수정" : "등록"}
-              </Button>
+            <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)]">
+              <JmButton type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                취소
+              </JmButton>
+              <JmButton
+                type="button"
+                variant="cta"
+                onClick={handleSubmit}
+                disabled={submitting}
+              >
+                {submitting && <Loader2 className="size-4 animate-spin" />}
+                <span>{isEdit ? "수정" : "등록"}</span>
+              </JmButton>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </JmDrawerContent>
+      </JmDrawer>
 
       <QuickCustomerSheet
         open={quickCustomerOpen}
@@ -609,7 +746,9 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
         supplierId={form.supplierId}
         supplierName={suppliers.find((s) => s.id === form.supplierId)?.name || ""}
         onCreated={async (sp) => {
-          setSupplierProducts(await apiGet<SupplierProductOption[]>("/api/supplier-products"));
+          setSupplierProducts(
+            await apiGet<SupplierProductOption[]>("/api/supplier-products"),
+          );
           if (quickSpItemIdx !== null) {
             updateItem(quickSpItemIdx, {
               supplierProductId: sp.id,
@@ -620,5 +759,37 @@ export function QuotationSheet({ open, onOpenChange, type, editData, onSaved }: 
         }}
       />
     </>
+  );
+}
+
+// ─── Field row helper ──────────────────────────────────────────────────────
+
+function FieldRow({
+  label,
+  required,
+  alignTop,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  alignTop?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[120px_1fr] gap-3 ${
+        alignTop ? "items-start" : "items-center"
+      }`}
+    >
+      <label
+        className={`text-right text-jm-sm text-[var(--jm-text-muted)] ${
+          alignTop ? "mt-2" : ""
+        }`}
+      >
+        {label}
+        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
+      </label>
+      {children}
+    </div>
   );
 }

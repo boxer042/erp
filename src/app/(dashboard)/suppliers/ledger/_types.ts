@@ -24,6 +24,14 @@ export const ALL_TYPES: LedgerType[] = [
   "REFUND",
 ];
 
+export type PaymentKind = "MIXED" | "SUPPLY_ONLY" | "VAT_ONLY";
+
+export const PAYMENT_KIND_LABELS: Record<PaymentKind, string> = {
+  MIXED: "전체",
+  SUPPLY_ONLY: "공급가액만",
+  VAT_ONLY: "부가세만",
+};
+
 export interface LedgerEntry {
   id: string;
   date: string;
@@ -35,6 +43,7 @@ export interface LedgerEntry {
   balance: string;
   referenceId: string | null;
   referenceType: string | null;
+  paymentKind: PaymentKind | null;
   supplier: { id: string; name: string };
 }
 

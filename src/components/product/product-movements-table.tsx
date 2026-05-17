@@ -1,6 +1,13 @@
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  JmBadge,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { fmtNumber, formatDateKo, MOVEMENT_TYPE_LABELS } from "./helpers";
 import type { InventoryMovementItem } from "./types";
 
@@ -11,72 +18,119 @@ interface ProductMovementsTableProps {
   showVariantColumn?: boolean;
 }
 
-export function ProductMovementsTable({ movements, isLoading, showVariantColumn }: ProductMovementsTableProps) {
+export function ProductMovementsTable({
+  movements,
+  isLoading,
+  showVariantColumn,
+}: ProductMovementsTableProps) {
   const colCount = 6 + (showVariantColumn ? 1 : 0);
   return (
-    <Table className="min-w-[820px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="h-9 px-3 text-xs">일시</TableHead>
+    <JmTable className="min-w-[820px]">
+      <JmTableHeader>
+        <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            일시
+          </JmTableHead>
           {showVariantColumn && (
-            <TableHead className="h-9 px-3 text-xs">변형</TableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+              변형
+            </JmTableHead>
           )}
-          <TableHead className="h-9 px-3 text-xs">유형</TableHead>
-          <TableHead className="h-9 px-3 text-xs text-right">수량</TableHead>
-          <TableHead className="h-9 px-3 text-xs text-right">잔량</TableHead>
-          <TableHead className="h-9 px-3 text-xs">사유</TableHead>
-          <TableHead className="h-9 px-3 text-xs">메모</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            유형
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+            수량
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+            잔량
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            사유
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            메모
+          </JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <TableRow key={i}>
-              <TableCell className="px-3 py-2.5"><Skeleton className="h-3 w-28" /></TableCell>
+            <JmTableRow key={i} className="hover:bg-transparent">
+              <JmTableCell className="px-3 py-2">
+                <JmSkeleton className="h-3 w-28" />
+              </JmTableCell>
               {showVariantColumn && (
-                <TableCell className="px-3 py-2.5"><Skeleton className="h-3 w-20" /></TableCell>
+                <JmTableCell className="px-3 py-2">
+                  <JmSkeleton className="h-3 w-20" />
+                </JmTableCell>
               )}
-              <TableCell className="px-3 py-2.5"><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
-              <TableCell className="px-3 py-2.5"><div className="flex justify-end"><Skeleton className="h-3 w-12" /></div></TableCell>
-              <TableCell className="px-3 py-2.5"><div className="flex justify-end"><Skeleton className="h-3 w-12" /></div></TableCell>
-              <TableCell className="px-3 py-2.5"><Skeleton className="h-3 w-16" /></TableCell>
-              <TableCell className="px-3 py-2.5"><Skeleton className="h-3 w-24" /></TableCell>
-            </TableRow>
+              <JmTableCell className="px-3 py-2">
+                <JmSkeleton className="h-5 w-16 rounded-md" />
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2">
+                <div className="flex justify-end">
+                  <JmSkeleton className="h-3 w-12" />
+                </div>
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2">
+                <div className="flex justify-end">
+                  <JmSkeleton className="h-3 w-12" />
+                </div>
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2">
+                <JmSkeleton className="h-3 w-16" />
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2">
+                <JmSkeleton className="h-3 w-24" />
+              </JmTableCell>
+            </JmTableRow>
           ))
         ) : !movements || movements.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={colCount} className="text-center py-8 text-muted-foreground text-sm">
+          <JmTableRow className="hover:bg-transparent">
+            <JmTableCell
+              colSpan={colCount}
+              className="text-center py-8 text-[var(--jm-text-muted)] text-jm-sm"
+            >
               이동 이력이 없습니다
-            </TableCell>
-          </TableRow>
+            </JmTableCell>
+          </JmTableRow>
         ) : (
           movements.map((m) => (
-            <TableRow key={m.id}>
-              <TableCell className="px-3 py-2.5 text-muted-foreground text-xs whitespace-nowrap">
+            <JmTableRow key={m.id}>
+              <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)] text-jm-xs whitespace-nowrap">
                 {formatDateKo(m.createdAt)}
-              </TableCell>
+              </JmTableCell>
               {showVariantColumn && (
-                <TableCell className="px-3 py-2.5 text-xs">
+                <JmTableCell className="px-3 py-2 text-jm-xs">
                   {m.inventory?.product ? (
-                    <span>{m.inventory.product.sku}</span>
+                    <span className="text-[var(--jm-text)]">{m.inventory.product.sku}</span>
                   ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <span className="text-[var(--jm-text-muted)]">-</span>
                   )}
-                </TableCell>
+                </JmTableCell>
               )}
-              <TableCell className="px-3 py-2.5">
-                <Badge variant="outline" className="text-[10px]">
+              <JmTableCell className="px-3 py-2">
+                <JmBadge variant="outline" size="sm" shape="square" className="text-jm-2xs">
                   {MOVEMENT_TYPE_LABELS[m.type] ?? m.type}
-                </Badge>
-              </TableCell>
-              <TableCell className="px-3 py-2.5 text-right tabular-nums">{fmtNumber(m.quantity)}</TableCell>
-              <TableCell className="px-3 py-2.5 text-right tabular-nums">{fmtNumber(m.balanceAfter)}</TableCell>
-              <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">{m.reason ?? "-"}</TableCell>
-              <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">{m.memo ?? "-"}</TableCell>
-            </TableRow>
+                </JmBadge>
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
+                {fmtNumber(m.quantity)}
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
+                {fmtNumber(m.balanceAfter)}
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2 text-jm-xs text-[var(--jm-text-muted)]">
+                {m.reason ?? "-"}
+              </JmTableCell>
+              <JmTableCell className="px-3 py-2 text-jm-xs text-[var(--jm-text-muted)]">
+                {m.memo ?? "-"}
+              </JmTableCell>
+            </JmTableRow>
           ))
         )}
-      </TableBody>
-    </Table>
+      </JmTableBody>
+    </JmTable>
   );
 }

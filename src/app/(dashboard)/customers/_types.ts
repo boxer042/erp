@@ -17,6 +17,7 @@ export interface Customer {
   contactPhone: string | null;
   contactPosition: string | null;
   memo: string | null;
+  serialServiceConsent?: boolean;
   isActive: boolean;
   createdAt?: string;
 }
@@ -38,6 +39,7 @@ export interface CustomerFormState {
   contactName: string;
   contactPhone: string;
   contactPosition: string;
+  serialServiceConsent: boolean;
 }
 
 export const emptyCustomerForm = (): CustomerFormState => ({
@@ -56,6 +58,7 @@ export const emptyCustomerForm = (): CustomerFormState => ({
   contactName: "",
   contactPhone: "",
   contactPosition: "",
+  serialServiceConsent: true,
 });
 
 export const customerToForm = (c: Customer): CustomerFormState => ({
@@ -75,4 +78,5 @@ export const customerToForm = (c: Customer): CustomerFormState => ({
   contactName: c.contactName ?? "",
   contactPhone: c.contactPhone ?? "",
   contactPosition: c.contactPosition ?? "",
+  serialServiceConsent: c.serialServiceConsent ?? false,
 });

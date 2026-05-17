@@ -1,12 +1,12 @@
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+  JmBadge,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import type { ProductSpecValueItem } from "./types";
 
 interface ProductSpecsTableProps {
@@ -16,40 +16,48 @@ interface ProductSpecsTableProps {
 export function ProductSpecsTable({ values }: ProductSpecsTableProps) {
   if (values.length === 0) {
     return (
-      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+      <div className="px-4 py-8 text-center text-jm-sm text-[var(--jm-text-muted)]">
         등록된 스펙이 없습니다
       </div>
     );
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="h-9 px-3 text-xs w-[200px]">슬롯</TableHead>
-          <TableHead className="h-9 px-3 text-xs">값</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <JmTable>
+      <JmTableHeader>
+        <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[200px]">
+            슬롯
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            값
+          </JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
         {values.map((v) => (
-          <TableRow key={v.id}>
-            <TableCell className="px-3 py-2.5">
+          <JmTableRow key={v.id}>
+            <JmTableCell className="px-3 py-2">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-sm">{v.slot.name}</span>
+                <span className="font-medium text-jm-sm text-[var(--jm-text)]">
+                  {v.slot.name}
+                </span>
                 {v.slot.type === "ENUM" && (
-                  <Badge variant="outline" className="text-[10px]">선택지</Badge>
+                  <JmBadge variant="outline" size="sm" shape="square" className="text-jm-2xs">
+                    선택지
+                  </JmBadge>
                 )}
               </div>
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-sm tabular-nums">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-jm-sm tabular-nums text-[var(--jm-text)]">
               {v.value}
               {v.slot.type === "NUMBER" && v.slot.unit && (
-                <span className="ml-1 text-muted-foreground">{v.slot.unit}</span>
+                <span className="ml-1 text-[var(--jm-text-muted)]">{v.slot.unit}</span>
               )}
-            </TableCell>
-          </TableRow>
+            </JmTableCell>
+          </JmTableRow>
         ))}
-      </TableBody>
-    </Table>
+      </JmTableBody>
+    </JmTable>
   );
 }

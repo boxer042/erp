@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, ScanLine, ShieldCheck, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import {
@@ -25,6 +25,17 @@ interface Customer {
   phone: string;
 }
 
+// GET /api/serial-items/[code] 응답 중 수리 접수에 필요한 부분.
+interface SerialLookup {
+  id: string;
+  code: string;
+  status: string;
+  device: { name: string } | null;
+  customer: { id: string | null; name: string; phone: string } | null;
+  warranty: { active: boolean; daysLeft: number | null };
+  repairs: { id: string }[];
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -45,6 +56,29 @@ export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [device, setDevice] = useState("");
   const [symptom, setSymptom] = useState("");
+  // 시리얼 조회 — 스캔/입력으로 기존 시리얼을 찾아 고객·기기 자동 채움
+  const [serialCode, setSerialCode] = useState("");
+  const [foundSerial, setFoundSerial] = useState<SerialLookup | null>(null);
+
+  const serialLookup = useMutation({
+    mutationFn: (code: string) =>
+      apiGet<SerialLookup>(`/api/serial-items/${encodeURIComponent(code.trim())}`),
+    onSuccess: (s) => {
+      setFoundSerial(s);
+      if (s.customer?.id) {
+        setSelectedCustomer({
+          id: s.customer.id,
+          name: s.customer.name,
+          phone: s.customer.phone,
+        });
+      }
+      if (s.device?.name) setDevice(s.device.name);
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError ? err.message : "시리얼을 찾을 수 없습니다",
+      ),
+  });
 
   // 고객 검색
   const customersQuery = useQuery<Customer[]>({
@@ -64,6 +98,7 @@ export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: 
         {
           type,
           customerId: selectedCustomer?.id ?? null,
+          serialItemId: foundSerial?.id ?? null,
           repairProductText: device.trim() || null,
           symptom: symptom.trim() || null,
           // 미등록 고객이면 카트 세션 매핑 — 등록 고객은 customerId 가 매핑 역할
@@ -97,6 +132,79 @@ export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: 
 
         <JmDrawerBody>
           <div className="flex flex-col gap-5">
+            {/* 시리얼 조회 — 스캔/입력으로 기존 기기·고객 자동 채움 */}
+            <Section label="시리얼 조회" optional>
+              {foundSerial ? (
+                <div className="flex flex-col gap-2 rounded-xl bg-[var(--jm-surface-muted)] px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-jm-sm font-semibold text-[var(--jm-text)]">
+                      #{foundSerial.code}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFoundSerial(null);
+                        setSerialCode("");
+                      }}
+                      aria-label="시리얼 해제"
+                      className="text-[var(--jm-text-muted)]"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <span className="text-jm-sm text-[var(--jm-text)]">
+                    {foundSerial.device?.name ?? "기기 미상"}
+                  </span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-jm-2xs text-[var(--jm-text-muted)]">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="size-3" />
+                      {foundSerial.warranty.daysLeft == null
+                        ? "보증 정보 없음"
+                        : foundSerial.warranty.active
+                          ? `보증 ${foundSerial.warranty.daysLeft}일 남음`
+                          : "보증 만료"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Wrench className="size-3" />
+                      이전 수리 {foundSerial.repairs.length}건
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <JmInput
+                    size="lg"
+                    value={serialCode}
+                    onChange={(e) => setSerialCode(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Enter" &&
+                        !e.nativeEvent.isComposing &&
+                        serialCode.trim()
+                      ) {
+                        serialLookup.mutate(serialCode);
+                      }
+                    }}
+                    placeholder="시리얼 코드 입력·스캔"
+                    className="flex-1"
+                  />
+                  <JmButton
+                    variant="outline"
+                    size="lg"
+                    disabled={!serialCode.trim() || serialLookup.isPending}
+                    onClick={() => serialLookup.mutate(serialCode)}
+                  >
+                    {serialLookup.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <ScanLine className="size-4" />
+                    )}
+                    조회
+                  </JmButton>
+                </div>
+              )}
+            </Section>
+
             {/* 유형 — 큰 토글 */}
             <Section label="유형">
               <div className="grid grid-cols-2 gap-2">

@@ -2,8 +2,7 @@
 
 import { useId, useMemo, useState, isValidElement, cloneElement, type ReactElement } from "react";
 import { focusCaretEnd } from "@/jm/lib/focus";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { JmBadge, JmInput } from "@/jm";
 import { Plus, X, ChevronRight, Package, Wrench, Layers, Cpu, Palette } from "lucide-react";
 import { formatComma, parseComma } from "@/lib/utils";
 import { TYPE_ACCENT, emptyCostRow, type CostRow, type ProductType } from "./types";
@@ -54,7 +53,7 @@ export function NameAutocomplete({
 
   return (
     <div className="relative">
-      <Input
+      <JmInput
         autoFocus={autoFocus}
         placeholder={placeholder}
         value={value}
@@ -83,7 +82,7 @@ export function NameAutocomplete({
               className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-left"
             >
               <span className="truncate">{it.name}</span>
-              {it.badge && <Badge variant="outline" className="ml-2 shrink-0">{it.badge}</Badge>}
+              {it.badge && <JmBadge variant="outline" className="ml-2 shrink-0">{it.badge}</JmBadge>}
             </button>
           ))}
         </div>
@@ -301,7 +300,7 @@ export function CostList({
         {costs.map((cost, idx) => (
           <tr key={cost.id} className="border-b border-border hover:bg-muted/50">
             <td className="border-r border-border px-1 py-0.5">
-              <Input
+              <JmInput
                 placeholder="비용명"
                 value={cost.name}
                 onChange={(e) => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
@@ -333,7 +332,7 @@ export function CostList({
                 : "—"}
             </td>
             <td className="border-r border-border px-1 py-0.5">
-              <Input
+              <JmInput
                 type="text"
                 inputMode={cost.costType === "PERCENTAGE" ? "decimal" : "numeric"}
                 placeholder={cost.costType === "PERCENTAGE" ? "%" : "원"}
@@ -403,7 +402,7 @@ export function CostList({
         return (
           <div key={cost.id} className="rounded-lg border border-border bg-card p-2.5 space-y-2">
             <div className="flex items-center gap-2">
-              <Input
+              <JmInput
                 placeholder="비용명"
                 value={cost.name}
                 onChange={(e) => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
@@ -430,7 +429,7 @@ export function CostList({
                   </button>
                 ))}
               </div>
-              <Input
+              <JmInput
                 type="text"
                 inputMode={cost.costType === "PERCENTAGE" ? "decimal" : "numeric"}
                 placeholder={cost.costType === "PERCENTAGE" ? "%" : "원"}

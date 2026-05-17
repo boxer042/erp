@@ -269,6 +269,11 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
           <div style={{ textAlign: "center", marginTop: "3mm", fontSize: "8pt", color: "#666" }}>
             감사합니다
           </div>
+          <div style={{ textAlign: "center", marginTop: "1.5mm", fontSize: "7pt", color: "#888", lineHeight: 1.4 }}>
+            제품 시리얼 라벨의 QR 코드로 본인 인증 후
+            <br />
+            보증·수리·구매 내역을 조회할 수 있습니다
+          </div>
         </div>
       </div>
     </>

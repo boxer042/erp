@@ -88,7 +88,7 @@ interface PeriodReport {
 }
 
 async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
-  const [orders, incomings, expenses] = await Promise.all([
+  const [orders, incomings, supplierReturns, expenses] = await Promise.all([
     prisma.order.findMany({
       where: {
         status: { in: [...REVENUE_BEARING_STATUSES] },
@@ -116,12 +116,48 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
         },
       },
     }),
+    // 입고 — taxAmount 필드는 저장 안 되므로 items.totalPrice × 0.1 로 계산
+    // 추가로 SupplierProduct.incomingCosts (perUnit=true) 의 매입세액도 가산
     prisma.incoming.findMany({
       where: {
         status: "CONFIRMED",
         incomingDate: { gte: from, lt: to },
       },
-      select: { taxAmount: true },
+      select: {
+        shippingCost: true,
+        shippingIsTaxable: true,
+        items: {
+          select: {
+            quantity: true,
+            unitPrice: true,
+            totalPrice: true,
+            supplierProduct: {
+              select: {
+                isTaxable: true,
+                incomingCosts: {
+                  where: { isActive: true, isTaxable: true, perUnit: true },
+                  select: { costType: true, value: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    // 입고 반품 — 매입세액 차감
+    prisma.supplierReturn.findMany({
+      where: {
+        status: "CONFIRMED",
+        returnDate: { gte: from, lt: to },
+      },
+      select: {
+        items: {
+          select: {
+            totalPrice: true,
+            supplierProduct: { select: { isTaxable: true } },
+          },
+        },
+      },
     }),
     prisma.expense.findMany({
       where: { date: { gte: from, lt: to }, recoverable: false },
@@ -145,8 +181,6 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
   let outputVat = 0;
 
   for (const order of orders) {
-    outputVat += Number(order.taxAmount);
-
     const isRepair = order.repairTicketId !== null;
     const isRental = order.rentalId !== null;
 
@@ -155,6 +189,11 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
     const isExchanged = order.status === "EXCHANGED";
     const isSalesCancelled = order.paymentStatus === "SALES_CANCELLED";
     const isFullyDeducted = isReturned || isExchanged || isSalesCancelled;
+
+    // 부가세 예수금 — 전액 차감 주문은 제외 (부분환불은 아래 루프에서 차감)
+    if (!isFullyDeducted) {
+      outputVat += Number(order.taxAmount);
+    }
 
     for (const item of order.items) {
       const qty = Number(item.quantity);
@@ -184,6 +223,10 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
         else if (isExchanged) deductions.exchange += supplyRevenue;
       } else if (refundedAmount > 0) {
         deductions.partial += supplyRefunded;
+        // 부분환불 부가세 차감 — 과세 상품만
+        if (taxRate > 0) {
+          outputVat -= supplyRefunded * taxRate;
+        }
       }
 
       // 매출원가
@@ -245,8 +288,39 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
   const generalTotal = categories.reduce((s, c) => s + c.amount, 0);
   const opexTotal = generalTotal + channelCommission + cardFee + sellingCostTotal;
 
-  const inputVatFromIncoming = incomings.reduce((s, i) => s + Number(i.taxAmount), 0);
-  const inputVat = inputVatFromIncoming + inputVatFromExpenses;
+  // 매입 부가세 — Incoming.taxAmount 필드는 저장 안 되므로 items.totalPrice × 0.1 로 계산
+  // 추가: SupplierProduct.incomingCosts (perUnit=true, isTaxable=true) 의 매입세액도 가산
+  let inputVatFromIncoming = 0;
+  for (const inc of incomings) {
+    for (const item of inc.items) {
+      const qty = Number(item.quantity);
+      const unitPrice = Number(item.unitPrice);
+      if (item.supplierProduct.isTaxable) {
+        inputVatFromIncoming += Number(item.totalPrice) * 0.1;
+      }
+      for (const cost of item.supplierProduct.incomingCosts) {
+        const raw =
+          cost.costType === "FIXED"
+            ? Number(cost.value)
+            : (unitPrice * Number(cost.value)) / 100;
+        const vat = cost.costType === "FIXED" ? raw / 11 : raw * 0.1;
+        inputVatFromIncoming += vat * qty;
+      }
+    }
+    if (inc.shippingIsTaxable && Number(inc.shippingCost) > 0) {
+      inputVatFromIncoming += Number(inc.shippingCost) / 11;
+    }
+  }
+  // 입고 반품 — 매입세액 차감
+  let inputVatReturned = 0;
+  for (const ret of supplierReturns) {
+    for (const item of ret.items) {
+      if (item.supplierProduct.isTaxable) {
+        inputVatReturned += Number(item.totalPrice) * 0.1;
+      }
+    }
+  }
+  const inputVat = inputVatFromIncoming - inputVatReturned + inputVatFromExpenses;
 
   const grossProfit = netRevenue - costOfGoodsSold;
   const operatingIncome = grossProfit - opexTotal;

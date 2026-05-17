@@ -31,7 +31,11 @@ export type CancelReason =
 const CANCEL_REASONS: { value: CancelReason; label: string; desc: string }[] = [
   { value: "MISTAKE", label: "잘못 생성", desc: "실수로 만든 티켓 — 미등록 고객은 자동 영구 삭제" },
   { value: "SOLD_AS_PRODUCT", label: "상품 구매로 전환", desc: "수리 대신 같은/다른 제품 구매 — 통계 보존" },
-  { value: "CUSTOMER_DECLINED", label: "고객 거절", desc: "견적 본 후 진행 거부" },
+  {
+    value: "CUSTOMER_DECLINED",
+    label: "손님 거절 (진단비도 면제)",
+    desc: "진단비를 청구하려면 견적 화면의 [진단비만] 을 사용하세요 (손님/매장 사유 모두 OK)",
+  },
   { value: "CUSTOMER_NO_SHOW", label: "고객 미반환", desc: "맡겼는데 안 찾으러 옴" },
   { value: "SHOP_GAVE_UP", label: "매장 포기", desc: "수리 불가 판정" },
   { value: "PARTS_UNAVAILABLE", label: "부속 수급 불가", desc: "부속을 구할 수 없음" },

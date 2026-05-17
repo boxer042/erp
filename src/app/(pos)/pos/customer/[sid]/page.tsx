@@ -27,10 +27,8 @@ import { PaymentSheet } from "../../_payment-sheet";
 import { useRepairSync } from "../../_use-repair-sync";
 import { ProductDetailView, type LandingResponse } from "../../_product-detail-view";
 import { RepairDetail } from "@/app/(pos)/pos/repairs/[id]/page";
-import {
-  STATUS_META,
-  type RepairTicketDetail,
-} from "@/app/(pos)/pos/repairs/_types";
+import { RepairTicketActionMenu } from "@/app/(pos)/pos/repairs/[id]/_repair-action-menu";
+import { type RepairTicketDetail } from "@/app/(pos)/pos/repairs/_types";
 
 type Mode = "product" | "repair" | "rental";
 type Detail = { type: "repair-ticket"; id: string } | { type: "product"; id: string } | null;
@@ -261,6 +259,7 @@ export default function PosV2CustomerPage({
 
           {detail ? (
             // 상세 모드 — 좌측: 컨텐츠 타이틀/상태, 우측: 고객 썸네일+이름+번호
+            // 수리 티켓일 땐 부모 헤더에도 같은 kebab 메뉴(즉시↔맡김 + 취소) 노출.
             <>
               <div className="flex min-w-0 flex-1">
                 {detail.type === "repair-ticket" ? (
@@ -680,20 +679,9 @@ function RepairTicketHeader({ ticketId }: { ticketId: string }) {
     );
   }
   const t = q.data;
-  const meta = STATUS_META[t.status];
   return (
     <div className="flex min-w-0 flex-col">
-      <div className="flex items-center gap-1.5">
-        <span className={`size-2 rounded-full ${meta.dot}`} />
-        <span className="text-[12px] font-semibold text-[var(--jm-text)]">
-          {meta.label}
-        </span>
-        {t.type === "ON_SITE" && (
-          <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-            즉시
-          </span>
-        )}
-      </div>
+      <RepairTicketActionMenu ticketId={ticketId} />
       <span className="font-mono text-[13px] text-[var(--jm-text-muted)]">{t.ticketNo}</span>
     </div>
   );

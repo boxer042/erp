@@ -1,6 +1,7 @@
 "use client";
 
-import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { useMemo } from "react";
+import { JmCombobox, type JmComboboxItem } from "@/jm";
 
 export interface SlotLabelOption {
   id: string;
@@ -14,6 +15,7 @@ interface Props {
   onCreateNew: (name: string) => void;
   placeholder?: string;
   clearable?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
 export function AssemblySlotLabelCombobox({
@@ -23,24 +25,26 @@ export function AssemblySlotLabelCombobox({
   onCreateNew,
   placeholder = "라벨 선택...",
   clearable = true,
+  size = "sm",
 }: Props) {
-  const selected = labels.find((l) => l.id === value);
+  const items = useMemo<JmComboboxItem[]>(
+    () => labels.map((l) => ({ id: l.id, label: l.name })),
+    [labels],
+  );
 
   return (
-    <ResponsiveCombobox<SlotLabelOption>
-      items={labels}
+    <JmCombobox
+      items={items}
       value={value}
-      getItemId={(l) => l.id}
-      matches={(l, q) => l.name.toLowerCase().includes(q.toLowerCase())}
-      onSelect={(l) => onChange(l.id, l.name)}
+      size={size}
+      onChange={(item) => onChange(item.id, item.label)}
       onCreateNew={onCreateNew}
-      selectedLabel={selected?.name}
       placeholder={placeholder}
       searchPlaceholder="라벨 검색..."
-      mobileTitle="라벨 선택"
+      emptyMessage="라벨이 없습니다"
       clearable={clearable}
       onClear={() => onChange("", "")}
-      renderItem={(l) => <span>{l.name}</span>}
+      matches={(item, q) => item.label.toLowerCase().includes(q.toLowerCase())}
     />
   );
 }

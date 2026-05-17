@@ -22,6 +22,7 @@ import {
   JmSectionLabel,
   JmSegmentedControl,
   JmSpinner,
+  JmSwitch,
   JmTextarea,
 } from "@/jm";
 
@@ -126,6 +127,7 @@ function CustomerSheetForm({ editTarget, onClose, onSaved }: FormProps) {
         contactPosition: isBusiness
           ? form.contactPosition || undefined
           : undefined,
+        serialServiceConsent: form.serialServiceConsent,
         allowDuplicatePhone: !isEdit && allowDuplicatePhone ? true : undefined,
       };
 
@@ -403,6 +405,25 @@ function CustomerSheetForm({ editTarget, onClose, onSaved }: FormProps) {
               onChange={(e) => update("memo", e.target.value)}
               placeholder="이 고객에 대한 내부 메모"
             />
+          </section>
+
+          {/* 시리얼 조회 서비스 동의 (PIPA) */}
+          <section className="space-y-3">
+            <JmSectionLabel>시리얼 조회 서비스</JmSectionLabel>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--jm-border)] p-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-jm-sm font-medium text-[var(--jm-text)]">
+                  보증·수리·구매내역 조회 동의
+                </span>
+                <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                  제품 라벨 QR 로 본인이 직접 조회. 미동의 시 라벨에 QR 미인쇄.
+                </span>
+              </div>
+              <JmSwitch
+                checked={form.serialServiceConsent}
+                onCheckedChange={(v) => update("serialServiceConsent", v)}
+              />
+            </div>
           </section>
       </JmDrawerBody>
 

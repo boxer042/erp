@@ -16,6 +16,7 @@ import { formatAmount } from "./_helpers";
 import {
   TYPE_JM_VARIANTS,
   TYPE_LABELS,
+  PAYMENT_KIND_LABELS,
   type CustomerSummary,
   type LedgerEntry,
 } from "./_types";
@@ -118,7 +119,16 @@ export function LedgerView({
                       {TYPE_LABELS[e.type]}
                     </JmBadge>
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">{e.description}</JmTableCell>
+                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">
+                    <span className="inline-flex items-center gap-1.5">
+                      {e.description}
+                      {e.paymentKind && e.paymentKind !== "MIXED" && (
+                        <JmBadge variant="warning" size="sm" shape="square">
+                          {PAYMENT_KIND_LABELS[e.paymentKind]}
+                        </JmBadge>
+                      )}
+                    </span>
+                  </JmTableCell>
                   <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center text-[var(--jm-text-muted)] text-xs">
                     {e.referenceType ?? "-"}
                   </JmTableCell>

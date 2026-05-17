@@ -18,6 +18,10 @@ import {
 import { BottomSheet } from "./_components/bottom-sheet";
 import { fmtKRW } from "./repairs/_helpers";
 
+// 임대 요율은 과세 — 세전 저장값을 VAT 포함 금액으로 변환해 표시.
+// (카트 전달값은 세전 유지 — cart-helpers 가 VAT 별도 계산)
+const withVat = (net: number) => Math.round(net * 1.1);
+
 interface RentalAsset {
   id: string;
   assetNo: string;
@@ -199,7 +203,7 @@ function AssetCard({
       </span>
       <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">{asset.assetNo}</span>
       <span className="mt-1 text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
-        {fmtKRW(dailyRate)}
+        {fmtKRW(withVat(dailyRate))}
         <span className="ml-0.5 text-jm-3xs font-normal text-[var(--jm-text-muted)]">/일</span>
       </span>
       {reservations.length > 0 ? (
@@ -436,7 +440,7 @@ function RentalSheetBody({
           className="w-full justify-between"
         >
           <span>{days}일 카트 추가</span>
-          <span className="tabular-nums">{fmtKRW(total)}</span>
+          <span className="tabular-nums">{fmtKRW(withVat(total))}</span>
         </JmButton>
       }
     >
@@ -476,22 +480,9 @@ function RentalSheetBody({
               value={startDate}
               onChange={(v) => {
                 setStartDate(v);
-                // 시작일 선택 시 종료일을 자동 +1 — 기본 1일 임대.
-                // 단 +1 일이 점유 범위에 걸리면 점유 시작 하루 전까지로 클램프.
-                const nextDayMs = new Date(v).getTime() + 86400000;
-                const newStart = stripTime(new Date(v));
-                const nextOccupied = occupiedRanges.find(
-                  (r) => r.start > newStart,
-                )?.start;
-                const clampedEndMs = nextOccupied
-                  ? Math.min(
-                      nextDayMs,
-                      nextOccupied.getTime() - 86400000,
-                    )
-                  : nextDayMs;
-                setEndDate(
-                  format(new Date(clampedEndMs), "yyyy-MM-dd"),
-                );
+                // 시작일 선택 시 종료일을 같은 날로 자동 설정 — 기본 당일 픽업·반납 (1일 임대).
+                // 사용자는 이후 종료일을 자유롭게 늘릴 수 있음.
+                setEndDate(v);
               }}
               occupiedRanges={occupiedRanges}
             />
@@ -529,7 +520,7 @@ function RentalSheetBody({
           <div className="flex items-baseline justify-between">
             <span className="text-jm-sm text-[var(--jm-text-muted)]">일일가</span>
             <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
-              {fmtKRW(dailyRate)}
+              {fmtKRW(withVat(dailyRate))}
               <span className="ml-1 text-jm-2xs font-normal text-[var(--jm-text-muted)]">×{days}</span>
             </span>
           </div>
@@ -544,9 +535,11 @@ function RentalSheetBody({
           )}
           <div className="my-1 h-px bg-[var(--jm-border)]" />
           <div className="flex items-baseline justify-between">
-            <span className="text-jm-base font-semibold text-[var(--jm-text)]">임대료</span>
+            <span className="text-jm-base font-semibold text-[var(--jm-text)]">
+              임대료 <span className="text-jm-2xs font-normal text-[var(--jm-text-muted)]">VAT 포함</span>
+            </span>
             <span className="text-jm-xl font-bold tabular-nums text-[var(--jm-text)]">
-              {fmtKRW(total)}
+              {fmtKRW(withVat(total))}
             </span>
           </div>
         </div>

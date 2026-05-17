@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
-import { SUPPLIER_PAYMENT_METHODS } from "@/lib/validators/supplier";
+import { SUPPLIER_PAYMENT_METHODS, PAYMENT_KIND } from "@/lib/validators/supplier";
 
 const updateSchema = z.object({
   amount: z.string().min(1, "금액을 입력해주세요")
     .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "금액은 0보다 커야 합니다"),
   paymentDate: z.string().min(1, "수금일을 선택해주세요"),
   method: z.enum(SUPPLIER_PAYMENT_METHODS),
+  kind: z.enum(PAYMENT_KIND).default("MIXED"),
   memo: z.string().optional(),
 });
 
@@ -57,6 +58,7 @@ export async function PUT(
         amount,
         paymentDate,
         method: data.method,
+        kind: data.kind,
         memo: data.memo || null,
       },
     });

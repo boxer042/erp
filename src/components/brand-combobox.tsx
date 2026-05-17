@@ -1,12 +1,17 @@
 "use client";
 
-import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { useMemo } from "react";
+import { JmCombobox, type JmComboboxItem } from "@/jm";
 
 export interface BrandOption {
   id: string;
   name: string;
   logoUrl?: string | null;
 }
+
+type BrandItem = JmComboboxItem & {
+  brand: BrandOption;
+};
 
 interface BrandComboboxProps {
   brands: BrandOption[];
@@ -15,6 +20,7 @@ interface BrandComboboxProps {
   onCreateNew: (name: string) => void;
   placeholder?: string;
   clearable?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
 export function BrandCombobox({
@@ -24,50 +30,45 @@ export function BrandCombobox({
   onCreateNew,
   placeholder = "브랜드 선택...",
   clearable = true,
+  size = "sm",
 }: BrandComboboxProps) {
-  const selected = brands.find((b) => b.id === value);
+  const items = useMemo<BrandItem[]>(
+    () =>
+      brands.map((b) => ({
+        id: b.id,
+        label: b.name,
+        brand: b,
+      })),
+    [brands],
+  );
 
   return (
-    <ResponsiveCombobox<BrandOption>
-      items={brands}
+    <JmCombobox<BrandItem>
+      items={items}
       value={value}
-      getItemId={(b) => b.id}
-      matches={(b, q) => b.name.toLowerCase().includes(q.toLowerCase())}
-      onSelect={(b) => onChange(b.id, b.name)}
+      size={size}
+      onChange={(item) => onChange(item.brand.id, item.brand.name)}
       onCreateNew={onCreateNew}
-      selectedLabel={selected?.name}
       placeholder={placeholder}
       searchPlaceholder="브랜드 검색..."
-      mobileTitle="브랜드 선택"
+      emptyMessage="브랜드가 없습니다"
       clearable={clearable}
       onClear={() => onChange("", "")}
-      renderTrigger={(s) => (
-        <>
-          {s?.logoUrl && (
+      matches={(item, q) =>
+        item.brand.name.toLowerCase().includes(q.toLowerCase())
+      }
+      renderItem={(item) => (
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {item.brand.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={s.logoUrl}
+              src={item.brand.logoUrl}
               alt=""
-              className="mr-2 size-5 shrink-0 rounded object-contain bg-card border border-border"
+              className="size-4 shrink-0 rounded object-contain bg-[var(--jm-surface)] border border-[var(--jm-border)]"
             />
           )}
-          <span className={`truncate ${s ? "" : "text-muted-foreground"}`}>
-            {s ? s.name : placeholder}
-          </span>
-        </>
-      )}
-      renderItem={(b) => (
-        <>
-          {b.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={b.logoUrl}
-              alt=""
-              className="h-4 w-4 rounded object-contain bg-card border border-border"
-            />
-          )}
-          <span>{b.name}</span>
-        </>
+          <span className="truncate text-[var(--jm-text)]">{item.brand.name}</span>
+        </span>
       )}
     />
   );

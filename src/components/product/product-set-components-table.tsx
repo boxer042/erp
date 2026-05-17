@@ -1,5 +1,12 @@
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  JmBadge,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { fmtNumber } from "./helpers";
 import type { SetComponentItem } from "./types";
 
@@ -10,37 +17,49 @@ interface ProductSetComponentsTableProps {
 export function ProductSetComponentsTable({ components }: ProductSetComponentsTableProps) {
   if (components.length === 0) {
     return (
-      <p className="text-center py-8 text-muted-foreground text-sm">
+      <p className="text-center py-8 text-[var(--jm-text-muted)] text-jm-sm">
         구성품이 없습니다
       </p>
     );
   }
   return (
-    <Table className="min-w-[640px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="h-9 px-3 text-xs">라벨</TableHead>
-          <TableHead className="h-9 px-3 text-xs">구성품</TableHead>
-          <TableHead className="h-9 px-3 text-xs">SKU</TableHead>
-          <TableHead className="h-9 px-3 text-xs text-right">수량</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <JmTable className="min-w-[640px]">
+      <JmTableHeader>
+        <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            라벨
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            구성품
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+            SKU
+          </JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+            수량
+          </JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
         {components.map((sc) => (
-          <TableRow key={sc.id}>
-            <TableCell className="px-3 py-2.5 text-muted-foreground">
+          <JmTableRow key={sc.id}>
+            <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)]">
               {sc.label?.trim() ? sc.label : "-"}
-            </TableCell>
-            <TableCell className="px-3 py-2.5 font-medium">{sc.component.name}</TableCell>
-            <TableCell className="px-3 py-2.5">
-              <Badge variant="outline">{sc.component.sku}</Badge>
-            </TableCell>
-            <TableCell className="px-3 py-2.5 text-right tabular-nums">
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 font-medium text-[var(--jm-text)]">
+              {sc.component.name}
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2">
+              <JmBadge variant="outline" size="sm" shape="square">
+                {sc.component.sku}
+              </JmBadge>
+            </JmTableCell>
+            <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
               {fmtNumber(sc.quantity)}
-            </TableCell>
-          </TableRow>
+            </JmTableCell>
+          </JmTableRow>
         ))}
-      </TableBody>
-    </Table>
+      </JmTableBody>
+    </JmTable>
   );
 }

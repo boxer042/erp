@@ -1,6 +1,7 @@
 "use client";
 
-import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { useMemo } from "react";
+import { JmCombobox, type JmComboboxItem } from "@/jm";
 
 interface SupplierProductCostItem {
   id: string;
@@ -21,6 +22,10 @@ interface SupplierProduct {
   incomingCosts?: SupplierProductCostItem[];
 }
 
+type SpItem = JmComboboxItem & {
+  sp: SupplierProduct;
+};
+
 interface SupplierProductComboboxProps {
   supplierProducts: SupplierProduct[];
   value: string;
@@ -28,6 +33,7 @@ interface SupplierProductComboboxProps {
   onCreateNew: (name: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
 export function SupplierProductCombobox({
@@ -37,48 +43,59 @@ export function SupplierProductCombobox({
   onCreateNew,
   placeholder = "공급상품 선택...",
   disabled = false,
+  size = "sm",
 }: SupplierProductComboboxProps) {
-  const selected = supplierProducts.find((s) => s.id === value);
-  const selectedLabel = selected
-    ? `${selected.name}${selected.spec ? ` · ${selected.spec}` : ""}`
-    : undefined;
+  const items = useMemo<SpItem[]>(
+    () =>
+      supplierProducts.map((s) => ({
+        id: s.id,
+        label: `${s.name}${s.spec ? ` · ${s.spec}` : ""}`,
+        sp: s,
+      })),
+    [supplierProducts],
+  );
 
   return (
-    <ResponsiveCombobox<SupplierProduct>
-      items={supplierProducts}
+    <JmCombobox<SpItem>
+      items={items}
       value={value}
-      getItemId={(s) => s.id}
-      matches={(s, q) => {
+      size={size}
+      onChange={(item) => onChange(item.sp)}
+      onCreateNew={onCreateNew}
+      placeholder={placeholder}
+      searchPlaceholder="품명·규격·품번 검색..."
+      emptyMessage="공급상품이 없습니다"
+      disabled={disabled}
+      matches={(item, q) => {
         const lower = q.toLowerCase();
+        const s = item.sp;
         return (
           s.name.toLowerCase().includes(lower) ||
           (s.supplierCode?.toLowerCase().includes(lower) ?? false) ||
           (s.spec?.toLowerCase().includes(lower) ?? false)
         );
       }}
-      onSelect={(s) => onChange(s)}
-      onCreateNew={onCreateNew}
-      selectedLabel={selectedLabel}
-      placeholder={placeholder}
-      searchPlaceholder="품명·규격·품번 검색..."
-      mobileTitle="공급상품 선택"
-      disabled={disabled}
-      renderItem={(s) => (
-        <>
-          <span className="flex-1 truncate">
-            {s.name}
-            {s.spec && (
-              <span className="ml-1 text-muted-foreground">· {s.spec}</span>
+      renderItem={(item) => {
+        const s = item.sp;
+        return (
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="flex-1 truncate text-[var(--jm-text)]">
+              {s.name}
+              {s.spec && (
+                <span className="ml-1 text-[var(--jm-text-muted)]">· {s.spec}</span>
+              )}
+            </span>
+            {s.supplierCode && (
+              <span className="text-jm-xs text-[var(--jm-text-muted)] shrink-0 font-[family-name:var(--jm-font-mono)]">
+                {s.supplierCode}
+              </span>
             )}
+            <span className="text-jm-xs text-[var(--jm-text-muted)] shrink-0 tabular-nums">
+              ₩{parseFloat(s.unitPrice).toLocaleString("ko-KR")}
+            </span>
           </span>
-          {s.supplierCode && (
-            <span className="text-xs text-muted-foreground mr-2 shrink-0">{s.supplierCode}</span>
-          )}
-          <span className="text-xs text-muted-foreground shrink-0">
-            ₩{parseFloat(s.unitPrice).toLocaleString("ko-KR")}
-          </span>
-        </>
-      )}
+        );
+      }}
     />
   );
 }

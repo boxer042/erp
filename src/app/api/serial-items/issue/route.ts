@@ -4,6 +4,7 @@ import type { Prisma, SerialItemSource } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
 import { nextSerialItemCode } from "@/lib/serial-item-code";
+import { generateAccessToken } from "@/lib/serial-token";
 
 /**
  * POS 카트의 라벨 발번. 두 종류를 한 번에 처리:
@@ -56,6 +57,18 @@ export async function POST(request: NextRequest) {
   const { customerId, productItems, repairTicketIds, skipRepairTicketIds, dryRun } =
     parsed.data;
   const skipSet = new Set(skipRepairTicketIds);
+
+  // 시리얼 조회 서비스 동의 확인 — 미동의(또는 미등록) 손님은 accessToken 없이 발급해
+  // 라벨에 QR 이 인쇄되지 않게 한다. 손님이 추후 동의하면 [토큰 재발급]으로 활성화.
+  let customerConsent = false;
+  if (customerId) {
+    const c = await prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { serialServiceConsent: true },
+    });
+    customerConsent = c?.serialServiceConsent ?? false;
+  }
+  const newToken = () => (customerConsent ? generateAccessToken() : null);
 
   // ── 사전 batch 조회 (N+1 회피) ────────────────────────────
   const productIds = Array.from(
@@ -150,7 +163,11 @@ export async function POST(request: NextRequest) {
         newlyIssued: true,
       });
     }
-    return NextResponse.json({ labels: issued, dryRun: true });
+    return NextResponse.json({
+      labels: issued,
+      dryRun: true,
+      consentMissing: !!customerId && !customerConsent,
+    });
   }
 
   // ── 실제 발번 ─────────────────────────────────────────
@@ -171,6 +188,7 @@ export async function POST(request: NextRequest) {
         const code = await nextSerialItemCode(tx, now);
         productCreates.push({
           code,
+          accessToken: newToken(),
           productId: product.id,
           customerId: customerId ?? null,
           source: "SALE",
@@ -232,6 +250,7 @@ export async function POST(request: NextRequest) {
       const created = await tx.serialItem.create({
         data: {
           code,
+          accessToken: newToken(),
           productId: useProduct?.id ?? null,
           displayName: useProduct ? null : (useText ?? null),
           customerId: customerId ?? null,
@@ -257,5 +276,8 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return NextResponse.json({ labels: issued }, { status: 201 });
+  return NextResponse.json(
+    { labels: issued, consentMissing: !!customerId && !customerConsent },
+    { status: 201 },
+  );
 }

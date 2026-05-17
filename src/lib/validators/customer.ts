@@ -28,6 +28,8 @@ export const customerSchema = z
     contactPosition: z.string().optional(),
     /** true 시 phone 중복 체크 우회 — 사용자가 "동명이인 새로 등록" 선택할 때 */
     allowDuplicatePhone: z.boolean().optional(),
+    /** 시리얼 기반 보증·수리·구매내역 조회 서비스 이용 동의 (PIPA) */
+    serialServiceConsent: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     // 기업이면 상호(name) 가 사실상 사업자 등록 상호여야 함 — 별도 강제는 안 하지만 안내

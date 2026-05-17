@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { JmCard, JmCardContent } from "@/jm";
 
 interface ProductSectionProps {
   title: React.ReactNode;
@@ -7,8 +7,6 @@ interface ProductSectionProps {
   actions?: React.ReactNode;
   /** 카드 본문에 padding 없이 (테이블 등 가장자리까지 채우는 경우) */
   noPadding?: boolean;
-  /** 카드 size */
-  size?: "default" | "sm";
   /** Card content 추가 className */
   bodyClassName?: string;
   children: React.ReactNode;
@@ -25,7 +23,6 @@ export function ProductSection({
   description,
   actions,
   noPadding,
-  size = "sm",
   bodyClassName,
   children,
 }: ProductSectionProps) {
@@ -33,20 +30,20 @@ export function ProductSection({
     <section>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 space-y-0.5">
-          <h4 className="text-[12px] font-semibold text-foreground">{title}</h4>
+          <h4 className="text-jm-xs font-semibold text-[var(--jm-text)]">{title}</h4>
           {description && (
-            <p className="text-[11px] text-muted-foreground leading-snug">
+            <p className="text-jm-2xs text-[var(--jm-text-muted)] leading-snug">
               {description}
             </p>
           )}
         </div>
         {actions && <div className="shrink-0 flex items-center gap-2">{actions}</div>}
       </div>
-      <Card size={size}>
-        <CardContent className={`${noPadding ? "!p-0" : ""} ${bodyClassName ?? ""}`}>
+      <JmCard>
+        <JmCardContent className={`${noPadding ? "!p-0" : ""} ${bodyClassName ?? ""}`}>
           {children}
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
     </section>
   );
 }

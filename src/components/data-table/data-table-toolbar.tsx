@@ -1,7 +1,6 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { JmButton, JmIconButton, JmInput } from "@/jm";
 import { Search, RefreshCw, Plus } from "lucide-react";
 
 interface DataTableToolbarProps {
@@ -27,17 +26,20 @@ export function DataTableToolbar({
   loading,
 }: DataTableToolbarProps) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-2.5">
+    <div className="flex items-center justify-between gap-3 border-b border-[var(--jm-border)] px-5 py-2.5">
       <div className="flex items-center gap-2 flex-1">
         {search && (
           <div className="relative max-w-[320px] flex-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--jm-text-muted)] pointer-events-none" />
+            <JmInput
+              size="sm"
               value={search.value}
               onChange={(e) => search.onChange(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) search.onSearch(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) search.onSearch();
+              }}
               placeholder={search.placeholder || "검색..."}
-              className="h-[30px] pl-8 text-[13px]"
+              className="pl-8"
             />
           </div>
         )}
@@ -45,25 +47,21 @@ export function DataTableToolbar({
       </div>
       <div className="flex items-center gap-1.5">
         {onRefresh && (
-          <Button
+          <JmIconButton
             variant="ghost"
-            size="icon"
-            className="h-[30px] w-[30px] text-muted-foreground hover:text-foreground"
+            size="sm"
+            aria-label="새로고침"
             onClick={onRefresh}
             disabled={loading}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </Button>
+            <RefreshCw className={loading ? "animate-spin" : ""} />
+          </JmIconButton>
         )}
         {onAdd && (
-          <Button
-            size="sm"
-            className="h-[30px] px-3 text-[13px]"
-            onClick={onAdd}
-          >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            {addLabel}
-          </Button>
+          <JmButton size="sm" variant="cta" onClick={onAdd}>
+            <Plus />
+            <span>{addLabel}</span>
+          </JmButton>
         )}
       </div>
     </div>

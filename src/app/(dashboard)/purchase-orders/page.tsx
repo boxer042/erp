@@ -238,8 +238,7 @@ function PurchaseOrdersPageInner() {
             </JmTableToolbarActions>
           </JmTableToolbar>
 
-          <div className="overflow-x-auto">
-            <JmTable className="min-w-[1100px]">
+          <JmTable className="min-w-[1100px]">
               <JmTableHeader>
                 <JmTableRow>
                   <JmTableHead className="w-[140px] whitespace-nowrap">발주번호</JmTableHead>
@@ -303,7 +302,6 @@ function PurchaseOrdersPageInner() {
                 )}
               </JmTableBody>
             </JmTable>
-          </div>
         </JmCard>
       </div>
 

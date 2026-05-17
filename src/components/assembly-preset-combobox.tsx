@@ -1,6 +1,7 @@
 "use client";
 
-import { ResponsiveCombobox } from "@/components/ui/responsive-combobox";
+import { useMemo } from "react";
+import { JmCombobox, type JmComboboxItem } from "@/jm";
 
 export interface AssemblyPresetOption {
   id: string;
@@ -15,6 +16,7 @@ interface AssemblyPresetComboboxProps {
   placeholder?: string;
   clearable?: boolean;
   disabled?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
 export function AssemblyPresetCombobox({
@@ -24,38 +26,46 @@ export function AssemblyPresetCombobox({
   placeholder = "프리셋 선택 (선택)",
   clearable = true,
   disabled = false,
+  size = "sm",
 }: AssemblyPresetComboboxProps) {
-  const selected = presets.find((p) => p.id === value);
+  const items = useMemo<JmComboboxItem[]>(
+    () =>
+      presets.map((p) => ({
+        id: p.id,
+        label: p.name,
+        description: p.description ?? undefined,
+      })),
+    [presets],
+  );
 
   return (
-    <ResponsiveCombobox<AssemblyPresetOption>
-      items={presets}
+    <JmCombobox
+      items={items}
       value={value}
-      getItemId={(p) => p.id}
-      matches={(p, q) => {
-        const lower = q.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(lower) ||
-          (p.description?.toLowerCase().includes(lower) ?? false)
-        );
-      }}
-      onSelect={(p) => onChange(p.id, p.name)}
-      selectedLabel={selected?.name}
+      size={size}
+      onChange={(item) => onChange(item.id, item.label)}
       placeholder={placeholder}
       searchPlaceholder="프리셋 검색..."
-      mobileTitle="프리셋 선택"
+      emptyMessage="프리셋이 없습니다"
       clearable={clearable}
       onClear={() => onChange("", "")}
       disabled={disabled}
-      renderItem={(p) => (
-        <>
-          <span className="flex-1 truncate">{p.name}</span>
-          {p.description && (
-            <span className="ml-2 text-xs text-muted-foreground truncate max-w-[40%]">
-              {p.description}
+      matches={(item, q) => {
+        const lower = q.toLowerCase();
+        return (
+          item.label.toLowerCase().includes(lower) ||
+          (item.description?.toLowerCase().includes(lower) ?? false)
+        );
+      }}
+      renderItem={(item) => (
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="flex-1 truncate text-[var(--jm-text)]">{item.label}</span>
+          {item.description && (
+            <span className="ml-2 text-jm-xs text-[var(--jm-text-muted)] truncate max-w-[40%]">
+              {item.description}
             </span>
           )}
-        </>
+        </span>
       )}
     />
   );

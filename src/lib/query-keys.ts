@@ -16,6 +16,7 @@ export const queryKeys = {
     costs: (id: string) => ["products", "costs", id] as const,
     movements: (id: string) => ["products", "movements", id] as const,
     landing: (id: string) => ["products", "landing", id] as const,
+    manual: (id: string) => ["products", "manual", id] as const,
     priceHistory: (id: string) => ["products", "price-history", id] as const,
     salesStats: (id: string) => ["products", "sales-stats", id] as const,
   },
@@ -102,6 +103,8 @@ export const queryKeys = {
   rentalAssets: {
     all: ["rental-assets"] as const,
     list: (params?: Record<string, unknown>) => ["rental-assets", "list", params ?? {}] as const,
+    manual: (id: string) => ["rental-assets", "manual", id] as const,
+    detail: (id: string) => ["rental-assets", "detail", id] as const,
   },
   rentals: {
     all: ["rentals"] as const,
@@ -150,6 +153,11 @@ export const queryKeys = {
       ["reports", "income-statement", "monthly", params ?? {}] as const,
     balanceSheet: (params?: Record<string, unknown>) =>
       ["reports", "balance-sheet", params ?? {}] as const,
+    vatFiling: (params?: Record<string, unknown>) =>
+      ["reports", "vat-filing", params ?? {}] as const,
+  },
+  manualBalance: {
+    all: ["manual-balance"] as const,
   },
   ledger: {
     suppliers: (params?: Record<string, unknown>) => ["ledger", "suppliers", params ?? {}] as const,
@@ -158,5 +166,10 @@ export const queryKeys = {
   auditLogs: {
     all: ["audit-logs"] as const,
     list: (params?: Record<string, unknown>) => ["audit-logs", "list", params ?? {}] as const,
+  },
+  serialItems: {
+    all: ["serial-items"] as const,
+    list: (params?: Record<string, unknown>) => ["serial-items", "list", params ?? {}] as const,
+    detail: (code: string) => ["serial-items", "detail", code] as const,
   },
 } as const;

@@ -137,9 +137,12 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
     openPrintTab("quotations", session.quotationId);
   };
 
-  const serialIssueMutation = useMutation<{ labels: { code: string }[] }>({
+  const serialIssueMutation = useMutation<{
+    labels: { code: string }[];
+    consentMissing: boolean;
+  }>({
     mutationFn: () =>
-      apiMutate<{ labels: { code: string }[] }>(
+      apiMutate<{ labels: { code: string }[]; consentMissing: boolean }>(
         "/api/serial-items/issue",
         "POST",
         {
@@ -157,6 +160,11 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
       }
       setSessionLabels(codes, session.id, session.id);
       toast.success(`라벨 ${codes.length}장 발번 완료`);
+      if (res.consentMissing) {
+        toast.warning(
+          "이 손님은 시리얼 조회 서비스 미동의 — QR 없이 발급되었습니다. 동의는 손님 정보에서 설정하세요.",
+        );
+      }
       onPrintLabels?.(codes);
       onOpenChange(false);
     },

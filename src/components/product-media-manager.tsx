@@ -1,36 +1,60 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Film,
+  Image as ImageIcon,
+  Library,
+  Link as LinkIcon,
+  Loader2,
+  Plus,
+  Star,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogTitle,
-} from "@/components/ui/dialog";
-import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Loader2, Image as ImageIcon, Film, Link as LinkIcon, Star, Library } from "lucide-react";
-import { extractYoutubeId } from "@/lib/utils";
+
 import { apiGet, apiMutate } from "@/lib/api-client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { extractYoutubeId } from "@/lib/utils";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
 import { MediaPickerDialog } from "@/components/media-picker-dialog";
+import {
+  JmButton,
+  JmDialog,
+  JmDialogContent,
+  JmDialogTitle,
+  JmIconButton,
+  JmInput,
+  JmSelect,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 
 function MediaSkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-7 w-7 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-          <TableCell><Skeleton className="h-12 w-12 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-7 w-20 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
-        </TableRow>
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell><JmSkeleton className="h-7 w-7 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-8" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-12 w-12 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-16 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-7 w-20 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-48" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+            </div>
+          </JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -57,7 +81,16 @@ interface ProductMediaManagerProps {
   onImageUrlChange?: () => void;
 }
 
-export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: ProductMediaManagerProps) {
+const KIND_OPTIONS = [
+  { value: "THUMBNAIL", label: "썸네일" },
+  { value: "DETAIL", label: "상세" },
+];
+
+export function ProductMediaManager({
+  productId,
+  imageUrl,
+  onImageUrlChange,
+}: ProductMediaManagerProps) {
   const [items, setItems] = useState<ProductMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [urlInput, setUrlInput] = useState("");
@@ -90,7 +123,12 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
     load();
   }, [load]);
 
-  const create = (data: { type: MediaType; kind: MediaKind; url: string; title: string | null }) =>
+  const create = (data: {
+    type: MediaType;
+    kind: MediaKind;
+    url: string;
+    title: string | null;
+  }) =>
     apiMutate("/api/product-media", "POST", {
       productId,
       ...data,
@@ -103,15 +141,15 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
       toast.error("URL을 입력하세요");
       return;
     }
-    // URL 패턴 자동 감지: YouTube ID 추출되면 YOUTUBE, 아니면 IMAGE
     const type: MediaType = extractYoutubeId(url) ? "YOUTUBE" : "IMAGE";
     setSubmitting(true);
     try {
-      // 외부 URL은 비율을 강제할 수 없어 DETAIL 기본
       await create({ type, kind: "DETAIL", url, title: null });
       setUrlInput("");
       await load();
-      toast.success(type === "YOUTUBE" ? "YouTube 영상이 추가되었습니다" : "이미지가 추가되었습니다");
+      toast.success(
+        type === "YOUTUBE" ? "YouTube 영상이 추가되었습니다" : "이미지가 추가되었습니다",
+      );
     } catch {
       toast.error("추가에 실패했습니다");
     } finally {
@@ -132,7 +170,6 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
     setUploading(true);
     try {
       const fd = new FormData();
-      // append 시 3번째 인자로 파일명 지정 (Blob이어도 정상 처리됨)
       fd.append("file", data, name);
       const upRes = await fetch("/api/products/upload", { method: "POST", body: fd });
       if (!upRes.ok) {
@@ -165,7 +202,6 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
       if (nextSuccess > 0) {
         toast.success(`${nextSuccess}개 이미지를 추가했습니다`);
         await load();
-        // 서버 측에서 Product.imageUrl이 자동 동기화됐을 수 있어 부모 캐시 갱신 알림
         onImageUrlChange?.();
       }
       setEditQueue([]);
@@ -253,15 +289,14 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
     }
   };
 
-  // URL 입력 미리 감지로 아이콘 토글
   const detectedIsYoutube = !!extractYoutubeId(urlInput.trim());
 
   return (
     <div>
-      {/* 통합 추가 패널 — 파일 업로드 + URL (외곽선 없음, 풀폭) */}
+      {/* 통합 추가 패널 — 파일 업로드 + URL */}
       <div
         className={`px-4 py-4 transition-colors ${
-          dragActive ? "bg-primary/5" : ""
+          dragActive ? "bg-[var(--jm-info-bg)]/30" : ""
         }`}
         onDragEnter={(e) => {
           e.preventDefault();
@@ -281,21 +316,25 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
           e.preventDefault();
           e.stopPropagation();
           setDragActive(false);
-          // 드래그앤드롭은 썸네일로 기본 처리 (1:1 lock)
           handleFiles(e.dataTransfer.files, "THUMBNAIL");
         }}
       >
-        {/* 상단: 파일 업로드 (kind 별 분리) */}
+        {/* 상단: 파일 업로드 */}
         <div className="flex items-start gap-3">
-          <ImageIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-1" />
+          <ImageIcon className="size-5 text-[var(--jm-text-muted)] shrink-0 mt-1" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">이미지 파일 업로드</p>
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">썸네일</span>은 1:1 정사각 (카드/리스트), <span className="font-medium text-foreground">상세 이미지</span>는 자유 비율 (상세 페이지)
+            <p className="text-jm-sm font-medium text-[var(--jm-text)]">
+              이미지 파일 업로드
+            </p>
+            <p className="text-jm-xs text-[var(--jm-text-muted)]">
+              <span className="font-medium text-[var(--jm-text)]">썸네일</span>은 1:1
+              정사각 (카드/리스트),{" "}
+              <span className="font-medium text-[var(--jm-text)]">상세 이미지</span>는
+              자유 비율 (상세 페이지)
             </p>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
-            <Button
+            <JmButton
               size="sm"
               variant="outline"
               onClick={() => {
@@ -305,15 +344,17 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
               disabled={uploading || editQueue.length > 0}
             >
               {uploading || editQueue.length > 0 ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="animate-spin" />
               ) : (
-                <Upload className="mr-1.5 h-3.5 w-3.5" />
+                <Upload />
               )}
-              {editQueue.length > 0
-                ? `편집 중 (${editIndex + 1}/${editQueue.length})`
-                : "썸네일 (1:1)"}
-            </Button>
-            <Button
+              <span>
+                {editQueue.length > 0
+                  ? `편집 중 (${editIndex + 1}/${editQueue.length})`
+                  : "썸네일 (1:1)"}
+              </span>
+            </JmButton>
+            <JmButton
               size="sm"
               variant="outline"
               onClick={() => {
@@ -322,10 +363,10 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
               }}
               disabled={uploading || editQueue.length > 0}
             >
-              <Upload className="mr-1.5 h-3.5 w-3.5" />
-              상세 이미지 (자유)
-            </Button>
-            <Button
+              <Upload />
+              <span>상세 이미지 (자유)</span>
+            </JmButton>
+            <JmButton
               size="sm"
               variant="outline"
               onClick={() => {
@@ -334,13 +375,9 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
               }}
               disabled={uploading || picking || editQueue.length > 0}
             >
-              {picking ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Library className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              라이브러리
-            </Button>
+              {picking ? <Loader2 className="animate-spin" /> : <Library />}
+              <span>라이브러리</span>
+            </JmButton>
           </div>
           <input
             ref={fileInputRef}
@@ -354,19 +391,20 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
 
         {/* 구분선 + 안내 */}
         <div className="my-3 flex items-center gap-3">
-          <div className="flex-1 border-t border-border" />
-          <span className="text-[11px] text-muted-foreground">또는</span>
-          <div className="flex-1 border-t border-border" />
+          <div className="flex-1 border-t border-[var(--jm-border)]" />
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">또는</span>
+          <div className="flex-1 border-t border-[var(--jm-border)]" />
         </div>
 
         {/* 하단: URL 입력 (자동 타입 감지) */}
         <div className="flex items-center gap-2">
           {detectedIsYoutube ? (
-            <Film className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Film className="size-4 text-[var(--jm-text-muted)] shrink-0" />
           ) : (
-            <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+            <LinkIcon className="size-4 text-[var(--jm-text-muted)] shrink-0" />
           )}
-          <Input
+          <JmInput
+            size="sm"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={(e) => {
@@ -376,10 +414,10 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
               }
             }}
             placeholder="YouTube URL 또는 이미지 URL 붙여넣기"
-            className="h-9 flex-1"
+            className="flex-1"
             disabled={submitting}
           />
-          <Button
+          <JmButton
             onClick={add}
             disabled={submitting || !urlInput.trim()}
             size="sm"
@@ -387,17 +425,19 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
           >
             {submitting ? (
               <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> 추가 중...
+                <Loader2 className="animate-spin" />
+                <span>추가 중...</span>
               </>
             ) : (
               <>
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> URL 추가
+                <Plus />
+                <span>URL 추가</span>
               </>
             )}
-          </Button>
+          </JmButton>
         </div>
         {urlInput.trim() && (
-          <p className="text-[11px] text-muted-foreground mt-1.5 ml-6">
+          <p className="text-jm-xs text-[var(--jm-text-muted)] mt-1.5 ml-6">
             {detectedIsYoutube
               ? "YouTube 영상으로 추가됩니다"
               : "이미지 URL로 추가됩니다"}
@@ -405,129 +445,175 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
         )}
       </div>
 
-      <div className="border-t border-border" />
+      <div className="border-t border-[var(--jm-border)]" />
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[60px]">대표</TableHead>
-            <TableHead className="w-[80px]">순서</TableHead>
-            <TableHead className="w-[80px]">미리보기</TableHead>
-            <TableHead className="w-[100px]">타입</TableHead>
-            <TableHead className="w-[120px]">종류</TableHead>
-            <TableHead>URL</TableHead>
-            <TableHead>제목</TableHead>
-            <TableHead className="w-[60px] text-right">액션</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <JmTable>
+        <JmTableHeader>
+          <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[60px]">
+              대표
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[80px]">
+              순서
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[80px]">
+              미리보기
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[100px]">
+              타입
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[120px]">
+              종류
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+              URL
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
+              제목
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[60px] text-right">
+              액션
+            </JmTableHead>
+          </JmTableRow>
+        </JmTableHeader>
+        <JmTableBody>
           {loading ? (
             <MediaSkeletonRows />
           ) : items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+            <JmTableRow className="hover:bg-transparent">
+              <JmTableCell
+                colSpan={8}
+                className="text-center py-8 text-[var(--jm-text-muted)]"
+              >
                 등록된 미디어가 없습니다
-              </TableCell>
-            </TableRow>
+              </JmTableCell>
+            </JmTableRow>
           ) : (
             items.map((m, i) => {
               const isPrimary = m.type === "IMAGE" && m.url === imageUrl;
               return (
-              <TableRow key={m.id}>
-                <TableCell>
-                  <Button
-                    size="icon"
-                    variant={isPrimary ? "default" : "ghost"}
-                    className="h-7 w-7"
-                    onClick={() => setPrimary(m)}
-                    disabled={m.type !== "IMAGE" || isPrimary}
-                    aria-label={isPrimary ? "현재 대표 이미지" : "대표 이미지로 설정"}
-                    title={
-                      m.type !== "IMAGE"
-                        ? "이미지만 대표로 설정 가능"
-                        : isPrimary
-                          ? "현재 대표 이미지"
-                          : "대표 이미지로 설정"
-                    }
-                  >
-                    <Star className={`h-3.5 w-3.5 ${isPrimary ? "fill-current" : ""}`} />
-                  </Button>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => move(i, -1)} disabled={i === 0}>
-                      <ArrowUp className="h-3 w-3" />
-                    </Button>
-                    <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => move(i, 1)} disabled={i === items.length - 1}>
-                      <ArrowDown className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewItem(m)}
-                    className="block h-10 w-10 rounded overflow-hidden border border-border hover:ring-2 hover:ring-primary/40 transition-all"
-                    aria-label="미리보기"
-                  >
-                    {m.type === "IMAGE" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={m.url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (() => {
-                      const yid = extractYoutubeId(m.url);
-                      return yid ? (
+                <JmTableRow key={m.id}>
+                  <JmTableCell className="px-3 py-2">
+                    <JmIconButton
+                      size="sm"
+                      variant={isPrimary ? "solid" : "ghost"}
+                      onClick={() => setPrimary(m)}
+                      disabled={m.type !== "IMAGE" || isPrimary}
+                      aria-label={
+                        isPrimary ? "현재 대표 이미지" : "대표 이미지로 설정"
+                      }
+                      title={
+                        m.type !== "IMAGE"
+                          ? "이미지만 대표로 설정 가능"
+                          : isPrimary
+                            ? "현재 대표 이미지"
+                            : "대표 이미지로 설정"
+                      }
+                    >
+                      <Star className={`size-3.5 ${isPrimary ? "fill-current" : ""}`} />
+                    </JmIconButton>
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2">
+                    <div className="flex gap-1">
+                      <JmIconButton
+                        size="sm"
+                        variant="outline"
+                        onClick={() => move(i, -1)}
+                        disabled={i === 0}
+                        aria-label="위로"
+                      >
+                        <ArrowUp />
+                      </JmIconButton>
+                      <JmIconButton
+                        size="sm"
+                        variant="outline"
+                        onClick={() => move(i, 1)}
+                        disabled={i === items.length - 1}
+                        aria-label="아래로"
+                      >
+                        <ArrowDown />
+                      </JmIconButton>
+                    </div>
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewItem(m)}
+                      className="block size-10 rounded overflow-hidden border border-[var(--jm-border)] hover:ring-2 hover:ring-[var(--jm-info-fg)]/40 transition-all"
+                      aria-label="미리보기"
+                    >
+                      {m.type === "IMAGE" ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={`https://img.youtube.com/vi/${yid}/default.jpg`}
+                          src={m.url}
                           alt=""
-                          className="h-full w-full object-cover"
+                          className="size-full object-cover"
                         />
                       ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-muted">
-                          <Film className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      );
-                    })()}
-                  </button>
-                </TableCell>
-                <TableCell>{m.type === "YOUTUBE" ? "YouTube" : "이미지"}</TableCell>
-                <TableCell>
-                  {m.type === "IMAGE" ? (
-                    <select
-                      value={m.kind}
-                      onChange={(e) => updateKind(m.id, e.target.value as MediaKind)}
-                      className="h-7 px-1.5 text-xs rounded border border-border bg-card focus:outline-none focus:ring-1 focus:ring-primary"
+                        (() => {
+                          const yid = extractYoutubeId(m.url);
+                          return yid ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={`https://img.youtube.com/vi/${yid}/default.jpg`}
+                              alt=""
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            <div className="size-full flex items-center justify-center bg-[var(--jm-surface-muted)]">
+                              <Film className="size-4 text-[var(--jm-text-muted)]" />
+                            </div>
+                          );
+                        })()
+                      )}
+                    </button>
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2 text-[var(--jm-text)]">
+                    {m.type === "YOUTUBE" ? "YouTube" : "이미지"}
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2">
+                    {m.type === "IMAGE" ? (
+                      <JmSelect
+                        size="sm"
+                        options={KIND_OPTIONS}
+                        value={m.kind}
+                        onChange={(v) => updateKind(m.id, v as MediaKind)}
+                      />
+                    ) : (
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">—</span>
+                    )}
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2 max-w-[320px] truncate">
+                    <a
+                      href={m.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[var(--jm-info-fg)] hover:underline"
                     >
-                      <option value="THUMBNAIL">썸네일</option>
-                      <option value="DETAIL">상세</option>
-                    </select>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="max-w-[320px] truncate">
-                  <a href={m.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                    {m.url}
-                  </a>
-                </TableCell>
-                <TableCell>{m.title ?? ""}</TableCell>
-                <TableCell className="text-right">
-                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => remove(m.id)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </TableCell>
-              </TableRow>
+                      {m.url}
+                    </a>
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2 text-[var(--jm-text)]">
+                    {m.title ?? ""}
+                  </JmTableCell>
+                  <JmTableCell className="px-3 py-2 text-right">
+                    <JmIconButton
+                      size="sm"
+                      variant="outline"
+                      onClick={() => remove(m.id)}
+                      aria-label="삭제"
+                    >
+                      <Trash2 />
+                    </JmIconButton>
+                  </JmTableCell>
+                </JmTableRow>
               );
             })
           )}
-        </TableBody>
-      </Table>
+        </JmTableBody>
+      </JmTable>
 
-      {/* 업로드 직전 편집 다이얼로그 — kind에 따라 비율 잠금/자유 분기 */}
+      {/* 업로드 직전 편집 다이얼로그 */}
       <ImageEditDialog
         open={currentEditFile !== null}
         file={currentEditFile}
@@ -545,10 +631,17 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
         onClose={() => setPickerOpen(false)}
       />
 
-      {/* 라이트박스 — 클릭 시 큰 미리보기 */}
-      <Dialog open={previewItem !== null} onOpenChange={(o) => { if (!o) setPreviewItem(null); }}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden">
-          <DialogTitle className="sr-only">{previewItem?.title ?? "미디어 미리보기"}</DialogTitle>
+      {/* 라이트박스 */}
+      <JmDialog
+        open={previewItem !== null}
+        onOpenChange={(o) => {
+          if (!o) setPreviewItem(null);
+        }}
+      >
+        <JmDialogContent size="xl" className="p-0 overflow-hidden">
+          <JmDialogTitle className="sr-only">
+            {previewItem?.title ?? "미디어 미리보기"}
+          </JmDialogTitle>
           {previewItem?.type === "IMAGE" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -556,31 +649,33 @@ export function ProductMediaManager({ productId, imageUrl, onImageUrlChange }: P
               alt={previewItem.title ?? ""}
               className="w-full max-h-[85vh] object-contain bg-black"
             />
-          ) : previewItem ? (() => {
-            const yid = extractYoutubeId(previewItem.url);
-            return yid ? (
-              <div className="aspect-video w-full bg-black">
-                <iframe
-                  title={previewItem.title ?? "youtube"}
-                  src={`https://www.youtube.com/embed/${yid}?autoplay=1`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="h-full w-full"
-                />
-              </div>
-            ) : (
-              <div className="p-8 text-center text-muted-foreground text-sm">
-                유효하지 않은 URL 입니다
-              </div>
-            );
-          })() : null}
+          ) : previewItem ? (
+            (() => {
+              const yid = extractYoutubeId(previewItem.url);
+              return yid ? (
+                <div className="aspect-video w-full bg-black">
+                  <iframe
+                    title={previewItem.title ?? "youtube"}
+                    src={`https://www.youtube.com/embed/${yid}?autoplay=1`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="size-full"
+                  />
+                </div>
+              ) : (
+                <div className="p-8 text-center text-[var(--jm-text-muted)] text-jm-sm">
+                  유효하지 않은 URL 입니다
+                </div>
+              );
+            })()
+          ) : null}
           {previewItem?.title && (
-            <div className="px-4 py-3 text-sm border-t border-border">
+            <div className="px-4 py-3 text-jm-sm border-t border-[var(--jm-border)] text-[var(--jm-text)]">
               {previewItem.title}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </JmDialogContent>
+      </JmDialog>
     </div>
   );
 }

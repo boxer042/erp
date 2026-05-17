@@ -103,6 +103,9 @@ export async function POST(request: NextRequest) {
       contactName: isBusiness ? data.contactName || null : null,
       contactPhone: isBusiness ? data.contactPhone || null : null,
       contactPosition: isBusiness ? data.contactPosition || null : null,
+      serialServiceConsent: data.serialServiceConsent ?? false,
+      consentedAt: data.serialServiceConsent ? new Date() : null,
+      consentVersion: data.serialServiceConsent ? "v1.0" : null,
     },
   });
 

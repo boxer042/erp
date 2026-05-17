@@ -136,6 +136,17 @@ interface RepairTicketDetail {
     | null;
   cancelMemo: string | null;
   cancelledAt: string | null;
+  quoteRejectReason:
+    | "TOO_EXPENSIVE"
+    | "NOT_WORTH_IT"
+    | "WILL_SHOP_AROUND"
+    | "CHANGED_MIND"
+    | "PARTS_UNAVAILABLE"
+    | "SHOP_DECLINED"
+    | "OTHER"
+    | null;
+  quoteRejectMemo: string | null;
+  quoteRejectedAt: string | null;
 }
 
 const STATUS_LABEL: Record<RepairStatus, string> = {
@@ -184,6 +195,11 @@ function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
     actions.push({ action: "cancel", label: "취소", variant: "destructive" });
   } else if (status === "QUOTED") {
     actions.push({ action: "approve", label: "고객 승인" });
+    actions.push({
+      action: "reject_after_quote",
+      label: "고객 거절 — 진단비만 청구",
+      variant: "outline",
+    });
     actions.push({ action: "cancel", label: "거절", variant: "destructive" });
   } else if (status === "APPROVED") {
     actions.push({ action: "start", label: "수리 시작" });
@@ -398,6 +414,26 @@ function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
           </div>
         </CardContent>
       )}
+      {/* 거절 정보 — quoteRejectReason 있으면 (READY 직행 or PICKED_UP 후 진단비만 청구된 케이스) */}
+      {ticket.quoteRejectReason && (
+        <CardContent className="border-t pt-3">
+          <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs">
+            <XCircle className="size-3.5 shrink-0 text-amber-600" />
+            <div className="flex flex-col gap-0.5">
+              <span className="font-semibold text-amber-900">거절 · 진단비만 청구</span>
+              <span className="text-amber-800">
+                {quoteRejectReasonLabel(ticket.quoteRejectReason)}
+                {ticket.quoteRejectMemo ? ` — ${ticket.quoteRejectMemo}` : null}
+                {ticket.quoteRejectedAt && (
+                  <span className="ml-2 font-mono text-[10px] opacity-70">
+                    {format(new Date(ticket.quoteRejectedAt), "yyyy-MM-dd HH:mm")}
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -413,6 +449,34 @@ function cancelReasonLabel(reason: string): string {
     OTHER: "기타",
   };
   return map[reason] ?? reason;
+}
+
+// 진단비만 청구 거절 사유 — POS RejectSheet 와 enum 동기화.
+type QuoteRejectReasonValue =
+  | "TOO_EXPENSIVE"
+  | "NOT_WORTH_IT"
+  | "WILL_SHOP_AROUND"
+  | "CHANGED_MIND"
+  | "PARTS_UNAVAILABLE"
+  | "SHOP_DECLINED"
+  | "OTHER";
+
+const QUOTE_REJECT_REASONS: {
+  value: QuoteRejectReasonValue;
+  label: string;
+  group: "customer" | "shop" | "other";
+}[] = [
+  { value: "TOO_EXPENSIVE", label: "가격 부담", group: "customer" },
+  { value: "NOT_WORTH_IT", label: "가성비 문제 (새 제품이 나음)", group: "customer" },
+  { value: "WILL_SHOP_AROUND", label: "다른 매장 비교", group: "customer" },
+  { value: "CHANGED_MIND", label: "단순 변심", group: "customer" },
+  { value: "PARTS_UNAVAILABLE", label: "부속 수급 불가", group: "shop" },
+  { value: "SHOP_DECLINED", label: "매장 포기 (장비·시간·복잡도)", group: "shop" },
+  { value: "OTHER", label: "기타", group: "other" },
+];
+
+function quoteRejectReasonLabel(reason: string): string {
+  return QUOTE_REJECT_REASONS.find((r) => r.value === reason)?.label ?? reason;
 }
 
 // ──────── 증상 / 진단 / 수리메모 ────────
@@ -1112,6 +1176,9 @@ function StatusActionsSection({
 }) {
   const actions = nextActions(ticket.status, ticket.type);
   const [pickupOpen, setPickupOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState<QuoteRejectReasonValue>("TOO_EXPENSIVE");
+  const [rejectMemo, setRejectMemo] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
 
   const transitionMutation = useMutation({
@@ -1129,9 +1196,12 @@ function StatusActionsSection({
         ready: "수리 완료",
         pickup: "픽업/결제 완료",
         cancel: "취소 처리됨",
+        reject_after_quote: "진단비만 청구로 진행합니다",
       };
       toast.success(labels[vars.action] ?? "처리되었습니다");
       setPickupOpen(false);
+      setRejectOpen(false);
+      setRejectMemo("");
       onChanged();
     },
     onError: (err) =>
@@ -1175,6 +1245,10 @@ function StatusActionsSection({
               onClick={() => {
                 if (a.action === "pickup") {
                   setPickupOpen(true);
+                  return;
+                }
+                if (a.action === "reject_after_quote") {
+                  setRejectOpen(true);
                   return;
                 }
                 if (
@@ -1254,6 +1328,102 @@ function StatusActionsSection({
             >
               {transitionMutation.isPending && <Loader2 className="size-4 animate-spin" />}
               결제 완료
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 진단비만 청구 (손님 거절 / 매장 포기) 다이얼로그 */}
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>진단비만 청구</DialogTitle>
+            <DialogDescription>
+              부속/공임 없이 진단비만 청구하고 인계대기로 이동합니다. 픽업/결제 흐름은 그대로.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-2">
+            <div className="rounded-lg bg-muted/50 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">청구 예정 진단비 (VAT 포함)</span>
+                <span className="tabular-nums text-lg font-bold">
+                  ₩{Math.round(Number(ticket.diagnosisFee) * 1.1).toLocaleString("ko-KR")}
+                </span>
+              </div>
+              {Number(ticket.diagnosisFee) === 0 && (
+                <p className="mt-1 text-xs text-amber-700">
+                  ⚠ 진단비가 0 으로 설정되어 있습니다. 위 진단비 카드에서 금액을 먼저 입력하세요.
+                </p>
+              )}
+            </div>
+
+            {(["customer", "shop", "other"] as const).map((g) => (
+              <div key={g} className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {g === "customer" ? "손님 사유" : g === "shop" ? "매장 사유" : "기타"}
+                </span>
+                <div className="flex flex-col gap-1.5">
+                  {QUOTE_REJECT_REASONS.filter((r) => r.group === g).map((r) => {
+                    const active = rejectReason === r.value;
+                    return (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => setRejectReason(r.value)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-md border-2 px-3 py-2 text-left text-sm transition-colors",
+                          active
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-border-strong",
+                        )}
+                      >
+                        <span className="font-medium">{r.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                메모 {rejectReason === "OTHER" && <span className="text-destructive">(필수)</span>}
+              </span>
+              <Textarea
+                value={rejectMemo}
+                onChange={(e) => setRejectMemo(e.target.value)}
+                placeholder="추가 설명 (선택)"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRejectOpen(false)}
+              disabled={transitionMutation.isPending}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={() =>
+                transitionMutation.mutate({
+                  action: "reject_after_quote",
+                  payload: {
+                    quoteRejectReason: rejectReason,
+                    quoteRejectMemo: rejectMemo,
+                  },
+                })
+              }
+              disabled={
+                transitionMutation.isPending ||
+                (rejectReason === "OTHER" && !rejectMemo.trim())
+              }
+            >
+              {transitionMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              진단비 청구로 진행
             </Button>
           </DialogFooter>
         </DialogContent>

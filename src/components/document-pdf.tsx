@@ -40,6 +40,8 @@ export interface DocumentPdfItem {
 
 interface DocumentPdfProps {
   title: string;
+  /** 문서 종류 — "statement"(거래명세표)면 하단에 시리얼 조회 안내 노출 */
+  docKind?: "quotation" | "statement";
   documentNo: string;
   issueDate: string;
   validUntil?: string | null;
@@ -588,6 +590,14 @@ function PdfContent(props: DocumentPdfProps) {
               <Text style={{ fontSize: 10 }}>비고: {props.memo}</Text>
             ) : null}
           </View>
+        ) : null}
+
+        {/* 거래명세표 — 시리얼 조회 안내 */}
+        {props.docKind === "statement" ? (
+          <Text style={{ marginTop: 10, fontSize: 8, color: "#666" }}>
+            제품에 부착된 시리얼 라벨의 QR 코드로 본인 인증 후 보증·수리·구매
+            내역을 직접 조회할 수 있습니다.
+          </Text>
         ) : null}
       </Page>
     </Document>

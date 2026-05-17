@@ -1,23 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
-import { Loader2, Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { ApiError, apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
@@ -25,6 +13,17 @@ import {
   syncChannelPricings,
   type ChannelPriceState,
 } from "@/lib/product-mutations";
+import {
+  JmBadge,
+  JmButton,
+  JmCheckbox,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerDescription,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmInput,
+} from "@/jm";
 import { summarizeCosts, toVatPrice } from "../helpers";
 import type { ProductDetail } from "../types";
 import { ProductCostsEditSheet } from "./product-costs-edit-sheet";
@@ -41,18 +40,19 @@ interface ProductChannelPricingEditSheetProps {
   product: ProductDetail;
 }
 
-export function ProductChannelPricingEditSheet(props: ProductChannelPricingEditSheetProps) {
+export function ProductChannelPricingEditSheet(
+  props: ProductChannelPricingEditSheetProps,
+) {
   return (
-    <Sheet open={props.open} onOpenChange={props.onOpenChange}>
+    <JmDrawer open={props.open} onOpenChange={props.onOpenChange}>
       {props.open && <ProductChannelPricingEditSheetContent {...props} />}
-    </Sheet>
+    </JmDrawer>
   );
 }
 
 interface RowState {
   channelId: string;
   enabled: boolean;
-  /** UI 입력값 — VAT 포함 금액 (세전 → VAT 포함은 toVatPrice 로 변환) */
   vatPrice: string;
 }
 
@@ -70,7 +70,6 @@ function ProductChannelPricingEditSheetContent({
   const taxRate = parseFloat(product.taxRate ?? "0.1");
   const isTaxable = product.taxType !== "TAX_FREE";
 
-  // 초기값: 기존 channelPricings 에서 enabled/price 매핑
   const [rows, setRows] = useState<Map<string, RowState>>(() => {
     const map = new Map<string, RowState>();
     for (const cp of product.channelPricings ?? []) {
@@ -97,7 +96,6 @@ function ProductChannelPricingEditSheetContent({
 
   const channels = channelsQuery.data ?? [];
 
-  // 채널별 기존 비용 미리 계산 (요약 표시용)
   const costsByChannel = new Map<string, typeof product.sellingCosts>();
   for (const c of product.sellingCosts ?? []) {
     if (!c.channelId) continue;
@@ -110,7 +108,6 @@ function ProductChannelPricingEditSheetContent({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // VAT 포함 → 세전 변환
       const next: ChannelPriceState[] = [];
       for (const ch of channels) {
         const r = rows.get(ch.id);
@@ -140,23 +137,32 @@ function ProductChannelPricingEditSheetContent({
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
     },
     onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : err.message || "저장에 실패했습니다"),
+      toast.error(
+        err instanceof ApiError ? err.message : err.message || "저장에 실패했습니다",
+      ),
   });
 
   return (
     <>
-      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-        <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-          <SheetTitle>채널별 가격 편집</SheetTitle>
-          <SheetDescription className="text-xs">
-            채널을 활성화하고 판매가(VAT 포함 금액)를 입력합니다. 저장 시 DB에는 세전(공급가액)으로 환산되어 저장됩니다. 채널 전용 비용은 행의 &ldquo;채널 비용 편집&rdquo; 버튼.
-          </SheetDescription>
-        </SheetHeader>
+      <JmDrawerContent
+        side="bottom"
+        size="xl"
+        className="flex flex-col p-0"
+        dragHandle={false}
+      >
+        <JmDrawerHeader className="border-b border-[var(--jm-border)] px-5 py-4 flex-shrink-0">
+          <JmDrawerTitle>채널별 가격 편집</JmDrawerTitle>
+          <JmDrawerDescription className="text-jm-xs">
+            채널을 활성화하고 판매가(VAT 포함 금액)를 입력합니다. 저장 시 DB에는
+            세전(공급가액)으로 환산되어 저장됩니다. 채널 전용 비용은 행의 &ldquo;채널 비용
+            편집&rdquo; 버튼.
+          </JmDrawerDescription>
+        </JmDrawerHeader>
 
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
             {channels.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">
+              <p className="text-jm-sm text-[var(--jm-text-muted)] py-6 text-center">
                 등록된 판매채널이 없습니다
               </p>
             ) : (
@@ -170,40 +176,47 @@ function ProductChannelPricingEditSheetContent({
                 return (
                   <div
                     key={ch.id}
-                    className="rounded-md border border-border p-3 space-y-2"
+                    className="rounded-md border border-[var(--jm-border)] p-3 space-y-2"
                   >
                     <div className="flex items-center gap-3">
-                      <Checkbox
+                      <JmCheckbox
                         checked={row.enabled}
                         onCheckedChange={(v) => setRow(ch.id, { enabled: !!v })}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm">{ch.name}</span>
-                          <Badge variant="outline" className="text-[10px]">
+                          <span className="font-medium text-jm-sm text-[var(--jm-text)]">
+                            {ch.name}
+                          </span>
+                          <JmBadge
+                            variant="outline"
+                            size="sm"
+                            shape="square"
+                            className="text-jm-2xs"
+                          >
                             {ch.code}
-                          </Badge>
+                          </JmBadge>
                         </div>
                       </div>
-                      <Button
+                      <JmButton
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-7 text-[12px]"
                         onClick={() => setCostsEditChannelId(ch.id)}
                       >
-                        <Pencil className="h-3 w-3 mr-1" />
-                        채널 비용 편집
-                      </Button>
+                        <Pencil />
+                        <span>채널 비용 편집</span>
+                      </JmButton>
                     </div>
                     {row.enabled && (
                       <div className="pl-7 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-muted-foreground w-28">
+                          <span className="text-jm-2xs text-[var(--jm-text-muted)] w-28">
                             판매가 (VAT 포함)
                           </span>
-                          <span className="text-sm">₩</span>
-                          <Input
+                          <span className="text-jm-sm text-[var(--jm-text)]">₩</span>
+                          <JmInput
+                            size="sm"
                             type="text"
                             inputMode="numeric"
                             value={formatComma(row.vatPrice)}
@@ -211,10 +224,10 @@ function ProductChannelPricingEditSheetContent({
                               setRow(ch.id, { vatPrice: parseComma(e.target.value) })
                             }
                             onFocus={focusCaretEnd}
-                            className="h-9 w-40"
+                            className="w-40"
                           />
                         </div>
-                        <div className="text-[11px] text-muted-foreground pl-30">
+                        <div className="text-jm-2xs text-[var(--jm-text-muted)] pl-30">
                           채널 전용 비용 요약: {summarizeCosts(chCosts)}
                         </div>
                       </div>
@@ -225,28 +238,28 @@ function ProductChannelPricingEditSheetContent({
             )}
           </div>
 
-          <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background flex-shrink-0">
-            <Button
+          <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)] flex-shrink-0">
+            <JmButton
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={saveMutation.isPending}
             >
               취소
-            </Button>
-            <Button
+            </JmButton>
+            <JmButton
               type="button"
+              variant="cta"
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
             >
-              {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              저장
-            </Button>
+              {saveMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              <span>저장</span>
+            </JmButton>
           </div>
         </div>
-      </SheetContent>
+      </JmDrawerContent>
 
-      {/* 채널 전용 비용 편집 Sheet */}
       <ProductCostsEditSheet
         open={costsEditChannelId !== null}
         onOpenChange={(o) => {

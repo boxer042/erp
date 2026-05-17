@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { JmButton } from "@/jm";
 import { fmtNumber } from "./helpers";
 import { ProductSection } from "./product-section";
 import type { ProductDetail } from "./types";
@@ -19,15 +19,22 @@ export function ProductInventoryCard({ product }: ProductInventoryCardProps) {
       title="재고"
       actions={
         <Link href={`/inventory/stocktake?productId=${product.id}`}>
-          <Button size="sm" variant="outline" className="h-8">
+          <JmButton size="sm" variant="outline">
             실사보정
-          </Button>
+          </JmButton>
         </Link>
       }
     >
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-3">
-        <Stat label="현재 수량" value={`${fmtNumber(qty)} ${product.unitOfMeasure}`} tone={isLow ? "bad" : "neutral"} />
-        <Stat label="안전재고" value={safety > 0 ? `${fmtNumber(safety)} ${product.unitOfMeasure}` : "—"} />
+        <Stat
+          label="현재 수량"
+          value={`${fmtNumber(qty)} ${product.unitOfMeasure}`}
+          tone={isLow ? "bad" : "neutral"}
+        />
+        <Stat
+          label="안전재고"
+          value={safety > 0 ? `${fmtNumber(safety)} ${product.unitOfMeasure}` : "—"}
+        />
         {inv?.avgCost ? (
           <Stat
             label="평균원가 (참고)"
@@ -56,15 +63,19 @@ function Stat({
 }) {
   return (
     <div className="space-y-0.5">
-      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+      <div className="text-jm-2xs font-medium text-[var(--jm-text-muted)]">{label}</div>
       <div
-        className={`text-base font-semibold tabular-nums ${
-          tone === "bad" ? "text-destructive" : tone === "good" ? "text-green-600" : ""
+        className={`text-jm-base font-semibold tabular-nums ${
+          tone === "bad"
+            ? "text-[var(--jm-danger-fg)]"
+            : tone === "good"
+              ? "text-[var(--jm-success-fg)]"
+              : "text-[var(--jm-text)]"
         }`}
       >
         {value}
       </div>
-      {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
+      {sub && <div className="text-jm-2xs text-[var(--jm-text-muted)]">{sub}</div>}
     </div>
   );
 }

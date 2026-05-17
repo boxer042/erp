@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Layout, Loader2 } from "lucide-react";
+import { Archive, Layout, Loader2, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -217,6 +217,14 @@ export default function ProductDetailPage() {
                   onClick={() => router.push(`/products/${product.id}/landing`)}
                 >
                   <Layout className="h-3.5 w-3.5 mr-1.5" />상세페이지
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => router.push(`/products/${product.id}/manual`)}
+                >
+                  <BookOpen className="h-3.5 w-3.5 mr-1.5" />사용설명서
                 </Button>
                 <Button
                   size="sm"

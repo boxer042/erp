@@ -45,6 +45,17 @@ export interface RepairTicketRow {
     | null;
   cancelMemo: string | null;
   cancelledAt: string | null;
+  // 거절 정보 — quoteRejectedAt 있으면 진단비만 청구된 케이스
+  quoteRejectReason:
+    | "TOO_EXPENSIVE"
+    | "NOT_WORTH_IT"
+    | "WILL_SHOP_AROUND"
+    | "CHANGED_MIND"
+    | "PARTS_UNAVAILABLE"
+    | "SHOP_DECLINED"
+    | "OTHER"
+    | null;
+  quoteRejectedAt: string | null;
   _count: { parts: number; labors: number };
 }
 
@@ -96,6 +107,17 @@ export interface RepairTicketDetail {
     | null;
   cancelMemo: string | null;
   cancelledAt: string | null;
+  quoteRejectReason:
+    | "TOO_EXPENSIVE"
+    | "NOT_WORTH_IT"
+    | "WILL_SHOP_AROUND"
+    | "CHANGED_MIND"
+    | "PARTS_UNAVAILABLE"
+    | "SHOP_DECLINED"
+    | "OTHER"
+    | null;
+  quoteRejectMemo: string | null;
+  quoteRejectedAt: string | null;
   repairWarrantyMonths: number | null;
   repairWarrantyEnds: string | null;
   customer: { id: string; name: string; phone: string | null } | null;

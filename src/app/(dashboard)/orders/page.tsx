@@ -729,8 +729,7 @@ export default function OrdersBoardPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
-            <JmTable className="min-w-[1320px]">
+          <JmTable className="min-w-[1320px]">
               <JmTableHeader>
                 <JmTableRow>
                   <JmTableHead className="w-[140px] sticky left-0 z-[2] bg-[var(--jm-surface-muted)] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] sm:static sm:shadow-none">주문번호</JmTableHead>
@@ -1056,7 +1055,6 @@ export default function OrdersBoardPage() {
                 )}
               </JmTableBody>
             </JmTable>
-          </div>
         </JmCard>
       </div>
 

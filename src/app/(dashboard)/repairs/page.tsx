@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Phone, User, Wrench, MapPin } from "lucide-react";
+import { HelpCircle, Phone, User, Wrench, MapPin } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
@@ -252,6 +252,15 @@ export default function RepairsPage() {
                 ))}
               </select>
             )}
+            <button
+              type="button"
+              onClick={() => router.push("/repairs/help")}
+              className="ml-auto inline-flex h-[30px] items-center gap-1 rounded-md border border-border bg-card px-2 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+              title="수리 시스템 가이드"
+            >
+              <HelpCircle className="size-3.5" />
+              도움말
+            </button>
           </div>
         }
       />

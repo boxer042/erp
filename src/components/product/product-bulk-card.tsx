@@ -1,25 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { focusCaretEnd } from "@/jm/lib/focus";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { ApiError, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import {
+  JmBadge,
+  JmButton,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmInput,
+} from "@/jm";
 
 import { ProductSection } from "./product-section";
 import type { ProductDetail } from "./types";
@@ -27,7 +27,13 @@ import type { ProductDetail } from "./types";
 interface ProductBulkCardProps {
   product: Pick<
     ProductDetail,
-    "id" | "name" | "isBulk" | "containerSize" | "unitOfMeasure" | "sellingPrice" | "bulkProduct"
+    | "id"
+    | "name"
+    | "isBulk"
+    | "containerSize"
+    | "unitOfMeasure"
+    | "sellingPrice"
+    | "bulkProduct"
   >;
 }
 
@@ -67,10 +73,9 @@ export function ProductBulkCard({ product }: ProductBulkCardProps) {
         }
         actions={
           !product.isBulk && !product.bulkProduct ? (
-            <Button
+            <JmButton
               size="sm"
               variant="outline"
-              className="h-8"
               onClick={() => {
                 setForm({
                   name: `${product.name} (벌크)`,
@@ -80,18 +85,20 @@ export function ProductBulkCard({ product }: ProductBulkCardProps) {
                 setOpen(true);
               }}
             >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              벌크 SKU 생성
-            </Button>
+              <Plus />
+              <span>벌크 SKU 생성</span>
+            </JmButton>
           ) : null
         }
       >
-        <div className="space-y-2 text-sm px-3 py-2">
+        <div className="space-y-2 text-jm-sm px-3 py-2">
           {product.isBulk && (
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="secondary">벌크 원료</Badge>
+              <JmBadge variant="default" size="sm" shape="square">
+                벌크 원료
+              </JmBadge>
               {product.containerSize && (
-                <span className="text-muted-foreground">
+                <span className="text-[var(--jm-text-muted)]">
                   · 용량 {product.containerSize} {product.unitOfMeasure}
                 </span>
               )}
@@ -99,82 +106,111 @@ export function ProductBulkCard({ product }: ProductBulkCardProps) {
           )}
           {product.bulkProduct && (
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline">소분 원료 연결</Badge>
+              <JmBadge variant="outline" size="sm" shape="square">
+                소분 원료 연결
+              </JmBadge>
               <Link
                 href={`/products/${product.bulkProduct.id}`}
-                className="font-medium hover:underline"
+                className="font-medium hover:underline text-[var(--jm-text)]"
               >
                 {product.bulkProduct.name}
               </Link>
-              <Badge variant="outline" className="text-[10px]">{product.bulkProduct.sku}</Badge>
+              <JmBadge
+                variant="outline"
+                size="sm"
+                shape="square"
+                className="text-jm-2xs"
+              >
+                {product.bulkProduct.sku}
+              </JmBadge>
               {product.containerSize && (
-                <span className="text-muted-foreground">
-                  · 1{product.unitOfMeasure} = {product.containerSize} {product.bulkProduct.unitOfMeasure}
+                <span className="text-[var(--jm-text-muted)]">
+                  · 1{product.unitOfMeasure} = {product.containerSize}{" "}
+                  {product.bulkProduct.unitOfMeasure}
                 </span>
               )}
             </div>
           )}
           {!product.isBulk && !product.bulkProduct && (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-[var(--jm-text-muted)] text-jm-xs">
               아직 연결된 벌크 SKU가 없습니다.
             </p>
           )}
         </div>
       </ProductSection>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>벌크 SKU 생성</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground">
-              병·통 단위 상품을 mL/g 같은 소량 단위로 분할 사용할 수 있도록 별도 SKU를 만듭니다. 분할 소모 시 자동으로 병이 따져 벌크 재고가 채워집니다.
-            </p>
-            <div className="space-y-2">
-              <Label>벌크 상품명</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                placeholder={`예: ${product.name} (벌크)`}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>벌크 단위</Label>
-                <Input
-                  value={form.unitOfMeasure}
-                  onChange={(e) => setForm((p) => ({ ...p, unitOfMeasure: e.target.value }))}
-                  placeholder="mL"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>
-                  1{product.unitOfMeasure} = ? {form.unitOfMeasure || "단위"}
-                </Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={form.containerSize}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, containerSize: e.target.value.replace(/[^\d.]/g, "") }))
-                  }
-                  onFocus={focusCaretEnd}
-                  placeholder="4000"
-                />
-              </div>
-            </div>
-            {previewPrice > 0 && (
-              <p className="text-xs text-muted-foreground">
-                벌크 판매가: ₩{previewPrice.toFixed(4)} / {form.unitOfMeasure || "단위"} (병 가격 ÷ 용량 자동 환산)
+      <JmDialog open={open} onOpenChange={setOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>벌크 SKU 생성</JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody>
+            <div className="space-y-4">
+              <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                병·통 단위 상품을 mL/g 같은 소량 단위로 분할 사용할 수 있도록 별도 SKU를
+                만듭니다. 분할 소모 시 자동으로 병이 따져 벌크 재고가 채워집니다.
               </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+              <div className="space-y-2">
+                <label className="text-jm-xs text-[var(--jm-text-muted)]">
+                  벌크 상품명
+                </label>
+                <JmInput
+                  size="sm"
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  onFocus={focusCaretEnd}
+                  placeholder={`예: ${product.name} (벌크)`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-jm-xs text-[var(--jm-text-muted)]">
+                    벌크 단위
+                  </label>
+                  <JmInput
+                    size="sm"
+                    value={form.unitOfMeasure}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, unitOfMeasure: e.target.value }))
+                    }
+                    onFocus={focusCaretEnd}
+                    placeholder="mL"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-jm-xs text-[var(--jm-text-muted)]">
+                    1{product.unitOfMeasure} = ? {form.unitOfMeasure || "단위"}
+                  </label>
+                  <JmInput
+                    size="sm"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.containerSize}
+                    onChange={(e) =>
+                      setForm((p) => ({
+                        ...p,
+                        containerSize: e.target.value.replace(/[^\d.]/g, ""),
+                      }))
+                    }
+                    onFocus={focusCaretEnd}
+                    placeholder="4000"
+                  />
+                </div>
+              </div>
+              {previewPrice > 0 && (
+                <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                  벌크 판매가: ₩{previewPrice.toFixed(4)} / {form.unitOfMeasure || "단위"} (병
+                  가격 ÷ 용량 자동 환산)
+                </p>
+              )}
+            </div>
+          </JmDialogBody>
+          <JmDialogFooter>
+            <JmButton variant="ghost" onClick={() => setOpen(false)}>
               취소
-            </Button>
-            <Button
+            </JmButton>
+            <JmButton
+              variant="cta"
               onClick={() => createBulkMutation.mutate()}
               disabled={
                 createBulkMutation.isPending ||
@@ -184,12 +220,12 @@ export function ProductBulkCard({ product }: ProductBulkCardProps) {
                 parseFloat(form.containerSize) <= 0
               }
             >
-              {createBulkMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              생성
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              {createBulkMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              <span>생성</span>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </>
   );
 }

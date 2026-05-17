@@ -297,8 +297,7 @@ export default function CustomersPage() {
               </JmTableToolbarActions>
             </JmTableToolbar>
 
-            <div className="overflow-x-auto">
-              <JmTable className="min-w-[1100px]">
+            <JmTable className="min-w-[1100px]">
                 <JmTableHeader>
                   <JmTableRow>
                     <JmTableHead className="w-[88px]">구분</JmTableHead>
@@ -442,7 +441,6 @@ export default function CustomersPage() {
                   )}
                 </JmTableBody>
                 </JmTable>
-              </div>
             </JmCard>
           </div>
 

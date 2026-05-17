@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { Skeleton } from "@/components/ui/skeleton";
+import { JmButton, JmSkeleton } from "@/jm";
 import { LandingPageView } from "@/components/landing/landing-page-view";
 import { SingleHtmlPreview } from "@/components/landing/single-html-preview";
 import type { LandingBlock } from "@/lib/validators/landing-block";
@@ -70,15 +70,16 @@ export function ProductDetailView({ productId }: Props) {
   if (landingQuery.isError) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6">
-        <p className="text-sm text-muted-foreground">상세페이지를 불러올 수 없습니다</p>
-        <button
+        <p className="text-jm-sm text-[var(--jm-text-muted)]">상세페이지를 불러올 수 없습니다</p>
+        <JmButton
           type="button"
+          variant="cta"
+          size="sm"
           onClick={() => landingQuery.refetch()}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--jm-action)] px-4 text-[13px] font-semibold text-white"
         >
-          <Loader2 className="h-3.5 w-3.5" />
-          다시 시도
-        </button>
+          <Loader2 />
+          <span>다시 시도</span>
+        </JmButton>
       </div>
     );
   }
@@ -89,7 +90,7 @@ export function ProductDetailView({ productId }: Props) {
         <SingleHtmlPreview src={resolveHtmlSrc(landingQuery.data.singleHtmlUrl)} />
       </div>
     ) : (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-jm-sm text-[var(--jm-text-muted)]">
         HTML 파일이 등록되지 않았습니다
       </div>
     );
@@ -109,17 +110,17 @@ export function ProductDetailView({ productId }: Props) {
 function PreviewSkeleton() {
   return (
     <div className="space-y-4 p-4">
-      <Skeleton className="h-[300px] w-full rounded-md" />
+      <JmSkeleton className="h-[300px] w-full rounded-md" />
       <div className="space-y-2 px-2">
-        <Skeleton className="h-6 w-2/3" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-5/6" />
+        <JmSkeleton className="h-6 w-2/3" />
+        <JmSkeleton className="h-4 w-full" />
+        <JmSkeleton className="h-4 w-5/6" />
       </div>
-      <Skeleton className="h-[400px] w-full rounded-md" />
+      <JmSkeleton className="h-[400px] w-full rounded-md" />
       <div className="grid grid-cols-3 gap-2">
-        <Skeleton className="aspect-square w-full rounded-md" />
-        <Skeleton className="aspect-square w-full rounded-md" />
-        <Skeleton className="aspect-square w-full rounded-md" />
+        <JmSkeleton className="aspect-square w-full rounded-md" />
+        <JmSkeleton className="aspect-square w-full rounded-md" />
+        <JmSkeleton className="aspect-square w-full rounded-md" />
       </div>
     </div>
   );

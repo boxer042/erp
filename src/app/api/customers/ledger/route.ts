@@ -133,5 +133,27 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  return NextResponse.json({ entries, refunds, customerSummaries });
+  // RECEIPT entry 에 수금 종류(kind) 부착 — referenceId 로 CustomerPayment batch 조회
+  const paymentRefIds = entries
+    .filter(
+      (e) =>
+        e.type === "RECEIPT" &&
+        e.referenceType === "CUSTOMER_PAYMENT" &&
+        e.referenceId,
+    )
+    .map((e) => e.referenceId as string);
+  const paymentKindMap = new Map<string, string>();
+  if (paymentRefIds.length > 0) {
+    const payments = await prisma.customerPayment.findMany({
+      where: { id: { in: paymentRefIds } },
+      select: { id: true, kind: true },
+    });
+    for (const p of payments) paymentKindMap.set(p.id, p.kind);
+  }
+  const entriesWithKind = entries.map((e) => ({
+    ...e,
+    paymentKind: e.referenceId ? (paymentKindMap.get(e.referenceId) ?? null) : null,
+  }));
+
+  return NextResponse.json({ entries: entriesWithKind, refunds, customerSummaries });
 }

@@ -3,13 +3,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
-import { Eraser, Loader2, RotateCcw, RotateCw, Sparkles, Sun, Undo2, ZoomIn } from "lucide-react";
+import {
+  Eraser,
+  Loader2,
+  RotateCcw,
+  RotateCw,
+  Sparkles,
+  Sun,
+  Undo2,
+  ZoomIn,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+
+import {
+  JmButton,
+  JmDialog,
+  JmDialogContent,
+  JmDialogTitle,
+} from "@/jm";
 
 // 출력 이미지의 긴 변 길이 (1024px 고정).
-// 비율에 따라 W/H가 결정됨: aspect>=1이면 W=LONG, H=LONG/aspect; aspect<1이면 H=LONG, W=LONG*aspect
 const LONG_SIDE = 1024;
 
 function computeOutputSize(aspect: number) {
@@ -53,7 +66,14 @@ interface Props {
 
 type PreviewSource = "bg-removal" | "manual";
 
-export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect = 1, lockAspect = false }: Props) {
+export function ImageEditDialog({
+  open,
+  file,
+  onConfirm,
+  onCancel,
+  defaultAspect = 1,
+  lockAspect = false,
+}: Props) {
   // Phase 1 (cropper) state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -99,7 +119,6 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
     return () => URL.revokeObjectURL(url);
   }, [file, defaultAspect]);
 
-  // previewUrl 메모리 정리
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -110,12 +129,10 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
     setCroppedAreaPixels(areaPixels);
   }, []);
 
-  // 미리보기 이미지를 캔버스에 다시 렌더 (지우기 초기화 / 진입 시)
   const renderPreviewToCanvas = useCallback(async () => {
     if (!canvasRef.current || !previewUrl) return;
     const img = await loadImage(previewUrl);
     const canvas = canvasRef.current;
-    // 미리보기 진입 시점의 이미지 크기를 그대로 사용 (aspect는 진입 시 고정됨)
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
     const ctx = canvas.getContext("2d");
@@ -179,7 +196,6 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
     setPreviewUrl(null);
   };
 
-  // ── 지우개 드로잉 ─────────────────────────────────
   const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
@@ -197,7 +213,6 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
     canvas.setPointerCapture(e.pointerId);
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    // 되돌리기 스택에 현재 상태 저장
     undoStackRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     if (undoStackRef.current.length > 50) undoStackRef.current.shift();
     setCanUndo(true);
@@ -251,7 +266,6 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
   const handleConfirm = async () => {
     if (!file || busy) return;
 
-    // 미리보기/지우개 단계에서 확정 → 캔버스 결과를 PNG로 출력
     if (isPreview && canvasRef.current) {
       setUploading(true);
       try {
@@ -272,7 +286,6 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
       return;
     }
 
-    // 단순 크롭만 적용해 확정
     if (!imageSrc || !croppedAreaPixels) return;
     setUploading(true);
     try {
@@ -296,18 +309,26 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
 
   const fileLabel = file ? file.name : "";
 
-  // 표시용 브러시 지름(CSS px) — 캔버스 표시 크기에 비례
   const liveCanvas = canvasRef.current;
   const brushDiamCss = liveCanvas
     ? brushSize * (liveCanvas.getBoundingClientRect().width / liveCanvas.width || 0)
     : brushSize;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o && !busy) onCancel(); }}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden sm:max-w-2xl" showCloseButton={false}>
-        <DialogTitle className="px-4 py-3 border-b border-border truncate">
+    <JmDialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o && !busy) onCancel();
+      }}
+    >
+      <JmDialogContent
+        size="xl"
+        className="p-0 gap-0 overflow-hidden"
+        showCloseButton={false}
+      >
+        <JmDialogTitle className="px-4 py-3 border-b border-[var(--jm-border)] truncate text-jm-base">
           {fileLabel ? `이미지 편집 — ${fileLabel}` : "이미지 편집"}
-        </DialogTitle>
+        </JmDialogTitle>
 
         <div
           className="relative bg-black select-none mx-auto"
@@ -331,7 +352,7 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
               />
               {hoverPos && brushDiamCss > 0 && (
                 <div
-                  className="pointer-events-none absolute rounded-full border-2 border-primary/80 bg-primary/10"
+                  className="pointer-events-none absolute rounded-full border-2 border-[var(--jm-info-fg)]/80 bg-[var(--jm-info-bg)]/40"
                   style={{
                     left: hoverPos.x - brushDiamCss / 2,
                     top: hoverPos.y - brushDiamCss / 2,
@@ -341,13 +362,13 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
                 />
               )}
               {previewSource === "bg-removal" && (
-                <div className="absolute top-2 right-2 rounded-md bg-primary/90 px-2 py-1 text-[11px] text-primary-foreground">
-                  <Sparkles className="inline h-3 w-3 mr-1" />
+                <div className="absolute top-2 right-2 rounded-md bg-[var(--jm-info-fg)]/90 px-2 py-1 text-jm-xs text-white">
+                  <Sparkles className="inline size-3 mr-1" />
                   배경 제거 적용됨
                 </div>
               )}
-              <div className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[11px] text-white">
-                <Eraser className="inline h-3 w-3 mr-1" />
+              <div className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-jm-xs text-white">
+                <Eraser className="inline size-3 mr-1" />
                 드래그로 지우기
               </div>
             </div>
@@ -373,20 +394,22 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
           {bgProcessing && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white">
               <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <p className="text-sm">배경 분석 중...</p>
-                <p className="text-[11px] text-white/70">첫 회는 모델 다운로드로 ~10초 소요</p>
+                <Loader2 className="size-8 animate-spin" />
+                <p className="text-jm-sm">배경 분석 중...</p>
+                <p className="text-jm-xs text-white/70">
+                  첫 회는 모델 다운로드로 ~10초 소요
+                </p>
               </div>
             </div>
           )}
         </div>
 
-        <div className="px-4 py-3 space-y-3 border-t border-border">
+        <div className="px-4 py-3 space-y-3 border-t border-[var(--jm-border)]">
           {isPreview ? (
             <>
               <div className="flex items-center gap-3">
-                <Eraser className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground w-10">굵기</span>
+                <Eraser className="size-4 text-[var(--jm-text-muted)]" />
+                <span className="text-jm-xs text-[var(--jm-text-muted)] w-10">굵기</span>
                 <input
                   type="range"
                   min={10}
@@ -394,50 +417,55 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
                   step={1}
                   value={brushSize}
                   onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                  className="flex-1 accent-primary"
+                  className="flex-1 accent-[var(--jm-info-fg)]"
                   disabled={busy}
                   aria-label="지우개 굵기"
                 />
-                <span className="text-xs tabular-nums w-12 text-right">{brushSize}px</span>
+                <span className="text-jm-xs tabular-nums w-12 text-right text-[var(--jm-text)]">
+                  {brushSize}px
+                </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <Button
+                <JmButton
                   variant="outline"
                   size="sm"
                   onClick={handleUndo}
                   disabled={busy || !canUndo}
                 >
-                  <Undo2 className="h-4 w-4 mr-1" /> 되돌리기
-                </Button>
-                <Button
+                  <Undo2 />
+                  <span>되돌리기</span>
+                </JmButton>
+                <JmButton
                   variant="outline"
                   size="sm"
                   onClick={handleResetErase}
                   disabled={busy}
                 >
-                  <RotateCcw className="h-4 w-4 mr-1" /> 지우기 초기화
-                </Button>
-                <Button
+                  <RotateCcw />
+                  <span>지우기 초기화</span>
+                </JmButton>
+                <JmButton
                   variant="outline"
                   size="sm"
                   onClick={handleRevertPreview}
                   disabled={busy}
                 >
                   처음부터 다시
-                </Button>
+                </JmButton>
               </div>
             </>
           ) : (
             <>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground w-10">비율</span>
+                <span className="text-jm-xs text-[var(--jm-text-muted)] w-10">비율</span>
                 {lockAspect ? (
-                  <div className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                  <div className="text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] rounded px-2 py-1">
                     {ASPECT_PRESETS.find((p) => Math.abs(aspect - p.value) < 0.001)?.label
-                      ?? aspect.toFixed(2)} 고정 (사용처 통일성 유지)
+                      ?? aspect.toFixed(2)}{" "}
+                    고정 (사용처 통일성 유지)
                   </div>
                 ) : (
-                  <div className="flex h-7 rounded-md border border-border overflow-hidden text-[12px]">
+                  <div className="flex h-7 rounded-md border border-[var(--jm-border)] overflow-hidden text-jm-xs">
                     {ASPECT_PRESETS.map((p) => (
                       <button
                         key={p.label}
@@ -450,8 +478,8 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
                         disabled={busy}
                         className={`px-2.5 transition-colors ${
                           Math.abs(aspect - p.value) < 0.001
-                            ? "bg-secondary text-foreground"
-                            : "text-muted-foreground hover:bg-muted/50"
+                            ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+                            : "text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]/50"
                         }`}
                       >
                         {p.label}
@@ -459,22 +487,23 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
                     ))}
                   </div>
                 )}
-                <span className="text-[10px] text-muted-foreground tabular-nums ml-auto">
+                <span className="text-jm-2xs text-[var(--jm-text-muted)] tabular-nums ml-auto">
                   {output.width} × {output.height}
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
-                <Button
+                <JmButton
                   variant="outline"
                   size="sm"
                   onClick={() => setRotation((r) => (r + 90) % 360)}
                   disabled={busy}
                 >
-                  <RotateCw className="h-4 w-4 mr-1" /> 90° 회전
-                </Button>
-                <ZoomIn className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground w-10">크기</span>
+                  <RotateCw />
+                  <span>90° 회전</span>
+                </JmButton>
+                <ZoomIn className="size-4 text-[var(--jm-text-muted)]" />
+                <span className="text-jm-xs text-[var(--jm-text-muted)] w-10">크기</span>
                 <input
                   type="range"
                   min={0.5}
@@ -482,26 +511,27 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
                   step={0.01}
                   value={zoom}
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="flex-1 accent-primary"
+                  className="flex-1 accent-[var(--jm-info-fg)]"
                   disabled={busy}
                   aria-label="확대/축소"
                 />
-                <Button
+                <JmButton
                   variant="ghost"
                   size="sm"
                   onClick={() => setZoom(1)}
                   disabled={busy}
-                  className="h-7 px-2 text-xs"
                   title="100%로 복원"
                 >
                   1:1
-                </Button>
-                <span className="text-xs tabular-nums w-12 text-right">{zoom.toFixed(2)}x</span>
+                </JmButton>
+                <span className="text-jm-xs tabular-nums w-12 text-right text-[var(--jm-text)]">
+                  {zoom.toFixed(2)}x
+                </span>
               </div>
 
               <div className="flex items-center gap-3">
-                <Sun className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground w-10">밝기</span>
+                <Sun className="size-4 text-[var(--jm-text-muted)]" />
+                <span className="text-jm-xs text-[var(--jm-text-muted)] w-10">밝기</span>
                 <input
                   type="range"
                   min={0.5}
@@ -509,52 +539,58 @@ export function ImageEditDialog({ open, file, onConfirm, onCancel, defaultAspect
                   step={0.01}
                   value={brightness}
                   onChange={(e) => setBrightness(parseFloat(e.target.value))}
-                  className="flex-1 accent-primary"
+                  className="flex-1 accent-[var(--jm-info-fg)]"
                   disabled={busy}
                   aria-label="밝기"
                 />
-                <span className="text-xs tabular-nums w-12 text-right">{Math.round(brightness * 100)}%</span>
+                <span className="text-jm-xs tabular-nums w-12 text-right text-[var(--jm-text)]">
+                  {Math.round(brightness * 100)}%
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <Button
+                <JmButton
                   variant="outline"
                   size="sm"
                   onClick={handleApplyBgRemoval}
                   disabled={busy || !croppedAreaPixels}
                 >
                   {bgProcessing ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    <Loader2 className="animate-spin" />
                   ) : (
-                    <Sparkles className="h-4 w-4 mr-1" />
+                    <Sparkles />
                   )}
-                  AI 배경 제거
-                </Button>
-                <Button
+                  <span>AI 배경 제거</span>
+                </JmButton>
+                <JmButton
                   variant="outline"
                   size="sm"
                   onClick={handleEnterEraser}
                   disabled={busy || !croppedAreaPixels}
                 >
-                  <Eraser className="h-4 w-4 mr-1" />
-                  지우개로 다듬기
-                </Button>
+                  <Eraser />
+                  <span>지우개로 다듬기</span>
+                </JmButton>
               </div>
             </>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border bg-muted/50">
-          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/50">
+          <JmButton variant="ghost" onClick={onCancel} disabled={busy}>
             취소
-          </Button>
-          <Button onClick={handleConfirm} disabled={busy || (!isPreview && !croppedAreaPixels)}>
-            {uploading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {uploading ? "업로드 중..." : "완료"}
-          </Button>
+          </JmButton>
+          <JmButton
+            variant="cta"
+            onClick={handleConfirm}
+            disabled={busy || (!isPreview && !croppedAreaPixels)}
+          >
+            {uploading && <Loader2 className="size-4 animate-spin" />}
+            <span>{uploading ? "업로드 중..." : "완료"}</span>
+          </JmButton>
         </div>
-      </DialogContent>
-    </Dialog>
+      </JmDialogContent>
+    </JmDialog>
   );
 }
 
@@ -590,7 +626,11 @@ async function getCroppedBlob(
   const image = await loadImage(imageSrc);
   const rotRad = (rotation * Math.PI) / 180;
 
-  const { width: bBoxWidth, height: bBoxHeight } = rotateSize(image.width, image.height, rotation);
+  const { width: bBoxWidth, height: bBoxHeight } = rotateSize(
+    image.width,
+    image.height,
+    rotation,
+  );
 
   const rotated = document.createElement("canvas");
   rotated.width = bBoxWidth;
@@ -608,8 +648,6 @@ async function getCroppedBlob(
   cropped.height = outputHeight;
   const cctx = cropped.getContext("2d");
   if (!cctx) throw new Error("canvas 2d 컨텍스트 생성 실패");
-  // JPEG는 투명도 미지원 → 축소 시 빈 영역이 검정이 되지 않도록 흰색으로 채움
-  // PNG는 투명 유지(배경 제거/지우개 결과 보존)
   if (outputType === "image/jpeg") {
     cctx.fillStyle = "#ffffff";
     cctx.fillRect(0, 0, outputWidth, outputHeight);

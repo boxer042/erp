@@ -16,6 +16,7 @@ import {
   JmScope,
   JmScrollArea,
   JmSkeleton,
+  JmSpinner,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -70,6 +71,7 @@ export default function CustomerLedgerPage() {
     amount: string;
     paymentDate: string;
     method: PaymentMethod;
+    kind: "MIXED" | "SUPPLY_ONLY" | "VAT_ONLY";
     memo: string | null;
   } | null>(null);
 
@@ -132,6 +134,7 @@ export default function CustomerLedgerPage() {
         amount: string;
         paymentDate: string;
         method: string;
+        kind?: "MIXED" | "SUPPLY_ONLY" | "VAT_ONLY";
         memo: string | null;
       }>(`/api/customer-payments/${e.referenceId}`).then((p) => {
         setEditingPayment({
@@ -140,6 +143,7 @@ export default function CustomerLedgerPage() {
           amount: p.amount,
           paymentDate: p.paymentDate,
           method: p.method as PaymentMethod,
+          kind: p.kind ?? "MIXED",
           memo: p.memo,
         });
         setPayDialogOpen(true);
@@ -192,6 +196,7 @@ export default function CustomerLedgerPage() {
     balance: "",
     referenceId: r.order.id,
     referenceType: r.order.orderNo,
+    paymentKind: null,
     customer: r.customer,
   }));
 
@@ -328,8 +333,16 @@ export default function CustomerLedgerPage() {
                 <span className="text-xs text-[var(--jm-text-muted)]">{data.entries.length}건</span>
               </div>
             </div>
-            {filteredSummaries.length === 0 ? (
-              <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">고객이 없습니다</div>
+            {loading ? (
+              <div className="flex items-center justify-center py-10">
+                <JmSpinner className="text-[var(--jm-text-muted)]" />
+              </div>
+            ) : filteredSummaries.length === 0 ? (
+              <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">
+                {search.trim()
+                  ? `"${search}" 검색 결과 없음`
+                  : "고객이 없습니다"}
+              </div>
             ) : (
               filteredSummaries.map((c) => {
                 const bal = c.currentBalance;

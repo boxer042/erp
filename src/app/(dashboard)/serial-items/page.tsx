@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Printer } from "lucide-react";
 import { format } from "date-fns";
@@ -53,6 +54,13 @@ function statusLabel(status: SerialItemRow["status"]) {
   return status === "ACTIVE" ? "활성" : status === "RETURNED" ? "반품" : "폐기";
 }
 
+type LabelSize = "small" | "standard" | "large";
+const LABEL_SIZES: { value: LabelSize; label: string }[] = [
+  { value: "small", label: "소형" },
+  { value: "standard", label: "표준" },
+  { value: "large", label: "대형" },
+];
+
 function SerialSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
     <>
@@ -89,9 +97,11 @@ function SerialSkeletonRows({ rows = 8 }: { rows?: number }) {
 }
 
 export default function SerialItemsPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [printCodes, setPrintCodes] = useState<string[] | null>(null);
+  const [printSize, setPrintSize] = useState<LabelSize>("standard");
 
   const itemsQuery = useQuery({
     queryKey: ["serial-items", search],
@@ -185,8 +195,12 @@ export default function SerialItemsPage() {
               </TableRow>
             ) : (
               items.map((it) => (
-                <TableRow key={it.id} className="hover:bg-muted/50">
-                  <TableCell>
+                <TableRow
+                  key={it.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => router.push(`/serial-items/${encodeURIComponent(it.code)}`)}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={selectedIds.has(it.id)}
                       onCheckedChange={() => toggleOne(it.id)}
@@ -246,7 +260,10 @@ export default function SerialItemsPage() {
                       {statusLabel(it.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell
+                    className="text-right"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Button
                       variant="ghost"
                       size="icon"
@@ -269,12 +286,26 @@ export default function SerialItemsPage() {
         onOpenChange={(o) => !o && setPrintCodes(null)}
       >
         <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
-          <DialogHeader className="border-b border-border p-4">
+          <DialogHeader className="flex-row items-center gap-3 border-b border-border p-4">
             <DialogTitle>라벨 재출력 ({printCodes?.length ?? 0}장)</DialogTitle>
+            <div className="flex gap-1">
+              {LABEL_SIZES.map((sz) => (
+                <Button
+                  key={sz.value}
+                  size="sm"
+                  variant={printSize === sz.value ? "default" : "outline"}
+                  className="h-7 text-[12px]"
+                  onClick={() => setPrintSize(sz.value)}
+                >
+                  {sz.label}
+                </Button>
+              ))}
+            </div>
           </DialogHeader>
           {printCodes && (
             <iframe
-              src={`/serial-items/print?codes=${printCodes.join(",")}`}
+              key={printSize}
+              src={`/serial-items/print?codes=${printCodes.join(",")}&size=${printSize}`}
               className="size-full flex-1 border-0"
               title="라벨 재출력"
             />

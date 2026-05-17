@@ -1,7 +1,12 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {
+  JmButton,
+  JmDialog,
+  JmDialogContent,
+  JmDialogHeader,
+  JmDialogTitle,
+} from "@/jm";
 import { FileDown, Printer } from "lucide-react";
 
 type Props = {
@@ -20,15 +25,17 @@ type Props = {
  */
 export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Props) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
-        <DialogHeader className="flex flex-row items-center justify-between border-b border-border p-4 space-y-0">
-          <DialogTitle className="text-base">{title}</DialogTitle>
+    <JmDialog open={open} onOpenChange={onOpenChange}>
+      <JmDialogContent
+        size="xl"
+        className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0"
+      >
+        <JmDialogHeader className="flex flex-row items-center justify-between border-b border-[var(--jm-border)] px-4 py-3 space-y-0">
+          <JmDialogTitle className="text-jm-base">{title}</JmDialogTitle>
           <div className="flex items-center gap-2 mr-8">
-            <Button
+            <JmButton
               variant="outline"
               size="sm"
-              className="h-8"
               disabled={!printPath}
               onClick={() => {
                 if (!printPath) return;
@@ -36,11 +43,12 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
                 window.open(url, "_blank");
               }}
             >
-              <FileDown className="h-3.5 w-3.5 mr-1.5" /> PDF 다운로드
-            </Button>
-            <Button
+              <FileDown className="size-3.5" />
+              <span>PDF 다운로드</span>
+            </JmButton>
+            <JmButton
               size="sm"
-              className="h-8"
+              variant="cta"
               disabled={!printPath}
               onClick={() => {
                 // 모달 안 iframe에 인쇄 명령 — react-pdf의 <PDFViewer>는 자체 인쇄 버튼 제공이라
@@ -49,10 +57,11 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
                 window.open(`${printPath}`, "_blank");
               }}
             >
-              <Printer className="h-3.5 w-3.5 mr-1.5" /> 새 탭에서 인쇄
-            </Button>
+              <Printer className="size-3.5" />
+              <span>새 탭에서 인쇄</span>
+            </JmButton>
           </div>
-        </DialogHeader>
+        </JmDialogHeader>
         {printPath ? (
           <iframe
             key={printPath}
@@ -61,11 +70,11 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
             title={title}
           />
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center text-jm-sm text-[var(--jm-text-muted)]">
             로드할 문서가 없습니다
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </JmDialogContent>
+    </JmDialog>
   );
 }

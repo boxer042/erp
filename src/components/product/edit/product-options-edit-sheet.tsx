@@ -1,24 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2, Plus, Trash2, ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import {
+  JmButton,
+  JmCheckbox,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerDescription,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmIconButton,
+  JmInput,
+} from "@/jm";
 import type { ProductDetail, ProductOptionItem } from "../types";
 
 interface Props {
@@ -27,10 +28,9 @@ interface Props {
   product: ProductDetail;
 }
 
-/** 옵션 슬롯 드래프트 — 신규/기존 모두 동일 형태 */
 interface OptionDraft {
-  rowId: string; // 클라이언트 임시 키
-  id?: string; // DB id (있으면 PATCH, 없으면 POST)
+  rowId: string;
+  id?: string;
   name: string;
   required: boolean;
   values: ValueDraft[];
@@ -43,7 +43,6 @@ interface ValueDraft {
   addPrice: string;
   mappedProductId: string | null;
   mappedVariantId: string | null;
-  /** SWAP: 메인 라인 productId 교체 (색상/사이즈 같은 변형) / ADDON: 자식 OrderItem 추가 */
   mappedMode: "SWAP" | "ADDON";
 }
 
@@ -87,9 +86,9 @@ function emptyOption(): OptionDraft {
 
 export function ProductOptionsEditSheet(props: Props) {
   return (
-    <Sheet open={props.open} onOpenChange={props.onOpenChange}>
+    <JmDrawer open={props.open} onOpenChange={props.onOpenChange}>
       {props.open && <Body {...props} />}
-    </Sheet>
+    </JmDrawer>
   );
 }
 
@@ -99,7 +98,6 @@ function Body({ product, onOpenChange }: Props) {
     (product.productOptions ?? []).map(fromOption),
   );
 
-  // 옵션값 매핑 candidates fetch — 자기 자신 / OPTION_PARENT 제외
   const productsQuery = useQuery<ProductOption[]>({
     queryKey: ["option-mapping-products"],
     queryFn: () =>
@@ -113,7 +111,6 @@ function Body({ product, onOpenChange }: Props) {
       (p) => p.id !== product.id && p.productType !== "OPTION_PARENT",
     );
   }, [productsQuery.data, product.id]);
-  // variant candidates — canonicalProductId 가 있는 상품 (변형) 만. 거의 안 쓰이지만 모드 B 폴백
   const variantCandidates = useMemo(() => {
     const all = productsQuery.data ?? [];
     return all.filter((p) => !!p.canonicalProductId);
@@ -228,7 +225,6 @@ function Body({ product, onOpenChange }: Props) {
     );
 
   const handleSubmit = async () => {
-    // 검증
     for (const d of drafts) {
       if (!d.name.trim()) {
         toast.error("옵션 슬롯명을 입력하세요");
@@ -252,7 +248,6 @@ function Body({ product, onOpenChange }: Props) {
       }
     }
 
-    // 기존 옵션 중 drafts 에서 삭제된 것 — 서버에 DELETE
     const existingIds = new Set(
       (product.productOptions ?? []).map((o) => o.id),
     );
@@ -281,21 +276,23 @@ function Body({ product, onOpenChange }: Props) {
   };
 
   return (
-    <SheetContent
+    <JmDrawerContent
       side="right"
-      className="w-full sm:max-w-[600px] flex flex-col p-0"
+      size="xl"
+      className="flex flex-col p-0"
+      dragHandle={false}
     >
-      <SheetHeader className="px-5 py-4 border-b">
-        <SheetTitle>고객 옵션 편집 — {product.name}</SheetTitle>
-        <SheetDescription>
+      <JmDrawerHeader className="px-5 py-4 border-b border-[var(--jm-border)]">
+        <JmDrawerTitle>고객 옵션 편집 — {product.name}</JmDrawerTitle>
+        <JmDrawerDescription>
           고객이 카탈로그·POS 에서 선택하는 옵션 슬롯을 정의합니다. 매장 분기
           (variant) 와 별도 도메인.
-        </SheetDescription>
-      </SheetHeader>
+        </JmDrawerDescription>
+      </JmDrawerHeader>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {drafts.length === 0 && (
-          <div className="text-center text-sm text-muted-foreground py-8">
+          <div className="text-center text-jm-sm text-[var(--jm-text-muted)] py-8">
             등록된 옵션이 없습니다. 아래 [옵션 슬롯 추가] 클릭해 시작하세요.
           </div>
         )}
@@ -303,71 +300,77 @@ function Body({ product, onOpenChange }: Props) {
         {drafts.map((draft) => (
           <div
             key={draft.rowId}
-            className="rounded-lg border bg-card p-4 space-y-3"
+            className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4 space-y-3"
           >
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-1">
-                <Label className="text-xs">옵션 슬롯명</Label>
-                <Input
+                <label className="text-jm-xs text-[var(--jm-text-muted)]">
+                  옵션 슬롯명
+                </label>
+                <JmInput
+                  size="sm"
                   value={draft.name}
                   onChange={(e) =>
                     updateOption(draft.rowId, { name: e.target.value })
                   }
+                  onFocus={focusCaretEnd}
                   placeholder="예: 색상, 용량, 메모리"
-                  className="h-9"
                 />
               </div>
-              <label className="flex items-center gap-1.5 px-2 h-9 text-xs">
-                <input
-                  type="checkbox"
+              <label className="flex items-center gap-1.5 px-2 h-9 text-jm-xs text-[var(--jm-text)] cursor-pointer">
+                <JmCheckbox
                   checked={draft.required}
-                  onChange={(e) =>
-                    updateOption(draft.rowId, { required: e.target.checked })
+                  onCheckedChange={(c) =>
+                    updateOption(draft.rowId, { required: c === true })
                   }
                 />
                 필수
               </label>
-              <Button
+              <JmIconButton
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-9 text-destructive"
                 onClick={() => removeOption(draft.rowId)}
+                aria-label="옵션 삭제"
+                className="text-[var(--jm-danger-fg)]"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+                <Trash2 />
+              </JmIconButton>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">옵션값</Label>
-                <Button
+                <label className="text-jm-xs text-[var(--jm-text-muted)]">옵션값</label>
+                <JmButton
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs"
                   onClick={() => addValue(draft.rowId)}
                 >
-                  <Plus className="h-3 w-3 mr-1" /> 값 추가
-                </Button>
+                  <Plus />
+                  <span>값 추가</span>
+                </JmButton>
               </div>
 
               {draft.values.map((v) => (
                 <div
                   key={v.rowId}
-                  className="grid grid-cols-[1fr_120px_140px_auto] items-center gap-2 rounded-md border bg-background p-2"
+                  className="grid grid-cols-[1fr_120px_140px_auto] items-center gap-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2"
                 >
-                  <Input
+                  <JmInput
+                    size="sm"
                     value={v.label}
                     onChange={(e) =>
                       updateValue(draft.rowId, v.rowId, {
                         label: e.target.value,
                       })
                     }
+                    onFocus={focusCaretEnd}
                     placeholder="라벨 (화이트, 32GB, 수냉)"
-                    className="h-8 text-xs"
+                    className="text-jm-xs"
                   />
-                  <Input
+                  <JmInput
+                    size="sm"
                     type="text"
                     inputMode="numeric"
                     value={v.addPrice}
@@ -376,8 +379,9 @@ function Body({ product, onOpenChange }: Props) {
                         addPrice: e.target.value.replace(/[^0-9]/g, ""),
                       })
                     }
+                    onFocus={focusCaretEnd}
                     placeholder="추가가"
-                    className="h-8 text-xs tabular-nums"
+                    className="text-jm-xs tabular-nums"
                   />
                   <MappingPicker
                     value={v}
@@ -388,55 +392,57 @@ function Body({ product, onOpenChange }: Props) {
                     variantCandidates={variantCandidates}
                     productsLoading={productsQuery.isPending}
                   />
-                  <Button
+                  <JmIconButton
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-8 w-8 p-0 text-destructive"
                     onClick={() => removeValue(draft.rowId, v.rowId)}
                     disabled={draft.values.length === 1}
+                    aria-label="옵션값 삭제"
+                    className="text-[var(--jm-danger-fg)]"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                    <Trash2 />
+                  </JmIconButton>
                 </div>
               ))}
             </div>
           </div>
         ))}
 
-        <Button
+        <JmButton
           type="button"
           variant="outline"
           className="w-full h-10"
           onClick={addOption}
         >
-          <Plus className="h-3.5 w-3.5 mr-1" /> 옵션 슬롯 추가
-        </Button>
+          <Plus />
+          <span>옵션 슬롯 추가</span>
+        </JmButton>
       </div>
 
-      <div className="border-t px-5 py-4 flex justify-end gap-2 bg-background">
-        <Button
+      <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)]">
+        <JmButton
           type="button"
-          variant="outline"
+          variant="ghost"
           onClick={() => onOpenChange(false)}
           disabled={submitting}
         >
           취소
-        </Button>
-        <Button type="button" onClick={handleSubmit} disabled={submitting}>
-          {submitting && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
-          저장
-        </Button>
+        </JmButton>
+        <JmButton
+          type="button"
+          variant="cta"
+          onClick={handleSubmit}
+          disabled={submitting}
+        >
+          {submitting && <Loader2 className="size-4 animate-spin" />}
+          <span>저장</span>
+        </JmButton>
       </div>
-    </SheetContent>
+    </JmDrawerContent>
   );
 }
 
-/**
- * 매핑 picker — 단순 텍스트 / Product 매핑 / Variant 매핑 토글.
- * Product 매핑 시 SWAP(메인 라인 교체, 색상/사이즈) / ADDON(자식 라인 추가) 모드 토글.
- * Combobox 로 상품 검색 (이름·SKU). 자기 자신 + OPTION_PARENT 제외 (호출측 candidates 필터).
- */
 function MappingPicker({
   value,
   onChange,
@@ -474,7 +480,7 @@ function MappingPicker({
       <div className="flex items-center gap-1">
         <button
           type="button"
-          className="text-[10px] px-1.5 py-0.5 rounded border bg-secondary hover:bg-secondary/80 inline-flex items-center gap-0.5 shrink-0"
+          className="text-jm-2xs px-1.5 py-0.5 rounded border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] hover:bg-[var(--jm-surface-muted)]/80 text-[var(--jm-text)] inline-flex items-center gap-0.5 shrink-0 transition-colors"
           onClick={cycleMode}
           title="매핑 모드 전환 (텍스트 / Product / Variant)"
         >
@@ -510,7 +516,6 @@ function MappingPicker({
           </div>
         )}
       </div>
-      {/* SWAP / ADDON 토글 — Product 매핑일 때만 의미 */}
       {mode === "product" && (
         <button
           type="button"
@@ -520,7 +525,7 @@ function MappingPicker({
               ? "SWAP — 옵션 선택 시 메인 라인 productId 가 매핑된 SKU 로 교체됨 (색상·사이즈 변형)"
               : "ADDON — 옵션 선택 시 자식 OrderItem 자동 추가됨 (메인 + 부속 결제). 일반 추가구매는 BundleProduct 도메인 권장"
           }
-          className="text-[10px] px-1.5 py-0.5 rounded border inline-flex items-center justify-center gap-0.5 bg-background hover:bg-secondary/40 self-start"
+          className="text-jm-2xs px-1.5 py-0.5 rounded border border-[var(--jm-border)] inline-flex items-center justify-center gap-0.5 bg-[var(--jm-bg)] hover:bg-[var(--jm-surface-muted)]/40 text-[var(--jm-text)] self-start transition-colors"
         >
           모드: <span className="font-semibold">{value.mappedMode}</span>
         </button>

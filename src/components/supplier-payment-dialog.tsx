@@ -26,8 +26,12 @@ import { formatComma, parseComma } from "@/lib/utils";
 import {
   PAYMENT_METHOD_LABELS,
   SUPPLIER_PAYMENT_METHODS,
+  PAYMENT_KIND,
+  PAYMENT_KIND_LABELS,
   type PaymentMethod,
 } from "@/lib/validators/supplier";
+
+type PaymentKindValue = (typeof PAYMENT_KIND)[number];
 
 interface Supplier {
   id: string;
@@ -47,6 +51,7 @@ export interface SupplierPaymentDialogProps {
     amount: string;
     paymentDate: string;
     method: PaymentMethod;
+    kind?: PaymentKindValue;
     memo: string | null;
   };
   onSaved?: () => void;
@@ -59,6 +64,11 @@ function todayIso() {
 const METHOD_OPTIONS = SUPPLIER_PAYMENT_METHODS.map((m) => ({
   value: m,
   label: PAYMENT_METHOD_LABELS[m],
+}));
+
+const KIND_OPTIONS = PAYMENT_KIND.map((k) => ({
+  value: k,
+  label: PAYMENT_KIND_LABELS[k],
 }));
 
 export function SupplierPaymentDialog({
@@ -77,6 +87,7 @@ export function SupplierPaymentDialog({
     amount: string;
     paymentDate: string;
     method: PaymentMethod;
+    kind: PaymentKindValue;
     memo: string;
   }>({
     supplierId: "",
@@ -84,6 +95,7 @@ export function SupplierPaymentDialog({
     amount: "",
     paymentDate: todayIso(),
     method: "TRANSFER",
+    kind: "MIXED",
     memo: "",
   });
 
@@ -96,6 +108,7 @@ export function SupplierPaymentDialog({
         amount: initialPayment.amount,
         paymentDate: new Date(initialPayment.paymentDate).toISOString().slice(0, 10),
         method: initialPayment.method,
+        kind: initialPayment.kind ?? "MIXED",
         memo: initialPayment.memo ?? "",
       });
     } else if (fixedSupplier) {
@@ -105,6 +118,7 @@ export function SupplierPaymentDialog({
         amount: "",
         paymentDate: todayIso(),
         method: "TRANSFER",
+        kind: "MIXED",
         memo: "",
       });
     } else {
@@ -114,6 +128,7 @@ export function SupplierPaymentDialog({
         amount: "",
         paymentDate: todayIso(),
         method: "TRANSFER",
+        kind: "MIXED",
         memo: "",
       });
     }
@@ -158,6 +173,7 @@ export function SupplierPaymentDialog({
             amount: form.amount,
             paymentDate: form.paymentDate,
             method: form.method,
+            kind: form.kind,
             memo: form.memo || undefined,
           }
         : {
@@ -165,6 +181,7 @@ export function SupplierPaymentDialog({
             amount: form.amount,
             paymentDate: form.paymentDate,
             method: form.method,
+            kind: form.kind,
             memo: form.memo || undefined,
           };
       return apiMutate(url, httpMethod, body);
@@ -243,15 +260,25 @@ export function SupplierPaymentDialog({
               </Field>
             </div>
 
-            {/* 결제 방식 */}
-            <Field label="결제 방식" required>
-              <JmSelect
-                size="sm"
-                options={METHOD_OPTIONS}
-                value={form.method}
-                onChange={(v) => setForm((f) => ({ ...f, method: v as PaymentMethod }))}
-              />
-            </Field>
+            {/* 결제 방식 + 종류 */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="결제 방식" required>
+                <JmSelect
+                  size="sm"
+                  options={METHOD_OPTIONS}
+                  value={form.method}
+                  onChange={(v) => setForm((f) => ({ ...f, method: v as PaymentMethod }))}
+                />
+              </Field>
+              <Field label="결제 종류" required>
+                <JmSelect
+                  size="sm"
+                  options={KIND_OPTIONS}
+                  value={form.kind}
+                  onChange={(v) => setForm((f) => ({ ...f, kind: v as PaymentKindValue }))}
+                />
+              </Field>
+            </div>
 
             {/* 메모 */}
             <Field label="메모">

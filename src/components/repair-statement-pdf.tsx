@@ -387,6 +387,10 @@ function RepairStatementDocument({ company, repair }: Props) {
         <Text style={s.footerNote}>
           이 내역서를 보관하여 보증 청구 시 제시해 주세요.
         </Text>
+        <Text style={s.footerNote}>
+          제품에 부착된 시리얼 라벨의 QR 코드로 본인 인증 후 보증·수리·구매
+          내역을 직접 조회할 수 있습니다.
+        </Text>
       </Page>
     </Document>
   );

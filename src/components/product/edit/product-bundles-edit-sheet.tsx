@@ -5,16 +5,16 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  JmButton,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerDescription,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmIconButton,
+  JmInput,
+} from "@/jm";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
@@ -29,7 +29,7 @@ interface Props {
 
 interface BundleDraft {
   rowId: string;
-  id?: string; // 기존 row update 용
+  id?: string;
   bundleProductId: string;
   bundleProductName?: string;
   bundleProductSku?: string;
@@ -67,9 +67,9 @@ function emptyBundle(): BundleDraft {
 
 export function ProductBundlesEditSheet(props: Props) {
   return (
-    <Sheet open={props.open} onOpenChange={props.onOpenChange}>
+    <JmDrawer open={props.open} onOpenChange={props.onOpenChange}>
       {props.open && <Body {...props} />}
-    </Sheet>
+    </JmDrawer>
   );
 }
 
@@ -79,7 +79,6 @@ function Body({ product, onOpenChange }: Props) {
     (product.bundles ?? []).map(fromBundle),
   );
 
-  // 추가구매 candidates fetch — 자기 자신 / OPTION_PARENT / 변형(canonicalProductId 있는) 제외
   const productsQuery = useQuery<ProductOption[]>({
     queryKey: ["bundle-picker-products"],
     queryFn: () =>
@@ -175,21 +174,23 @@ function Body({ product, onOpenChange }: Props) {
   };
 
   return (
-    <SheetContent
+    <JmDrawerContent
       side="right"
-      className="w-full sm:max-w-[640px] flex flex-col p-0"
+      size="xl"
+      className="flex flex-col p-0"
+      dragHandle={false}
     >
-      <SheetHeader className="px-5 py-4 border-b">
-        <SheetTitle>추가구매 추천 편집 — {product.name}</SheetTitle>
-        <SheetDescription>
+      <JmDrawerHeader className="px-5 py-4 border-b border-[var(--jm-border)]">
+        <JmDrawerTitle>추가구매 추천 편집 — {product.name}</JmDrawerTitle>
+        <JmDrawerDescription className="text-jm-xs">
           이 상품과 함께 사면 좋은 단독 카탈로그 상품을 추천 목록으로 등록합니다.
           ProductOption (옵션 슬롯) 과 다른 도메인 — 손님이 카트 추가 시 별도 선택.
-        </SheetDescription>
-      </SheetHeader>
+        </JmDrawerDescription>
+      </JmDrawerHeader>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-3">
         {drafts.length === 0 && (
-          <div className="text-center text-sm text-muted-foreground py-8">
+          <div className="text-center text-jm-sm text-[var(--jm-text-muted)] py-8">
             추가구매 매핑이 없습니다. 아래 [추가] 버튼으로 시작하세요.
           </div>
         )}
@@ -197,11 +198,11 @@ function Body({ product, onOpenChange }: Props) {
         {drafts.map((d) => (
           <div
             key={d.rowId}
-            className="rounded-lg border bg-card p-4 space-y-2.5"
+            className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4 space-y-2.5"
           >
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-1">
-                <Label className="text-xs">추가 상품</Label>
+                <label className="text-jm-xs text-[var(--jm-text-muted)]">추가 상품</label>
                 <ProductCombobox
                   products={candidates}
                   value={d.bundleProductId}
@@ -219,7 +220,7 @@ function Body({ product, onOpenChange }: Props) {
                   clearable={false}
                 />
                 {d.bundleProductName && (
-                  <span className="font-mono text-[11px] text-muted-foreground block">
+                  <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)] block">
                     {d.bundleProductSku}
                     {d.bundleProductSellingPrice
                       ? ` · ₩${d.bundleProductSellingPrice.toLocaleString("ko-KR")}`
@@ -227,21 +228,23 @@ function Body({ product, onOpenChange }: Props) {
                   </span>
                 )}
               </div>
-              <Button
+              <JmIconButton
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-8 text-destructive"
+                aria-label="행 삭제"
+                className="text-[var(--jm-danger-fg)]"
                 onClick={() => removeBundle(d.rowId)}
               >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+                <Trash2 />
+              </JmIconButton>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="space-y-1">
-                <Label className="text-xs">기본 수량</Label>
-                <Input
+                <label className="text-jm-xs text-[var(--jm-text-muted)]">기본 수량</label>
+                <JmInput
+                  size="sm"
                   type="text"
                   inputMode="decimal"
                   value={d.defaultQuantity}
@@ -250,12 +253,13 @@ function Body({ product, onOpenChange }: Props) {
                       defaultQuantity: e.target.value.replace(/[^0-9.]/g, ""),
                     })
                   }
-                  className="h-8 text-xs tabular-nums"
+                  className="tabular-nums"
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">번들 할인 (세전)</Label>
-                <Input
+                <label className="text-jm-xs text-[var(--jm-text-muted)]">번들 할인 (세전)</label>
+                <JmInput
+                  size="sm"
                   type="text"
                   inputMode="numeric"
                   value={formatComma(d.discountAmount)}
@@ -265,53 +269,54 @@ function Body({ product, onOpenChange }: Props) {
                     })
                   }
                   placeholder="할인 없음"
-                  className="h-8 text-xs tabular-nums"
+                  className="tabular-nums"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">추천 카피 (선택)</Label>
-              <Input
+              <label className="text-jm-xs text-[var(--jm-text-muted)]">추천 카피 (선택)</label>
+              <JmInput
+                size="sm"
                 value={d.recommendMessage}
                 onChange={(e) =>
                   updateBundle(d.rowId, { recommendMessage: e.target.value })
                 }
                 placeholder="예: 필터도 함께 쓰세요 / 정수기 살균 전용"
-                className="h-8 text-xs"
               />
             </div>
           </div>
         ))}
 
-        <Button
+        <JmButton
           type="button"
           variant="outline"
-          className="w-full h-10"
+          className="w-full"
           onClick={addBundle}
         >
-          <Plus className="h-3.5 w-3.5 mr-1" /> 추가구매 추가
-        </Button>
+          <Plus />
+          <span>추가구매 추가</span>
+        </JmButton>
 
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+        <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-3 py-2 text-jm-2xs text-[var(--jm-text-muted)]">
           상품 검색 — 이름·SKU 로 찾기. 자기 자신과 OPTION_PARENT (옵션 대표) 는 자동 제외.
         </div>
       </div>
 
-      <div className="border-t px-5 py-4 flex justify-end gap-2 bg-background">
-        <Button
+      <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-bg)]">
+        <JmButton
           type="button"
-          variant="outline"
+          variant="ghost"
           onClick={() => onOpenChange(false)}
           disabled={submitting}
         >
           취소
-        </Button>
-        <Button type="button" onClick={handleSubmit} disabled={submitting}>
-          {submitting && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
-          저장
-        </Button>
+        </JmButton>
+        <JmButton type="button" variant="cta" onClick={handleSubmit} disabled={submitting}>
+          {submitting && <Loader2 className="size-4 animate-spin" />}
+          <span>저장</span>
+        </JmButton>
       </div>
-    </SheetContent>
+    </JmDrawerContent>
   );
 }

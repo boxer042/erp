@@ -67,6 +67,16 @@ const CANCEL_REASON_LABEL: Record<string, string> = {
   OTHER: "기타",
 };
 
+const QUOTE_REJECT_REASON_LABEL: Record<string, string> = {
+  TOO_EXPENSIVE: "가격 부담",
+  NOT_WORTH_IT: "가성비 문제",
+  WILL_SHOP_AROUND: "다른 매장 비교",
+  CHANGED_MIND: "단순 변심",
+  PARTS_UNAVAILABLE: "부속 수급 불가",
+  SHOP_DECLINED: "매장 포기",
+  OTHER: "기타",
+};
+
 const PIE_COLORS = [
   "#10b981",
   "#3b82f6",
@@ -112,6 +122,14 @@ interface Stats {
   cancelled: number;
   byStatus: { status: string; count: number }[];
   byCancelReason: { reason: string | null; count: number }[];
+  quoteRejection: {
+    byReason: { reason: string | null; count: number }[];
+    quotedCount: number;
+    rejectedCount: number;
+    rejectedRevenue: number;
+    rejectedPaidCount: number;
+    avgQuotedAmount: number;
+  };
   byCategory: CategoryStat[];
   byProduct: ProductStat[];
   avgRepairDays: { avgDays: number | null; completedCount: number };
@@ -228,6 +246,16 @@ export default function RepairStatsPage() {
         value: r.count,
       })),
     [stats?.byCancelReason],
+  );
+  const quoteRejectChart = useMemo(
+    () =>
+      (stats?.quoteRejection.byReason ?? []).map((r) => ({
+        name: r.reason
+          ? QUOTE_REJECT_REASON_LABEL[r.reason] ?? r.reason
+          : "(미지정)",
+        value: r.count,
+      })),
+    [stats?.quoteRejection.byReason],
   );
   const categoryChart = useMemo(
     () =>
@@ -462,6 +490,95 @@ export default function RepairStatsPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* 거절 견적 분석 — 진단비만 청구한 케이스. 가격 정책/마진 피드백용 */}
+            {stats && stats.quoteRejection.rejectedCount > 0 && (
+              <Card className="stats-print-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">
+                    견적 거절 분석 — 진단비만 청구
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-4 lg:grid-cols-[260px_1fr]">
+                  <div className="flex flex-col gap-2">
+                    <div className="rounded-lg border bg-muted/30 p-3">
+                      <div className="text-xs text-muted-foreground">거절 건수 / 견적 발생</div>
+                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                        {stats.quoteRejection.rejectedCount} / {stats.quoteRejection.quotedCount}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        거절률{" "}
+                        <span className="font-semibold text-foreground">
+                          {stats.quoteRejection.quotedCount > 0
+                            ? (
+                                (stats.quoteRejection.rejectedCount /
+                                  stats.quoteRejection.quotedCount) *
+                                100
+                              ).toFixed(1)
+                            : "0"}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-muted/30 p-3">
+                      <div className="text-xs text-muted-foreground">거절 매출 (진단비)</div>
+                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                        ₩
+                        {Math.round(
+                          stats.quoteRejection.rejectedRevenue,
+                        ).toLocaleString("ko-KR")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        결제 완료{" "}
+                        <span className="font-semibold text-foreground">
+                          {stats.quoteRejection.rejectedPaidCount}
+                        </span>
+                        건
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-muted/30 p-3">
+                      <div className="text-xs text-muted-foreground">평균 거절 견적가</div>
+                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                        ₩
+                        {Math.round(
+                          stats.quoteRejection.avgQuotedAmount,
+                        ).toLocaleString("ko-KR")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        어느 가격대에서 거절이 자주 나는지 추적
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    {quoteRejectChart.length === 0 ? (
+                      <EmptyChart hint="거절 사유 데이터 없음" />
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={quoteRejectChart}
+                            dataKey="value"
+                            nameKey="name"
+                            outerRadius={90}
+                            label={(entry) => `${entry.name} ${entry.value}`}
+                            labelLine={false}
+                          >
+                            {quoteRejectChart.map((_, i) => (
+                              <Cell
+                                key={i}
+                                fill={PIE_COLORS[i % PIE_COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* 상품 전환 월별 추이 — 라인 */}
             <Card className="stats-print-card">

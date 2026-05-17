@@ -22,6 +22,7 @@ import {
 import {
   Package, Store, Truck, ShoppingCart, Warehouse, ChevronDown, ChevronUp, Plus,
   Pencil, Trash2, Loader2, Building2, Landmark, Star, Layout, ChevronRight, Images,
+  ShieldCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -301,6 +302,23 @@ export default function SettingsPage() {
           </CardTitle>
           <CardDescription>
             업로드한 이미지를 한 곳에서 확인합니다. 사용 중/고아 상태를 한눈에 보고, 안 쓰는 파일만 영구 삭제할 수 있습니다.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <Card
+        onClick={() => router.push("/settings/privacy-policy")}
+        className="cursor-pointer transition-shadow hover:shadow-md"
+      >
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" /> 시리얼 조회 서비스 약관
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </CardTitle>
+          <CardDescription>
+            시리얼번호 기반 보증·수리 조회 서비스의 개인정보 처리방침을 관리합니다. 손님 동의 화면과 공개 페이지에 노출됩니다.
           </CardDescription>
         </CardHeader>
       </Card>

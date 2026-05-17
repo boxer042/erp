@@ -52,6 +52,7 @@ export async function PUT(
         amount,
         paymentDate,
         method: data.method,
+        kind: data.kind,
         memo: data.memo || null,
       },
     });

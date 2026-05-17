@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { supplierProductSchema } from "@/lib/validators/product";
 import { computeSupplierProductAvgShipping } from "@/lib/cost-utils";
 import { guardUser } from "@/lib/api-auth";
-import { createAutoMappedProductForSupplierProduct } from "@/lib/mapping-helpers";
 
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -89,31 +88,22 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
 
-  const product = await prisma.$transaction(async (tx) => {
-    const sp = await tx.supplierProduct.create({
-      data: {
-        supplierId: data.supplierId,
-        name: data.name,
-        spec: data.spec || null,
-        supplierCode: data.supplierCode || null,
-        unitOfMeasure: data.unitOfMeasure,
-        listPrice: parseFloat(data.listPrice ?? data.unitPrice),
-        unitPrice: parseFloat(data.unitPrice),
-        isTaxable: data.isTaxable,
-        isProvisional: data.isProvisional,
-        currency: data.currency,
-        leadTimeDays: data.leadTimeDays,
-        minOrderQty: data.minOrderQty,
-        memo: data.memo || null,
-      },
-    });
-
-    const { productId } = await createAutoMappedProductForSupplierProduct(tx, sp);
-    await tx.productMapping.create({
-      data: { supplierProductId: sp.id, productId, conversionRate: 1 },
-    });
-
-    return sp;
+  const product = await prisma.supplierProduct.create({
+    data: {
+      supplierId: data.supplierId,
+      name: data.name,
+      spec: data.spec || null,
+      supplierCode: data.supplierCode || null,
+      unitOfMeasure: data.unitOfMeasure,
+      listPrice: parseFloat(data.listPrice ?? data.unitPrice),
+      unitPrice: parseFloat(data.unitPrice),
+      isTaxable: data.isTaxable,
+      isProvisional: data.isProvisional,
+      currency: data.currency,
+      leadTimeDays: data.leadTimeDays,
+      minOrderQty: data.minOrderQty,
+      memo: data.memo || null,
+    },
   });
 
   return NextResponse.json(product, { status: 201 });

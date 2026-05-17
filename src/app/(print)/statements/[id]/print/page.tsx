@@ -62,6 +62,7 @@ export default async function StatementPrintPage({
   return (
     <DocumentPdf
       title="거래명세표"
+      docKind="statement"
       documentNo={s.statementNo}
       issueDate={s.issueDate.toISOString()}
       supplier={OUR_COMPANY}
