@@ -548,6 +548,11 @@ export default function SupplierLedgerPage() {
           </div>
 
           {/* 거래처 목록 */}
+          {loading ? (
+            <div className="flex flex-1 min-h-0 items-center justify-center">
+              <JmSpinner className="text-[var(--jm-text-muted)]" />
+            </div>
+          ) : (
           <JmScrollArea className="flex-1 min-h-0">
             <div
               onClick={() => setSelectedSupplierId(null)}
@@ -558,11 +563,7 @@ export default function SupplierLedgerPage() {
                 <span className="text-xs text-[var(--jm-text-muted)]">{data.entries.length}건</span>
               </div>
             </div>
-            {loading ? (
-              <div className="flex items-center justify-center py-10">
-                <JmSpinner className="text-[var(--jm-text-muted)]" />
-              </div>
-            ) : filteredSummaries.length === 0 ? (
+            {filteredSummaries.length === 0 ? (
               <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">
                 {isDataEmpty
                   ? "거래처가 없습니다"
@@ -590,6 +591,7 @@ export default function SupplierLedgerPage() {
               })
             )}
           </JmScrollArea>
+          )}
         </div>
         )}
 

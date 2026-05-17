@@ -323,6 +323,11 @@ export default function CustomerLedgerPage() {
             </PopoverPrimitive.Root>
           </div>
 
+          {loading ? (
+            <div className="flex flex-1 min-h-0 items-center justify-center">
+              <JmSpinner className="text-[var(--jm-text-muted)]" />
+            </div>
+          ) : (
           <JmScrollArea className="flex-1 min-h-0">
             <div
               onClick={() => setSelectedCustomerId(null)}
@@ -333,11 +338,7 @@ export default function CustomerLedgerPage() {
                 <span className="text-xs text-[var(--jm-text-muted)]">{data.entries.length}건</span>
               </div>
             </div>
-            {loading ? (
-              <div className="flex items-center justify-center py-10">
-                <JmSpinner className="text-[var(--jm-text-muted)]" />
-              </div>
-            ) : filteredSummaries.length === 0 ? (
+            {filteredSummaries.length === 0 ? (
               <div className="text-center py-8 text-[var(--jm-text-muted)] text-sm">
                 {search.trim()
                   ? `"${search}" 검색 결과 없음`
@@ -372,6 +373,7 @@ export default function CustomerLedgerPage() {
               })
             )}
           </JmScrollArea>
+          )}
         </div>
         )}
 
