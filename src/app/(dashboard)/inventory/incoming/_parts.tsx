@@ -296,7 +296,8 @@ export function InlineCellProductSearch({
     const q = search.toLowerCase();
     return (
       p.name.toLowerCase().includes(q) ||
-      (p.supplierCode?.toLowerCase().includes(q) ?? false)
+      (p.supplierCode?.toLowerCase().includes(q) ?? false) ||
+      (p.spec?.toLowerCase().includes(q) ?? false)
     );
   });
 
@@ -450,8 +451,13 @@ export function InlineCellProductSearch({
                         setSearch("");
                       }}
                     >
-                      <span className="flex-1 flex items-center gap-1.5">
-                        {p.name}
+                      <span className="flex-1 flex items-center gap-1.5 min-w-0">
+                        <span className="truncate">{p.name}</span>
+                        {p.spec && (
+                          <span className="text-jm-xs text-[var(--jm-text-muted)] shrink-0">
+                            ({p.spec})
+                          </span>
+                        )}
                         {p.hasMapping === false && (
                           <JmTooltip content="매핑 없음 — 등록 시 오르판 로트로 들어감">
                             <span className="size-1.5 rounded-full bg-[var(--jm-warning-solid)] shrink-0" />
@@ -459,7 +465,7 @@ export function InlineCellProductSearch({
                         )}
                       </span>
                       {p.supplierCode && (
-                        <span className="text-jm-xs text-[var(--jm-text-muted)] mr-2">
+                        <span className="text-jm-xs text-[var(--jm-text-muted)] mr-2 shrink-0">
                           {p.supplierCode}
                         </span>
                       )}

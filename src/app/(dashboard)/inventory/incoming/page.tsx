@@ -258,6 +258,10 @@ function IncomingPageInner() {
     setItems(prev => {
       const updated = [...prev];
       const existing = updated[index];
+      // 이미 다른 공급상품이 선택돼 있던 행에서 교체하는 경우 — 가격/할인/공급가액은
+      // 새 상품 기준으로 리셋 (이전 상품 단가가 잔류하면 안 됨).
+      const isSwap = !!existing.supplierProductId && existing.supplierProductId !== sp.id;
+      // 빈 행에 처음 선택하는 경우 — 사용자가 손으로 입력한 값이 있으면 보존.
       const hasData = existing.quantity || existing.unitPrice || existing.supplyAmount;
       updated[index] = {
         ...existing,
@@ -269,8 +273,11 @@ function IncomingPageInner() {
         originalPrice: sp.unitPrice,
         isNew: undefined,
         pendingSourceRow: undefined,
-        // 금액이 이미 입력되어 있으면 유지, 없으면 상품 기본가 적용
-        ...(hasData ? {} : { unitPrice: sp.unitPrice }),
+        ...(isSwap
+          ? { unitPrice: sp.unitPrice, discount: "", supplyAmount: "" }
+          : hasData
+            ? {}
+            : { unitPrice: sp.unitPrice }),
       };
       return updated;
     });

@@ -84,7 +84,8 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
     if (!trimmed) return true;
     return (
       p.name.toLowerCase().includes(lower) ||
-      (p.supplierCode?.toLowerCase().includes(lower) ?? false)
+      (p.supplierCode?.toLowerCase().includes(lower) ?? false) ||
+      (p.spec?.toLowerCase().includes(lower) ?? false)
     );
   });
   const hasExactMatch = products.some((p) => p.name.toLowerCase() === lower);
@@ -295,13 +296,20 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
                           disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
                         )}
                       >
-                        <span className="flex-1 truncate">{p.name}</span>
+                        <span className="flex-1 truncate">
+                          {p.name}
+                          {p.spec && (
+                            <span className="text-jm-xs text-[var(--jm-text-muted)] ml-1">
+                              ({p.spec})
+                            </span>
+                          )}
+                        </span>
                         {p.supplierCode && (
-                          <span className="text-jm-xs text-[var(--jm-text-muted)] mr-2">
+                          <span className="text-jm-xs text-[var(--jm-text-muted)] mr-2 shrink-0">
                             {p.supplierCode}
                           </span>
                         )}
-                        <span className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
+                        <span className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums shrink-0">
                           ₩{parseFloat(p.unitPrice).toLocaleString("ko-KR")}
                         </span>
                         {alreadyAdded && (
