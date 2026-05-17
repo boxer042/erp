@@ -1,20 +1,28 @@
 import { z } from "zod";
 
-export const orderItemSchema = z.object({
-  productId: z.string().min(1, "상품을 선택해주세요"),
-  quantity: z.string().min(1, "수량을 입력해주세요"),
-  unitPrice: z.string().min(1, "단가를 입력해주세요"),
-  /**
-   * 고객이 선택한 옵션값 ID 들 — 결제 시 OrderItem 의 optionSnapshot + OPTION_REF 자식 라인 자동 생성에 사용.
-   * 주문 후 보존되는 건 optionSnapshot (옵션값 라벨 mapping). 이 ID 들은 transient 용.
-   */
-  optionValueIds: z.array(z.string()).optional(),
-  /**
-   * 진입 경로 SKU — 자사몰/외부 채널 한정. SWAP 옵션으로 productId 가 swap 된 후 손님이 본 카탈로그 SKU 보존.
-   * POS 는 직원 입력이라 노이즈 우려로 안 쓰는 게 정책 (analytics 쿼리에서 IS NOT NULL 로 필터).
-   */
-  entryProductId: z.string().nullable().optional(),
-});
+export const orderItemSchema = z
+  .object({
+    // 상품 라인은 productId, 기술료/공임 등 서비스 라인은 serviceName — 둘 중 하나 필수
+    productId: z.string().optional(),
+    /** 기술료/공임 등 상품 없는 서비스 라인명 — productId 없을 때 사용 */
+    serviceName: z.string().optional(),
+    quantity: z.string().min(1, "수량을 입력해주세요"),
+    unitPrice: z.string().min(1, "단가를 입력해주세요"),
+    /**
+     * 고객이 선택한 옵션값 ID 들 — 결제 시 OrderItem 의 optionSnapshot + OPTION_REF 자식 라인 자동 생성에 사용.
+     * 주문 후 보존되는 건 optionSnapshot (옵션값 라벨 mapping). 이 ID 들은 transient 용.
+     */
+    optionValueIds: z.array(z.string()).optional(),
+    /**
+     * 진입 경로 SKU — 자사몰/외부 채널 한정. SWAP 옵션으로 productId 가 swap 된 후 손님이 본 카탈로그 SKU 보존.
+     * POS 는 직원 입력이라 노이즈 우려로 안 쓰는 게 정책 (analytics 쿼리에서 IS NOT NULL 로 필터).
+     */
+    entryProductId: z.string().nullable().optional(),
+  })
+  .refine((v) => !!v.productId?.trim() || !!v.serviceName?.trim(), {
+    message: "상품 또는 기술료 항목명을 입력해주세요",
+    path: ["productId"],
+  });
 
 export const fulfillmentTypeSchema = z.enum([
   "IN_STORE", // 매장 즉시판매 (POS 결제 + 즉시 인도)

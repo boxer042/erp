@@ -13,6 +13,7 @@ import { issueQuotation, openPrintTab, calcCartFingerprint } from "./_issue-docu
 import { PriceInputDialog } from "./_components/price-input-dialog";
 import { DiscountInputDialog } from "./_components/discount-input-dialog";
 import { QuotationLoadSheet } from "./_quotation-load-sheet";
+import { ServiceFeeSheet } from "./_service-fee-sheet";
 
 interface Props {
   open: boolean;
@@ -89,6 +90,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   const [discountOpen, setDiscountOpen] = useState(false);
   const [shippingOpen, setShippingOpen] = useState(false);
   const [quotationLoadOpen, setQuotationLoadOpen] = useState(false);
+  const [serviceFeeOpen, setServiceFeeOpen] = useState(false);
 
   const parkMutation = useMutation({
     mutationFn: () =>
@@ -248,9 +250,9 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
           </div>
         )}
 
-        {/* 액션 — 2×3 그리드: [할인][배송비][시리얼출력] / [장바구니저장][견적서][불러오기] */}
+        {/* 액션 그리드 (4열): [할인][배송비][기술료][시리얼출력] / [장바구니저장][견적서][불러오기] */}
         {items.length > 0 && (
-          <div className="mt-3 grid grid-cols-3 gap-1.5">
+          <div className="mt-3 grid grid-cols-4 gap-1.5">
             <ActionButton
               label="할인"
               sub={
@@ -272,6 +274,11 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               }
               active={!!session.shippingCost && session.shippingCost !== "0"}
               onClick={() => setShippingOpen(true)}
+            />
+            <ActionButton
+              label="기술료"
+              sub="공임 추가"
+              onClick={() => setServiceFeeOpen(true)}
             />
             <ActionButton
               label="시리얼출력"
@@ -329,7 +336,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               onClick={() => setQuotationLoadOpen(true)}
             />
             {cartChangedSinceQuotation && (
-              <p className="col-span-3 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
+              <p className="col-span-4 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
                 ⚠ 카트가 발행 후 변경됨 — 견적서 버튼 다시 눌러 재발행
               </p>
             )}
@@ -360,6 +367,13 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
         initialNet={parseInt(session.shippingCost || "0", 10) || 0}
         taxType="TAXABLE"
         onSubmit={(net) => setSessionShipping(String(net), session.id)}
+      />
+
+      {/* 기술료/공임 추가 — 프리셋 + 직접 입력 */}
+      <ServiceFeeSheet
+        open={serviceFeeOpen}
+        onOpenChange={setServiceFeeOpen}
+        sessionId={session.id}
       />
 
       {/* 견적서 → 카트 로드 — 고객 연결됐을 때만 진입 가능 */}

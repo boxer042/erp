@@ -93,6 +93,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
       if (i.isAddon) {
         return {
           productId: i.productId,
+          itemType: i.itemType,
           name: i.name,
           sku: i.sku,
           quantity: i.quantity,
@@ -116,6 +117,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
       const baseUnitPrice = Math.max(0, i.unitPrice - addPriceSum);
       return {
         productId: i.productId,
+        itemType: i.itemType,
         name: i.name,
         sku: i.sku,
         quantity: i.quantity,

@@ -2435,6 +2435,21 @@ model RepairLabor {
   @@map("repair_labors")
 }
 
+// 판매 기술료/공임 프리셋 — 상품 판매 시 장착·설치 등 추가 청구하는 기술료.
+// POS 카트·ERP 주문 생성에서 빠르게 선택. 수리(RepairLaborPreset) 와 별개 — 판매 라인용.
+model ServiceFeePreset {
+  id        String   @id @default(uuid())
+  name      String // 예: "장착비", "출장 설치비"
+  unitPrice Decimal  @map("unit_price") @db.Decimal(15, 2) // 세전 공급가액 (항상 과세)
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  memo      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("service_fee_presets")
+}
+
 // ============================================================
 // 수리 서비스 카탈로그 (공임 프리셋 / 수리 패키지)
 // ============================================================

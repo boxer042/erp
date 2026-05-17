@@ -22,7 +22,7 @@ import {
 import {
   Package, Store, Truck, ShoppingCart, Warehouse, ChevronDown, ChevronUp, Plus,
   Pencil, Trash2, Loader2, Building2, Landmark, Star, Layout, ChevronRight, Images,
-  ShieldCheck,
+  ShieldCheck, Wrench,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { formatComma, parseComma } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Stats {
@@ -547,7 +548,243 @@ export default function SettingsPage() {
       </AlertDialog>
 
       <CardFeeSection />
+
+      <ServiceFeePresetSection />
     </div>
+  );
+}
+
+interface ServiceFeePreset {
+  id: string;
+  name: string;
+  unitPrice: string | number;
+  memo: string | null;
+}
+
+const emptyServiceFeeForm = { name: "", unitPrice: "", memo: "" };
+
+function ServiceFeePresetSection() {
+  const queryClient = useQueryClient();
+
+  const presetsQuery = useQuery({
+    queryKey: queryKeys.serviceFeePresets.all,
+    queryFn: () => apiGet<ServiceFeePreset[]>("/api/service-fee-presets"),
+  });
+  const presets = presetsQuery.data ?? [];
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyServiceFeeForm);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyServiceFeeForm);
+    setDialogOpen(true);
+  };
+  const openEdit = (p: ServiceFeePreset) => {
+    setEditingId(p.id);
+    setForm({
+      name: p.name,
+      unitPrice: String(Math.round(Number(p.unitPrice))),
+      memo: p.memo ?? "",
+    });
+    setDialogOpen(true);
+  };
+
+  const save = useMutation({
+    mutationFn: () => {
+      const payload = {
+        name: form.name.trim(),
+        unitPrice: parseComma(form.unitPrice) || "0",
+        memo: form.memo.trim() || null,
+      };
+      return editingId
+        ? apiMutate(`/api/service-fee-presets/${editingId}`, "PUT", payload)
+        : apiMutate("/api/service-fee-presets", "POST", payload);
+    },
+    onSuccess: () => {
+      toast.success(editingId ? "수정되었습니다" : "추가되었습니다");
+      setDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceFeePresets.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장에 실패했습니다"),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => apiMutate(`/api/service-fee-presets/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast.success("삭제되었습니다");
+      setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceFeePresets.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
+  });
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-4 w-4" /> 기술료 / 공임 프리셋
+            </CardTitle>
+            <CardDescription>
+              상품 판매 시 장착·설치 등 추가 청구하는 기술료입니다. POS 카트와 주문 등록에서 빠르게 선택할 수 있습니다. 금액은 세전(공급가액) 기준 — 항상 과세.
+            </CardDescription>
+          </div>
+          <Button size="sm" variant="outline" className="h-8 text-[13px] gap-1.5" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" />
+            기술료 추가
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {presetsQuery.isPending ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : presets.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground py-6 text-center">
+              등록된 기술료 프리셋이 없습니다.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>이름</TableHead>
+                  <TableHead className="text-right">금액 (세전)</TableHead>
+                  <TableHead>메모</TableHead>
+                  <TableHead className="w-28 text-right">액션</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {presets.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      ₩{Number(p.unitPrice).toLocaleString("ko-KR")}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{p.memo ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteId(p.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? "기술료 수정" : "기술료 추가"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-[13px]">
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">
+                이름<span className="text-destructive ml-0.5">*</span>
+              </label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="예: 장착비, 출장 설치비"
+                className="h-8 text-[13px]"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">
+                금액 (세전)<span className="text-destructive ml-0.5">*</span>
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatComma(form.unitPrice)}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, unitPrice: parseComma(e.target.value) }))
+                }
+                onFocus={(e) => e.currentTarget.select()}
+                placeholder="예: 20,000"
+                className="h-8 text-[13px]"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">메모</label>
+              <Input
+                value={form.memo}
+                onChange={(e) => setForm((p) => ({ ...p, memo: e.target.value }))}
+                placeholder="선택"
+                className="h-8 text-[13px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="h-8 text-[13px]" onClick={() => setDialogOpen(false)}>
+              취소
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 text-[13px]"
+              onClick={() => {
+                if (!form.name.trim()) {
+                  toast.error("이름은 필수입니다");
+                  return;
+                }
+                save.mutate();
+              }}
+              disabled={save.isPending}
+            >
+              {save.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+              {editingId ? "수정" : "추가"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(v) => !v && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>기술료 프리셋 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 프리셋을 삭제하시겠습니까? 이미 등록된 주문에는 영향이 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteId) remove.mutate(deleteId);
+              }}
+              disabled={remove.isPending}
+            >
+              {remove.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

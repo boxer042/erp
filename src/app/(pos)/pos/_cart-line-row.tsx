@@ -141,6 +141,11 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                   추가구매
                 </span>
               )}
+              {item.itemType === "service" && (
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)]">
+                  기술료
+                </span>
+              )}
               {taxType === "TAX_FREE" && (
                 <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text-muted)]">
                   면세

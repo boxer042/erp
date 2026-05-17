@@ -81,6 +81,9 @@ export const queryKeys = {
   cardCompanyFees: {
     all: ["card-company-fees"] as const,
   },
+  serviceFeePresets: {
+    all: ["service-fee-presets"] as const,
+  },
   customers: {
     all: ["customers"] as const,
     list: (params?: Record<string, unknown>) => ["customers", "list", params ?? {}] as const,

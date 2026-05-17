@@ -60,7 +60,15 @@ interface ProductOption {
   unitOfMeasure: string;
 }
 
+interface ServiceFeePreset {
+  id: string;
+  name: string;
+  unitPrice: string;
+}
+
 interface OrderItemForm {
+  /** "product" — 상품 라인 / "service" — 기술료·공임 등 자유 라인 (productName 이 항목명) */
+  kind: "product" | "service";
   productId: string;
   productName: string;
   sku: string;
@@ -119,6 +127,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
   const [memo, setMemo] = useState("");
   const [items, setItems] = useState<OrderItemForm[]>([]);
   const [productPick, setProductPick] = useState("");
+  const [servicePick, setServicePick] = useState("");
 
   const channelsQuery = useQuery({
     queryKey: ["channels"],
@@ -133,6 +142,11 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
   const productsQuery = useQuery({
     queryKey: ["products", "for-order"],
     queryFn: () => apiGet<ProductOption[]>("/api/products?isBulk=all"),
+    enabled: open,
+  });
+  const serviceFeePresetsQuery = useQuery({
+    queryKey: queryKeys.serviceFeePresets.all,
+    queryFn: () => apiGet<ServiceFeePreset[]>("/api/service-fee-presets"),
     enabled: open,
   });
 
@@ -175,6 +189,18 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
     [productsQuery.data],
   );
 
+  // 기술료 프리셋 combobox
+  const serviceFeeItems = useMemo(
+    () =>
+      (serviceFeePresetsQuery.data ?? []).map((p) => ({
+        id: p.id,
+        label: p.name,
+        description: `₩${Number(p.unitPrice).toLocaleString("ko-KR")}`,
+        unitPrice: p.unitPrice,
+      })),
+    [serviceFeePresetsQuery.data],
+  );
+
   // 초기화
   useEffect(() => {
     if (!open) return;
@@ -195,12 +221,14 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
     setMemo("");
     setItems([]);
     setProductPick("");
+    setServicePick("");
   }, [open]);
 
   const addItem = (item: (typeof productItems)[number]) => {
     setItems((prev) => [
       ...prev,
       {
+        kind: "product",
         productId: item.id,
         productName: item.label,
         sku: item.sku,
@@ -210,6 +238,23 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
       },
     ]);
     setProductPick("");
+  };
+
+  // 기술료 라인 추가 — 프리셋 선택 또는 빈 라인 직접 추가
+  const addServiceItem = (preset?: (typeof serviceFeeItems)[number]) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        kind: "service",
+        productId: "",
+        productName: preset?.label ?? "",
+        sku: "",
+        quantity: "1",
+        unitPrice: preset ? String(preset.unitPrice) : "0",
+        optionValueIds: [],
+      },
+    ]);
+    setServicePick("");
   };
 
   const updateItem = (idx: number, patch: Partial<OrderItemForm>) =>
@@ -232,6 +277,9 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
     mutationFn: () => {
       if (items.length === 0) {
         throw new Error("주문 항목을 1개 이상 추가해주세요");
+      }
+      if (items.some((it) => it.kind === "service" && !it.productName.trim())) {
+        throw new Error("기술료 항목명을 입력해주세요");
       }
       // 매장 인도(IN_STORE/PICKUP) 가 아닐 때만 배송지 필수
       if (
@@ -261,12 +309,20 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
         shippingFee: shippingFee || "0",
         shippingPaymentType,
         memo: memo || undefined,
-        items: items.map((it) => ({
-          productId: it.productId,
-          quantity: it.quantity,
-          unitPrice: it.unitPrice,
-          optionValueIds: it.optionValueIds,
-        })),
+        items: items.map((it) =>
+          it.kind === "service"
+            ? {
+                serviceName: it.productName,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+              }
+            : {
+                productId: it.productId,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                optionValueIds: it.optionValueIds,
+              },
+        ),
       });
     },
     onSuccess: () => {
@@ -448,6 +504,27 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
               />
             </JmFormField>
 
+            <JmFormField
+              label="기술료 / 공임"
+              hint="상품 장착·설치 등 추가 청구 — 프리셋 선택 또는 직접 추가 (항상 과세)"
+            >
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <JmCombobox
+                    items={serviceFeeItems}
+                    value={servicePick}
+                    onChange={(item) => addServiceItem(item)}
+                    placeholder="기술료 프리셋 선택"
+                    searchPlaceholder="기술료명"
+                    emptyMessage="등록된 프리셋 없음 — 설정에서 추가"
+                  />
+                </div>
+                <JmButton variant="outline" onClick={() => addServiceItem()}>
+                  직접 추가
+                </JmButton>
+              </div>
+            </JmFormField>
+
             {items.length > 0 && (
               <div className="overflow-hidden rounded-xl border border-[var(--jm-border)]">
                 <JmTable>
@@ -473,14 +550,32 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                         <Fragment key={idx}>
                           <JmTableRow className="hover:bg-transparent">
                             <JmTableCell>
-                              <div className="flex flex-col">
-                                <span className="text-jm-sm text-[var(--jm-text)]">
-                                  {it.productName}
-                                </span>
-                                <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
-                                  {it.sku}
-                                </span>
-                              </div>
+                              {it.kind === "service" ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-2xs font-semibold text-[var(--jm-text-muted)]">
+                                    기술료
+                                  </span>
+                                  <JmInput
+                                    size="sm"
+                                    value={it.productName}
+                                    onChange={(e) =>
+                                      updateItem(idx, {
+                                        productName: e.target.value,
+                                      })
+                                    }
+                                    placeholder="기술료 항목명"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex flex-col">
+                                  <span className="text-jm-sm text-[var(--jm-text)]">
+                                    {it.productName}
+                                  </span>
+                                  <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
+                                    {it.sku}
+                                  </span>
+                                </div>
+                              )}
                             </JmTableCell>
                             <JmTableCell>
                               <JmInput
@@ -524,13 +619,15 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                             </JmTableCell>
                           </JmTableRow>
                           {/* 옵션 선택 — 옵션 등록된 상품에만 노출. 5개 컬럼 colspan */}
-                          <OrderItemOptionsRow
-                            productId={it.productId}
-                            selectedIds={it.optionValueIds}
-                            onChange={(ids) =>
-                              updateItem(idx, { optionValueIds: ids })
-                            }
-                          />
+                          {it.kind === "product" && (
+                            <OrderItemOptionsRow
+                              productId={it.productId}
+                              selectedIds={it.optionValueIds}
+                              onChange={(ids) =>
+                                updateItem(idx, { optionValueIds: ids })
+                              }
+                            />
+                          )}
                         </Fragment>
                       );
                     })}

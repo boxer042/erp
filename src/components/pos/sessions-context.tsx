@@ -24,7 +24,8 @@ export interface RentalMeta {
 export interface CartItem {
   cartItemId: string;        // 카트 내 고유 식별자 (UUID)
   productId?: string;        // 상품 항목만 있음, 서비스 항목은 없음
-  itemType: "product" | "repair" | "rental";
+  // "service" — 기술료/공임 라인 (상품 없는 자유 라인, 결제 시 OrderItem.serviceName 으로 저장)
+  itemType: "product" | "repair" | "rental" | "service";
   name: string;
   sku?: string;
   imageUrl: string | null;

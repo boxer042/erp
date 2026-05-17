@@ -251,7 +251,9 @@ export async function POST(request: NextRequest) {
   }
 
   // 항목별 taxType 조회 — 면세/영세율 상품은 세액 0
-  const productIds = data.items.map((i) => i.productId).filter(Boolean);
+  const productIds = data.items
+    .map((i) => i.productId)
+    .filter((id): id is string => Boolean(id));
   const products = productIds.length
     ? await prisma.product.findMany({
         where: { id: { in: productIds } },
@@ -277,7 +279,8 @@ export async function POST(request: NextRequest) {
 
   // 메인 라인 + OPTION_REF 자식 라인 모두 평탄화. parentItemIndex 로 부모 link 표시.
   type StagedItem = {
-    productId: string;
+    productId: string | null;
+    serviceName: string | null;
     quantity: number;
     unitPrice: number;
     totalPrice: number;
@@ -292,6 +295,23 @@ export async function POST(request: NextRequest) {
   for (const item of data.items) {
     const qty = parseFloat(item.quantity);
     const price = parseFloat(item.unitPrice);
+
+    // 기술료/공임 등 서비스 라인 — productId 없음. 재고·옵션 무관, 항상 과세.
+    if (!item.productId) {
+      stagedItems.push({
+        productId: null,
+        serviceName: item.serviceName?.trim() || "기술료",
+        quantity: qty,
+        unitPrice: price,
+        totalPrice: qty * price,
+        lineRole: "MAIN",
+        parentItemIndex: null,
+        optionSnapshot: null,
+        entryProductId: null,
+        _taxable: true,
+      });
+      continue;
+    }
 
     // 옵션값 처리 — 추가가 합산 + snapshot + OPTION_REF 자식 라인 후보
     let unitAddPrice = 0;
@@ -312,6 +332,7 @@ export async function POST(request: NextRequest) {
     const mainIdx = stagedItems.length;
     stagedItems.push({
       productId: item.productId,
+      serviceName: null,
       quantity: qty,
       unitPrice: finalUnitPrice,
       totalPrice: qty * finalUnitPrice,
@@ -330,6 +351,7 @@ export async function POST(request: NextRequest) {
         : Number(mp.sellingPrice ?? 0);
       stagedItems.push({
         productId: mp.id,
+        serviceName: null,
         quantity: qty, // 메인 수량과 동일 (1 PC 사면 1 메모리)
         unitPrice: refUnit,
         totalPrice: qty * refUnit,
@@ -410,6 +432,7 @@ export async function POST(request: NextRequest) {
         data: {
           orderId: o.id,
           productId: it.productId,
+          serviceName: it.serviceName ?? undefined,
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           totalPrice: it.totalPrice,

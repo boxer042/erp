@@ -7,7 +7,9 @@ import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
 type Action = "order" | "quotation" | "statement";
 
 interface CheckoutItem {
-  productId?: string;      // 상품 항목만 있음, 서비스 항목(수리/임대)은 없음
+  productId?: string;      // 상품 항목만 있음, 서비스 항목(수리/임대/기술료)은 없음
+  /** 카트 라인 종류 — "repair" 만 RepairTicket 으로 처리. "service"(기술료) 는 일반 OrderItem 서비스 라인. */
+  itemType?: "product" | "repair" | "rental" | "service";
   quantity: number;
   unitPrice: number;       // 할인 전 단가(세전) — 메인 base 가격, optionValueIds addPrice 미포함
   /**
@@ -669,7 +671,8 @@ export async function POST(request: NextRequest) {
         });
         if (existing && existing.status !== "PICKED_UP" && existing.status !== "CANCELLED") {
           // 수리 라인 합계 = 본 수리에 대한 finalAmount
-          const repairLines = body.items.filter((i) => !i.productId);
+          // itemType=repair 만 — 기술료(service)·임대(rental) 라인은 제외
+          const repairLines = body.items.filter((i) => i.itemType === "repair");
           const repairTotal = repairLines.reduce(
             (s, i) =>
               s +

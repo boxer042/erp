@@ -2048,7 +2048,9 @@ export async function PATCH(
   // 항목 변경 시 금액 재계산 — POST /api/orders 와 동일 로직
   let recalcPatch: Record<string, unknown> = {};
   if (data.items !== undefined) {
-    const productIds = data.items.map((i) => i.productId).filter(Boolean);
+    const productIds = data.items
+      .map((i) => i.productId)
+      .filter((id): id is string => Boolean(id));
     const products = productIds.length
       ? await prisma.product.findMany({
           where: { id: { in: productIds } },
@@ -2064,7 +2066,7 @@ export async function PATCH(
         quantity: qty,
         unitPrice: price,
         totalPrice: qty * price,
-        _taxable: (taxTypeById.get(item.productId) ?? "TAXABLE") === "TAXABLE",
+        _taxable: (taxTypeById.get(item.productId ?? "") ?? "TAXABLE") === "TAXABLE",
       };
     });
     const subtotalAmount = items.reduce((sum, i) => sum + i.totalPrice, 0);
