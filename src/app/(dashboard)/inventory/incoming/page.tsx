@@ -19,6 +19,7 @@ import {
   JmCheckbox,
   JmDateRangePicker,
   JmDialog,
+  JmDialogBody,
   JmDialogContent,
   JmDialogFooter,
   JmDialogHeader,
@@ -271,6 +272,8 @@ function IncomingPageInner() {
         spec: sp.spec || "",
         unitOfMeasure: sp.unitOfMeasure,
         originalPrice: sp.unitPrice,
+        // 비교 기준 — 이 공급상품의 직전 입고가(마스터 단가). 입력 단가와 비교해 상승/하락 표시.
+        prevUnitPrice: sp.unitPrice,
         isNew: undefined,
         pendingSourceRow: undefined,
         ...(isSwap
@@ -1519,30 +1522,32 @@ function IncomingPageInner() {
               <JmDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
                 <JmDialogContent size="sm">
                   <JmDialogHeader><JmDialogTitle>입고 확인</JmDialogTitle></JmDialogHeader>
-                  <p className="text-jm-sm text-[var(--jm-text-muted)]">입고를 확인하시겠습니까?<br />재고가 증가하고 원장에 기록됩니다.</p>
-                  {(() => {
-                    const unmappedItems = detail.items.filter(
-                      (i) => !i.supplierProduct.productMappings || i.supplierProduct.productMappings.length === 0
-                    );
-                    const seenNames = new Set<string>();
-                    const unmapped = unmappedItems.filter((i) => {
-                      if (seenNames.has(i.supplierProduct.name)) return false;
-                      seenNames.add(i.supplierProduct.name);
-                      return true;
-                    });
-                    if (unmapped.length === 0) return null;
-                    return (
-                      <div className="mt-3 rounded-lg bg-[var(--jm-warning-bg)] border border-[var(--jm-warning-fg)]/30 px-3 py-2 text-jm-sm text-[var(--jm-warning-fg)]">
-                        <p className="font-medium">미매핑 항목 {unmapped.length}건</p>
-                        <p className="text-jm-xs mt-1 opacity-80">해당 항목은 재고에 반영되지 않습니다 (오르판 로트로 보관, 매핑 시 자동 흡수).</p>
-                        <ul className="mt-1.5 space-y-0.5 text-jm-xs">
-                          {unmapped.map((i) => (
-                            <li key={i.supplierProduct.name}>• {i.supplierProduct.name}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })()}
+                  <JmDialogBody>
+                    <p className="text-jm-sm text-[var(--jm-text-muted)]">입고를 확인하시겠습니까?<br />재고가 증가하고 원장에 기록됩니다.</p>
+                    {(() => {
+                      const unmappedItems = detail.items.filter(
+                        (i) => !i.supplierProduct.productMappings || i.supplierProduct.productMappings.length === 0
+                      );
+                      const seenNames = new Set<string>();
+                      const unmapped = unmappedItems.filter((i) => {
+                        if (seenNames.has(i.supplierProduct.name)) return false;
+                        seenNames.add(i.supplierProduct.name);
+                        return true;
+                      });
+                      if (unmapped.length === 0) return null;
+                      return (
+                        <div className="mt-3 rounded-lg bg-[var(--jm-warning-bg)] border border-[var(--jm-warning-fg)]/30 px-3 py-2 text-jm-sm text-[var(--jm-warning-fg)]">
+                          <p className="font-medium">미매핑 항목 {unmapped.length}건</p>
+                          <p className="text-jm-xs mt-1 opacity-80">해당 항목은 재고에 반영되지 않습니다 (오르판 로트로 보관, 매핑 시 자동 흡수).</p>
+                          <ul className="mt-1.5 space-y-0.5 text-jm-xs">
+                            {unmapped.map((i) => (
+                              <li key={i.supplierProduct.name}>• {i.supplierProduct.name}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()}
+                  </JmDialogBody>
                   <JmDialogFooter>
                     <JmButton variant="ghost" onClick={() => setConfirmDialogOpen(false)} disabled={confirming}>취소</JmButton>
                     <JmButton variant="cta" onClick={() => handleConfirm(detail.id)} disabled={confirming}>
@@ -1555,7 +1560,9 @@ function IncomingPageInner() {
               <JmDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
                 <JmDialogContent size="sm">
                   <JmDialogHeader><JmDialogTitle>입고 취소</JmDialogTitle></JmDialogHeader>
-                  <p className="text-jm-sm text-[var(--jm-text-muted)]">입고를 취소하시겠습니까?</p>
+                  <JmDialogBody>
+                    <p className="text-jm-sm text-[var(--jm-text-muted)]">입고를 취소하시겠습니까?</p>
+                  </JmDialogBody>
                   <JmDialogFooter>
                     <JmButton variant="ghost" onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>닫기</JmButton>
                     <JmButton variant="danger" onClick={() => handleCancel(detail.id)} disabled={cancelling}>
@@ -1568,14 +1575,16 @@ function IncomingPageInner() {
               <JmDialog open={unconfirmDialogOpen} onOpenChange={setUnconfirmDialogOpen}>
                 <JmDialogContent size="md">
                   <JmDialogHeader><JmDialogTitle>입고 확정 취소</JmDialogTitle></JmDialogHeader>
-                  <div className="space-y-2 py-2 text-jm-sm text-[var(--jm-text-muted)]">
-                    <p>확정된 입고를 <span className="text-[var(--jm-text)] font-medium">대기 상태</span>로 되돌립니다. 품목 수정·재확정이 가능해집니다.</p>
-                    <ul className="list-disc pl-5 space-y-1 text-jm-xs">
-                      <li>증가했던 재고 · 로트 · 거래처 원장 · 택배비 경비가 모두 원복됩니다.</li>
-                      <li>확정 시 자동 생성된 상품 매핑이 있으면 매핑이 끊기고 흡수된 과거 입고 로트는 다시 미매핑(오르판) 상태로 돌아갑니다.</li>
-                      <li>이 입고 재고나 흡수된 과거 입고 재고가 이미 <span className="text-[var(--jm-text)]">출고·수리·반품·실사</span>에 사용·차감되었으면 취소가 차단됩니다.</li>
-                    </ul>
-                  </div>
+                  <JmDialogBody>
+                    <div className="space-y-2 text-jm-sm text-[var(--jm-text-muted)]">
+                      <p>확정된 입고를 <span className="text-[var(--jm-text)] font-medium">대기 상태</span>로 되돌립니다. 품목 수정·재확정이 가능해집니다.</p>
+                      <ul className="list-disc pl-5 space-y-1 text-jm-xs">
+                        <li>증가했던 재고 · 로트 · 거래처 원장 · 택배비 경비가 모두 원복됩니다.</li>
+                        <li>확정 시 자동 생성된 상품 매핑이 있으면 매핑이 끊기고 흡수된 과거 입고 로트는 다시 미매핑(오르판) 상태로 돌아갑니다.</li>
+                        <li>이 입고 재고나 흡수된 과거 입고 재고가 이미 <span className="text-[var(--jm-text)]">출고·수리·반품·실사</span>에 사용·차감되었으면 취소가 차단됩니다.</li>
+                      </ul>
+                    </div>
+                  </JmDialogBody>
                   <JmDialogFooter>
                     <JmButton variant="ghost" onClick={() => setUnconfirmDialogOpen(false)} disabled={unconfirming}>닫기</JmButton>
                     <JmButton variant="danger" onClick={() => handleUnconfirm(detail.id)} disabled={unconfirming}>
@@ -1590,7 +1599,8 @@ function IncomingPageInner() {
               <JmDialog open={shippingEditOpen} onOpenChange={setShippingEditOpen}>
                 <JmDialogContent size="md">
                   <JmDialogHeader><JmDialogTitle>택배비 {parseFloat(detail.shippingCost) > 0 ? "수정" : "추가"}</JmDialogTitle></JmDialogHeader>
-                  <div className="space-y-4 py-2">
+                  <JmDialogBody>
+                    <div className="space-y-4">
                     <div className="grid grid-cols-[80px_1fr] items-center gap-2">
                       <p className="text-jm-xs text-[var(--jm-text-muted)]">공급가액</p>
                       <input
@@ -1708,7 +1718,8 @@ function IncomingPageInner() {
                         })}
                       </div>
                     </details>
-                  </div>
+                    </div>
+                  </JmDialogBody>
                   <JmDialogFooter>
                     <JmButton variant="ghost" onClick={() => setShippingEditOpen(false)} disabled={shippingEditSaving}>취소</JmButton>
                     <JmButton variant="cta" onClick={handleShippingEdit} disabled={shippingEditSaving}>
@@ -1823,6 +1834,14 @@ function IncomingPageInner() {
                       const up = parseFloat(item.unitPrice || "0");
                       const discountPerUnit = calcDiscountPerUnit(up, item.discount);
                       const actualPrice = up - discountPerUnit;
+                      // 직전 입고가(공급상품 마스터 단가) 대비 변동 — 신규 상품·미입력은 비교 없음
+                      const prevUnit = item.prevUnitPrice ? parseFloat(item.prevUnitPrice) : null;
+                      const priceDiff =
+                        prevUnit !== null && actualPrice > 0 ? actualPrice - prevUnit : 0;
+                      const priceDiffPct =
+                        priceDiff !== 0 && prevUnit && prevUnit > 0
+                          ? Math.round(Math.abs(priceDiff / prevUnit) * 100)
+                          : 0;
                       const lineSupply = item.supplyAmount ? parseFloat(item.supplyAmount) : actualPrice * qty;
                       const lineTax = Math.round(lineSupply * 0.1);
                       const matchedSp = supplierProducts.find((sp) => sp.id === item.supplierProductId);
@@ -1974,9 +1993,26 @@ function IncomingPageInner() {
                             />
                           </td>
 
-                          {/* 실제단가 */}
+                          {/* 실제단가 — 직전 입고가 대비 상승/하락 표시 */}
                           <td className="border-r border-[var(--jm-border)] text-right px-2 py-1 tabular-nums text-[var(--jm-text)]">
-                            {!isEmptyRow && actualPrice > 0 && formatPrice(actualPrice)}
+                            {!isEmptyRow && actualPrice > 0 && (
+                              <div className="flex flex-col items-end leading-tight">
+                                <span>{formatPrice(actualPrice)}</span>
+                                {priceDiff !== 0 && (
+                                  <span
+                                    className={`text-[10px] whitespace-nowrap ${
+                                      priceDiff > 0
+                                        ? "text-[var(--jm-warning-fg)]"
+                                        : "text-[var(--jm-text-muted)]"
+                                    }`}
+                                    title={`직전 입고가 ₩${formatPrice(prevUnit ?? 0)} 대비`}
+                                  >
+                                    {priceDiff > 0 ? "▲" : "▼"} {formatPrice(Math.abs(priceDiff))}
+                                    {priceDiffPct >= 1 ? ` (${priceDiffPct}%)` : ""}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </td>
 
                           {/* 공급가액 */}

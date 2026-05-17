@@ -93,6 +93,8 @@ export interface IncomingItemForm {
   memo: string;
   itemShippingCost: string;        // VAT 포함 합계. 빈 문자열 = 미설정(분배 적용)
   itemShippingIsTaxable: boolean;  // 품목 운임 과세 여부
+  /** 공급상품 선택 시점의 마스터 단가(직전 입고가, 세전). 입력 실제단가와 비교해 상승/하락 표시. 신규 상품은 없음. */
+  prevUnitPrice?: string;
   isNew?: boolean;
   pendingSourceRow?: number;
   // 발주 기반 입고 시 어느 발주 항목에서 들어온 것인지 연결
