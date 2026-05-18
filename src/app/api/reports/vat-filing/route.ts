@@ -257,7 +257,8 @@ export async function GET(request: NextRequest) {
       if (refundedAmount <= 0) continue;
       const taxRate =
         item.product?.taxType === "TAXABLE" ? Number(item.product.taxRate) : 0;
-      const supplyRefunded = taxRate > 0 ? refundedAmount / (1 + taxRate) : refundedAmount;
+      // OrderItem.refundedAmount 는 이미 세전(공급가액) — 추가 환산 금지
+      const supplyRefunded = refundedAmount;
       orderPartialSupply += supplyRefunded;
       if (taxRate > 0) orderPartialVat += supplyRefunded * taxRate;
     }

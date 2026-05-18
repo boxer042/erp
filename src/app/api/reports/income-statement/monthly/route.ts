@@ -106,10 +106,9 @@ export async function GET(request: NextRequest) {
       const qty = Number(item.quantity);
       const totalPrice = Number(item.totalPrice);
       const refundedAmount = Number(item.refundedAmount);
-      const taxRate =
-        item.product?.taxType === "TAXABLE" ? Number(item.product.taxRate) : 0;
-      const supplyRevenue = taxRate > 0 ? totalPrice / (1 + taxRate) : totalPrice;
-      const supplyRefunded = taxRate > 0 ? refundedAmount / (1 + taxRate) : refundedAmount;
+      // OrderItem.totalPrice / refundedAmount 는 이미 세전(공급가액) — 추가 환산 금지
+      const supplyRevenue = totalPrice;
+      const supplyRefunded = refundedAmount;
 
       const refundRatio =
         !isFullyDeducted && refundedAmount > 0 && totalPrice > 0

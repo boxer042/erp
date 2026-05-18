@@ -201,8 +201,10 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
       const refundedAmount = Number(item.refundedAmount);
       const taxRate =
         item.product?.taxType === "TAXABLE" ? Number(item.product.taxRate) : 0;
-      const supplyRevenue = taxRate > 0 ? totalPrice / (1 + taxRate) : totalPrice;
-      const supplyRefunded = taxRate > 0 ? refundedAmount / (1 + taxRate) : refundedAmount;
+      // OrderItem.totalPrice / refundedAmount 는 이미 세전(공급가액) 기준 저장값.
+      // 추가 환산(÷1.1) 금지 — 이중 차감됨.
+      const supplyRevenue = totalPrice;
+      const supplyRefunded = refundedAmount;
 
       // 부분환불 비율 (활성 주문에만 적용 — 0~1 사이)
       const refundRatio =
