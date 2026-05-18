@@ -69,7 +69,7 @@ export function NameAutocomplete({
         className={inputClassName}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-md border border-input bg-popover shadow-md">
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] shadow-md">
           {suggestions.map((it) => (
             <button
               key={it.id}
@@ -79,7 +79,7 @@ export function NameAutocomplete({
                 onChange(it.name);
                 setOpen(false);
               }}
-              className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-left"
+              className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-[var(--jm-surface-muted)] text-left"
             >
               <span className="truncate">{it.name}</span>
               {it.badge && <JmBadge variant="outline" className="ml-2 shrink-0">{it.badge}</JmBadge>}
@@ -88,10 +88,10 @@ export function NameAutocomplete({
         </div>
       )}
       {exactMatch && (
-        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+        <p className="mt-1 text-xs text-[var(--jm-warning-fg)]">
           {warningLabel}: <span className="font-medium">{exactMatch.name}</span>
           {exactMatch.badge && (
-            <span className="ml-1 text-muted-foreground">({exactMatch.badge})</span>
+            <span className="ml-1 text-[var(--jm-text-muted)]">({exactMatch.badge})</span>
           )}
         </p>
       )}
@@ -125,11 +125,11 @@ export function Field({
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={targetId} className="block text-[12px] font-medium text-muted-foreground">
+      <label htmlFor={targetId} className="block text-jm-xs font-medium text-[var(--jm-text-muted)]">
         {label}{required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
       {renderedChildren}
-      {hint && <div className="text-[11px] text-amber-400/90">{hint}</div>}
+      {hint && <div className="text-jm-2xs text-[var(--jm-warning-fg)]">{hint}</div>}
     </div>
   );
 }
@@ -137,8 +137,8 @@ export function Field({
 export function GroupHeader({ step, title, id }: { step: string; title: string; id?: string }) {
   return (
     <div id={id} className="flex items-center gap-2 pt-2 first:pt-0 scroll-mt-4">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{step}</span>
-      <span className="text-[12px] font-medium text-muted-foreground">{title}</span>
+      <span className="text-jm-3xs font-bold uppercase tracking-wider text-[var(--jm-text-muted)]">{step}</span>
+      <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">{title}</span>
       <div className="flex-1 h-px bg-secondary" />
     </div>
   );
@@ -156,7 +156,7 @@ export function SectionTitle({
   return (
     <div className="flex items-center gap-2 mb-2">
       {icon}
-      <h4 className="text-[12px] font-semibold text-foreground">{title}</h4>
+      <h4 className="text-jm-xs font-semibold text-[var(--jm-text)]">{title}</h4>
       {badge && <span className="ml-auto">{badge}</span>}
     </div>
   );
@@ -172,7 +172,7 @@ export function ToggleGroup<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-lg border border-border overflow-hidden h-9">
+    <div className="flex rounded-lg border border-[var(--jm-border)] overflow-hidden h-9">
       {options.map((o) => (
         <button
           key={o.value}
@@ -180,8 +180,8 @@ export function ToggleGroup<T extends string>({
           onClick={() => onChange(o.value)}
           className={`flex-1 text-sm font-medium transition-colors ${
             value === o.value
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-secondary text-[var(--jm-text)]"
+              : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
           }`}
         >
           {o.label}
@@ -213,7 +213,7 @@ export function CostList({
     const hasShipping = avgShippingCost != null && avgShippingCost > 0;
     if (!hasCosts && !hasShipping) {
       return (
-        <p className="text-[12px] text-muted-foreground py-4 text-center">
+        <p className="text-jm-xs text-[var(--jm-text-muted)] py-4 text-center">
           {emptyLabel ?? "등록된 입고 비용이 없습니다"}
         </p>
       );
@@ -221,28 +221,28 @@ export function CostList({
     return (
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-muted text-muted-foreground text-xs">
-            <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">비용명</th>
-            <th className="border-r border-b border-border w-[80px] py-1.5 px-2 text-center font-medium">유형</th>
-            <th className="border-r border-b border-border w-[90px] py-1.5 px-2 text-center font-medium">공급가액</th>
-            <th className="border-r border-b border-border w-[80px] py-1.5 px-2 text-center font-medium">세액</th>
-            <th className="border-b border-border w-[90px] py-1.5 px-2 text-center font-medium">금액</th>
+          <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs">
+            <th className="border-r border-b border-[var(--jm-border)] py-1.5 px-2 text-left font-medium">비용명</th>
+            <th className="border-r border-b border-[var(--jm-border)] w-[80px] py-1.5 px-2 text-center font-medium">유형</th>
+            <th className="border-r border-b border-[var(--jm-border)] w-[90px] py-1.5 px-2 text-center font-medium">공급가액</th>
+            <th className="border-r border-b border-[var(--jm-border)] w-[80px] py-1.5 px-2 text-center font-medium">세액</th>
+            <th className="border-b border-[var(--jm-border)] w-[90px] py-1.5 px-2 text-center font-medium">금액</th>
           </tr>
         </thead>
         <tbody>
           {hasShipping && (
-            <tr className="border-b border-border bg-card">
-              <td className="border-r border-border px-2 py-2 text-[12px] text-muted-foreground">
-                평균 배송비{avgShippingIsTaxable && <span className="ml-1 text-[10px]">(과세)</span>}
+            <tr className="border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+              <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs text-[var(--jm-text-muted)]">
+                평균 배송비{avgShippingIsTaxable && <span className="ml-1 text-jm-3xs">(과세)</span>}
               </td>
-              <td className="border-r border-border px-2 py-2 text-[12px] text-center text-muted-foreground">고정</td>
-              <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums">
+              <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs text-center text-[var(--jm-text-muted)]">고정</td>
+              <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs text-right tabular-nums">
                 ₩{Math.round(avgShippingIsTaxable ? avgShippingCost! / 1.1 : avgShippingCost!).toLocaleString("ko-KR")}
               </td>
-              <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums">
+              <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs text-right tabular-nums">
                 {avgShippingIsTaxable ? `₩${Math.round(avgShippingCost! / 1.1 * 0.1).toLocaleString("ko-KR")}` : "—"}
               </td>
-              <td className="px-2 py-2 text-[12px] text-right tabular-nums">
+              <td className="px-2 py-2 text-jm-xs text-right tabular-nums">
                 ₩{Math.round(avgShippingCost!).toLocaleString("ko-KR")}
               </td>
             </tr>
@@ -256,18 +256,18 @@ export function CostList({
               ? Math.round((v / 1.1) * 0.1)
               : null;
             return (
-              <tr key={cost.id} className="border-b border-border">
-                <td className="border-r border-border px-2 py-2 text-[12px]">{cost.name || "—"}</td>
-                <td className="border-r border-border px-2 py-2 text-[12px] text-center text-muted-foreground">
+              <tr key={cost.id} className="border-b border-[var(--jm-border)]">
+                <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs">{cost.name || "—"}</td>
+                <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs text-center text-[var(--jm-text-muted)]">
                   {cost.costType === "FIXED" ? "고정" : "비율"}
                 </td>
-                <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums text-muted-foreground">
+                <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs text-right tabular-nums text-[var(--jm-text-muted)]">
                   {supply != null ? `₩${supply.toLocaleString("ko-KR")}` : "—"}
                 </td>
-                <td className="border-r border-border px-2 py-2 text-[12px] text-right tabular-nums text-muted-foreground">
+                <td className="border-r border-[var(--jm-border)] px-2 py-2 text-jm-xs text-right tabular-nums text-[var(--jm-text-muted)]">
                   {tax != null ? `₩${tax.toLocaleString("ko-KR")}` : "—"}
                 </td>
-                <td className="px-2 py-2 text-[12px] text-right tabular-nums">
+                <td className="px-2 py-2 text-jm-xs text-right tabular-nums">
                   {cost.costType === "FIXED" && v
                     ? `₩${v.toLocaleString("ko-KR")}`
                     : cost.value
@@ -287,51 +287,51 @@ export function CostList({
     {/* PC 테이블 */}
     <table className="hidden md:table w-full text-sm">
       <thead>
-        <tr className="bg-muted text-muted-foreground text-xs">
-          <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">비용명</th>
-          <th className="border-r border-b border-border w-[90px] py-1.5 px-2 text-center font-medium">유형</th>
-          <th className="border-r border-b border-border w-[90px] py-1.5 px-2 text-center font-medium">공급가액</th>
-          <th className="border-r border-b border-border w-[80px] py-1.5 px-2 text-center font-medium">세액</th>
-          <th className="border-r border-b border-border w-[90px] py-1.5 px-2 text-center font-medium">금액</th>
-          <th className="border-b border-border w-[32px]" />
+        <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs">
+          <th className="border-r border-b border-[var(--jm-border)] py-1.5 px-2 text-left font-medium">비용명</th>
+          <th className="border-r border-b border-[var(--jm-border)] w-[90px] py-1.5 px-2 text-center font-medium">유형</th>
+          <th className="border-r border-b border-[var(--jm-border)] w-[90px] py-1.5 px-2 text-center font-medium">공급가액</th>
+          <th className="border-r border-b border-[var(--jm-border)] w-[80px] py-1.5 px-2 text-center font-medium">세액</th>
+          <th className="border-r border-b border-[var(--jm-border)] w-[90px] py-1.5 px-2 text-center font-medium">금액</th>
+          <th className="border-b border-[var(--jm-border)] w-[32px]" />
         </tr>
       </thead>
       <tbody>
         {costs.map((cost, idx) => (
-          <tr key={cost.id} className="border-b border-border hover:bg-muted/50">
-            <td className="border-r border-border px-1 py-0.5">
+          <tr key={cost.id} className="border-b border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]/50">
+            <td className="border-r border-[var(--jm-border)] px-1 py-0.5">
               <JmInput
                 placeholder="비용명"
                 value={cost.name}
                 onChange={(e) => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
-                className="h-7 text-[12px] border-0 bg-transparent focus-visible:ring-0 px-1"
+                className="h-7 text-jm-xs border-0 bg-transparent focus-visible:ring-0 px-1"
               />
             </td>
-            <td className="border-r border-border px-1 py-0.5">
-              <div className="flex rounded border border-border overflow-hidden">
+            <td className="border-r border-[var(--jm-border)] px-1 py-0.5">
+              <div className="flex rounded border border-[var(--jm-border)] overflow-hidden">
                 {(["FIXED", "PERCENTAGE"] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, costType: type } : c))}
-                    className={`flex-1 h-7 text-[11px] transition-colors ${cost.costType === type ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
+                    className={`flex-1 h-7 text-jm-2xs transition-colors ${cost.costType === type ? "bg-secondary text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"}`}
                   >
                     {type === "FIXED" ? "고정" : "비율"}
                   </button>
                 ))}
               </div>
             </td>
-            <td className="border-r border-border px-2 py-0.5 text-right text-[11px] tabular-nums text-muted-foreground">
+            <td className="border-r border-[var(--jm-border)] px-2 py-0.5 text-right text-jm-2xs tabular-nums text-[var(--jm-text-muted)]">
               {cost.costType === "FIXED" && cost.value
                 ? `₩${Math.round(cost.isTaxable ? parseFloat(cost.value) / 1.1 : parseFloat(cost.value)).toLocaleString("ko-KR")}`
                 : "—"}
             </td>
-            <td className="border-r border-border px-2 py-0.5 text-right text-[11px] tabular-nums text-muted-foreground">
+            <td className="border-r border-[var(--jm-border)] px-2 py-0.5 text-right text-jm-2xs tabular-nums text-[var(--jm-text-muted)]">
               {cost.costType === "FIXED" && cost.value && cost.isTaxable
                 ? `₩${Math.round(parseFloat(cost.value) / 1.1 * 0.1).toLocaleString("ko-KR")}`
                 : "—"}
             </td>
-            <td className="border-r border-border px-1 py-0.5">
+            <td className="border-r border-[var(--jm-border)] px-1 py-0.5">
               <JmInput
                 type="text"
                 inputMode={cost.costType === "PERCENTAGE" ? "decimal" : "numeric"}
@@ -342,13 +342,13 @@ export function CostList({
                   onChange((prev) => prev.map((c, i) => i === idx ? { ...c, value: v } : c));
                 }}
                 onFocus={focusCaretEnd}
-                className="h-7 text-[12px] text-right border-0 bg-transparent focus-visible:ring-0 px-1"
+                className="h-7 text-jm-xs text-right border-0 bg-transparent focus-visible:ring-0 px-1"
               />
             </td>
             <td className="text-center">
               <button
                 type="button"
-                className="text-muted-foreground hover:text-red-400 transition-colors p-1"
+                className="text-[var(--jm-text-muted)] hover:text-red-400 transition-colors p-1"
                 onClick={() => onChange((prev) => prev.filter((_, i) => i !== idx))}
               >
                 <X className="h-3 w-3" />
@@ -357,19 +357,19 @@ export function CostList({
           </tr>
         ))}
         {avgShippingCost != null && avgShippingCost > 0 && (
-          <tr className="border-b border-border bg-card">
-            <td className="border-r border-border px-2 py-1.5 text-[12px] text-muted-foreground">
+          <tr className="border-b border-[var(--jm-border)] bg-[var(--jm-surface)]">
+            <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-jm-xs text-[var(--jm-text-muted)]">
               평균 배송비{avgShippingIsTaxable && <span className="ml-1">(과세)</span>}
-              <span className="ml-1.5 text-[11px] text-muted-foreground">과거 입고 기준·수정 불가</span>
+              <span className="ml-1.5 text-jm-2xs text-[var(--jm-text-muted)]">과거 입고 기준·수정 불가</span>
             </td>
-            <td className="border-r border-border px-2 py-1.5 text-[12px] text-center text-muted-foreground">고정</td>
-            <td className="border-r border-border px-2 py-1.5 text-[12px] text-right tabular-nums text-muted-foreground">
+            <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-jm-xs text-center text-[var(--jm-text-muted)]">고정</td>
+            <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-jm-xs text-right tabular-nums text-[var(--jm-text-muted)]">
               ₩{Math.round(avgShippingIsTaxable ? avgShippingCost / 1.1 : avgShippingCost).toLocaleString("ko-KR")}
             </td>
-            <td className="border-r border-border px-2 py-1.5 text-[12px] text-right tabular-nums text-muted-foreground">
+            <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-jm-xs text-right tabular-nums text-[var(--jm-text-muted)]">
               {avgShippingIsTaxable ? `₩${Math.round(avgShippingCost / 1.1 * 0.1).toLocaleString("ko-KR")}` : "—"}
             </td>
-            <td className="border-r border-border px-2 py-1.5 text-[12px] text-right tabular-nums">
+            <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-jm-xs text-right tabular-nums">
               ₩{Math.round(avgShippingCost).toLocaleString("ko-KR")}
             </td>
             <td />
@@ -380,7 +380,7 @@ export function CostList({
             <button
               type="button"
               onClick={() => onChange((prev) => [...prev, emptyCostRow()])}
-              className="flex items-center gap-1.5 text-muted-foreground text-[12px] hover:text-primary transition-colors"
+              className="flex items-center gap-1.5 text-[var(--jm-text-muted)] text-jm-xs hover:text-[var(--jm-text)] transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
               {addLabel}
@@ -400,30 +400,30 @@ export function CostList({
           ? Math.round(parseFloat(cost.value) / 1.1 * 0.1)
           : 0;
         return (
-          <div key={cost.id} className="rounded-lg border border-border bg-card p-2.5 space-y-2">
+          <div key={cost.id} className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] p-2.5 space-y-2">
             <div className="flex items-center gap-2">
               <JmInput
                 placeholder="비용명"
                 value={cost.name}
                 onChange={(e) => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
-                className="h-9 text-[13px] flex-1"
+                className="h-9 text-jm-sm flex-1"
               />
               <button
                 type="button"
-                className="text-muted-foreground hover:text-red-400 transition-colors p-1.5 shrink-0"
+                className="text-[var(--jm-text-muted)] hover:text-red-400 transition-colors p-1.5 shrink-0"
                 onClick={() => onChange((prev) => prev.filter((_, i) => i !== idx))}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex rounded border border-border overflow-hidden shrink-0">
+              <div className="flex rounded border border-[var(--jm-border)] overflow-hidden shrink-0">
                 {(["FIXED", "PERCENTAGE"] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, costType: type } : c))}
-                    className={`px-3 h-9 text-[12px] transition-colors ${cost.costType === type ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
+                    className={`px-3 h-9 text-jm-xs transition-colors ${cost.costType === type ? "bg-secondary text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"}`}
                   >
                     {type === "FIXED" ? "고정" : "비율"}
                   </button>
@@ -439,11 +439,11 @@ export function CostList({
                   onChange((prev) => prev.map((c, i) => i === idx ? { ...c, value: v } : c));
                 }}
                 onFocus={focusCaretEnd}
-                className="h-9 flex-1 text-right text-[13px]"
+                className="h-9 flex-1 text-right text-jm-sm"
               />
             </div>
             {cost.costType === "FIXED" && cost.value && (
-              <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums px-1">
+              <div className="flex justify-between text-jm-2xs text-[var(--jm-text-muted)] tabular-nums px-1">
                 <span>공급가액 ₩{supplyAmount.toLocaleString("ko-KR")}</span>
                 <span>세액 {cost.isTaxable ? `₩${taxAmount.toLocaleString("ko-KR")}` : "—"}</span>
               </div>
@@ -452,15 +452,15 @@ export function CostList({
         );
       })}
       {avgShippingCost != null && avgShippingCost > 0 && (
-        <div className="rounded-lg border border-border bg-card p-2.5 space-y-1">
-          <div className="flex items-center justify-between text-[12px]">
-            <span className="text-muted-foreground">
-              평균 배송비{avgShippingIsTaxable && <span className="ml-1 text-[10px]">(과세)</span>}
-              <span className="ml-1.5 text-[10px] text-muted-foreground">과거 입고 기준·수정 불가</span>
+        <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] p-2.5 space-y-1">
+          <div className="flex items-center justify-between text-jm-xs">
+            <span className="text-[var(--jm-text-muted)]">
+              평균 배송비{avgShippingIsTaxable && <span className="ml-1 text-jm-3xs">(과세)</span>}
+              <span className="ml-1.5 text-jm-3xs text-[var(--jm-text-muted)]">과거 입고 기준·수정 불가</span>
             </span>
             <span className="tabular-nums">₩{Math.round(avgShippingCost).toLocaleString("ko-KR")}</span>
           </div>
-          <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums px-1">
+          <div className="flex justify-between text-jm-2xs text-[var(--jm-text-muted)] tabular-nums px-1">
             <span>공급가액 ₩{Math.round(avgShippingIsTaxable ? avgShippingCost / 1.1 : avgShippingCost).toLocaleString("ko-KR")}</span>
             <span>세액 {avgShippingIsTaxable ? `₩${Math.round(avgShippingCost / 1.1 * 0.1).toLocaleString("ko-KR")}` : "—"}</span>
           </div>
@@ -469,7 +469,7 @@ export function CostList({
       <button
         type="button"
         onClick={() => onChange((prev) => [...prev, emptyCostRow()])}
-        className="flex items-center gap-1.5 text-muted-foreground text-[13px] hover:text-primary transition-colors py-2"
+        className="flex items-center gap-1.5 text-[var(--jm-text-muted)] text-jm-sm hover:text-[var(--jm-text)] transition-colors py-2"
       >
         <Plus className="h-4 w-4" />
         {addLabel}
@@ -516,8 +516,8 @@ export function TypeSelectScreen({ onSelect }: { onSelect: (type: ProductType) =
   return (
     <div className="max-w-2xl mx-auto px-5 py-8 space-y-3">
       <div className="mb-5">
-        <h2 className="text-base font-semibold text-foreground">어떤 상품을 등록하시겠어요?</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">상품 유형에 따라 등록 방법이 달라집니다</p>
+        <h2 className="text-base font-semibold text-[var(--jm-text)]">어떤 상품을 등록하시겠어요?</h2>
+        <p className="text-jm-sm text-[var(--jm-text-muted)] mt-1">상품 유형에 따라 등록 방법이 달라집니다</p>
       </div>
       {PRODUCT_TYPE_CARDS.map(({ type, label, Icon, desc }) => {
         const accent = TYPE_ACCENT[type];
@@ -526,7 +526,7 @@ export function TypeSelectScreen({ onSelect }: { onSelect: (type: ProductType) =
             key={type}
             type="button"
             onClick={() => onSelect(type)}
-            className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl border border-border bg-card text-left hover:border-border hover:bg-muted/50 transition-all group"
+            className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] text-left hover:border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]/50 transition-all group"
           >
             <div
               className="p-2.5 rounded-lg shrink-0 transition-colors"
@@ -535,10 +535,10 @@ export function TypeSelectScreen({ onSelect }: { onSelect: (type: ProductType) =
               <Icon className="h-5 w-5 transition-colors" style={{ color: accent }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-foreground text-sm">{label}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">{desc}</p>
+              <p className="font-semibold text-[var(--jm-text)] text-sm">{label}</p>
+              <p className="text-jm-xs text-[var(--jm-text-muted)] mt-0.5 leading-relaxed">{desc}</p>
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-muted-foreground transition-colors shrink-0" />
+            <ChevronRight className="h-4 w-4 text-[var(--jm-text-muted)] group-hover:text-[var(--jm-text-muted)] transition-colors shrink-0" />
           </button>
         );
       })}

@@ -14,7 +14,9 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
-    trace: "retain-on-failure",
+    // PW_RECORD=1 이면 통과 테스트도 영상·트레이스 기록 (실행 영상 확인용)
+    trace: process.env.PW_RECORD ? "on" : "retain-on-failure",
+    video: process.env.PW_RECORD ? "on" : "retain-on-failure",
     screenshot: "only-on-failure",
     locale: "ko-KR",
   },

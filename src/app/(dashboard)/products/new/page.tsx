@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { computeUnitCost, computeSupplierProductAvgShipping } from "@/lib/cost-utils";
-import { NewProductForm } from "@/components/new-product-form";
+import { NewProductForm } from "@/components/new-product-form-v2";
 import type { ProductOption } from "@/components/product-combobox";
 
 export default async function NewProductPage() {

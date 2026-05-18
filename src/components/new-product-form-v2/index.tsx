@@ -16,6 +16,7 @@ import {
   JmIconButton,
   JmInput,
   JmSelect,
+  JmSwitch,
   JmTextarea,
   JmTooltipContent,
   JmTooltipProvider,
@@ -26,7 +27,7 @@ import { RefreshCw, Plus, X, Loader2, ChevronLeft, ChevronRight, Calculator, Inf
 import { ComponentIncomingInfoSections } from "@/components/product";
 import { toast } from "sonner";
 import { UNITS_OF_MEASURE } from "@/lib/constants";
-import { formatComma, parseComma, cn } from "@/lib/utils";
+import { formatComma, parseComma } from "@/lib/utils";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { SupplierProductCombobox } from "@/components/supplier-product-combobox";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
@@ -57,17 +58,17 @@ import {
   type SetComponentRow,
   type ParentProductRow,
   type ProductType,
-} from "./new-product-form/types";
+} from "../new-product-form/types";
 import {
   Field,
-  GroupHeader,
   SectionTitle,
   CostList,
   TypeSelectScreen,
   PRODUCT_TYPE_CARDS,
   NameAutocomplete,
-} from "./new-product-form/parts";
+} from "../new-product-form/parts";
 import { ShippingHistoryCard } from "@/components/shipping-history-card";
+import { buildSteps, STEP_LABEL, type StepId } from "./steps";
 
 // OPTION_PARENT 옵션값 한 줄 — 라벨 + 연결할 단품(SWAP 대상)
 type OptionValueRow = {
@@ -118,11 +119,12 @@ export function NewProductForm({
   const [newBulkName, setNewBulkName] = useState("");
   const [newBulkUnit, setNewBulkUnit] = useState("mL");
   const bulkNameAutoSync = useRef(true);
-  const [step, setStep] = useState<"type" | "form">(
-    defaultProductType || presetCanonicalId ? "form" : "type",
-  );
   const [productType, setProductType] = useState<ProductType>(
     defaultProductType ?? "FINISHED",
+  );
+  // 스텝 마법사 — 0=type, 1=basic, ... 마지막=review
+  const [currentStepIdx, setCurrentStepIdx] = useState(
+    defaultProductType || presetCanonicalId ? 1 : 0,
   );
 
   const [form, setForm] = useState({
@@ -264,128 +266,24 @@ export function NewProductForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
-  const [activeStep, setActiveStep] = useState(1);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const suppressScrollUpdateRef = useRef(false);
 
-  const stepItems = useMemo(() => {
-    const items = [
-      { id: 1, anchor: "np-step-1", label: "거래처 매핑" },
-      { id: 2, anchor: "np-step-2", label: "상품 정보" },
-      { id: 3, anchor: "np-step-3", label: "비용" },
-    ];
-    // OPTION_PARENT 는 자체 가격/매핑 없음 — 가격/채널 대신 옵션 구성 STEP
-    if (productType === "OPTION_PARENT") {
-      items.push({ id: 4, anchor: "np-step-opt", label: "옵션 구성" });
-    } else {
-      items.push({ id: 4, anchor: "np-step-4", label: "가격 설정" });
-      if (channels.length > 0) {
-        items.push({ id: 5, anchor: "np-step-5", label: "채널별 가격" });
-      }
-    }
-    return items;
-  }, [channels.length, productType]);
+  // ── 스텝 마법사 ──
+  const steps = useMemo<StepId[]>(
+    () => buildSteps(productType, channels.length > 0),
+    [productType, channels.length],
+  );
+  // productType 변경으로 스텝 수가 줄면 인덱스 클램프
+  const safeStepIdx = Math.min(currentStepIdx, steps.length - 1);
+  const currentStep = steps[safeStepIdx];
 
-  const getViewport = useCallback((): HTMLElement | null => {
-    return scrollAreaRef.current;
-  }, []);
-
-  const scrollToStep = useCallback((anchor: string) => {
-    const viewport = getViewport();
-    const target = viewport?.querySelector<HTMLElement>(`#${anchor}`);
-    if (viewport && target) {
-      viewport.scrollTo({ top: target.offsetTop - 8, behavior: "smooth" });
-    }
-  }, [getViewport]);
-
+  // 스텝 이동 시 본문 스크롤 맨 위로
   useEffect(() => {
-    if (step !== "form") return;
-    const viewport = getViewport();
-    if (!viewport) return;
-
-    const getAnchorPairs = () =>
-      stepItems
-        .map((s) => ({ id: s.id, el: viewport.querySelector<HTMLElement>(`#${s.anchor}`) }))
-        .filter((x): x is { id: number; el: HTMLElement } => !!x.el);
-
-    const update = () => {
-      if (suppressScrollUpdateRef.current) return;
-      const pairs = getAnchorPairs();
-      if (pairs.length === 0) return;
-      const scrollTop = viewport.scrollTop;
-      // 바닥 근처면 마지막 STEP 강제 (마지막 섹션이 짧아 threshold를 못 넘기는 케이스 방지)
-      const atBottom =
-        viewport.scrollHeight - scrollTop - viewport.clientHeight < 8;
-      if (atBottom) {
-        setActiveStep(pairs[pairs.length - 1].id);
-        return;
-      }
-      const threshold = 60;
-      let current = pairs[0].id;
-      for (const p of pairs) {
-        if (p.el.offsetTop - threshold <= scrollTop) {
-          current = p.id;
-        }
-      }
-      setActiveStep(current);
-    };
-
-    const setFromInteraction = (stepId: number) => {
-      suppressScrollUpdateRef.current = true;
-      setActiveStep(stepId);
-      window.setTimeout(() => {
-        suppressScrollUpdateRef.current = false;
-      }, 400);
-    };
-
-    const resolveStep = (y: number): number | null => {
-      const pairs = getAnchorPairs();
-      if (pairs.length === 0) return null;
-      let current = pairs[0].id;
-      for (const p of pairs) {
-        if (p.el.offsetTop <= y) current = p.id;
-      }
-      return current;
-    };
-
-    const onClick = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t || !viewport.contains(t)) return;
-      // label → 내부 input 으로 재발행되는 synthetic click은 clientX/Y가 (0, 0)임.
-      // 실제 사용자 좌표가 없으면 이 이벤트는 무시.
-      if (e.clientX === 0 && e.clientY === 0) return;
-      const vpTop = viewport.getBoundingClientRect().top;
-      const y = e.clientY - vpTop + viewport.scrollTop;
-      const s = resolveStep(y);
-      if (s != null) setFromInteraction(s);
-    };
-
-    const onFocusIn = (e: FocusEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t || !viewport.contains(t)) return;
-      // 실제 visible한 focusable 엘리먼트(가장 가까운 label/button/input/textarea/select)의 rect 기준
-      const focusable = (t.closest("label, button, a, select, textarea") as HTMLElement | null) ?? t;
-      const rect = focusable.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      const vpTop = viewport.getBoundingClientRect().top;
-      const y = rect.top - vpTop + viewport.scrollTop;
-      const s = resolveStep(y);
-      if (s != null) setFromInteraction(s);
-    };
-
-    update();
-    viewport.addEventListener("scroll", update, { passive: true });
-    viewport.addEventListener("focusin", onFocusIn as EventListener);
-    viewport.addEventListener("click", onClick as EventListener);
-    return () => {
-      viewport.removeEventListener("scroll", update);
-      viewport.removeEventListener("focusin", onFocusIn as EventListener);
-      viewport.removeEventListener("click", onClick as EventListener);
-    };
-  }, [step, channels.length, productType, mapping.supplierId, mapping.supplierProductId, getViewport, stepItems]);
+    scrollAreaRef.current?.scrollTo({ top: 0 });
+  }, [safeStepIdx]);
 
   const resetAll = useCallback(() => {
-    setStep("type");
+    setCurrentStepIdx(0);
     setProductType("FINISHED");
     setForm({
       name: "",
@@ -447,7 +345,7 @@ export function NewProductForm({
   }, [channels]);
 
   const isDirty = (
-    step === "form" && (
+    currentStepIdx > 0 && (
       form.name.trim() !== "" ||
       form.brand.trim() !== "" ||
       form.modelName.trim() !== "" ||
@@ -487,7 +385,67 @@ export function NewProductForm({
 
   const handleSelectType = (type: ProductType) => {
     setProductType(type);
-    setStep("form");
+    setCurrentStepIdx(1);
+  };
+
+  // 현재 스텝의 필수값 검증 — 통과 시 true
+  const validateStep = (stepId: StepId): boolean => {
+    if (stepId === "basic") {
+      if (!form.name.trim()) {
+        toast.error("상품명을 입력해주세요");
+        return false;
+      }
+      if (!form.sku.trim()) {
+        toast.error("SKU를 입력해주세요");
+        return false;
+      }
+    }
+    if (stepId === "components") {
+      if (setComponents.some((c) => !c.product)) {
+        toast.error("구성 상품을 모두 선택해주세요");
+        return false;
+      }
+      const seen = new Set<string>();
+      for (const c of setComponents) {
+        const id = c.product!.id;
+        if (seen.has(id)) {
+          toast.error("구성 상품이 중복됩니다");
+          return false;
+        }
+        seen.add(id);
+      }
+    }
+    if (stepId === "options") {
+      if (!optionSlotName.trim()) {
+        toast.error("옵션 슬롯명을 입력해주세요");
+        return false;
+      }
+      const filled = optionParentValues.filter((v) => v.label.trim() && v.product);
+      if (filled.length === 0) {
+        toast.error("옵션값을 1개 이상 단품에 연결해주세요");
+        return false;
+      }
+      const seenOpt = new Set<string>();
+      for (const v of filled) {
+        if (seenOpt.has(v.product!.id)) {
+          toast.error("같은 단품이 옵션값에 중복 연결되어 있습니다");
+          return false;
+        }
+        seenOpt.add(v.product!.id);
+      }
+    }
+    return true;
+  };
+
+  const goNextStep = () => {
+    if (!validateStep(currentStep)) return;
+    setCurrentStepIdx((i) => Math.min(i + 1, steps.length - 1));
+  };
+  const goPrevStep = () => setCurrentStepIdx((i) => Math.max(i - 1, 0));
+  // review 에서 항목 "수정" → 해당 스텝으로 점프
+  const jumpToStep = (stepId: StepId) => {
+    const idx = steps.indexOf(stepId);
+    if (idx >= 0) setCurrentStepIdx(idx);
   };
 
   // ASSEMBLED일 때 템플릿 목록을 불러온다 (각 템플릿 상세까지 한 번에 조회)
@@ -1121,224 +1079,222 @@ export function NewProductForm({
     const marginAmount = activeCalcPrice.marginAmount;
     const marginRate = activeCalcPrice.marginRate;
 
+    const cardFeeLabel = (
+      <>
+        카드수수료{" "}
+        <span className="text-jm-3xs">
+          (판매가 {(cardFeeRate * 100).toFixed(2)}%)
+        </span>
+      </>
+    );
     return (
       <section>
         <SectionTitle
-          icon={<Calculator className="h-4 w-4 text-muted-foreground" />}
+          icon={<Calculator className="h-4 w-4 text-[var(--jm-text-muted)]" />}
           title="가격 계산기"
-          badge={<span className="text-[11px] text-muted-foreground">공급가액 기준</span>}
+          badge={
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+              공급가액 기준
+            </span>
+          }
         />
         <JmCard className="overflow-hidden">
-        {/* ── 원가 요약 ── */}
-        <table className="w-full text-[12px]">
-          <tbody className="[&_tr]:border-b [&_tr]:border-border">
+          {/* 원가 요약 */}
+          <div className="divide-y divide-[var(--jm-border)] text-jm-xs">
             {isSetOrAssembled ? (
               <>
-                <tr>
-                  <td className="px-3 py-2 text-muted-foreground">구성품 공급단가 합</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(componentsBreakdown.supplier).toLocaleString("ko-KR")}</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-muted-foreground">구성품 입고 평균 배송비</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(componentsBreakdown.shipping).toLocaleString("ko-KR")}</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-muted-foreground">구성품 입고 부대비용</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(componentsBreakdown.incoming).toLocaleString("ko-KR")}</td>
-                </tr>
+                <CostLine label="구성품 공급단가 합" value={componentsBreakdown.supplier} />
+                <CostLine label="구성품 입고 평균 배송비" value={componentsBreakdown.shipping} />
+                <CostLine label="구성품 입고 부대비용" value={componentsBreakdown.incoming} />
                 {productType === "ASSEMBLED" && (
-                  <tr>
-                    <td className="px-3 py-2 text-muted-foreground">조립비용</td>
-                    <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(assemblyFixedCost).toLocaleString("ko-KR")}</td>
-                  </tr>
+                  <CostLine label="조립비용" value={assemblyFixedCost} />
                 )}
                 {cardFeeRate > 0 && (
-                  <tr>
-                    <td className="px-3 py-2 text-muted-foreground">카드수수료 <span className="text-[10px]">(판매가 {(cardFeeRate * 100).toFixed(2)}%)</span></td>
-                    <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcSetPrice.cardFeeAmount).toLocaleString("ko-KR")}</td>
-                  </tr>
+                  <CostLine label={cardFeeLabel} value={calcSetPrice.cardFeeAmount} />
                 )}
               </>
             ) : (
               <>
                 {!mapping.supplierProductId ? (
-                  <tr>
-                    <td className="px-3 py-2 text-muted-foreground">원가 직접 입력</td>
-                    <td className="px-3 py-1 text-right">
-                      <JmInput
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={formatComma(baseCost)}
-                        onChange={(e) => setBaseCost(parseComma(e.target.value))}
-                        onFocus={focusCaretEnd}
-                        className="h-7 w-28 ml-auto text-right text-[12px]"
-                      />
-                    </td>
-                  </tr>
+                  <div className="flex items-center justify-between px-3 py-1.5">
+                    <span className="text-[var(--jm-text-muted)]">원가 직접 입력</span>
+                    <JmInput
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={formatComma(baseCost)}
+                      onChange={(e) => setBaseCost(parseComma(e.target.value))}
+                      onFocus={focusCaretEnd}
+                      className="h-8 w-32 text-right"
+                    />
+                  </div>
                 ) : (
-                  <tr>
-                    <td className="px-3 py-2 text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <span className="text-[var(--jm-text-muted)]">
                       공급단가 ÷ 환산비율
                       {avgIncomingCost !== null && (
                         <span
-                          className="ml-1.5 text-[10px] text-muted-foreground"
+                          className="ml-1.5 text-jm-3xs"
                           title="최근 입고 50건의 수량 가중평균. 실제 출고 원가와 다를 수 있습니다 (참고값)."
                         >
-                          (최근 입고 평균 ₩{Math.round(avgIncomingCost / (parseFloat(mapping.conversionRate || "1") || 1)).toLocaleString("ko-KR")})
+                          (최근 입고 평균 ₩
+                          {Math.round(
+                            avgIncomingCost /
+                              (parseFloat(mapping.conversionRate || "1") || 1),
+                          ).toLocaleString("ko-KR")}
+                          )
                         </span>
                       )}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.unitCost).toLocaleString("ko-KR")}</td>
-                  </tr>
+                    </span>
+                    <span className="shrink-0 tabular-nums text-[var(--jm-text)]">
+                      ₩{Math.round(calcPrice.unitCost).toLocaleString("ko-KR")}
+                    </span>
+                  </div>
                 )}
-                <tr>
-                  <td className="px-3 py-2 text-muted-foreground">입고 평균 배송비</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.avgShippingNet).toLocaleString("ko-KR")}</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-muted-foreground">입고 부대비용</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.incomingTotal - calcPrice.avgShippingNet).toLocaleString("ko-KR")}</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-muted-foreground">판매비용</td>
-                  <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.sellingFixed).toLocaleString("ko-KR")}</td>
-                </tr>
+                <CostLine label="입고 평균 배송비" value={calcPrice.avgShippingNet} />
+                <CostLine
+                  label="입고 부대비용"
+                  value={calcPrice.incomingTotal - calcPrice.avgShippingNet}
+                />
+                <CostLine label="판매비용" value={calcPrice.sellingFixed} />
                 {cardFeeRate > 0 && (
-                  <tr>
-                    <td className="px-3 py-2 text-muted-foreground">카드수수료 <span className="text-[10px]">(판매가 {(cardFeeRate * 100).toFixed(2)}%)</span></td>
-                    <td className="px-3 py-2 text-right tabular-nums">₩{Math.round(calcPrice.cardFeeAmount).toLocaleString("ko-KR")}</td>
-                  </tr>
+                  <CostLine label={cardFeeLabel} value={calcPrice.cardFeeAmount} />
                 )}
               </>
             )}
-          </tbody>
-          <tfoot>
-            <tr className="bg-muted/30">
-              <td className="px-3 py-2.5 text-[13px] font-semibold">
-                <span className="flex items-center gap-1.5">
-                  총원가
-              <JmTooltipProvider delay={100}>
-                <JmTooltipRoot>
-                  <JmTooltipTrigger
-                    render={
-                      <button type="button" className="text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] transition-colors" aria-label="원가 계산식 보기">
-                        <Info className="h-3.5 w-3.5" />
-                      </button>
-                    }
-                  />
-                  <JmTooltipContent side="top" className="max-w-[280px] text-jm-2xs leading-relaxed">
-                    {isSetOrAssembled ? (
-                      <div className="space-y-1">
-                        <div className="font-semibold">총원가 계산식</div>
-                        <div>= 구성품 공급단가 + 입고 평균 배송비 + 입고 부대비용{productType === "ASSEMBLED" ? " + 조립비용" : ""}{cardFeeRate > 0 && " + 카드수수료"}</div>
-                        <div className="pt-1 border-t border-[var(--jm-border)] mt-1 space-y-0.5 text-[10px] opacity-80">
-                          <div>• 각 구성품의 공급단가/배송비/부대비용을 (수량 × 단위) 로 합산</div>
-                          <div>• 배송비/부대비용 과세분 ÷ 1.1 로 공급가액 환산</div>
-                          {productType === "ASSEMBLED" && <div>• 조립비용(과세) ÷ 1.1 로 공급가액 환산</div>}
-                          {cardFeeRate > 0 && <div>• 카드수수료 = 판매가(VAT포함) × {(cardFeeRate * 100).toFixed(2)}%</div>}
+            {/* 총원가 */}
+            <div className="flex items-center justify-between bg-[var(--jm-surface-muted)] px-3 py-2.5">
+              <span className="flex items-center gap-1.5 text-jm-sm font-semibold text-[var(--jm-text)]">
+                총원가
+                <JmTooltipProvider delay={100}>
+                  <JmTooltipRoot>
+                    <JmTooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="text-[var(--jm-text-muted)] transition-colors hover:text-[var(--jm-text)]"
+                          aria-label="원가 계산식 보기"
+                        >
+                          <Info className="h-3.5 w-3.5" />
+                        </button>
+                      }
+                    />
+                    <JmTooltipContent side="top" className="max-w-[280px] text-jm-2xs leading-relaxed">
+                      {isSetOrAssembled ? (
+                        <div className="space-y-1">
+                          <div className="font-semibold">총원가 계산식</div>
+                          <div>= 구성품 공급단가 + 입고 평균 배송비 + 입고 부대비용{productType === "ASSEMBLED" ? " + 조립비용" : ""}{cardFeeRate > 0 && " + 카드수수료"}</div>
+                          <div className="mt-1 space-y-0.5 border-t border-[var(--jm-border)] pt-1 text-jm-3xs opacity-80">
+                            <div>• 각 구성품의 공급단가/배송비/부대비용을 (수량 × 단위) 로 합산</div>
+                            <div>• 배송비/부대비용 과세분 ÷ 1.1 로 공급가액 환산</div>
+                            {productType === "ASSEMBLED" && <div>• 조립비용(과세) ÷ 1.1 로 공급가액 환산</div>}
+                            {cardFeeRate > 0 && <div>• 카드수수료 = 판매가(VAT포함) × {(cardFeeRate * 100).toFixed(2)}%</div>}
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="font-semibold">총원가 계산식</div>
-                        <div>= 원가 + 입고 평균 배송비 + 입고 부대비용 + 판매비용{cardFeeRate > 0 && " + 카드수수료"}</div>
-                        <div className="pt-1 border-t border-[var(--jm-border)] mt-1 space-y-0.5 text-[10px] opacity-80">
-                          <div>• 원가 = 공급단가 ÷ 환산비율</div>
-                          <div>• 과세 비용은 ÷ 1.1 로 공급가액 환산 후 합산</div>
-                          <div>• PERCENTAGE 부대비용은 원가의 %로 적용</div>
-                          {cardFeeRate > 0 && <div>• 카드수수료 = 판매가(VAT포함) × {(cardFeeRate * 100).toFixed(2)}%</div>}
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="font-semibold">총원가 계산식</div>
+                          <div>= 원가 + 입고 평균 배송비 + 입고 부대비용 + 판매비용{cardFeeRate > 0 && " + 카드수수료"}</div>
+                          <div className="mt-1 space-y-0.5 border-t border-[var(--jm-border)] pt-1 text-jm-3xs opacity-80">
+                            <div>• 원가 = 공급단가 ÷ 환산비율</div>
+                            <div>• 과세 비용은 ÷ 1.1 로 공급가액 환산 후 합산</div>
+                            <div>• PERCENTAGE 부대비용은 원가의 %로 적용</div>
+                            {cardFeeRate > 0 && <div>• 카드수수료 = 판매가(VAT포함) × {(cardFeeRate * 100).toFixed(2)}%</div>}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </JmTooltipContent>
-                </JmTooltipRoot>
-              </JmTooltipProvider>
-                </span>
-              </td>
-              <td className="px-3 py-2.5 text-right tabular-nums text-[13px] font-semibold">₩{Math.round(totalCost).toLocaleString("ko-KR")}</td>
-            </tr>
-          </tfoot>
-        </table>
-
-        <JmCardContent className="py-4 space-y-3 border-t border-border">
-        {/* ── 마진율 ── */}
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-muted-foreground shrink-0 w-14">마진율</span>
-          <div className="relative flex-1">
-            <JmInput
-              type="number"
-              inputMode="decimal"
-              min="0"
-              max="100"
-              value={lastEdited === "rate" ? targetMargin : marginRate.toFixed(1)}
-              onChange={(e) => { setTargetMargin(e.target.value); setLastEdited("rate"); }}
-              onFocus={focusCaretEnd}
-              className={`h-9 pr-6 text-right text-[13px] ${marginAmount < 0 ? "text-red-400" : ""}`}
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">%</span>
-          </div>
-        </div>
-
-        {/* ── 마진금액 ── */}
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-muted-foreground shrink-0 w-14">마진금액</span>
-          <JmInput
-            type="text"
-            inputMode="numeric"
-            placeholder="0"
-            value={formatComma(lastEdited === "amount" ? targetMarginAmount : (marginAmount !== 0 ? Math.round(marginAmount).toString() : ""))}
-            onChange={(e) => { setTargetMarginAmount(parseComma(e.target.value)); setLastEdited("amount"); }}
-            onFocus={focusCaretEnd}
-            className={`h-9 flex-1 text-right text-[13px] ${marginAmount < 0 ? "text-red-400" : ""}`}
-          />
-        </div>
-        {marginAmount < 0 && vatPrice > 0 && (
-          <div className="text-[11px] text-red-400 flex items-center gap-1">
-            <span>⚠</span>
-            <span>카드수수료·비용을 반영하면 마진이 음수입니다</span>
-          </div>
-        )}
-
-        {/* ── 가격 결과 (3컬럼 삼등분) ── */}
-        <div className="grid grid-cols-3 rounded-lg border border-border overflow-hidden bg-card">
-          {/* 공급가액 */}
-          <div className="px-2 py-2 text-center border-r border-border">
-            <div className="text-[10px] text-muted-foreground mb-1">공급가액</div>
-            <JmInput
-              type="text"
-              inputMode="numeric"
-              placeholder="0"
-              value={formatComma(lastEdited === "supply" ? manualSupplyPrice : (supplyPrice > 0 ? supplyPrice.toString() : ""))}
-              onChange={(e) => { setManualSupplyPrice(parseComma(e.target.value)); setLastEdited("supply"); }}
-              onFocus={focusCaretEnd}
-              className="h-7 text-center text-[15px] font-bold border-0 bg-transparent focus-visible:ring-1 px-0"
-            />
-          </div>
-          {/* 세액 */}
-          <div className="px-2 py-3 text-center border-r border-border">
-            <div className="text-[10px] text-muted-foreground mb-1">세액</div>
-            <div className="text-[15px] font-bold tabular-nums">
-              {supplyPrice > 0 && taxRate > 0
-                ? `₩${Math.round(supplyPrice * taxRate).toLocaleString("ko-KR")}`
-                : "—"}
+                      )}
+                    </JmTooltipContent>
+                  </JmTooltipRoot>
+                </JmTooltipProvider>
+              </span>
+              <span className="text-jm-sm font-semibold tabular-nums text-[var(--jm-text)]">
+                ₩{Math.round(totalCost).toLocaleString("ko-KR")}
+              </span>
             </div>
           </div>
-          {/* 판매가 */}
-          <div className="px-2 py-2 text-center">
-            <div className="text-[10px] text-muted-foreground mb-1">판매가</div>
-            <JmInput
-              type="text"
-              inputMode="numeric"
-              placeholder="0"
-              value={formatComma(lastEdited === "price" ? manualVatPrice : (vatPrice > 0 ? vatPrice.toString() : ""))}
-              onChange={(e) => { setManualVatPrice(parseComma(e.target.value)); setLastEdited("price"); }}
-              onFocus={focusCaretEnd}
-              className="h-7 text-center text-[15px] font-bold border-0 bg-transparent focus-visible:ring-1 px-0"
-            />
-          </div>
-        </div>
-        </JmCardContent></JmCard>
+
+          {/* 마진·가격 */}
+          <JmCardContent className="space-y-3 border-t border-[var(--jm-border)]">
+            {/* 마진율 */}
+            <div className="flex items-center gap-2">
+              <span className="w-16 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
+                마진율
+              </span>
+              <div className="relative flex-1">
+                <JmInput
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  max="100"
+                  value={lastEdited === "rate" ? targetMargin : marginRate.toFixed(1)}
+                  onChange={(e) => { setTargetMargin(e.target.value); setLastEdited("rate"); }}
+                  onFocus={focusCaretEnd}
+                  className={`h-9 pr-7 text-right ${marginAmount < 0 ? "text-[var(--jm-danger-fg)]" : ""}`}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-jm-xs text-[var(--jm-text-muted)]">
+                  %
+                </span>
+              </div>
+            </div>
+            {/* 마진금액 */}
+            <div className="flex items-center gap-2">
+              <span className="w-16 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
+                마진금액
+              </span>
+              <JmInput
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={formatComma(lastEdited === "amount" ? targetMarginAmount : (marginAmount !== 0 ? Math.round(marginAmount).toString() : ""))}
+                onChange={(e) => { setTargetMarginAmount(parseComma(e.target.value)); setLastEdited("amount"); }}
+                onFocus={focusCaretEnd}
+                className={`h-9 flex-1 text-right ${marginAmount < 0 ? "text-[var(--jm-danger-fg)]" : ""}`}
+              />
+            </div>
+            {marginAmount < 0 && vatPrice > 0 && (
+              <div className="flex items-center gap-1 text-jm-xs text-[var(--jm-danger-fg)]">
+                <span>⚠</span>
+                <span>카드수수료·비용을 반영하면 마진이 음수입니다</span>
+              </div>
+            )}
+
+            {/* 가격 결과 — 공급가액 / 세액 / 판매가 */}
+            <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--jm-border)]">
+              <div className="border-r border-[var(--jm-border)] px-2 py-2 text-center">
+                <div className="mb-1 text-jm-2xs text-[var(--jm-text-muted)]">공급가액</div>
+                <JmInput
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={formatComma(lastEdited === "supply" ? manualSupplyPrice : (supplyPrice > 0 ? supplyPrice.toString() : ""))}
+                  onChange={(e) => { setManualSupplyPrice(parseComma(e.target.value)); setLastEdited("supply"); }}
+                  onFocus={focusCaretEnd}
+                  className="h-8 border-0 bg-transparent px-0 text-center text-jm-md font-bold"
+                />
+              </div>
+              <div className="border-r border-[var(--jm-border)] px-2 py-2 text-center">
+                <div className="mb-1 text-jm-2xs text-[var(--jm-text-muted)]">세액</div>
+                <div className="text-jm-md font-bold leading-8 tabular-nums text-[var(--jm-text)]">
+                  {supplyPrice > 0 && taxRate > 0
+                    ? `₩${Math.round(supplyPrice * taxRate).toLocaleString("ko-KR")}`
+                    : "—"}
+                </div>
+              </div>
+              <div className="px-2 py-2 text-center">
+                <div className="mb-1 text-jm-2xs text-[var(--jm-text-muted)]">판매가</div>
+                <JmInput
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={formatComma(lastEdited === "price" ? manualVatPrice : (vatPrice > 0 ? vatPrice.toString() : ""))}
+                  onChange={(e) => { setManualVatPrice(parseComma(e.target.value)); setLastEdited("price"); }}
+                  onFocus={focusCaretEnd}
+                  className="h-8 border-0 bg-transparent px-0 text-center text-jm-md font-bold"
+                />
+              </div>
+            </div>
+          </JmCardContent>
+        </JmCard>
       </section>
     );
   };
@@ -1391,7 +1347,7 @@ export function NewProductForm({
       <section>
         <SectionTitle
           title="채널별 가격"
-          badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
+          badge={<span className="text-jm-2xs text-[var(--jm-text-muted)]">선택사항</span>}
         />
         <JmCard><JmCardContent className="space-y-2">
           {channels.map((ch, idx) => {
@@ -1404,10 +1360,10 @@ export function NewProductForm({
             const commissionAmount = channelVatPrice * commRate;
             const realMargin = channelSupplyPrice - baseTotalCost - commissionAmount;
             const realMarginRate = channelSupplyPrice > 0 ? (realMargin / channelSupplyPrice) * 100 : 0;
-            const marginColor = realMargin >= 0 ? "text-primary" : "text-red-400";
+            const marginColor = realMargin >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]";
 
             return (
-              <div key={ch.id} className="rounded-lg border border-border bg-card overflow-hidden">
+              <div key={ch.id} className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] overflow-hidden">
                 <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer">
                   <JmCheckbox
                     checked={row.enabled}
@@ -1420,14 +1376,14 @@ export function NewProductForm({
                       ));
                     }}
                   />
-                  <span className="text-[13px] font-medium flex-1 truncate">{ch.name}</span>
-                  <span className="text-[11px] text-muted-foreground shrink-0">수수료 {(commRate * 100).toFixed(2)}%</span>
+                  <span className="text-jm-sm font-medium flex-1 truncate">{ch.name}</span>
+                  <span className="text-jm-2xs text-[var(--jm-text-muted)] shrink-0">수수료 {(commRate * 100).toFixed(2)}%</span>
                 </label>
                 {row.enabled && (
-                  <div className="px-3 pb-3 pt-1 space-y-3 border-t border-border">
+                  <div className="px-3 pb-3 pt-1 space-y-3 border-t border-[var(--jm-border)]">
                     {/* 마진율 */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground w-14 shrink-0">마진율</span>
+                      <span className="text-jm-2xs text-[var(--jm-text-muted)] w-14 shrink-0">마진율</span>
                       <div className="relative flex-1">
                         <JmInput
                           type="text"
@@ -1435,14 +1391,14 @@ export function NewProductForm({
                           value={row.lastEdited === "rate" ? row.targetRate : realMarginRate.toFixed(1)}
                           onChange={(e) => updateRow(idx, { targetRate: e.target.value, lastEdited: "rate" })}
                           onFocus={focusCaretEnd}
-                          className="h-8 pr-6 text-right text-[12px]"
+                          className="h-8 pr-6 text-right text-jm-xs"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">%</span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-jm-2xs text-[var(--jm-text-muted)] pointer-events-none">%</span>
                       </div>
                     </div>
                     {/* 마진금액 */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground w-14 shrink-0">마진금액</span>
+                      <span className="text-jm-2xs text-[var(--jm-text-muted)] w-14 shrink-0">마진금액</span>
                       <JmInput
                         type="text"
                         inputMode="numeric"
@@ -1450,12 +1406,12 @@ export function NewProductForm({
                         value={formatComma(row.lastEdited === "amount" ? row.targetAmount : (realMargin > 0 ? Math.round(realMargin).toString() : ""))}
                         onChange={(e) => updateRow(idx, { targetAmount: parseComma(e.target.value), lastEdited: "amount" })}
                         onFocus={focusCaretEnd}
-                        className="h-8 flex-1 text-right text-[12px]"
+                        className="h-8 flex-1 text-right text-jm-xs"
                       />
                     </div>
                     {/* 판매가 */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground w-14 shrink-0">판매가</span>
+                      <span className="text-jm-2xs text-[var(--jm-text-muted)] w-14 shrink-0">판매가</span>
                       <JmInput
                         type="text"
                         inputMode="numeric"
@@ -1463,14 +1419,14 @@ export function NewProductForm({
                         value={formatComma(row.lastEdited === "price" || row.lastEdited === null ? row.price : String(channelVatPrice))}
                         onChange={(e) => updateRow(idx, { price: parseComma(e.target.value), lastEdited: "price" })}
                         onFocus={focusCaretEnd}
-                        className="h-8 flex-1 text-right text-[12px] font-medium"
+                        className="h-8 flex-1 text-right text-jm-xs font-medium"
                       />
                     </div>
                     {/* 채널 전용 판매비용 */}
-                    <div className="rounded-md border border-border bg-card">
-                      <div className="px-2.5 py-1.5 border-b border-border flex items-center justify-between">
-                        <span className="text-[11px] text-muted-foreground">{ch.name} 전용 판매비용</span>
-                        <span className="text-[10px] text-muted-foreground">전사 공통 비용은 위 &quot;판매 비용&quot; 섹션에서 관리</span>
+                    <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)]">
+                      <div className="px-2.5 py-1.5 border-b border-[var(--jm-border)] flex items-center justify-between">
+                        <span className="text-jm-2xs text-[var(--jm-text-muted)]">{ch.name} 전용 판매비용</span>
+                        <span className="text-jm-3xs text-[var(--jm-text-muted)]">전사 공통 비용은 위 &quot;판매 비용&quot; 섹션에서 관리</span>
                       </div>
                       <CostList
                         costs={channelSellingCosts[ch.id] ?? []}
@@ -1485,24 +1441,24 @@ export function NewProductForm({
                       />
                     </div>
                     {/* 결과 */}
-                    <div className="grid grid-cols-4 rounded-md border border-border overflow-hidden text-[11px] bg-card">
-                      <div className="px-2 py-1.5 text-center border-r border-border">
-                        <div className="text-[10px] text-muted-foreground">공급가</div>
+                    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-[var(--jm-border)] bg-[var(--jm-border)] text-jm-2xs sm:grid-cols-4">
+                      <div className="bg-[var(--jm-surface)] px-2 py-1.5 text-center">
+                        <div className="text-jm-3xs text-[var(--jm-text-muted)]">공급가</div>
                         <div className="tabular-nums">₩{Math.round(channelSupplyPrice).toLocaleString("ko-KR")}</div>
                       </div>
-                      <div className="px-2 py-1.5 text-center border-r border-border">
-                        <div className="text-[10px] text-muted-foreground">세액</div>
+                      <div className="bg-[var(--jm-surface)] px-2 py-1.5 text-center">
+                        <div className="text-jm-3xs text-[var(--jm-text-muted)]">세액</div>
                         <div className="tabular-nums">₩{Math.round(taxAmount).toLocaleString("ko-KR")}</div>
                       </div>
-                      <div className="px-2 py-1.5 text-center border-r border-border">
-                        <div className="text-[10px] text-muted-foreground">수수료</div>
+                      <div className="bg-[var(--jm-surface)] px-2 py-1.5 text-center">
+                        <div className="text-jm-3xs text-[var(--jm-text-muted)]">수수료</div>
                         <div className="tabular-nums">₩{Math.round(commissionAmount).toLocaleString("ko-KR")}</div>
                       </div>
-                      <div className="px-2 py-1.5 text-center">
-                        <div className="text-[10px] text-muted-foreground">실마진</div>
+                      <div className="bg-[var(--jm-surface)] px-2 py-1.5 text-center">
+                        <div className="text-jm-3xs text-[var(--jm-text-muted)]">실마진</div>
                         <div className={`tabular-nums font-medium ${marginColor}`}>
                           ₩{Math.round(realMargin).toLocaleString("ko-KR")}
-                          <span className="ml-1 text-[10px]">({realMarginRate.toFixed(1)}%)</span>
+                          <span className="ml-1 text-jm-3xs">({realMarginRate.toFixed(1)}%)</span>
                         </div>
                       </div>
                     </div>
@@ -1516,24 +1472,35 @@ export function NewProductForm({
     );
   };
 
+  // 스텝 진행바에 노출할 스텝(type 제외 — 유형 선택 후 표시)
+  const navSteps = steps.filter((s) => s !== "type");
+
   return (
     <>
-      <div className="flex h-full flex-col bg-background">
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
         {/* 헤더 */}
-        <header className="border-b border-border px-5 py-3.5 shrink-0">
+        <header className="border-b border-[var(--jm-border)] px-5 py-3.5 shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 aria-label="뒤로가기"
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] transition-colors"
                 onClick={() => {
-                  if (step === "form") {
-                    if (lockProductType) {
+                  if (currentStepIdx > 0) {
+                    if (lockProductType && currentStep === "basic") {
                       handleLeave();
                       return;
                     }
-                    if (isDirty && !window.confirm("입력한 내용이 사라집니다. 상품 유형 선택으로 돌아갈까요?")) return;
-                    resetAll();
+                    if (currentStepIdx === 1 && lockProductType) {
+                      handleLeave();
+                      return;
+                    }
+                    if (currentStepIdx === 1) {
+                      if (isDirty && !window.confirm("입력한 내용이 사라집니다. 상품 유형 선택으로 돌아갈까요?")) return;
+                      resetAll();
+                    } else {
+                      goPrevStep();
+                    }
                   } else {
                     handleLeave();
                   }
@@ -1542,9 +1509,9 @@ export function NewProductForm({
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <h1 className="text-base font-medium flex-1">새 상품 등록</h1>
-              {step === "form" && currentTypeCard && (
+              {currentStepIdx > 0 && currentTypeCard && (
                 <div
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[12px] font-medium leading-none"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-jm-xs font-medium leading-none"
                   style={{
                     borderColor: `${typeAccent}40`,
                     color: typeAccent,
@@ -1558,44 +1525,46 @@ export function NewProductForm({
             </div>
         </header>
 
-          {/* 진행도 */}
-          {step === "form" && (
+          {/* 진행도 — 스텝 칩 */}
+          {currentStepIdx > 0 && (
             <nav
               aria-label="등록 단계"
-              className="border-b border-border px-4 py-2 shrink-0 overflow-x-auto"
+              className="border-b border-[var(--jm-border)] px-4 py-2 shrink-0 overflow-x-auto"
             >
               <ol className="flex items-center gap-1 min-w-max">
-                {stepItems.map((s, i) => {
-                  const isActive = activeStep === s.id;
-                  const isDone = activeStep > s.id;
+                {navSteps.map((s, i) => {
+                  const stepIdx = steps.indexOf(s);
+                  const isActive = stepIdx === safeStepIdx;
+                  const isDone = stepIdx < safeStepIdx;
                   return (
-                    <li key={s.id} className="flex items-center gap-1">
+                    <li key={s} className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => scrollToStep(s.anchor)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                        disabled={!isDone}
+                        onClick={() => isDone && setCurrentStepIdx(stepIdx)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-jm-2xs font-medium transition-colors ${
                           isActive
-                            ? "bg-secondary text-foreground"
+                            ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
                             : isDone
-                            ? "text-primary hover:bg-muted/50"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                            ? "text-[var(--jm-action)] hover:bg-[var(--jm-surface-muted)]/50 cursor-pointer"
+                            : "text-[var(--jm-text-muted)] cursor-default"
                         }`}
                       >
                         <span
-                          className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold leading-none ${
+                          className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-jm-3xs font-bold leading-none ${
                             isActive
-                              ? "bg-primary text-primary-foreground"
+                              ? "bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
                               : isDone
-                              ? "bg-primary/20 text-primary"
-                              : "bg-secondary text-muted-foreground"
+                              ? "bg-[var(--jm-action)]/15 text-[var(--jm-action)]"
+                              : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
                           }`}
                         >
-                          {s.id}
+                          {i + 1}
                         </span>
-                        {s.label}
+                        {STEP_LABEL[s]}
                       </button>
-                      {i < stepItems.length - 1 && (
-                        <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+                      {i < navSteps.length - 1 && (
+                        <ChevronRight className="h-3 w-3 text-[var(--jm-text-muted)]/50" />
                       )}
                     </li>
                   );
@@ -1606,63 +1575,67 @@ export function NewProductForm({
 
           {/* 본문 */}
           <div ref={scrollAreaRef} className="flex-1 min-h-0 overflow-y-auto">
-            {step === "type" ? (
+            {currentStep === "type" ? (
               <TypeSelectScreen onSelect={handleSelectType} />
             ) : (
               <fieldset disabled={submitting} className="contents">
 
-                {/* ── 입력 폼 ── */}
-                <div className="px-5 py-5 space-y-5">
+                {/* ── 입력 폼 (한 스텝만 표시) ── */}
+                <div className="max-w-2xl mx-auto px-4 py-5 space-y-5">
 
                   {/* 변형 추가 인라인 진입 시 대표 연결 안내 배너 */}
                   {presetCanonicalId && canonicalProductId && (
-                    <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-[12px] text-foreground">
-                      <span className="text-muted-foreground">대표 상품 변형으로 등록: </span>
+                    <div className="rounded-md border border-[var(--jm-info-fg)]/30 bg-[var(--jm-info-bg)] px-3 py-2 text-jm-xs text-[var(--jm-info-fg)]">
+                      <span className="text-[var(--jm-text-muted)]">대표 상품 변형으로 등록: </span>
                       <span className="font-medium">
                         {existingProducts.find((p) => p.id === canonicalProductId)?.name ?? "선택된 대표"}
                       </span>
                     </div>
                   )}
 
-                  {/* 거래처 매핑 (STEP 1) */}
-                  {(productType === "FINISHED" || productType === "PARTS") && (
-                    <>
-                      <GroupHeader step="STEP 1" title="거래처 매핑" id="np-step-1" />
-                      <section>
-                        <SectionTitle
-                          title="거래처 매핑"
-                          badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
-                        />
-                        <JmCard><JmCardContent className="space-y-3">
-                        <Field label="거래처">
-                          <SupplierCombobox
-                            suppliers={suppliers}
-                            value={mapping.supplierId}
-                            onChange={(id) => {
-                              setMapping((prev) => ({ ...prev, supplierId: id, supplierProductId: "" }));
-                              fetchSupplierProducts(id);
-                            }}
-                            onCreateNew={(name) => {
-                              setQuickSupplierDefaultName(name);
-                              setQuickSupplierOpen(true);
-                            }}
-                          />
-                        </Field>
+                  {/* 거래처 연결 */}
+                  {currentStep === "supplier" && (productType === "FINISHED" || productType === "PARTS") && (
+                    <section>
+                      <SectionTitle
+                        title="거래처 연결"
+                        badge={
+                          <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                            선택
+                          </span>
+                        }
+                      />
+                      <JmCard>
+                        <JmCardContent className="space-y-4">
+                          <Field label="거래처">
+                            <SupplierCombobox
+                              suppliers={suppliers}
+                              value={mapping.supplierId}
+                              onChange={(id) => {
+                                setMapping((prev) => ({ ...prev, supplierId: id, supplierProductId: "" }));
+                                fetchSupplierProducts(id);
+                              }}
+                              onCreateNew={(name) => {
+                                setQuickSupplierDefaultName(name);
+                                setQuickSupplierOpen(true);
+                              }}
+                            />
+                          </Field>
 
-                        {mapping.supplierId && (
-                          <div className="flex items-center gap-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <JmCheckbox
+                          {mapping.supplierId && (
+                            <div className="space-y-2.5">
+                              <ToggleField
+                                label="임시 등록"
+                                desc="실제 입고 전 어림잡은 정보"
                                 checked={mapping.isProvisional}
-                                onCheckedChange={(checked) => setMapping((prev) => ({ ...prev, isProvisional: !!checked }))}
+                                onChange={(v) =>
+                                  setMapping((prev) => ({ ...prev, isProvisional: v }))
+                                }
                               />
-                              <span className="text-[13px] text-muted-foreground">임시 등록 <span className="text-[11px]">(실제 입고 전 어림잡은 정보)</span></span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <JmCheckbox
+                              <ToggleField
+                                label="상품명 동일"
+                                desc="공급상품명을 판매상품명으로 그대로 사용"
                                 checked={mapping.syncName}
-                                onCheckedChange={(checked) => {
-                                  const next = !!checked;
+                                onChange={(next) => {
                                   setMapping((prev) => ({ ...prev, syncName: next }));
                                   if (next) {
                                     const sp = mapping.supplierProductId
@@ -1674,477 +1647,497 @@ export function NewProductForm({
                                   }
                                 }}
                               />
-                              <span className="text-[13px] text-muted-foreground">상품명 동일 <span className="text-[11px]">(공급상품명을 그대로 사용)</span></span>
-                            </label>
-                          </div>
-                        )}
-
-                        {mapping.supplierId && (
-                          <Field label="공급상품">
-                            <SupplierProductCombobox
-                              supplierProducts={supplierProducts}
-                              value={mapping.supplierProductId}
-                              onChange={(sp) => {
-                                setMapping((prev) => ({ ...prev, supplierProductId: sp.id }));
-                                if (mapping.syncName) {
-                                  setForm((prev) => ({ ...prev, name: sp.name, spec: sp.spec || "" }));
-                                }
-                                fetchIncomingCosts(sp.id);
-                              }}
-                              onCreateNew={(name) => {
-                                setQuickSupplierProductDefaultName(name);
-                                setQuickSupplierProductOpen(true);
-                              }}
-                              disabled={loadingSupplierProducts}
-                              placeholder="공급상품 선택..."
-                            />
-                          </Field>
-                        )}
-
-                        {mapping.supplierProductId && (() => {
-                          const selectedSp = supplierProducts.find((sp) => sp.id === mapping.supplierProductId);
-                          const unitMismatch = !!selectedSp && selectedSp.unitOfMeasure !== form.unitOfMeasure;
-                          return (
-                          <Field
-                            label="환산비율"
-                            hint={unitMismatch ? `공급상품 단위(${selectedSp!.unitOfMeasure})와 판매상품 단위(${form.unitOfMeasure})가 다릅니다. 환산비율을 확인하세요.` : undefined}
-                          >
-                            <div className="flex items-center gap-3">
-                              <JmInput
-                                type="text"
-                                inputMode="decimal"
-                                value={mapping.conversionRate}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) {
-                                    setMapping((prev) => ({ ...prev, conversionRate: v }));
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  const n = parseFloat(e.target.value);
-                                  if (!isFinite(n) || n <= 0) {
-                                    setMapping((prev) => ({ ...prev, conversionRate: "1" }));
-                                  }
-                                }}
-                                onFocus={focusCaretEnd}
-                                className="h-9 w-28"
-                              />
-                              <p className="text-[12px] text-muted-foreground">공급상품 1개 → 판매상품 <span className="text-foreground font-medium">{mapping.conversionRate || "1"}</span>개</p>
                             </div>
-                          </Field>
-                          );
-                        })()}
+                          )}
+
+                          {mapping.supplierId && (
+                            <Field label="공급상품">
+                              <SupplierProductCombobox
+                                supplierProducts={supplierProducts}
+                                value={mapping.supplierProductId}
+                                onChange={(sp) => {
+                                  setMapping((prev) => ({ ...prev, supplierProductId: sp.id }));
+                                  if (mapping.syncName) {
+                                    setForm((prev) => ({ ...prev, name: sp.name, spec: sp.spec || "" }));
+                                  }
+                                  fetchIncomingCosts(sp.id);
+                                }}
+                                onCreateNew={(name) => {
+                                  setQuickSupplierProductDefaultName(name);
+                                  setQuickSupplierProductOpen(true);
+                                }}
+                                disabled={loadingSupplierProducts}
+                                placeholder="공급상품 선택..."
+                              />
+                            </Field>
+                          )}
+
+                          {mapping.supplierProductId && (() => {
+                            const selectedSp = supplierProducts.find((sp) => sp.id === mapping.supplierProductId);
+                            const unitMismatch = !!selectedSp && selectedSp.unitOfMeasure !== form.unitOfMeasure;
+                            return (
+                              <Field
+                                label="환산비율"
+                                hint={unitMismatch ? `공급상품 단위(${selectedSp!.unitOfMeasure})와 판매상품 단위(${form.unitOfMeasure})가 다릅니다. 환산비율을 확인하세요.` : undefined}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <JmInput
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={mapping.conversionRate}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) {
+                                        setMapping((prev) => ({ ...prev, conversionRate: v }));
+                                      }
+                                    }}
+                                    onBlur={(e) => {
+                                      const n = parseFloat(e.target.value);
+                                      if (!isFinite(n) || n <= 0) {
+                                        setMapping((prev) => ({ ...prev, conversionRate: "1" }));
+                                      }
+                                    }}
+                                    onFocus={focusCaretEnd}
+                                    className="h-9 w-28"
+                                  />
+                                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                                    공급상품 1개 → 판매상품{" "}
+                                    <span className="font-medium text-[var(--jm-text)]">
+                                      {mapping.conversionRate || "1"}
+                                    </span>
+                                    개
+                                  </p>
+                                </div>
+                              </Field>
+                            );
+                          })()}
                         </JmCardContent>
+
+                        {/* 선택한 공급상품 정보 — 모바일 친화 key·value 그리드 */}
                         {mapping.supplierProductId && (() => {
                           const sp = supplierProducts.find((s) => s.id === mapping.supplierProductId);
                           if (!sp) return null;
                           const listPrice = parseFloat(sp.listPrice) || 0;
                           const unitPrice = parseFloat(sp.unitPrice) || 0;
                           const discount = listPrice - unitPrice;
-                          const supplyAmt = unitPrice * 1;
-                          const taxAmt = sp.isTaxable ? Math.round(supplyAmt * 0.1) : 0;
+                          const taxAmt = sp.isTaxable ? Math.round(unitPrice * 0.1) : 0;
+                          const rows: Array<{ label: string; value: string; strong?: boolean }> = [
+                            { label: "품번", value: sp.supplierCode || "-" },
+                            { label: "규격", value: sp.spec || "-" },
+                            { label: "단위", value: sp.unitOfMeasure },
+                            { label: "정가", value: listPrice > 0 ? `₩${listPrice.toLocaleString("ko-KR")}` : "-" },
+                            { label: "할인", value: discount > 0 ? `₩${discount.toLocaleString("ko-KR")}` : "-" },
+                            { label: "실제단가", value: `₩${unitPrice.toLocaleString("ko-KR")}`, strong: true },
+                            { label: "공급가액", value: `₩${unitPrice.toLocaleString("ko-KR")}` },
+                            { label: "세액", value: taxAmt > 0 ? `₩${taxAmt.toLocaleString("ko-KR")}` : "-" },
+                          ];
                           return (
-                            <table className="w-full text-[12px] border-t border-border">
-                              <thead>
-                                <tr className="bg-muted text-muted-foreground">
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap w-28">품번</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap">규격</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-center font-medium whitespace-nowrap">단위</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-center font-medium whitespace-nowrap">수량</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">단가</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">할인</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">실제단가</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">공급가액</th>
-                                  <th className="border-r border-b border-border py-1.5 px-2 text-right font-medium whitespace-nowrap">세액</th>
-                                  <th className="border-b border-border py-1.5 px-2 text-left font-medium whitespace-nowrap">비고</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr className="border-b border-border">
-                                  <td className="border-r border-border py-1.5 px-2 text-muted-foreground w-28 max-w-28 truncate">{sp.supplierCode || "-"}</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-muted-foreground">{sp.spec || "-"}</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-center">{sp.unitOfMeasure}</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-center">1</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-right">{listPrice > 0 ? `₩${listPrice.toLocaleString("ko-KR")}` : "-"}</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-right">{discount > 0 ? `₩${discount.toLocaleString("ko-KR")}` : "-"}</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-right font-medium">₩{unitPrice.toLocaleString("ko-KR")}</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-right">₩{supplyAmt.toLocaleString("ko-KR")}</td>
-                                  <td className="border-r border-border py-1.5 px-2 text-right">{taxAmt > 0 ? `₩${taxAmt.toLocaleString("ko-KR")}` : "-"}</td>
-                                  <td className="border-border py-1.5 px-2 text-muted-foreground">{sp.memo || "-"}</td>
-                                </tr>
-                              </tbody>
-                            </table>
+                            <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-5 py-3">
+                              <p className="mb-2 text-jm-2xs font-medium text-[var(--jm-text-muted)]">
+                                선택한 공급상품 정보
+                              </p>
+                              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                                {rows.map((r) => (
+                                  <div key={r.label}>
+                                    <dt className="text-jm-2xs text-[var(--jm-text-muted)]">
+                                      {r.label}
+                                    </dt>
+                                    <dd
+                                      className={
+                                        r.strong
+                                          ? "text-jm-sm font-semibold tabular-nums text-[var(--jm-text)]"
+                                          : "text-jm-sm tabular-nums text-[var(--jm-text)]"
+                                      }
+                                    >
+                                      {r.value}
+                                    </dd>
+                                  </div>
+                                ))}
+                              </dl>
+                              {sp.memo && (
+                                <div className="mt-2">
+                                  <dt className="text-jm-2xs text-[var(--jm-text-muted)]">
+                                    비고
+                                  </dt>
+                                  <dd className="text-jm-sm text-[var(--jm-text)]">
+                                    {sp.memo}
+                                  </dd>
+                                </div>
+                              )}
+                            </div>
                           );
                         })()}
-                        </JmCard>
-                      </section>
-                    </>
+                      </JmCard>
+                    </section>
                   )}
 
-                  <GroupHeader step="STEP 2" title="상품 정보" id="np-step-2" />
-
                   {/* 기본 정보 */}
-                  <section>
-                    <SectionTitle title="기본 정보" />
-                    <JmCard><JmCardContent className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Field label="상품명" required>
-                        <NameAutocomplete
-                          value={form.name}
-                          onChange={(name) => setForm((prev) => ({ ...prev, name }))}
-                          items={productNameItems}
-                        />
-                      </Field>
-                      <Field label="규격">
-                        <JmInput
-                          placeholder="예: B-55, 3HP (선택)"
-                          value={form.spec}
-                          onChange={(e) => setForm((prev) => ({ ...prev, spec: e.target.value }))}
-                          className="h-9"
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Field label="브랜드">
-                        <BrandCombobox
-                          brands={brands}
-                          value={form.brandId}
-                          onChange={(id, name) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              brandId: id,
-                              brandName: name,
-                            }))
-                          }
-                          onCreateNew={(name) => {
-                            setQuickBrandDefaultName(name);
-                            setQuickBrandOpen(true);
-                          }}
-                        />
-                      </Field>
-                      <Field label="SKU" required>
-                        <div className="flex gap-1.5">
-                          <JmInput
-                            placeholder="SKU"
-                            value={form.sku}
-                            onChange={(e) => {
-                              setSkuManuallyEdited(true);
-                              setForm((prev) => ({ ...prev, sku: e.target.value }));
-                            }}
-                            className="h-9 flex-1"
-                          />
-                          <JmButton
-                            type="button"
-                            variant="outline"
-                            className="shrink-0 h-9 w-9 p-0"
-                            onClick={() => {
-                              if (skuManuallyEdited && !window.confirm("입력한 SKU가 덮어써집니다. 재생성할까요?")) return;
-                              setForm((prev) => ({ ...prev, sku: generateSku() }));
-                              setSkuManuallyEdited(false);
-                            }}
-                            title="자동 생성"
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                          </JmButton>
-                        </div>
-                      </Field>
-                    </div>
-
-                    <Field label="단위">
-                      <JmSelect
-                        size="sm"
-                        value={form.unitOfMeasure}
-                        onChange={(v) => setForm((prev) => ({ ...prev, unitOfMeasure: v || "EA" }))}
-                        options={UNITS_OF_MEASURE.map((u) => ({
-                          value: u.value,
-                          label: `${u.label} (${u.value})`,
-                        }))}
-                      />
-                    </Field>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Field label="모델명">
-                        <JmInput
-                          placeholder="모델명 (선택)"
-                          value={form.modelName}
-                          onChange={(e) => setForm((prev) => ({ ...prev, modelName: e.target.value }))}
-                          className="h-9"
-                        />
-                      </Field>
-                      {categories.length > 0 && (
-                        <Field label="카테고리">
-                          <JmSelect
-                            size="sm"
-                            value={form.categoryId || "__none__"}
-                            onChange={(v) =>
-                              setForm((prev) => ({ ...prev, categoryId: !v || v === "__none__" ? "" : v }))
-                            }
-                            options={[
-                              { value: "__none__", label: "없음" },
-                              ...categories.flatMap((cat) =>
-                                cat.children.length > 0
-                                  ? cat.children.map((child) => ({
-                                      value: child.id,
-                                      label: `${cat.name} > ${child.name}`,
-                                    }))
-                                  : [{ value: cat.id, label: cat.name }],
-                              ),
-                            ]}
-                          />
-                        </Field>
-                      )}
-                    </div>
-
-                    {(productType === "FINISHED" || productType === "PARTS") && true && (
-                      <div className="space-y-2 rounded-md border border-dashed border-border p-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <JmCheckbox
-                            checked={bulkUsable}
-                            onCheckedChange={(v) => {
-                              const checked = !!v;
-                              setBulkUsable(checked);
-                              if (!checked) {
-                                setContainerSize("");
-                                setNewBulkName("");
-                                bulkNameAutoSync.current = true;
-                              } else {
-                                bulkNameAutoSync.current = true;
-                                setNewBulkName(form.name ? `${form.name} (벌크)` : "");
-                              }
-                            }}
-                          />
-                          <span className="text-[13px]">분할 사용 가능 (병·통 단위 입고, 소량 단위 소모)</span>
-                        </label>
-                        {bulkUsable && (
-                          <div className="space-y-2 pl-6">
-                            <Field label="용기 용량">
-                              <div className="flex items-center gap-1.5">
-                                <JmInput
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="예: 4000"
-                                  value={containerSize}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) setContainerSize(v);
-                                  }}
-                                  onFocus={focusCaretEnd}
-                                  className="h-9 flex-1"
-                                />
-                                <JmSelect
-                                  size="sm"
-                                  className="w-20"
-                                  value={newBulkUnit}
-                                  onChange={(v) => setNewBulkUnit(v || "mL")}
-                                  options={[
-                                    { value: "mL", label: "mL" },
-                                    { value: "L", label: "L" },
-                                    { value: "g", label: "g" },
-                                    { value: "kg", label: "kg" },
-                                  ]}
-                                />
-
-                              </div>
-                            </Field>
-                            <Field label="벌크명">
+                  {currentStep === "basic" && (
+                  <div className="space-y-5">
+                    {/* 기본 정보 */}
+                    <section>
+                      <SectionTitle title="기본 정보" />
+                      <JmCard>
+                        <JmCardContent className="space-y-4">
+                          <Field label="상품명" required>
+                            <NameAutocomplete
+                              value={form.name}
+                              onChange={(name) => setForm((prev) => ({ ...prev, name }))}
+                              items={productNameItems}
+                            />
+                          </Field>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field label="규격">
                               <JmInput
-                                placeholder="예: 엔진오일 5W-30 (벌크)"
-                                value={newBulkName}
-                                onChange={(e) => {
-                                  bulkNameAutoSync.current = false;
-                                  setNewBulkName(e.target.value);
-                                }}
+                                placeholder="예: B-55, 3HP (선택)"
+                                value={form.spec}
+                                onChange={(e) => setForm((prev) => ({ ...prev, spec: e.target.value }))}
+                                className="h-9"
+                              />
+                            </Field>
+                            <Field label="모델명">
+                              <JmInput
+                                placeholder="모델명 (선택)"
+                                value={form.modelName}
+                                onChange={(e) => setForm((prev) => ({ ...prev, modelName: e.target.value }))}
                                 className="h-9"
                               />
                             </Field>
                           </div>
-                        )}
-                      </div>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field label="브랜드">
+                              <BrandCombobox
+                                brands={brands}
+                                value={form.brandId}
+                                onChange={(id, name) =>
+                                  setForm((prev) => ({ ...prev, brandId: id, brandName: name }))
+                                }
+                                onCreateNew={(name) => {
+                                  setQuickBrandDefaultName(name);
+                                  setQuickBrandOpen(true);
+                                }}
+                              />
+                            </Field>
+                            <Field label="SKU" required>
+                              <div className="flex gap-1.5">
+                                <JmInput
+                                  placeholder="SKU"
+                                  value={form.sku}
+                                  onChange={(e) => {
+                                    setSkuManuallyEdited(true);
+                                    setForm((prev) => ({ ...prev, sku: e.target.value }));
+                                  }}
+                                  className="h-9 flex-1"
+                                />
+                                <JmButton
+                                  type="button"
+                                  variant="outline"
+                                  className="h-9 w-9 shrink-0 p-0"
+                                  onClick={() => {
+                                    if (skuManuallyEdited && !window.confirm("입력한 SKU가 덮어써집니다. 재생성할까요?")) return;
+                                    setForm((prev) => ({ ...prev, sku: generateSku() }));
+                                    setSkuManuallyEdited(false);
+                                  }}
+                                  title="자동 생성"
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                </JmButton>
+                              </div>
+                            </Field>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field label="단위">
+                              <JmSelect
+                                size="sm"
+                                value={form.unitOfMeasure}
+                                onChange={(v) => setForm((prev) => ({ ...prev, unitOfMeasure: v || "EA" }))}
+                                options={UNITS_OF_MEASURE.map((u) => ({
+                                  value: u.value,
+                                  label: `${u.label} (${u.value})`,
+                                }))}
+                              />
+                            </Field>
+                            {categories.length > 0 && (
+                              <Field label="카테고리">
+                                <JmSelect
+                                  size="sm"
+                                  value={form.categoryId || "__none__"}
+                                  onChange={(v) =>
+                                    setForm((prev) => ({ ...prev, categoryId: !v || v === "__none__" ? "" : v }))
+                                  }
+                                  options={[
+                                    { value: "__none__", label: "없음" },
+                                    ...categories.flatMap((cat) =>
+                                      cat.children.length > 0
+                                        ? cat.children.map((child) => ({
+                                            value: child.id,
+                                            label: `${cat.name} > ${child.name}`,
+                                          }))
+                                        : [{ value: cat.id, label: cat.name }],
+                                    ),
+                                  ]}
+                                />
+                              </Field>
+                            )}
+                          </div>
+                        </JmCardContent>
+                      </JmCard>
+                    </section>
+
+                    {/* 세금·노출 */}
+                    <section>
+                      <SectionTitle title="세금 · 노출" />
+                      <JmCard>
+                        <JmCardContent className="space-y-3.5">
+                          <ToggleField
+                            label="영세율 적용 가능"
+                            desc="과세 상품 — 영세율 대상이면 켜기"
+                            checked={form.zeroRateEligible}
+                            onChange={(v) =>
+                              setForm((prev) => ({ ...prev, zeroRateEligible: v }))
+                            }
+                          />
+                          <div className="h-px bg-[var(--jm-border)]" />
+                          <div className="space-y-2.5">
+                            <ToggleField
+                              label="시리얼 라벨 발번 (개별추적)"
+                              desc="개별 시리얼 코드로 추적·보증 관리"
+                              checked={form.trackable}
+                              onChange={(v) =>
+                                setForm((prev) => ({ ...prev, trackable: v }))
+                              }
+                            />
+                            {form.trackable && (
+                              <div className="flex items-center gap-2 pl-14">
+                                <JmInput
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  value={form.warrantyMonths}
+                                  onChange={(e) =>
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      warrantyMonths: e.target.value.replace(/\D/g, ""),
+                                    }))
+                                  }
+                                  onFocus={focusCaretEnd}
+                                  className="h-8 w-20 text-right"
+                                />
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                                  개월 보증
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="h-px bg-[var(--jm-border)]" />
+                          <ToggleField
+                            label="카탈로그 노출 차단"
+                            desc="옵션 SWAP 대상 SKU — 카탈로그에 단독 노출 안 함"
+                            checked={form.catalogHidden}
+                            onChange={(v) =>
+                              setForm((prev) => ({ ...prev, catalogHidden: v }))
+                            }
+                          />
+                        </JmCardContent>
+                      </JmCard>
+                    </section>
+
+                    {/* 분할 사용 — 완제품·부속 */}
+                    {(productType === "FINISHED" || productType === "PARTS") && (
+                      <section>
+                        <SectionTitle
+                          title="분할 사용"
+                          badge={
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                              선택
+                            </span>
+                          }
+                        />
+                        <JmCard>
+                          <JmCardContent className="space-y-3">
+                            <ToggleField
+                              label="분할 사용 가능"
+                              desc="병·통 단위로 입고하고 소량 단위로 소모"
+                              checked={bulkUsable}
+                              onChange={(checked) => {
+                                setBulkUsable(checked);
+                                if (!checked) {
+                                  setContainerSize("");
+                                  setNewBulkName("");
+                                  bulkNameAutoSync.current = true;
+                                } else {
+                                  bulkNameAutoSync.current = true;
+                                  setNewBulkName(form.name ? `${form.name} (벌크)` : "");
+                                }
+                              }}
+                            />
+                            {bulkUsable && (
+                              <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
+                                <Field label="용기 용량">
+                                  <div className="flex items-center gap-1.5">
+                                    <JmInput
+                                      type="text"
+                                      inputMode="decimal"
+                                      placeholder="예: 4000"
+                                      value={containerSize}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) setContainerSize(v);
+                                      }}
+                                      onFocus={focusCaretEnd}
+                                      className="h-9 flex-1"
+                                    />
+                                    <JmSelect
+                                      size="sm"
+                                      className="w-20"
+                                      value={newBulkUnit}
+                                      onChange={(v) => setNewBulkUnit(v || "mL")}
+                                      options={[
+                                        { value: "mL", label: "mL" },
+                                        { value: "L", label: "L" },
+                                        { value: "g", label: "g" },
+                                        { value: "kg", label: "kg" },
+                                      ]}
+                                    />
+                                  </div>
+                                </Field>
+                                <Field label="벌크명">
+                                  <JmInput
+                                    placeholder="예: 엔진오일 5W-30 (벌크)"
+                                    value={newBulkName}
+                                    onChange={(e) => {
+                                      bulkNameAutoSync.current = false;
+                                      setNewBulkName(e.target.value);
+                                    }}
+                                    className="h-9"
+                                  />
+                                </Field>
+                              </div>
+                            )}
+                          </JmCardContent>
+                        </JmCard>
+                      </section>
                     )}
 
-                    <Field label="세금 유형">
-                      <div className="flex gap-1">
-                        <span
-                          className="px-2 h-6 rounded text-[11px] border transition-colors bg-primary/10 border-primary/40 text-primary inline-flex items-center"
-                        >
-                          과세
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setForm((prev) => ({
-                              ...prev,
-                              zeroRateEligible: !prev.zeroRateEligible,
-                            }))
-                          }
-                          className={cn(
-                            "px-2 h-6 rounded text-[11px] border transition-colors",
-                            form.zeroRateEligible
-                              ? "bg-primary/10 border-primary/40 text-primary"
-                              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                          )}
-                        >
-                          영세율 가능
-                        </button>
-                      </div>
-                    </Field>
-
-                    <Field label="개별추적">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setForm((prev) => ({ ...prev, trackable: !prev.trackable }))
-                          }
-                          className={cn(
-                            "px-2 h-6 rounded text-[11px] border transition-colors",
-                            form.trackable
-                              ? "bg-primary/10 border-primary/40 text-primary"
-                              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                          )}
-                        >
-                          시리얼 라벨 발번
-                        </button>
-                        {form.trackable && (
-                          <div className="flex items-center gap-1.5">
-                            <JmInput
-                              type="text"
-                              inputMode="numeric"
-                              placeholder="0"
-                              value={form.warrantyMonths}
-                              onChange={(e) =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  warrantyMonths: e.target.value.replace(/\D/g, ""),
-                                }))
-                              }
-                              onFocus={focusCaretEnd}
-                              className="h-7 w-16 text-right text-[13px]"
-                            />
-                            <span className="text-[11px] text-muted-foreground">개월 보증</span>
-                          </div>
-                        )}
-                      </div>
-                    </Field>
-
-                    <Field label="카탈로그">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setForm((prev) => ({
-                              ...prev,
-                              catalogHidden: !prev.catalogHidden,
-                            }))
-                          }
-                          className={cn(
-                            "px-2 h-6 rounded text-[11px] border transition-colors",
-                            form.catalogHidden
-                              ? "bg-amber-100 border-amber-300 text-amber-900 dark:bg-amber-500/15 dark:border-amber-500/40 dark:text-amber-300"
-                              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                          )}
-                          title="ON: 자사몰/POS 카탈로그에서 단독 노출 안 됨. 다른 상품의 옵션 SWAP 으로만 도달 가능 (가습기-블랙 같은 케이스)"
-                        >
-                          {form.catalogHidden ? "노출 차단" : "정상 노출"}
-                        </button>
-                        {form.catalogHidden && (
-                          <span className="text-[10px] text-muted-foreground">
-                            옵션 SWAP 대상 SKU 운영 시 사용
+                    {/* 메모 */}
+                    <section>
+                      <SectionTitle
+                        title="메모"
+                        badge={
+                          <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                            선택
                           </span>
-                        )}
-                      </div>
-                    </Field>
-
-                    <Field label="메모">
-                      <JmTextarea
-                        placeholder="메모 (선택)"
-                        value={form.memo}
-                        onChange={(e) => setForm((prev) => ({ ...prev, memo: e.target.value }))}
-                        className="min-h-[60px] resize-none text-[13px]"
+                        }
                       />
-                    </Field>
-                    </JmCardContent></JmCard>
-                  </section>
+                      <JmCard>
+                        <JmCardContent>
+                          <JmTextarea
+                            placeholder="메모 (선택)"
+                            value={form.memo}
+                            onChange={(e) => setForm((prev) => ({ ...prev, memo: e.target.value }))}
+                            className="min-h-[72px] resize-none"
+                          />
+                        </JmCardContent>
+                      </JmCard>
+                    </section>
+                  </div>
+                  )}
 
                   {/* 상위 상품 연결 (부속) */}
-                  {productType === "PARTS" && true && (
+                  {currentStep === "parents" && productType === "PARTS" && (
                     <section>
                       <SectionTitle
                         title="상위 상품 연결"
-                        badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
+                        badge={
+                          <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                            선택
+                          </span>
+                        }
                       />
-                      <JmCard className="overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-muted text-muted-foreground text-xs">
-                            <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">상위 세트/조립 상품</th>
-                            <th className="border-r border-b border-border w-[80px] py-1.5 px-2 text-center font-medium">수량</th>
-                            <th className="border-b border-border w-[32px]" />
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <JmCard>
+                        <JmCardContent className="space-y-2">
+                          <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                            이 부속이 들어가는 상위 세트·조립 상품을 연결합니다.
+                          </p>
                           {parentProducts.map((row, idx) => (
-                            <tr key={row.id} className="border-b border-border hover:bg-muted/50">
-                              <td className="border-r border-border px-1 py-0.5">
+                            <div
+                              key={row.id}
+                              className="flex items-center gap-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2"
+                            >
+                              <div className="min-w-0 flex-1">
                                 <ProductCombobox
                                   products={existingProducts}
                                   value={row.product?.id ?? ""}
-                                  onChange={(p) => setParentProducts((prev) => prev.map((r, i) => i === idx ? { ...r, product: p } : r))}
+                                  onChange={(p) =>
+                                    setParentProducts((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, product: p } : r)),
+                                    )
+                                  }
                                   filterType="set"
                                   placeholder="상위 세트/조립 상품 선택..."
                                 />
-                              </td>
-                              <td className="border-r border-border px-1 py-0.5">
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                                  수량
+                                </span>
                                 <JmInput
                                   type="number"
                                   inputMode="decimal"
                                   min="0.0001"
                                   step="0.01"
                                   value={row.quantity}
-                                  onChange={(e) => setParentProducts((prev) => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
-                                  className="h-7 text-[12px] text-right border-0 bg-transparent focus-visible:ring-0 px-1"
+                                  onChange={(e) =>
+                                    setParentProducts((prev) =>
+                                      prev.map((r, i) =>
+                                        i === idx ? { ...r, quantity: e.target.value } : r,
+                                      ),
+                                    )
+                                  }
+                                  className="h-9 w-16 text-right"
                                 />
-                              </td>
-                              <td className="text-center">
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-red-400 transition-colors p-1"
-                                  onClick={() => setParentProducts((prev) => prev.filter((_, i) => i !== idx))}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                          <tr>
-                            <td colSpan={3} className="px-2 py-1.5">
-                              <button
+                              </div>
+                              <JmIconButton
                                 type="button"
-                                onClick={() => setParentProducts((prev) => [...prev, emptyParentRow()])}
-                                className="flex items-center gap-1.5 text-muted-foreground text-[12px] hover:text-primary transition-colors"
+                                size="sm"
+                                variant="ghost"
+                                aria-label="상위 상품 삭제"
+                                className="text-[var(--jm-danger-fg)]"
+                                onClick={() =>
+                                  setParentProducts((prev) => prev.filter((_, i) => i !== idx))
+                                }
                               >
-                                <Plus className="h-3.5 w-3.5" />
-                                상위 상품 추가
-                              </button>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                                <X />
+                              </JmIconButton>
+                            </div>
+                          ))}
+                          <JmButton
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() =>
+                              setParentProducts((prev) => [...prev, emptyParentRow()])
+                            }
+                          >
+                            <Plus />
+                            <span>상위 상품 추가</span>
+                          </JmButton>
+                        </JmCardContent>
                       </JmCard>
                     </section>
                   )}
 
                   {/* 조립 템플릿/프리셋 — ASSEMBLED일 때만 */}
-                  {productType === "ASSEMBLED" && templates.length > 0 && (
+                  {currentStep === "components" && productType === "ASSEMBLED" && templates.length > 0 && (
                     <section>
                       <SectionTitle
                         title="조립 템플릿"
-                        badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
+                        badge={<span className="text-jm-2xs text-[var(--jm-text-muted)]">선택사항</span>}
                       />
-                      <JmCard><JmCardContent className="grid grid-cols-2 gap-3">
+                      <JmCard><JmCardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="flex flex-col gap-1">
-                          <label className="text-[12px] text-muted-foreground">템플릿</label>
+                          <label className="text-jm-xs text-[var(--jm-text-muted)]">템플릿</label>
                           <AssemblyTemplateCombobox
                             templates={templates.map((t) => ({ id: t.id, name: t.name }))}
                             value={templateId}
@@ -2158,7 +2151,7 @@ export function NewProductForm({
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <label className="text-[12px] text-muted-foreground">프리셋</label>
+                          <label className="text-jm-xs text-[var(--jm-text-muted)]">프리셋</label>
                           <div className="flex gap-2">
                             <AssemblyPresetCombobox
                               presets={
@@ -2193,133 +2186,142 @@ export function NewProductForm({
                   )}
 
                   {/* 구성 상품 (세트/조립) */}
-                  {isSetOrAssembled && (() => {
+                  {currentStep === "components" && isSetOrAssembled && (() => {
                     const showLabel = productType === "ASSEMBLED";
-                    const colCount = showLabel ? 5 : 4;
                     return (
                     <section>
                       <SectionTitle title="구성 상품" />
-                      <JmCard className="overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-muted text-muted-foreground text-xs">
-                            {showLabel && (
-                              <th className="border-r border-b border-border w-[110px] py-1.5 px-2 text-left font-medium">라벨</th>
-                            )}
-                            <th className="border-r border-b border-border py-1.5 px-2 text-left font-medium">상품</th>
-                            <th className="border-r border-b border-border w-[72px] py-1.5 px-2 text-center font-medium">수량</th>
-                            <th className="border-r border-b border-border w-[110px] py-1.5 px-2 text-center font-medium">소계</th>
-                            <th className="border-b border-border w-[32px]" />
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <JmCard>
+                        <JmCardContent className="space-y-2">
                           {setComponents.map((row, idx) => {
                             const hasCost = row.product && row.product.unitCost != null;
                             const lineTotal = hasCost
                               ? parseFloat(row.product!.unitCost || "0") * parseFloat(row.quantity || "1")
                               : 0;
                             return (
-                              <tr key={row.id} className="border-b border-border hover:bg-muted/50">
+                              <div
+                                key={row.id}
+                                className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2.5"
+                              >
                                 {showLabel && (
-                                  <td className="border-r border-border p-0.5">
-                                    <AssemblySlotLabelCombobox
-                                      labels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
-                                      value={row.slotLabelId ?? ""}
-                                      onChange={(id, name) =>
-                                        setSetComponents((prev) =>
-                                          prev.map((r, i) =>
-                                            i === idx ? { ...r, slotLabelId: id || null, label: name } : r,
-                                          ),
-                                        )
-                                      }
-                                      onCreateNew={(name) =>
-                                        createSlotLabelMutation.mutate({ name, rowIdx: idx })
-                                      }
-                                      placeholder={
-                                        row.label && !row.slotLabelId
-                                          ? `${row.label} (재선택 필요)`
-                                          : "라벨 선택..."
-                                      }
-                                    />
-                                  </td>
-                                )}
-                                <td className="border-r border-border px-1 py-0.5">
-                                  <ProductCombobox
-                                    products={existingProducts}
-                                    value={row.product?.id ?? ""}
-                                    onChange={(p) => setSetComponents((prev) => prev.map((r, i) => i === idx ? { ...r, product: p } : r))}
-                                    placeholder="구성 상품 선택..."
+                                  <AssemblySlotLabelCombobox
+                                    labels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
+                                    value={row.slotLabelId ?? ""}
+                                    onChange={(id, name) =>
+                                      setSetComponents((prev) =>
+                                        prev.map((r, i) =>
+                                          i === idx ? { ...r, slotLabelId: id || null, label: name } : r,
+                                        ),
+                                      )
+                                    }
+                                    onCreateNew={(name) =>
+                                      createSlotLabelMutation.mutate({ name, rowIdx: idx })
+                                    }
+                                    placeholder={
+                                      row.label && !row.slotLabelId
+                                        ? `${row.label} (재선택 필요)`
+                                        : "라벨 선택..."
+                                    }
                                   />
-                                </td>
-                                <td className="border-r border-border px-1 py-0.5">
+                                )}
+                                <ProductCombobox
+                                  products={existingProducts}
+                                  value={row.product?.id ?? ""}
+                                  onChange={(p) =>
+                                    setSetComponents((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, product: p } : r)),
+                                    )
+                                  }
+                                  placeholder="구성 상품 선택..."
+                                />
+                                <div className="flex items-center gap-2">
+                                  <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                                    수량
+                                  </span>
                                   <JmInput
                                     type="number"
                                     inputMode="decimal"
                                     min="0.0001"
                                     step="0.01"
                                     value={row.quantity}
-                                    onChange={(e) => setSetComponents((prev) => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
-                                    className="h-7 text-[12px] text-right border-0 bg-transparent focus-visible:ring-0 px-1"
+                                    onChange={(e) =>
+                                      setSetComponents((prev) =>
+                                        prev.map((r, i) =>
+                                          i === idx ? { ...r, quantity: e.target.value } : r,
+                                        ),
+                                      )
+                                    }
+                                    className="h-9 w-20 text-right"
                                   />
-                                </td>
-                                <td className="border-r border-border px-2 py-1 text-right text-[12px] tabular-nums text-primary">
-                                  {hasCost ? `₩${Math.round(lineTotal).toLocaleString("ko-KR")}` : "—"}
-                                </td>
-                                <td className="text-center">
+                                  <span className="ml-auto text-jm-sm tabular-nums text-[var(--jm-text)]">
+                                    {hasCost
+                                      ? `소계 ₩${Math.round(lineTotal).toLocaleString("ko-KR")}`
+                                      : ""}
+                                  </span>
                                   {setComponents.length > 1 && (
-                                    <button
+                                    <JmIconButton
                                       type="button"
-                                      className="text-muted-foreground hover:text-red-400 transition-colors p-1"
-                                      onClick={() => setSetComponents((prev) => prev.filter((_, i) => i !== idx))}
+                                      size="sm"
+                                      variant="ghost"
+                                      aria-label="구성 상품 삭제"
+                                      className="text-[var(--jm-danger-fg)]"
+                                      onClick={() =>
+                                        setSetComponents((prev) =>
+                                          prev.filter((_, i) => i !== idx),
+                                        )
+                                      }
                                     >
-                                      <X className="h-3 w-3" />
-                                    </button>
+                                      <X />
+                                    </JmIconButton>
                                   )}
-                                </td>
-                              </tr>
+                                </div>
+                              </div>
                             );
                           })}
-                          <tr className={componentsTotalCost > 0 ? "border-b border-border" : ""}>
-                            <td colSpan={colCount} className="px-2 py-1.5">
-                              <button
-                                type="button"
-                                onClick={() => setSetComponents((prev) => [...prev, emptySetComponent()])}
-                                className="flex items-center gap-1.5 text-muted-foreground text-[12px] hover:text-primary transition-colors"
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                                구성 상품 추가
-                              </button>
-                            </td>
-                          </tr>
+                          <JmButton
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() =>
+                              setSetComponents((prev) => [...prev, emptySetComponent()])
+                            }
+                          >
+                            <Plus />
+                            <span>구성 상품 추가</span>
+                          </JmButton>
                           {componentsTotalCost > 0 && (
-                            <tr>
-                              <td colSpan={showLabel ? 3 : 2} className="px-2 py-2 text-[12px] text-muted-foreground">구성품 원가 합계</td>
-                              <td className="px-2 py-2 text-right text-[13px] font-semibold tabular-nums" colSpan={2}>
+                            <div className="flex items-center justify-between rounded-md bg-[var(--jm-surface-muted)] px-3 py-2">
+                              <span className="text-jm-sm text-[var(--jm-text-muted)]">
+                                구성품 원가 합계
+                              </span>
+                              <span className="text-jm-md font-semibold tabular-nums text-[var(--jm-text)]">
                                 ₩{Math.round(componentsTotalCost).toLocaleString("ko-KR")}
-                              </td>
-                            </tr>
+                              </span>
+                            </div>
                           )}
-                        </tbody>
-                      </table>
+                        </JmCardContent>
                       </JmCard>
                     </section>
                     );
                   })()}
 
-                  <GroupHeader step="STEP 3" title="비용" id="np-step-3" />
+                  {/* ── 가격·비용 스텝 ── */}
+                  {currentStep === "pricing" && (
+                  <>
 
                   {/* 조립 비용 */}
                   {productType === "ASSEMBLED" && (
                     <section>
                       <SectionTitle
                         title="조립 비용"
-                        badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
+                        badge={<span className="text-jm-2xs text-[var(--jm-text-muted)]">선택사항</span>}
                       />
                       <JmCard className="overflow-hidden">
                         <CostList costs={assemblyCosts} onChange={setAssemblyCosts} addLabel="조립 비용 추가" />
                         {assemblyFixedCost > 0 && (
-                          <div className="flex items-center justify-between px-3 py-2 border-t border-border text-[12px]">
-                            <span className="text-muted-foreground">조립비용 합계</span>
+                          <div className="flex items-center justify-between px-3 py-2 border-t border-[var(--jm-border)] text-jm-xs">
+                            <span className="text-[var(--jm-text-muted)]">조립비용 합계</span>
                             <span className="font-semibold tabular-nums">₩{Math.round(assemblyFixedCost).toLocaleString("ko-KR")}</span>
                           </div>
                         )}
@@ -2354,7 +2356,7 @@ export function NewProductForm({
                         <SectionTitle
                           title="입고 배송비"
                           badge={
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                               과거 입고 이력 기준. 평균값을 가격계산기에 반영
                             </span>
                           }
@@ -2371,7 +2373,7 @@ export function NewProductForm({
                         <SectionTitle
                           title="입고 부대비용"
                           badge={
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                               거래처상품 상세에서 등록·수정 (이 화면 표시 전용)
                             </span>
                           }
@@ -2393,33 +2395,27 @@ export function NewProductForm({
                   <section>
                     <SectionTitle
                       title="판매 비용"
-                      badge={<span className="text-[11px] text-muted-foreground">선택사항</span>}
+                      badge={<span className="text-jm-2xs text-[var(--jm-text-muted)]">선택사항</span>}
                     />
                     <JmCard className="overflow-hidden">
                       <CostList costs={sellingCosts} onChange={setSellingCosts} addLabel="판매 비용 추가" />
                     </JmCard>
                   </section>
 
-                  {productType !== "OPTION_PARENT" && (
-                    <>
-                      <GroupHeader step="STEP 4" title="가격 설정" id="np-step-4" />
+                  {/* 가격 계산기 */}
+                  {productType !== "OPTION_PARENT" && PricePanel()}
 
-                      {/* 가격 계산기 */}
-                      {PricePanel()}
+                  </>
+                  )}
 
-                      {channels.length > 0 && (
-                        <>
-                          <GroupHeader step="STEP 5" title="채널별 가격" id="np-step-5" />
-                          {ChannelPricingPanel()}
-                        </>
-                      )}
-                    </>
+                  {/* ── 채널별 가격 스텝 ── */}
+                  {currentStep === "channels" && productType !== "OPTION_PARENT" && channels.length > 0 && (
+                    ChannelPricingPanel()
                   )}
 
                   {/* OPTION_PARENT — 옵션 슬롯 + 연결 단품(SWAP) 구성 */}
-                  {productType === "OPTION_PARENT" && (
+                  {currentStep === "options" && productType === "OPTION_PARENT" && (
                     <>
-                      <GroupHeader step="STEP 4" title="옵션 구성" id="np-step-opt" />
                       <section>
                         <SectionTitle
                           title="고객 옵션"
@@ -2448,7 +2444,7 @@ export function NewProductForm({
                               {optionParentValues.map((v) => (
                                 <div
                                   key={v.rowId}
-                                  className="grid grid-cols-1 gap-2 sm:grid-cols-[150px_1fr_auto] sm:items-center"
+                                  className="grid grid-cols-1 gap-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2 sm:grid-cols-[150px_1fr_auto] sm:items-center"
                                 >
                                   <JmInput
                                     value={v.label}
@@ -2515,24 +2511,200 @@ export function NewProductForm({
                       </section>
                     </>
                   )}
+
+                  {/* ── 확인 스텝 ── */}
+                  {currentStep === "review" && (() => {
+                    const ReviewRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+                      <div className="flex items-start justify-between gap-3 border-b border-[var(--jm-border)] py-2 text-jm-sm last:border-0">
+                        <span className="shrink-0 text-[var(--jm-text-muted)]">{label}</span>
+                        <span className="break-words text-right text-[var(--jm-text)]">{value || "—"}</span>
+                      </div>
+                    );
+                    const EditButton = ({ to }: { to: StepId }) => (
+                      <JmButton type="button" variant="outline" size="sm" className="h-7 text-jm-xs" onClick={() => jumpToStep(to)}>
+                        수정
+                      </JmButton>
+                    );
+                    const brandName =
+                      brands.find((b) => b.id === form.brandId)?.name || form.brandName || "";
+                    const categoryName = (() => {
+                      for (const cat of categories) {
+                        if (cat.id === form.categoryId) return cat.name;
+                        const child = cat.children.find((c) => c.id === form.categoryId);
+                        if (child) return `${cat.name} > ${child.name}`;
+                      }
+                      return "";
+                    })();
+                    const supplierName = suppliers.find((s) => s.id === mapping.supplierId)?.name || "";
+                    const supplierProductName =
+                      supplierProducts.find((sp) => sp.id === mapping.supplierProductId)?.name || "";
+                    const enabledChannels = channelPrices.filter((r) => r.enabled && r.price);
+                    return (
+                      <div className="space-y-4">
+                        <section>
+                          <SectionTitle title="기본 정보" />
+                          <JmCard><JmCardContent>
+                            <div className="flex items-center justify-between">
+                              <span className="text-jm-xs text-[var(--jm-text-muted)]">유형 / 기본</span>
+                              <EditButton to="basic" />
+                            </div>
+                            <ReviewRow label="상품 유형" value={currentTypeCard?.label} />
+                            <ReviewRow label="상품명" value={form.name} />
+                            <ReviewRow label="SKU" value={form.sku} />
+                            <ReviewRow label="규격" value={form.spec} />
+                            <ReviewRow label="브랜드" value={brandName} />
+                            <ReviewRow label="카테고리" value={categoryName} />
+                            <ReviewRow label="단위" value={form.unitOfMeasure} />
+                          </JmCardContent></JmCard>
+                        </section>
+
+                        {(productType === "FINISHED" || productType === "PARTS") && (
+                          <section>
+                            <SectionTitle title="거래처 연결" />
+                            <JmCard><JmCardContent>
+                              <div className="flex items-center justify-between">
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">매핑</span>
+                                <EditButton to="supplier" />
+                              </div>
+                              <ReviewRow label="거래처" value={supplierName} />
+                              <ReviewRow label="공급상품" value={supplierProductName} />
+                              {mapping.supplierProductId && (
+                                <ReviewRow label="환산비율" value={mapping.conversionRate || "1"} />
+                              )}
+                            </JmCardContent></JmCard>
+                          </section>
+                        )}
+
+                        {isSetOrAssembled && (
+                          <section>
+                            <SectionTitle title="구성 상품" />
+                            <JmCard><JmCardContent>
+                              <div className="flex items-center justify-between">
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">구성</span>
+                                <EditButton to="components" />
+                              </div>
+                              {setComponents.filter((c) => c.product).length === 0 ? (
+                                <p className="py-1.5 text-jm-sm text-[var(--jm-text-muted)]">구성 상품 없음</p>
+                              ) : (
+                                setComponents
+                                  .filter((c) => c.product)
+                                  .map((c) => (
+                                    <ReviewRow
+                                      key={c.id}
+                                      label={c.product!.name}
+                                      value={`${c.quantity || "1"} ${c.product!.unitOfMeasure ?? ""}`}
+                                    />
+                                  ))
+                              )}
+                            </JmCardContent></JmCard>
+                          </section>
+                        )}
+
+                        {productType === "OPTION_PARENT" && (
+                          <section>
+                            <SectionTitle title="옵션 구성" />
+                            <JmCard><JmCardContent>
+                              <div className="flex items-center justify-between">
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">{optionSlotName}</span>
+                                <EditButton to="options" />
+                              </div>
+                              {optionParentValues
+                                .filter((v) => v.label.trim() && v.product)
+                                .map((v) => (
+                                  <ReviewRow key={v.rowId} label={v.label} value={v.product!.name} />
+                                ))}
+                            </JmCardContent></JmCard>
+                          </section>
+                        )}
+
+                        {productType !== "OPTION_PARENT" && (
+                          <section>
+                            <SectionTitle title="가격" />
+                            <JmCard><JmCardContent>
+                              <div className="flex items-center justify-between">
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">판매가·마진</span>
+                                <EditButton to="pricing" />
+                              </div>
+                              <ReviewRow
+                                label="판매가 (VAT 포함)"
+                                value={`₩${(parseFloat(form.sellingPrice || "0")).toLocaleString("ko-KR")}`}
+                              />
+                              <ReviewRow
+                                label="원가"
+                                value={`₩${Math.round(activeCalcPrice.totalCost).toLocaleString("ko-KR")}`}
+                              />
+                            </JmCardContent></JmCard>
+                          </section>
+                        )}
+
+                        {productType !== "OPTION_PARENT" && channels.length > 0 && (
+                          <section>
+                            <SectionTitle title="채널 가격" />
+                            <JmCard><JmCardContent>
+                              <div className="flex items-center justify-between">
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">활성 채널</span>
+                                <EditButton to="channels" />
+                              </div>
+                              {enabledChannels.length === 0 ? (
+                                <p className="py-1.5 text-jm-sm text-[var(--jm-text-muted)]">설정한 채널 가격 없음</p>
+                              ) : (
+                                enabledChannels.map((r) => (
+                                  <ReviewRow
+                                    key={r.channelId}
+                                    label={channels.find((c) => c.id === r.channelId)?.name ?? r.channelId}
+                                    value={`₩${(parseFloat(r.price || "0")).toLocaleString("ko-KR")}`}
+                                  />
+                                ))
+                              )}
+                            </JmCardContent></JmCard>
+                          </section>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
               </fieldset>
             )}
         </div>
 
-        {/* 하단 버튼 */}
-        <div className="border-t border-border px-5 py-3.5 flex justify-end gap-2 bg-background shrink-0">
-          {step === "type" ? (
-            <JmButton variant="outline" onClick={handleLeave}>취소</JmButton>
+        {/* 하단 네비게이션 */}
+        <div className="border-t border-[var(--jm-border)] px-5 py-3.5 flex items-center justify-between gap-2 bg-[var(--jm-bg)] shrink-0">
+          {currentStepIdx > 0 && currentStep !== "type" ? (
+            <JmButton
+              variant="outline"
+              onClick={() => {
+                if (currentStepIdx === 1) {
+                  if (lockProductType) { handleLeave(); return; }
+                  if (isDirty && !window.confirm("입력한 내용이 사라집니다. 상품 유형 선택으로 돌아갈까요?")) return;
+                  resetAll();
+                } else {
+                  goPrevStep();
+                }
+              }}
+              disabled={submitting}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              이전
+            </JmButton>
           ) : (
-            <>
+            <span />
+          )}
+          {currentStep === "type" ? (
+            <JmButton variant="outline" onClick={handleLeave}>취소</JmButton>
+          ) : currentStep === "review" ? (
+            <div className="flex gap-2">
               <JmButton variant="outline" onClick={handleLeave} disabled={submitting}>취소</JmButton>
               <JmButton onClick={handleSubmit} disabled={submitting}>
                 {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 등록
               </JmButton>
-            </>
+            </div>
+          ) : (
+            <JmButton onClick={goNextStep} disabled={submitting}>
+              다음
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </JmButton>
           )}
         </div>
       </div>
@@ -2610,5 +2782,54 @@ export function NewProductForm({
         </JmDialogContent>
       </JmDialog>
     </>
+  );
+}
+
+/** 가격 계산기 원가 요약 한 줄 — 라벨 + 금액 */
+function CostLine({
+  label,
+  value,
+}: {
+  label: React.ReactNode;
+  value: number;
+}) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2">
+      <span className="text-[var(--jm-text-muted)]">{label}</span>
+      <span className="tabular-nums text-[var(--jm-text)]">
+        ₩{Math.round(value).toLocaleString("ko-KR")}
+      </span>
+    </div>
+  );
+}
+
+/** 스위치 + 라벨/설명 한 줄 — 세금·노출·분할 등 on/off 설정용 */
+function ToggleField({
+  label,
+  desc,
+  checked,
+  onChange,
+}: {
+  label: string;
+  desc?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3">
+      <JmSwitch
+        checked={checked}
+        onCheckedChange={(v) => onChange(v === true)}
+        className="mt-0.5 shrink-0"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-jm-sm text-[var(--jm-text)]">{label}</span>
+        {desc && (
+          <span className="block text-jm-2xs text-[var(--jm-text-muted)]">
+            {desc}
+          </span>
+        )}
+      </span>
+    </label>
   );
 }
