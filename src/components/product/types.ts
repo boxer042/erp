@@ -135,6 +135,7 @@ export interface ProductOptionValueItem {
     sellingPrice?: string;
     listPrice?: string;
     taxType?: string;
+    imageUrl?: string | null;
   } | null;
   /** 매장 variant 매핑 (쿨러 → 수냉쿨러 variant) */
   mappedVariantId: string | null;

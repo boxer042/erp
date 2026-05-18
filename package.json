@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:lan": "next dev -H 0.0.0.0",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
@@ -60,6 +62,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",

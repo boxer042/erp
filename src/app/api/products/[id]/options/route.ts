@@ -26,7 +26,7 @@ export async function GET(
         where: { isActive: true },
         orderBy: { sortOrder: "asc" },
         include: {
-          mappedProduct: { select: { id: true, name: true, sku: true, sellingPrice: true, listPrice: true, taxType: true } },
+          mappedProduct: { select: { id: true, name: true, sku: true, sellingPrice: true, listPrice: true, taxType: true, imageUrl: true } },
           mappedVariant: { select: { id: true, name: true, sku: true } },
         },
       },

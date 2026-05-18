@@ -13,6 +13,7 @@ import {
   JmDialogFooter,
   JmDialogHeader,
   JmDialogTitle,
+  JmIconButton,
   JmInput,
   JmSelect,
   JmTextarea,
@@ -67,6 +68,19 @@ import {
   NameAutocomplete,
 } from "./new-product-form/parts";
 import { ShippingHistoryCard } from "@/components/shipping-history-card";
+
+// OPTION_PARENT 옵션값 한 줄 — 라벨 + 연결할 단품(SWAP 대상)
+type OptionValueRow = {
+  rowId: string;
+  label: string;
+  product: ProductOption | null;
+};
+const newOptionValueRow = (): OptionValueRow => ({
+  rowId: Math.random().toString(36).slice(2),
+  label: "",
+  product: null,
+});
+
 export interface NewProductFormProps {
   suppliers: Supplier[];
   channels: Channel[];
@@ -184,6 +198,12 @@ export function NewProductForm({
   const [assemblyCosts, setAssemblyCosts] = useState<CostRow[]>([]);
   const [parentProducts, setParentProducts] = useState<ParentProductRow[]>([]);
 
+  // OPTION_PARENT — 옵션 슬롯명 + 옵션값(연결 단품) 행들
+  const [optionSlotName, setOptionSlotName] = useState("색상");
+  const [optionParentValues, setOptionParentValues] = useState<OptionValueRow[]>([
+    newOptionValueRow(),
+  ]);
+
   // 조립 슬롯 라벨 마스터 — 구성상품 라벨 콤보박스에서 선택/생성
   const queryClient = useQueryClient();
   const slotLabelsQuery = useQuery({
@@ -254,8 +274,10 @@ export function NewProductForm({
       { id: 2, anchor: "np-step-2", label: "상품 정보" },
       { id: 3, anchor: "np-step-3", label: "비용" },
     ];
-    // OPTION_PARENT 는 자체 가격/매핑 없으므로 가격/채널 STEP 제외
-    if (productType !== "OPTION_PARENT") {
+    // OPTION_PARENT 는 자체 가격/매핑 없음 — 가격/채널 대신 옵션 구성 STEP
+    if (productType === "OPTION_PARENT") {
+      items.push({ id: 4, anchor: "np-step-opt", label: "옵션 구성" });
+    } else {
       items.push({ id: 4, anchor: "np-step-4", label: "가격 설정" });
       if (channels.length > 0) {
         items.push({ id: 5, anchor: "np-step-5", label: "채널별 가격" });
@@ -404,6 +426,8 @@ export function NewProductForm({
     setSetComponents([emptySetComponent()]);
     setAssemblyCosts([]);
     setParentProducts([]);
+    setOptionSlotName("색상");
+    setOptionParentValues([newOptionValueRow()]);
   }, [channels]);
 
   useEffect(() => {
@@ -437,6 +461,7 @@ export function NewProductForm({
       assemblyCosts.some((c) => c.name || c.value) ||
       setComponents.some((c) => c.product) ||
       parentProducts.some((c) => c.product) ||
+      optionParentValues.some((v) => v.label || v.product) ||
       channelPrices.some((r) => r.enabled || r.price) ||
       baseCost !== "" ||
       manualVatPrice !== "" ||
@@ -853,9 +878,26 @@ export function NewProductForm({
       }
     }
 
-    // OPTION_PARENT — 자체 가격/매핑/세트 검증 skip. 옵션 슬롯은 등록 후 별도 추가 안내 (필수 아님)
+    // OPTION_PARENT — 자체 가격/매핑은 무관(서버가 sellingPrice=0 강제).
+    // 단 옵션 슬롯 + 연결 단품은 필수 — 빈 OPTION_PARENT 는 카탈로그에서 선택 불가.
     if (productType === "OPTION_PARENT") {
-      // 가격/매핑은 무관 — 서버에서 sellingPrice=0 강제 처리
+      if (!optionSlotName.trim()) {
+        toast.error("옵션 슬롯명을 입력해주세요");
+        return;
+      }
+      const filledOptions = optionParentValues.filter((v) => v.label.trim() && v.product);
+      if (filledOptions.length === 0) {
+        toast.error("옵션값을 1개 이상 단품에 연결해주세요");
+        return;
+      }
+      const seenOpt = new Set<string>();
+      for (const v of filledOptions) {
+        if (seenOpt.has(v.product!.id)) {
+          toast.error("같은 단품이 옵션값에 중복 연결되어 있습니다");
+          return;
+        }
+        seenOpt.add(v.product!.id);
+      }
     }
 
     setSubmitting(true);
@@ -972,6 +1014,28 @@ export function NewProductForm({
               }
             }
           }
+        }
+      } else if (productType === "OPTION_PARENT") {
+        // 옵션 슬롯 + SWAP 매핑 단품 등록 — 검증은 위에서 완료
+        try {
+          await apiMutate(`/api/products/${productId}/options`, "POST", {
+            name: optionSlotName.trim(),
+            required: true,
+            sortOrder: 0,
+            isActive: true,
+            values: optionParentValues
+              .filter((v) => v.label.trim() && v.product)
+              .map((v, i) => ({
+                label: v.label.trim(),
+                addPrice: 0,
+                sortOrder: i,
+                isActive: true,
+                mappedProductId: v.product!.id,
+                mappedMode: "SWAP" as const,
+              })),
+          });
+        } catch {
+          errors.push("옵션 구성 등록");
         }
       } else {
         const validComponents = setComponents.filter((c) => c.product);
@@ -2352,18 +2416,104 @@ export function NewProductForm({
                     </>
                   )}
 
-                  {/* OPTION_PARENT 안내 — 자체 가격/재고 없이 옵션 SWAP 으로 동작 */}
+                  {/* OPTION_PARENT — 옵션 슬롯 + 연결 단품(SWAP) 구성 */}
                   {productType === "OPTION_PARENT" && (
-                    <div className="rounded-md border border-purple-500/30 bg-purple-500/5 px-4 py-3 text-[13px] space-y-1.5">
-                      <div className="font-semibold text-foreground">
-                        옵션 대표 상품으로 등록됩니다
-                      </div>
-                      <ul className="list-disc list-inside text-muted-foreground space-y-0.5 text-[12px]">
-                        <li>자체 재고/가격 없음 — 카탈로그 노출용 placeholder</li>
-                        <li>등록 후 [고객 옵션] 섹션에서 색상/사이즈 슬롯 + 매핑 SKU 들 추가 (mode=SWAP)</li>
-                        <li>POS/자사몰에서 이 상품 선택 시 옵션 모달이 강제 노출되어 실제 SKU 결정</li>
-                      </ul>
-                    </div>
+                    <>
+                      <GroupHeader step="STEP 4" title="옵션 구성" id="np-step-opt" />
+                      <section>
+                        <SectionTitle
+                          title="고객 옵션"
+                          badge={
+                            <span className="text-jm-2xs text-[var(--jm-danger-fg)]">
+                              필수
+                            </span>
+                          }
+                        />
+                        <JmCard>
+                          <JmCardContent className="space-y-3">
+                            <div className="rounded-md border border-[var(--jm-info-fg)]/30 bg-[var(--jm-info-bg)] px-3 py-2 text-jm-xs text-[var(--jm-info-fg)] leading-relaxed">
+                              고객이 카탈로그·POS 에서 이 대표상품을 고르면 옵션값 하나를
+                              선택 → 연결된 단품 SKU 로 주문·재고 차감됩니다. 대표상품
+                              자체는 재고·가격이 없습니다.
+                            </div>
+                            <Field label="옵션 슬롯명">
+                              <JmInput
+                                value={optionSlotName}
+                                onChange={(e) => setOptionSlotName(e.target.value)}
+                                placeholder="예: 색상, 사이즈"
+                                className="h-9"
+                              />
+                            </Field>
+                            <div className="space-y-2">
+                              {optionParentValues.map((v) => (
+                                <div
+                                  key={v.rowId}
+                                  className="grid grid-cols-1 gap-2 sm:grid-cols-[150px_1fr_auto] sm:items-center"
+                                >
+                                  <JmInput
+                                    value={v.label}
+                                    onChange={(e) =>
+                                      setOptionParentValues((prev) =>
+                                        prev.map((r) =>
+                                          r.rowId === v.rowId
+                                            ? { ...r, label: e.target.value }
+                                            : r,
+                                        ),
+                                      )
+                                    }
+                                    placeholder="옵션값 (예: 화이트)"
+                                    className="h-9"
+                                  />
+                                  <ProductCombobox
+                                    products={existingProducts}
+                                    value={v.product?.id ?? ""}
+                                    onChange={(p) =>
+                                      setOptionParentValues((prev) =>
+                                        prev.map((r) =>
+                                          r.rowId === v.rowId ? { ...r, product: p } : r,
+                                        ),
+                                      )
+                                    }
+                                    filterType="component"
+                                    placeholder="연결할 단품 선택..."
+                                  />
+                                  <JmIconButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label="옵션값 삭제"
+                                    className="justify-self-end text-[var(--jm-danger-fg)]"
+                                    disabled={optionParentValues.length <= 1}
+                                    onClick={() =>
+                                      setOptionParentValues((prev) =>
+                                        prev.filter((r) => r.rowId !== v.rowId),
+                                      )
+                                    }
+                                  >
+                                    <X />
+                                  </JmIconButton>
+                                </div>
+                              ))}
+                              <JmButton
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                onClick={() =>
+                                  setOptionParentValues((prev) => [
+                                    ...prev,
+                                    newOptionValueRow(),
+                                  ])
+                                }
+                              >
+                                <Plus />
+                                <span>옵션값 추가</span>
+                              </JmButton>
+                            </div>
+                          </JmCardContent>
+                        </JmCard>
+                      </section>
+                    </>
                   )}
                 </div>
 

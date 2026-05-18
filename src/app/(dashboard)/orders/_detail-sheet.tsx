@@ -313,6 +313,12 @@ export function OrderDetailSheet({
     Record<string, string>
   >({});
 
+  // 인쇄 미리보기 모달 (시리얼 라벨·영수증·거래명세표 — iframe 임베드)
+  const [printPreview, setPrintPreview] = useState<{
+    title: string;
+    src: string;
+  } | null>(null);
+
   // orderId/open 변경 시 모든 다이얼로그·편집 state 초기화 — 렌더 중 비교 패턴 (effect 회피)
   const resetKey = `${orderId ?? ""}|${open ? "1" : "0"}`;
   const [lastResetKey, setLastResetKey] = useState(resetKey);
@@ -336,6 +342,7 @@ export function OrderDetailSheet({
     setExchangeDialogPrefill({});
     setRefundDialogOpen(false);
     setRefundDialogPrefill({});
+    setPrintPreview(null);
   }
 
   // highlightItemId 가 있고 데이터 로드 후 — 해당 라인으로 스크롤
@@ -436,11 +443,10 @@ export function OrderDetailSheet({
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       if (codes.length > 0) {
-        window.open(
-          `/serial-items/print?codes=${encodeURIComponent(codes.join(","))}&auto=1`,
-          "_blank",
-          "noopener,noreferrer",
-        );
+        setPrintPreview({
+          title: `시리얼 라벨 ${codes.length}장`,
+          src: `/serial-items/print?codes=${encodeURIComponent(codes.join(","))}`,
+        });
       }
     },
     onError: (err) =>
@@ -772,11 +778,10 @@ export function OrderDetailSheet({
                       variant="ghost"
                       size="xs"
                       onClick={() =>
-                        window.open(
-                          `/pos-receipt/${data.id}/print`,
-                          "_blank",
-                          "noopener,noreferrer",
-                        )
+                        setPrintPreview({
+                          title: "영수증 미리보기",
+                          src: `/pos-receipt/${data.id}/print`,
+                        })
                       }
                     >
                       <Printer className="size-3.5" />
@@ -787,11 +792,10 @@ export function OrderDetailSheet({
                     variant="ghost"
                     size="xs"
                     onClick={() =>
-                      window.open(
-                        `/order-statement/${data.id}/print`,
-                        "_blank",
-                        "noopener,noreferrer",
-                      )
+                      setPrintPreview({
+                        title: "거래명세표 미리보기",
+                        src: `/order-statement/${data.id}/print`,
+                      })
                     }
                   >
                     <Printer className="size-3.5" />
@@ -1257,6 +1261,25 @@ export function OrderDetailSheet({
           onDone={() => onOpenChange(false)}
         />
       )}
+
+      {/* 인쇄 미리보기 — 시리얼 라벨·영수증·거래명세표 iframe 모달 */}
+      <JmDialog
+        open={!!printPreview}
+        onOpenChange={(o) => !o && setPrintPreview(null)}
+      >
+        <JmDialogContent className="flex h-[95vh] w-[95vw] max-w-[95vw] flex-col p-0">
+          <JmDialogHeader>
+            <JmDialogTitle>{printPreview?.title}</JmDialogTitle>
+          </JmDialogHeader>
+          {printPreview && (
+            <iframe
+              src={printPreview.src}
+              className="size-full flex-1 border-0"
+              title={printPreview.title}
+            />
+          )}
+        </JmDialogContent>
+      </JmDialog>
     </JmDrawer>
   );
 }

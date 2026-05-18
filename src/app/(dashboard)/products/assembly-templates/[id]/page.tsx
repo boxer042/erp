@@ -7,35 +7,38 @@ import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+  JmBadge,
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmDialog,
+  JmDialogContent,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDrawer,
+  JmDrawerBody,
+  JmDrawerContent,
+  JmDrawerFooter,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmInput,
+  JmSpinner,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmTextarea,
+} from "@/jm";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import { ProductsThemeScope } from "../../_theme-scope";
 import Loading from "./loading";
 
 interface Slot {
@@ -111,16 +114,24 @@ export default function TemplateDetailPage({
   });
   const template = templateQuery.data ?? null;
   const loading = templateQuery.isPending;
-  const fetchTemplate = () => queryClient.invalidateQueries({ queryKey: queryKeys.assembly.detail(id) });
+  const fetchTemplate = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.assembly.detail(id) });
 
   const productsQuery = useQuery({
     queryKey: queryKeys.products.list({ scope: "assembly-templates" }),
     queryFn: async () => {
-      const data = await apiGet<Array<{
-        id: string; name: string; sku: string; spec: string | null;
-        sellingPrice: string; unitCost: string | null;
-        unitOfMeasure: string; isSet: boolean;
-      }>>("/api/products");
+      const data = await apiGet<
+        Array<{
+          id: string;
+          name: string;
+          sku: string;
+          spec: string | null;
+          sellingPrice: string;
+          unitCost: string | null;
+          unitOfMeasure: string;
+          isSet: boolean;
+        }>
+      >("/api/products");
       return data.map((p) => ({
         id: p.id,
         name: p.name,
@@ -254,238 +265,253 @@ export default function TemplateDetailPage({
 
   if (loading && !template) return <Loading />;
   if (!template) {
-    return <div className="p-8 text-center">템플릿을 찾을 수 없습니다</div>;
+    return (
+      <ProductsThemeScope>
+        <div className="flex h-full items-center justify-center bg-[var(--jm-bg)] text-jm-sm text-[var(--jm-text-muted)]">
+          템플릿을 찾을 수 없습니다
+        </div>
+      </ProductsThemeScope>
+    );
   }
 
   return (
-    <div className="flex h-full flex-col overflow-auto p-5 gap-4">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleBack}>
-          <ArrowLeft data-icon="inline-start" />
-          목록
-        </Button>
+    <ProductsThemeScope>
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-6 p-6">
+            {/* 뒤로가기 */}
+            <div className="flex items-center gap-2">
+              <JmButton variant="ghost" size="sm" onClick={handleBack}>
+                <ArrowLeft className="size-3.5" />
+                목록
+              </JmButton>
+            </div>
+
+            {/* 헤더 정보 카드 */}
+            <JmCard>
+              <JmCardHeader>
+                <JmCardTitle className="flex items-center gap-2">
+                  <span>{template.name}</span>
+                  {template.isActive ? (
+                    <JmBadge variant="success" size="sm">활성</JmBadge>
+                  ) : (
+                    <JmBadge variant="default" size="sm">비활성</JmBadge>
+                  )}
+                </JmCardTitle>
+                {template.description && (
+                  <p className="text-jm-sm text-[var(--jm-text-muted)]">
+                    {template.description}
+                  </p>
+                )}
+              </JmCardHeader>
+              <JmCardContent>
+                <div className="grid grid-cols-2 gap-4 text-jm-sm">
+                  <div>
+                    <span className="text-[var(--jm-text-muted)]">기본 조립비: </span>
+                    <span>
+                      {template.defaultLaborCost
+                        ? `₩${Number(template.defaultLaborCost).toLocaleString("ko-KR")}`
+                        : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--jm-text-muted)]">슬롯 수: </span>
+                    <span>{template.slots.length}</span>
+                  </div>
+                </div>
+              </JmCardContent>
+            </JmCard>
+
+            {/* 슬롯 카드 */}
+            <JmCard>
+              <JmCardHeader>
+                <JmCardTitle>슬롯 ({template.slots.length}개)</JmCardTitle>
+              </JmCardHeader>
+              <JmCardContent className="p-0">
+                <div className="max-h-[420px] overflow-y-auto">
+                  <JmTable>
+                    <JmTableHeader className="sticky top-0 z-10 bg-[var(--jm-surface-muted)]">
+                      <JmTableRow>
+                        <JmTableHead className="w-12 text-right">순서</JmTableHead>
+                        <JmTableHead>라벨</JmTableHead>
+                        <JmTableHead className="text-right">기본 수량</JmTableHead>
+                        <JmTableHead>기본 상품</JmTableHead>
+                        <JmTableHead className="w-16 text-center">가변</JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {template.slots.map((s) => (
+                        <JmTableRow key={s.id}>
+                          <JmTableCell className="text-right">{s.order + 1}</JmTableCell>
+                          <JmTableCell>{s.label}</JmTableCell>
+                          <JmTableCell className="text-right">
+                            {Number(s.defaultQuantity).toLocaleString("ko-KR")}
+                          </JmTableCell>
+                          <JmTableCell>
+                            {s.defaultProduct ? (
+                              <div className="flex flex-col">
+                                <span>{s.defaultProduct.name}</span>
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                                  {s.defaultProduct.sku}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-[var(--jm-text-muted)]">-</span>
+                            )}
+                          </JmTableCell>
+                          <JmTableCell className="text-center">
+                            {s.isVariable ? (
+                              <JmBadge variant="solid" size="sm">가변</JmBadge>
+                            ) : (
+                              <span className="text-jm-xs text-[var(--jm-text-muted)]">고정</span>
+                            )}
+                          </JmTableCell>
+                        </JmTableRow>
+                      ))}
+                    </JmTableBody>
+                  </JmTable>
+                </div>
+              </JmCardContent>
+            </JmCard>
+
+            {/* 프리셋 카드 */}
+            <JmCard>
+              <JmCardHeader className="flex flex-row items-center justify-between">
+                <JmCardTitle>프리셋</JmCardTitle>
+                <JmButton size="sm" onClick={openNewPreset}>
+                  <Plus className="size-3.5" />
+                  프리셋 추가
+                </JmButton>
+              </JmCardHeader>
+              <JmCardContent className="p-0">
+                {template.presets.length === 0 ? (
+                  <p className="py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+                    등록된 프리셋이 없습니다
+                  </p>
+                ) : (
+                  <JmTable>
+                    <JmTableHeader>
+                      <JmTableRow>
+                        <JmTableHead>프리셋명</JmTableHead>
+                        <JmTableHead>구성품 요약</JmTableHead>
+                        <JmTableHead>상태</JmTableHead>
+                        <JmTableHead className="w-40"></JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {template.presets.map((p) => (
+                        <JmTableRow key={p.id}>
+                          <JmTableCell>
+                            <div className="flex flex-col">
+                              <span>{p.name}</span>
+                              {p.description && (
+                                <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                                  {p.description}
+                                </span>
+                              )}
+                            </div>
+                          </JmTableCell>
+                          <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)] max-w-md truncate">
+                            {p.items
+                              .map((i) => `${i.slot.label}: ${i.product.name}`)
+                              .join(", ")}
+                          </JmTableCell>
+                          <JmTableCell>
+                            {p.isActive ? (
+                              <JmBadge variant="success" size="sm">활성</JmBadge>
+                            ) : (
+                              <JmBadge variant="default" size="sm">비활성</JmBadge>
+                            )}
+                          </JmTableCell>
+                          <JmTableCell>
+                            <div className="flex gap-1 justify-end">
+                              <JmButton
+                                variant="outline"
+                                size="xs"
+                                onClick={() => openEditPreset(p)}
+                              >
+                                <Pencil className="size-3" />
+                                수정
+                              </JmButton>
+                              <JmButton
+                                variant="outline"
+                                size="xs"
+                                onClick={() => openDuplicatePreset(p)}
+                              >
+                                <Copy className="size-3" />
+                                복제
+                              </JmButton>
+                              <JmButton
+                                variant="danger"
+                                size="xs"
+                                onClick={() => {
+                                  setDeleteTarget(p);
+                                  setDeleteOpen(true);
+                                }}
+                              >
+                                <Trash2 className="size-3" />
+                                삭제
+                              </JmButton>
+                            </div>
+                          </JmTableCell>
+                        </JmTableRow>
+                      ))}
+                    </JmTableBody>
+                  </JmTable>
+                )}
+              </JmCardContent>
+            </JmCard>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>{template.name}</span>
-            {template.isActive ? (
-              <Badge variant="success">활성</Badge>
-            ) : (
-              <Badge variant="secondary">비활성</Badge>
-            )}
-          </CardTitle>
-          {template.description && (
-            <p className="text-sm text-muted-foreground">{template.description}</p>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">기본 조립비: </span>
-              <span>
-                {template.defaultLaborCost
-                  ? `₩${Number(template.defaultLaborCost).toLocaleString("ko-KR")}`
-                  : "-"}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">슬롯 수: </span>
-              <span>{template.slots.length}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>슬롯 ({template.slots.length}개)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="max-h-[420px] overflow-y-auto rounded-md border border-border">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="h-9 px-3 text-xs text-muted-foreground w-12 text-right">순서</TableHead>
-                  <TableHead className="h-9 px-3 text-xs text-muted-foreground">라벨</TableHead>
-                  <TableHead className="h-9 px-3 text-xs text-muted-foreground text-right">기본 수량</TableHead>
-                  <TableHead className="h-9 px-3 text-xs text-muted-foreground">기본 상품</TableHead>
-                  <TableHead className="h-9 px-3 text-xs text-muted-foreground w-16 text-center">가변</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {template.slots.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="px-3 py-2.5 text-right">{s.order + 1}</TableCell>
-                    <TableCell className="px-3 py-2.5">{s.label}</TableCell>
-                    <TableCell className="px-3 py-2.5 text-right">
-                      {Number(s.defaultQuantity).toLocaleString("ko-KR")}
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5">
-                      {s.defaultProduct ? (
-                        <div className="flex flex-col">
-                          <span>{s.defaultProduct.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {s.defaultProduct.sku}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5 text-center">
-                      {s.isVariable ? (
-                        <Badge variant="default">가변</Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">고정</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>프리셋</CardTitle>
-          <Button size="sm" onClick={openNewPreset}>
-            <Plus data-icon="inline-start" />
-            프리셋 추가
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {template.presets.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              등록된 프리셋이 없습니다
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>프리셋명</TableHead>
-                  <TableHead>구성품 요약</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead className="w-40"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {template.presets.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{p.name}</span>
-                        {p.description && (
-                          <span className="text-xs text-muted-foreground">
-                            {p.description}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-md truncate">
-                      {p.items
-                        .map((i) => `${i.slot.label}: ${i.product.name}`)
-                        .join(", ")}
-                    </TableCell>
-                    <TableCell>
-                      {p.isActive ? (
-                        <Badge variant="success">활성</Badge>
-                      ) : (
-                        <Badge variant="secondary">비활성</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[12px]"
-                          onClick={() => openEditPreset(p)}
-                        >
-                          <Pencil data-icon="inline-start" />
-                          수정
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[12px]"
-                          onClick={() => openDuplicatePreset(p)}
-                        >
-                          <Copy data-icon="inline-start" />
-                          복제
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[12px] text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setDeleteTarget(p);
-                            setDeleteOpen(true);
-                          }}
-                        >
-                          <Trash2 data-icon="inline-start" />
-                          삭제
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Sheet open={presetSheetOpen} onOpenChange={setPresetSheetOpen}>
-        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-          <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-            <SheetTitle>
+      {/* 프리셋 등록/수정 Drawer */}
+      <JmDrawer open={presetSheetOpen} onOpenChange={setPresetSheetOpen}>
+        <JmDrawerContent side="bottom" size="xl">
+          <JmDrawerHeader>
+            <JmDrawerTitle>
               {editingPreset ? "프리셋 수정" : "프리셋 등록"}
-            </SheetTitle>
-          </SheetHeader>
+            </JmDrawerTitle>
+          </JmDrawerHeader>
 
-          <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-            <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+          <JmDrawerBody className="flex flex-col gap-4">
             <div className="grid grid-cols-[120px_1fr] items-center gap-2">
-              <label className="text-sm text-right">프리셋명</label>
-              <Input
+              <label className="text-jm-sm text-right text-[var(--jm-text-muted)]">프리셋명</label>
+              <JmInput
                 value={presetName}
                 onChange={(e) => setPresetName(e.target.value)}
                 placeholder="예: 3HP 기본형"
               />
             </div>
             <div className="grid grid-cols-[120px_1fr] items-start gap-2">
-              <label className="text-sm text-right pt-2">설명</label>
-              <Textarea
+              <label className="text-jm-sm text-right pt-2 text-[var(--jm-text-muted)]">설명</label>
+              <JmTextarea
                 value={presetDescription}
                 onChange={(e) => setPresetDescription(e.target.value)}
                 rows={2}
               />
             </div>
 
-            <div className="border-t border-border pt-4">
-              <h3 className="font-semibold mb-2">슬롯별 상품</h3>
-              <div className="-mx-5 border-y border-border">
-                <table className="w-full text-sm">
+            <div className="border-t border-[var(--jm-border)] pt-4">
+              <h3 className="text-jm-sm font-semibold mb-2 text-[var(--jm-text)]">슬롯별 상품</h3>
+              <div className="-mx-5 border-y border-[var(--jm-border)]">
+                <table className="w-full text-jm-sm">
                   <thead>
-                    <tr className="bg-muted text-muted-foreground text-xs">
-                      <th className="border-r border-b border-border w-[40px] py-2 text-center font-medium">번호</th>
-                      <th className="border-r border-b border-border py-2 px-2 text-left font-medium" style={{ width: "25%" }}>라벨</th>
-                      <th className="border-r border-b border-border w-[100px] py-2 text-center font-medium">수량</th>
-                      <th className="border-b border-border py-2 px-2 text-left font-medium">상품</th>
+                    <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-jm-xs">
+                      <th className="border-r border-b border-[var(--jm-border)] w-[40px] py-2 text-center font-medium">번호</th>
+                      <th className="border-r border-b border-[var(--jm-border)] py-2 px-2 text-left font-medium" style={{ width: "25%" }}>라벨</th>
+                      <th className="border-r border-b border-[var(--jm-border)] w-[100px] py-2 text-center font-medium">수량</th>
+                      <th className="border-b border-[var(--jm-border)] py-2 px-2 text-left font-medium">상품</th>
                     </tr>
                   </thead>
                   <tbody>
                     {template.slots.map((s, idx) => {
                       const item = presetItems[idx];
                       return (
-                        <tr key={s.id} className="border-b border-border hover:bg-muted/50">
-                          <td className="border-r border-border text-center text-muted-foreground py-1">{idx + 1}</td>
-                          <td className="border-r border-border px-2 py-1">{s.label}</td>
-                          <td className="border-r border-border p-0.5">
+                        <tr key={s.id} className="border-b border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]">
+                          <td className="border-r border-[var(--jm-border)] text-center text-[var(--jm-text-muted)] py-1">{idx + 1}</td>
+                          <td className="border-r border-[var(--jm-border)] px-2 py-1 text-[var(--jm-text)]">{s.label}</td>
+                          <td className="border-r border-[var(--jm-border)] p-0.5">
                             <input
                               type="text"
                               inputMode="decimal"
@@ -498,7 +524,7 @@ export default function TemplateDetailPage({
                                 )
                               }
                               onFocus={focusCaretEnd}
-                              className="w-full h-7 bg-transparent text-sm px-2 text-right outline-none focus:bg-muted rounded tabular-nums"
+                              className="w-full h-7 bg-transparent text-jm-sm px-2 text-right outline-none focus:bg-[var(--jm-surface-muted)] rounded tabular-nums text-[var(--jm-text)]"
                             />
                           </td>
                           <td className="p-0.5">
@@ -522,49 +548,57 @@ export default function TemplateDetailPage({
                 </table>
               </div>
             </div>
-          </div>
+          </JmDrawerBody>
 
-            <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background">
-              <Button variant="outline" onClick={() => setPresetSheetOpen(false)}>
-                취소
-              </Button>
-              <Button onClick={submitPreset} disabled={submitting}>
-                {submitting ? <Loader2 className="animate-spin" /> : null}
-                <span>{submitting ? "처리 중..." : "저장"}</span>
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+          <JmDrawerFooter>
+            <JmButton variant="outline" onClick={() => setPresetSheetOpen(false)}>
+              취소
+            </JmButton>
+            <JmButton onClick={submitPreset} disabled={submitting}>
+              {submitting && <JmSpinner size="sm" tone="inverted" />}
+              {submitting ? "처리 중..." : "저장"}
+            </JmButton>
+          </JmDrawerFooter>
+        </JmDrawerContent>
+      </JmDrawer>
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>프리셋 삭제</DialogTitle>
-            <DialogDescription>
+      {/* 삭제 확인 Dialog */}
+      <JmDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <JmDialogContent size="sm">
+          <JmDialogHeader>
+            <JmDialogTitle>프리셋 삭제</JmDialogTitle>
+            <JmDialogDescription>
               {deleteTarget && (
                 <>
                   <span className="block">
                     &quot;{deleteTarget.name}&quot; 프리셋을 삭제하시겠습니까?
                   </span>
-                  <span className="block mt-2 text-muted-foreground">
+                  <span className="block mt-2">
                     삭제된 프리셋은 복구할 수 없으며, 이미 등록된 조립상품에는 영향이 없습니다.
                   </span>
                 </>
               )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
               취소
-            </Button>
-            <Button variant="destructive" onClick={confirmDeletePreset} disabled={deleting}>
-              {deleting ? <Loader2 className="animate-spin" /> : null}
+            </JmButton>
+            <JmButton
+              variant="danger"
+              onClick={confirmDeletePreset}
+              disabled={deleting}
+            >
+              {deleting && <JmSpinner size="sm" tone="inverted" />}
               삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+    </ProductsThemeScope>
   );
 }

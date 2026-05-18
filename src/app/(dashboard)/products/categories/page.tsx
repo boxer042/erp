@@ -1,34 +1,63 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
+  FolderTree,
+  Library,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { toast } from "sonner";
 import {
-  Plus, Pencil, Trash2, Upload, Loader2, X, ChevronDown, ChevronRight, FolderTree,
-} from "lucide-react";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from "@/components/ui/table";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+  JmButton,
+  JmCard,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDrawer,
+  JmDrawerBody,
+  JmDrawerContent,
+  JmDrawerFooter,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmEmpty,
+  JmFormField,
+  JmIconButton,
+  JmInput,
+  JmSearchInput,
+  JmSelect,
+  JmSkeleton,
+  JmSpinner,
+  JmStat,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarSearch,
+  JmTooltip,
+  JmTooltipProvider,
+} from "@/jm";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
 import { MediaPickerDialog } from "@/components/media-picker-dialog";
-import { Library } from "lucide-react";
+import { ProductsThemeScope } from "../_theme-scope";
 
 interface CategoryChild {
   id: string;
@@ -71,18 +100,37 @@ const emptyForm = (): FormState => ({
   imagePath: null,
 });
 
-function SkeletonRows({ rows = 5 }: { rows?: number }) {
+function CategorySkeletonRows({ rows = 5 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell className="w-8"><Skeleton className="h-4 w-4" /></TableCell>
-          <TableCell><Skeleton className="h-8 w-8 rounded" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-10" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-10" /></TableCell>
-          <TableCell><div className="flex gap-1"><Skeleton className="h-7 w-7 rounded-md" /><Skeleton className="h-7 w-7 rounded-md" /></div></TableCell>
-        </TableRow>
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell className="w-8">
+            <JmSkeleton className="h-4 w-4" />
+          </JmTableCell>
+          <JmTableCell className="w-12">
+            <JmSkeleton className="h-8 w-8 rounded-md" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-36" />
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-10" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-10" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end gap-1">
+              <JmSkeleton className="h-7 w-7 rounded-md" />
+              <JmSkeleton className="h-7 w-7 rounded-md" />
+            </div>
+          </JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -91,8 +139,9 @@ function SkeletonRows({ rows = 5 }: { rows?: number }) {
 export default function CategoriesPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<EditTarget>({ type: "root" });
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -107,12 +156,40 @@ export default function CategoriesPage() {
     queryFn: () => apiGet<Category[]>("/api/categories"),
   });
 
-  const filtered = (categoriesQuery.data ?? []).filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const allCategories = categoriesQuery.data ?? [];
+
+  const filtered = useMemo(() => {
+    if (!appliedSearch) return allCategories;
+    const q = appliedSearch.toLowerCase();
+    return allCategories.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.children.some((ch) => ch.name.toLowerCase().includes(q)),
+    );
+  }, [allCategories, appliedSearch]);
+
+  // KPI
+  const stats = useMemo(() => {
+    const rootCount = allCategories.length;
+    const childCount = allCategories.reduce((s, c) => s + c.children.length, 0);
+    let totalProducts = 0;
+    let emptyCount = 0;
+    for (const cat of allCategories) {
+      const catProducts = cat._count.products + cat.children.reduce((s, c) => s + c._count.products, 0);
+      totalProducts += catProducts;
+      if (cat._count.products === 0 && cat.children.length === 0) emptyCount += 1;
+      if (cat._count.products === 0 && cat.children.length > 0) {
+        // 대분류 자체에 상품 없고 소분류만 있는 경우 — 대분류는 empty 아님
+      }
+      for (const ch of cat.children) {
+        if (ch._count.products === 0) emptyCount += 1;
+      }
+    }
+    return { rootCount, childCount, totalProducts, emptyCount };
+  }, [allCategories]);
 
   const saveMutation = useMutation({
-    mutationFn: (payload: Partial<FormState>) =>
+    mutationFn: (payload: FormState) =>
       editId
         ? apiMutate(`/api/categories/${editId}`, "PUT", {
             name: payload.name,
@@ -131,7 +208,7 @@ export default function CategoriesPage() {
     onSuccess: () => {
       toast.success(editId ? "카테고리가 수정되었습니다" : "카테고리가 등록되었습니다");
       qc.invalidateQueries({ queryKey: queryKeys.categories.all });
-      setSheetOpen(false);
+      setDrawerOpen(false);
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "저장 실패"),
   });
@@ -144,8 +221,7 @@ export default function CategoriesPage() {
       setDeleteTarget(null);
     },
     onError: (err) => {
-      const msg = err instanceof ApiError ? err.message : "삭제 실패";
-      toast.error(msg);
+      toast.error(err instanceof ApiError ? err.message : "삭제 실패");
       setDeleteTarget(null);
     },
   });
@@ -157,7 +233,7 @@ export default function CategoriesPage() {
       ...emptyForm(),
       parentId: target.type === "child" ? target.parentId : null,
     });
-    setSheetOpen(true);
+    setDrawerOpen(true);
   };
 
   const openEdit = (cat: Category | CategoryChild, parentId: string | null) => {
@@ -170,7 +246,7 @@ export default function CategoriesPage() {
       imageUrl: cat.imageUrl ?? null,
       imagePath: cat.imagePath ?? null,
     });
-    setSheetOpen(true);
+    setDrawerOpen(true);
   };
 
   const uploadBlob = async (data: Blob | File, name: string) => {
@@ -180,8 +256,7 @@ export default function CategoriesPage() {
       fd.append("file", data, name);
       const res = await fetch("/api/categories/upload", { method: "POST", body: fd });
       if (!res.ok) throw new Error((await res.json()).error ?? "업로드 실패");
-      const json = await res.json() as { url: string; path: string };
-      // 기존 이미지 스토리지 삭제 X — /settings/media 에서 일괄 관리
+      const json = (await res.json()) as { url: string; path: string };
       setForm((f) => ({ ...f, imageUrl: json.url, imagePath: json.path }));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "업로드 실패");
@@ -199,7 +274,6 @@ export default function CategoriesPage() {
   };
 
   const handleRemoveImage = () => {
-    // 스토리지 삭제는 /settings/media 에서 — 여기서는 분리만
     setForm((f) => ({ ...f, imageUrl: null, imagePath: null }));
   };
 
@@ -212,325 +286,507 @@ export default function CategoriesPage() {
     });
   };
 
+  const drawerTitle = editId
+    ? "카테고리 수정"
+    : editTarget.type === "child"
+      ? "소분류 등록"
+      : "대분류 등록";
+
+  // JmSelect options — 상위 카테고리 선택 (대분류 편집 시)
+  const parentOptions = useMemo(
+    () => [
+      { value: "__none__", label: "없음 (대분류)" },
+      ...allCategories.map((c) => ({ value: c.id, label: c.name })),
+    ],
+    [allCategories],
+  );
+
   return (
-    <div className="flex h-full flex-col">
-      <DataTableToolbar
-        search={{ value: search, onChange: setSearch, onSearch: () => {}, placeholder: "카테고리명 검색..." }}
-        onAdd={() => openCreate({ type: "root" })}
-        addLabel="대분류 등록"
-        loading={categoriesQuery.isFetching}
-        onRefresh={() => qc.invalidateQueries({ queryKey: queryKeys.categories.all })}
-      />
-
-      <div className="flex-1 overflow-auto min-h-0">
-        <Table className="min-w-[600px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8" />
-              <TableHead className="w-12">이미지</TableHead>
-              <TableHead>카테고리명</TableHead>
-              <TableHead className="w-20 text-right">소분류</TableHead>
-              <TableHead className="w-20 text-right">상품 수</TableHead>
-              <TableHead className="w-24" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {categoriesQuery.isPending ? (
-              <SkeletonRows />
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  등록된 카테고리가 없습니다
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((cat) => (
-                <React.Fragment key={cat.id}>
-                  <TableRow className="border-b border-border hover:bg-muted/50">
-                    <TableCell className="px-3 py-2">
-                      {cat.children.length > 0 ? (
-                        <button
-                          onClick={() => toggleExpand(cat.id)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          {expanded.has(cat.id) ? (
-                            <ChevronDown className="size-4" />
-                          ) : (
-                            <ChevronRight className="size-4" />
-                          )}
-                        </button>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="px-3 py-2">
-                      {cat.imageUrl ? (
-                        <img src={cat.imageUrl} alt={cat.name} className="size-8 rounded object-cover" />
-                      ) : (
-                        <div className="size-8 rounded bg-muted flex items-center justify-center">
-                          <FolderTree className="size-4 text-muted-foreground" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-3 py-2 font-medium">{cat.name}</TableCell>
-                    <TableCell className="px-3 py-2 text-right text-muted-foreground text-sm">
-                      {cat.children.length}
-                    </TableCell>
-                    <TableCell className="px-3 py-2 text-right text-muted-foreground text-sm">
-                      {cat._count.products + cat.children.reduce((s, c) => s + c._count.products, 0)}
-                    </TableCell>
-                    <TableCell className="px-3 py-2">
-                      <div className="flex gap-1 justify-end">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="소분류 추가"
-                          onClick={() => openCreate({ type: "child", parentId: cat.id })}
-                        >
-                          <Plus className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => openEdit(cat, null)}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget({ id: cat.id, name: cat.name })}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-
-                  {expanded.has(cat.id) &&
-                    cat.children.map((child) => (
-                      <TableRow key={child.id} className="border-b border-border hover:bg-muted/50 bg-muted/20">
-                        <TableCell className="px-3 py-2" />
-                        <TableCell className="px-3 py-2 pl-8">
-                          {child.imageUrl ? (
-                            <img src={child.imageUrl} alt={child.name} className="size-7 rounded object-cover" />
-                          ) : (
-                            <div className="size-7 rounded bg-muted flex items-center justify-center">
-                              <FolderTree className="size-3.5 text-muted-foreground" />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 pl-8 text-sm text-muted-foreground">
-                          {child.name}
-                        </TableCell>
-                        <TableCell />
-                        <TableCell className="px-3 py-2 text-right text-muted-foreground text-sm">
-                          {child._count.products}
-                        </TableCell>
-                        <TableCell className="px-3 py-2">
-                          <div className="flex gap-1 justify-end">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => openEdit(child, cat.id)}
-                            >
-                              <Pencil className="size-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteTarget({ id: child.id, name: child.name })}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </React.Fragment>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* 등록/수정 Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-          <SheetHeader className="border-b border-border px-5 py-4 shrink-0">
-            <SheetTitle>
-              {editId ? "카테고리 수정" : editTarget.type === "child" ? "소분류 등록" : "대분류 등록"}
-            </SheetTitle>
-          </SheetHeader>
-
-          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="cat-name">카테고리명 *</Label>
-              <Input
-                id="cat-name"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder={editTarget.type === "child" ? "예: 전기형, 엔진형" : "예: 고압분무기"}
+    <ProductsThemeScope>
+      <JmTooltipProvider>
+        <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+          <div className="flex w-full flex-col gap-6 p-4">
+            {/* KPI */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <JmStat
+                label="대분류"
+                value={
+                  categoriesQuery.isPending
+                    ? "—"
+                    : stats.rootCount.toLocaleString("ko-KR")
+                }
+                icon={<FolderTree className="size-4" />}
+                hint={categoriesQuery.isPending ? "" : "최상위 카테고리"}
+                size="sm"
+              />
+              <JmStat
+                label="소분류"
+                value={
+                  categoriesQuery.isPending
+                    ? "—"
+                    : stats.childCount.toLocaleString("ko-KR")
+                }
+                icon={<FolderOpen className="size-4" />}
+                hint={categoriesQuery.isPending ? "" : "하위 카테고리 합계"}
+                size="sm"
+              />
+              <JmStat
+                label="연결 상품"
+                value={
+                  categoriesQuery.isPending
+                    ? "—"
+                    : stats.totalProducts.toLocaleString("ko-KR")
+                }
+                icon={<FolderTree className="size-4" />}
+                hint={categoriesQuery.isPending ? "" : "카테고리 연결 상품 수"}
+                size="sm"
+              />
+              <JmStat
+                label="빈 카테고리"
+                value={
+                  categoriesQuery.isPending
+                    ? "—"
+                    : stats.emptyCount.toLocaleString("ko-KR")
+                }
+                icon={<FolderTree className="size-4" />}
+                hint={categoriesQuery.isPending ? "" : "연결 상품 없는 카테고리"}
+                positiveIsGood={false}
+                size="sm"
               />
             </div>
 
-            {editTarget.type === "root" && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="cat-parent">상위 카테고리 (소분류로 등록 시)</Label>
-                <Select
-                  value={form.parentId ?? "__none__"}
-                  onValueChange={(v) => setForm((f) => ({ ...f, parentId: v === "__none__" ? null : v }))}
-                >
-                  <SelectTrigger id="cat-parent">
-                    <SelectValue placeholder="없음 (대분류)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">없음 (대분류)</SelectItem>
-                    {(categoriesQuery.data ?? []).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="cat-order">순서</Label>
-              <Input
-                id="cat-order"
-                type="number"
-                value={form.order}
-                onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))}
-                placeholder="0"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label>이미지</Label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handlePickFile(file);
-                  e.target.value = "";
-                }}
-              />
-              <div className="flex items-start gap-2">
-                {form.imageUrl ? (
-                  <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border">
-                    <img src={form.imageUrl} alt="preview" className="w-full h-full object-cover" />
-                    <button
-                      onClick={handleRemoveImage}
-                      className="absolute top-1 right-1 bg-background/80 rounded p-0.5 hover:bg-background"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-primary flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+            {/* 메인 카드 */}
+            <JmCard className="overflow-hidden p-0">
+              <JmTableToolbar>
+                <JmTableToolbarSearch>
+                  <JmSearchInput
+                    size="sm"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onClear={() => {
+                      setSearch("");
+                      setAppliedSearch("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                        setAppliedSearch(search);
+                      }
+                    }}
+                    placeholder="카테고리명 검색..."
+                  />
+                </JmTableToolbarSearch>
+                <JmTableToolbarActions>
+                  <JmIconButton
+                    variant="ghost"
+                    size="sm"
+                    aria-label="새로고침"
+                    onClick={() => qc.invalidateQueries({ queryKey: queryKeys.categories.all })}
+                    disabled={categoriesQuery.isFetching}
                   >
-                    {uploading ? (
-                      <Loader2 className="size-5 animate-spin" />
+                    {categoriesQuery.isFetching ? (
+                      <JmSpinner size="sm" />
                     ) : (
-                      <>
-                        <Upload className="size-5" />
-                        <span className="text-xs">업로드</span>
-                      </>
+                      <RefreshCw className="size-4" />
                     )}
-                  </button>
-                )}
-                <div className="flex flex-col gap-1.5">
-                  {form.imageUrl && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
+                  </JmIconButton>
+                  <JmButton size="sm" onClick={() => openCreate({ type: "root" })}>
+                    <Plus className="size-4" />
+                    대분류 등록
+                  </JmButton>
+                </JmTableToolbarActions>
+              </JmTableToolbar>
+
+              <JmTable className="min-w-[600px]">
+                <JmTableHeader>
+                  <JmTableRow>
+                    <JmTableHead className="w-8" />
+                    <JmTableHead className="w-12">이미지</JmTableHead>
+                    <JmTableHead>카테고리명</JmTableHead>
+                    <JmTableHead className="w-20 text-right">소분류</JmTableHead>
+                    <JmTableHead className="w-20 text-right">상품 수</JmTableHead>
+                    <JmTableHead className="w-28 text-right">관리</JmTableHead>
+                  </JmTableRow>
+                </JmTableHeader>
+                <JmTableBody>
+                  {categoriesQuery.isPending ? (
+                    <CategorySkeletonRows />
+                  ) : categoriesQuery.isError ? (
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell
+                        colSpan={6}
+                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      >
+                        카테고리 목록을 불러오지 못했습니다
+                      </JmTableCell>
+                    </JmTableRow>
+                  ) : filtered.length === 0 ? (
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell colSpan={6} className="py-12">
+                        <JmEmpty
+                          icon={<FolderTree className="size-8" />}
+                          title={
+                            appliedSearch
+                              ? "조건에 맞는 카테고리가 없습니다"
+                              : "등록된 카테고리가 없습니다"
+                          }
+                          description={
+                            appliedSearch
+                              ? "검색어를 바꿔보세요"
+                              : "대분류를 먼저 등록하고 소분류를 추가하세요"
+                          }
+                          action={
+                            !appliedSearch ? (
+                              <JmButton
+                                size="sm"
+                                onClick={() => openCreate({ type: "root" })}
+                              >
+                                <Plus className="size-4" />
+                                대분류 등록
+                              </JmButton>
+                            ) : null
+                          }
+                        />
+                      </JmTableCell>
+                    </JmTableRow>
+                  ) : (
+                    filtered.map((cat) => (
+                      <React.Fragment key={cat.id}>
+                        {/* 대분류 행 */}
+                        <JmTableRow>
+                          <JmTableCell className="w-8">
+                            {cat.children.length > 0 ? (
+                              <button
+                                onClick={() => toggleExpand(cat.id)}
+                                className="text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] transition-colors"
+                              >
+                                {expanded.has(cat.id) ? (
+                                  <ChevronDown className="size-4" />
+                                ) : (
+                                  <ChevronRight className="size-4" />
+                                )}
+                              </button>
+                            ) : null}
+                          </JmTableCell>
+                          <JmTableCell className="w-12">
+                            {cat.imageUrl ? (
+                              <img
+                                src={cat.imageUrl}
+                                alt={cat.name}
+                                className="size-8 rounded-md object-cover"
+                              />
+                            ) : (
+                              <div className="size-8 rounded-md bg-[var(--jm-surface-muted)] flex items-center justify-center">
+                                <FolderTree className="size-4 text-[var(--jm-text-subtle)]" />
+                              </div>
+                            )}
+                          </JmTableCell>
+                          <JmTableCell className="font-medium text-[var(--jm-text)]">
+                            {cat.name}
+                          </JmTableCell>
+                          <JmTableCell className="text-right text-[13px] text-[var(--jm-text-muted)]">
+                            {cat.children.length}
+                          </JmTableCell>
+                          <JmTableCell className="text-right text-[13px] text-[var(--jm-text-muted)]">
+                            {cat._count.products +
+                              cat.children.reduce((s, c) => s + c._count.products, 0)}
+                          </JmTableCell>
+                          <JmTableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <JmTooltip content="소분류 추가">
+                                <JmIconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label="소분류 추가"
+                                  onClick={() =>
+                                    openCreate({ type: "child", parentId: cat.id })
+                                  }
+                                >
+                                  <Plus className="size-3.5" />
+                                </JmIconButton>
+                              </JmTooltip>
+                              <JmTooltip content="수정">
+                                <JmIconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label="수정"
+                                  onClick={() => openEdit(cat, null)}
+                                >
+                                  <Pencil className="size-3.5" />
+                                </JmIconButton>
+                              </JmTooltip>
+                              <JmTooltip content="삭제">
+                                <JmIconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label="삭제"
+                                  onClick={() =>
+                                    setDeleteTarget({ id: cat.id, name: cat.name })
+                                  }
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </JmIconButton>
+                              </JmTooltip>
+                            </div>
+                          </JmTableCell>
+                        </JmTableRow>
+
+                        {/* 소분류 행들 */}
+                        {expanded.has(cat.id) &&
+                          cat.children.map((child) => (
+                            <JmTableRow
+                              key={child.id}
+                              className="bg-[var(--jm-surface-muted)]"
+                            >
+                              <JmTableCell />
+                              <JmTableCell className="pl-8">
+                                {child.imageUrl ? (
+                                  <img
+                                    src={child.imageUrl}
+                                    alt={child.name}
+                                    className="size-7 rounded-md object-cover"
+                                  />
+                                ) : (
+                                  <div className="size-7 rounded-md bg-[var(--jm-bg)] flex items-center justify-center">
+                                    <FolderTree className="size-3.5 text-[var(--jm-text-subtle)]" />
+                                  </div>
+                                )}
+                              </JmTableCell>
+                              <JmTableCell className="pl-8 text-[13px] text-[var(--jm-text-muted)]">
+                                {child.name}
+                              </JmTableCell>
+                              <JmTableCell />
+                              <JmTableCell className="text-right text-[13px] text-[var(--jm-text-muted)]">
+                                {child._count.products}
+                              </JmTableCell>
+                              <JmTableCell>
+                                <div className="flex items-center justify-end gap-1">
+                                  <JmTooltip content="수정">
+                                    <JmIconButton
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label="수정"
+                                      onClick={() => openEdit(child, cat.id)}
+                                    >
+                                      <Pencil className="size-3.5" />
+                                    </JmIconButton>
+                                  </JmTooltip>
+                                  <JmTooltip content="삭제">
+                                    <JmIconButton
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label="삭제"
+                                      onClick={() =>
+                                        setDeleteTarget({ id: child.id, name: child.name })
+                                      }
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </JmIconButton>
+                                  </JmTooltip>
+                                </div>
+                              </JmTableCell>
+                            </JmTableRow>
+                          ))}
+                      </React.Fragment>
+                    ))
+                  )}
+                </JmTableBody>
+              </JmTable>
+            </JmCard>
+          </div>
+        </div>
+
+        {/* 등록/수정 Drawer */}
+        <JmDrawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+          <JmDrawerContent side="right" size="md">
+            <JmDrawerHeader>
+              <JmDrawerTitle>{drawerTitle}</JmDrawerTitle>
+            </JmDrawerHeader>
+
+            <JmDrawerBody className="flex flex-col gap-5">
+              <JmFormField label="카테고리명" required>
+                <JmInput
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder={
+                    editTarget.type === "child" ? "예: 전기형, 엔진형" : "예: 고압분무기"
+                  }
+                />
+              </JmFormField>
+
+              {editTarget.type === "root" && (
+                <JmFormField label="상위 카테고리" hint="소분류로 등록 시 선택">
+                  <JmSelect
+                    value={form.parentId ?? "__none__"}
+                    onChange={(v) =>
+                      setForm((f) => ({ ...f, parentId: v === "__none__" ? null : v }))
+                    }
+                    options={parentOptions}
+                  />
+                </JmFormField>
+              )}
+
+              <JmFormField label="순서">
+                <JmInput
+                  type="text"
+                  inputMode="numeric"
+                  value={form.order}
+                  onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))}
+                  placeholder="0"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+              </JmFormField>
+
+              <JmFormField label="이미지">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePickFile(file);
+                    e.target.value = "";
+                  }}
+                />
+                <div className="flex items-start gap-3">
+                  {form.imageUrl ? (
+                    <div className="relative h-24 w-24 overflow-hidden rounded-lg border border-[var(--jm-border)]">
+                      <img
+                        src={form.imageUrl}
+                        alt="미리보기"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        onClick={handleRemoveImage}
+                        className="absolute right-1 top-1 rounded-md bg-[var(--jm-bg)]/80 p-0.5 hover:bg-[var(--jm-bg)] transition-colors"
+                      >
+                        <X className="size-3.5 text-[var(--jm-text)]" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading}
+                      className="flex h-24 w-24 flex-col items-center justify-center gap-1.5 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface)] transition-colors disabled:opacity-50"
                     >
-                      <Upload className="h-3.5 w-3.5 mr-1" /> 교체
-                    </Button>
+                      {uploading ? (
+                        <JmSpinner size="sm" />
+                      ) : (
+                        <>
+                          <Upload className="size-5" />
+                          <span className="text-xs">업로드</span>
+                        </>
+                      )}
+                    </button>
                   )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPickerOpen(true)}
-                    disabled={uploading}
-                  >
-                    <Library className="h-3.5 w-3.5 mr-1" /> 라이브러리
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    {form.imageUrl && (
+                      <JmButton
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        <Upload className="size-3.5" />
+                        교체
+                      </JmButton>
+                    )}
+                    <JmButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPickerOpen(true)}
+                      disabled={uploading}
+                    >
+                      <Library className="size-3.5" />
+                      라이브러리
+                    </JmButton>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
+              </JmFormField>
+            </JmDrawerBody>
 
-          <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background shrink-0">
-            <Button variant="outline" onClick={() => setSheetOpen(false)}>취소</Button>
-            <Button
-              onClick={() => saveMutation.mutate(form)}
-              disabled={saveMutation.isPending || !form.name.trim()}
-            >
-              {saveMutation.isPending && <Loader2 className="size-4 animate-spin" data-icon="inline-start" />}
-              {editId ? "수정" : "등록"}
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+            <JmDrawerFooter>
+              <JmButton
+                variant="ghost"
+                onClick={() => setDrawerOpen(false)}
+                disabled={saveMutation.isPending}
+              >
+                취소
+              </JmButton>
+              <JmButton
+                variant="cta"
+                onClick={() => saveMutation.mutate(form)}
+                disabled={saveMutation.isPending || !form.name.trim()}
+              >
+                {saveMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
+                {editId ? "수정" : "등록"}
+              </JmButton>
+            </JmDrawerFooter>
+          </JmDrawerContent>
+        </JmDrawer>
 
-      {/* 삭제 확인 Dialog */}
-      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>카테고리 삭제</DialogTitle>
-            <DialogDescription>
-              <strong>{deleteTarget?.name}</strong> 카테고리를 삭제하시겠습니까?<br />
-              하위 카테고리나 연결된 상품이 있으면 삭제할 수 없습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>취소</Button>
-            <Button
-              variant="destructive"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending && <Loader2 className="size-4 animate-spin" data-icon="inline-start" />}
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* 삭제 확인 Dialog */}
+        <JmDialog
+          open={!!deleteTarget}
+          onOpenChange={(o) => !o && setDeleteTarget(null)}
+        >
+          <JmDialogContent size="sm">
+            <JmDialogHeader>
+              <JmDialogTitle>카테고리 삭제</JmDialogTitle>
+            </JmDialogHeader>
+            <JmDialogBody>
+              <p className="text-jm-sm text-[var(--jm-text)]">
+                <span className="font-semibold">{deleteTarget?.name}</span> 카테고리를
+                삭제하시겠습니까?
+              </p>
+              <p className="mt-2 text-jm-xs text-[var(--jm-text-muted)]">
+                하위 카테고리나 연결된 상품이 있으면 삭제할 수 없습니다.
+              </p>
+            </JmDialogBody>
+            <JmDialogFooter>
+              <JmButton
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteMutation.isPending}
+              >
+                취소
+              </JmButton>
+              <JmButton
+                variant="danger"
+                onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
+                삭제
+              </JmButton>
+            </JmDialogFooter>
+          </JmDialogContent>
+        </JmDialog>
 
-      <ImageEditDialog
-        open={pendingFile !== null}
-        file={pendingFile}
-        defaultAspect={1}
-        lockAspect
-        onConfirm={async (blob, name) => {
-          setPendingFile(null);
-          await uploadBlob(blob, name);
-        }}
-        onCancel={() => setPendingFile(null)}
-      />
-      <MediaPickerDialog
-        open={pickerOpen}
-        bucket="category-images"
-        onSelect={({ url, path }) => {
-          setForm((f) => ({ ...f, imageUrl: url, imagePath: path }));
-          setPickerOpen(false);
-        }}
-        onClose={() => setPickerOpen(false)}
-      />
-    </div>
+        {/* 이미지 편집 Dialog */}
+        <ImageEditDialog
+          open={pendingFile !== null}
+          file={pendingFile}
+          defaultAspect={1}
+          lockAspect
+          onConfirm={async (blob, name) => {
+            setPendingFile(null);
+            await uploadBlob(blob, name);
+          }}
+          onCancel={() => setPendingFile(null)}
+        />
+
+        {/* 미디어 라이브러리 Dialog */}
+        <MediaPickerDialog
+          open={pickerOpen}
+          bucket="category-images"
+          onSelect={({ url, path }) => {
+            setForm((f) => ({ ...f, imageUrl: url, imagePath: path }));
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      </JmTooltipProvider>
+    </ProductsThemeScope>
   );
 }

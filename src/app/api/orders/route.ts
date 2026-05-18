@@ -313,25 +313,41 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // 옵션값 처리 — 추가가 합산 + snapshot + OPTION_REF 자식 라인 후보
+    // 옵션값 처리 — SWAP(메인 라인 교체) / ADDON(자식 라인) / 텍스트 옵션 분기.
+    //  - SWAP : OPTION_PARENT 대표상품을 옵션값이 가리키는 실제 SKU 로 메인 라인 교체.
+    //           단일축 정책 — SWAP 옵션값은 한 주문 라인에 최대 1개.
+    //  - ADDON: 메모리·부속 등 별도 자식 OrderItem(OPTION_REF) 으로 분리.
     let unitAddPrice = 0;
     const snapshot: Record<string, string> = {};
     const addonRefs: typeof optionValues = [];
+    let swapTarget: (typeof optionValues)[number] | null = null;
     for (const optId of item.optionValueIds ?? []) {
       const ov = optionValueMap.get(optId);
       if (!ov) continue;
       snapshot[ov.option.name] = ov.label;
-      unitAddPrice += Number(ov.addPrice);
-      // mappedProductId 가 있으면 OPTION_REF 자식 라인으로 분리 (메모리 케이스)
-      if (ov.mappedProductId && ov.mappedProduct) {
+      if (ov.mappedProductId && ov.mappedProduct && ov.mappedMode === "SWAP") {
+        swapTarget = ov;
+      } else if (ov.mappedProductId && ov.mappedProduct) {
         addonRefs.push(ov);
+        unitAddPrice += Number(ov.addPrice);
+      } else {
+        // 텍스트 옵션 — addPrice 만 합산
+        unitAddPrice += Number(ov.addPrice);
       }
     }
 
-    const finalUnitPrice = price + unitAddPrice;
+    // SWAP 시 메인 라인은 매핑된 실제 SKU 로 교체 + 그 SKU 의 sellingPrice 사용.
+    // 손님이 본 진입 상품(OPTION_PARENT)은 entryProductId 로 보존 (funnel 분석).
+    const mainProductId = swapTarget
+      ? swapTarget.mappedProductId!
+      : item.productId;
+    const mainBasePrice = swapTarget
+      ? Number(swapTarget.mappedProduct!.sellingPrice ?? 0)
+      : price;
+    const finalUnitPrice = mainBasePrice + unitAddPrice;
     const mainIdx = stagedItems.length;
     stagedItems.push({
-      productId: item.productId,
+      productId: mainProductId,
       serviceName: null,
       quantity: qty,
       unitPrice: finalUnitPrice,
@@ -339,8 +355,13 @@ export async function POST(request: NextRequest) {
       lineRole: "MAIN",
       parentItemIndex: null,
       optionSnapshot: Object.keys(snapshot).length > 0 ? snapshot : null,
-      entryProductId: item.entryProductId ?? null,
-      _taxable: (taxTypeById.get(item.productId) ?? "TAXABLE") === "TAXABLE",
+      entryProductId: swapTarget
+        ? item.productId
+        : (item.entryProductId ?? null),
+      _taxable:
+        (taxTypeById.get(mainProductId) ??
+          swapTarget?.mappedProduct?.taxType ??
+          "TAXABLE") === "TAXABLE",
     });
 
     // OPTION_REF 자식 라인들 — mappedProduct 별도 OrderItem

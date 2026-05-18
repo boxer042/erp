@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { focusCaretEnd } from "@/jm/lib/focus";
-import { ChipToggle } from "@/components/ui/chip-toggle";
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import { QuickBrandSheet } from "@/components/quick-register-sheets";
 import { ApiError, apiGet } from "@/lib/api-client";
@@ -25,6 +24,7 @@ import {
   JmDrawerHeader,
   JmDrawerTitle,
   JmInput,
+  JmSegmentedControl,
   JmSelect,
 } from "@/jm";
 import type { ProductDetail } from "../types";
@@ -250,7 +250,7 @@ function ProductInfoEditSheetContent({
             </Field>
 
             <Field label="세금유형">
-              <ChipToggle<"TAXABLE" | "TAX_FREE">
+              <JmSegmentedControl<"TAXABLE" | "TAX_FREE">
                 value={form.taxType}
                 onChange={(v) => setForm((p) => ({ ...p, taxType: v }))}
                 options={[

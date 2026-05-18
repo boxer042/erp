@@ -61,8 +61,12 @@ export type SalesHistoryRow = {
   claimType: OrderClaimType | null;
   claimReason: OrderClaimReason | null;
   fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" | null;
+  /** 거래액 — VAT 포함 (고객 청구 총액). 표시용 */
   amount: number;
-  /** 순매출 기여분 — 환불/매출취소면 0, PARTIAL_REFUND 면 amount - partialRefundAmount, 그 외엔 amount */
+  /**
+   * 순매출 기여분 — 공급가액(세전) 기준.
+   * 환불/매출취소면 0, PARTIAL_REFUND 면 공급가액 − 부분환불액, 그 외엔 공급가액.
+   */
   netAmount: number;
   /**
    * PARTIAL_REFUND 부분 환불 누적 금액 (세전). 0 이면 부분 환불 없음.
@@ -201,6 +205,7 @@ export async function GET(request: NextRequest) {
       paymentMethod: true,
       paymentStatus: true,
       totalAmount: true,
+      subtotalAmount: true,
       status: true,
       claimType: true,
       claimReason: true,
@@ -338,7 +343,10 @@ export async function GET(request: NextRequest) {
       : o.rentalId
         ? "rental"
         : "product";
+    // amount = VAT 포함 거래액 (고객 청구 총액, 표시용)
+    // supplyAmount = 공급가액(세전) — 순매출(netAmount) 산정 기준
     const amount = Number(o.totalAmount);
+    const supplyAmount = Number(o.subtotalAmount);
     // 누적 부분 환불 금액 (세전 공급가액 기준) — PARTIAL_REFUND 일 때 의미 있음
     const partialRefundAmount = (o.items ?? []).reduce(
       (s, it) => s + Number(it.refundedAmount ?? 0),
@@ -348,11 +356,11 @@ export async function GET(request: NextRequest) {
       o.status === "RETURNED" ||
       o.paymentStatus === "REFUNDED" ||
       o.paymentStatus === "SALES_CANCELLED";
-    // PARTIAL_REFUND — 부분 환불액만큼 차감해 순매출 계산. 음수 가드.
+    // PARTIAL_REFUND — 부분 환불액(세전)만큼 공급가액에서 차감해 순매출 계산. 음수 가드.
     const isPartial = o.paymentStatus === "PARTIAL_REFUND";
     const partialNet = isPartial
-      ? Math.max(0, amount - partialRefundAmount)
-      : amount;
+      ? Math.max(0, supplyAmount - partialRefundAmount)
+      : supplyAmount;
     return {
       id: `order-${o.id}`,
       type: t,

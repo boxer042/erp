@@ -36,6 +36,8 @@ export interface ProductOption {
   hasProductOptions?: boolean;
   /** Product.productType — OPTION_PARENT 등 필터링용 */
   productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
+  /** 상품 대표 이미지 — 옵션 연결 카드 썸네일 등 */
+  imageUrl?: string | null;
 }
 
 type ProductItem = JmComboboxItem & {

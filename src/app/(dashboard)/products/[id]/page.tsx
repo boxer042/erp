@@ -3,18 +3,20 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Layout, Loader2, BookOpen } from "lucide-react";
+import { Archive, BookOpen, Layout, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  JmAlert,
+  JmButton,
+  JmDialog,
+  JmDialogContent,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmSpinner,
+} from "@/jm";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -57,11 +59,21 @@ import { ProductSpecsEditSheet } from "@/components/product/edit/product-specs-e
 import { ProductOptionsEditSheet } from "@/components/product/edit/product-options-edit-sheet";
 import { ProductBundlesEditSheet } from "@/components/product/edit/product-bundles-edit-sheet";
 import { ProductSetComponentsEditSheet } from "@/components/product/edit/product-set-components-edit-sheet";
-import { Pencil } from "lucide-react";
 import { ProductMediaManager } from "@/components/product-media-manager";
 import { ShippingHistoryCard } from "@/components/shipping-history-card";
 import type { ProductDetail } from "@/components/product/types";
 import type { Movement } from "./_types";
+import { ProductsThemeScope } from "../_theme-scope";
+
+/** 섹션 우측 [편집] 버튼 — 6개 섹션에서 동일 사용 */
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <JmButton size="xs" variant="outline" onClick={onClick}>
+      <Pencil className="size-3" />
+      편집
+    </JmButton>
+  );
+}
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -131,12 +143,17 @@ export default function ProductDetailPage() {
   if (productQuery.isPending) return null; // loading.tsx 가 처리
   if (!product)
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-        상품을 찾을 수 없습니다
-      </div>
+      <ProductsThemeScope>
+        <div className="flex h-full items-center justify-center bg-[var(--jm-bg)] text-jm-sm text-[var(--jm-text-muted)]">
+          상품을 찾을 수 없습니다
+        </div>
+      </ProductsThemeScope>
     );
 
   // 파생값
+  // OPTION_PARENT — 자체 가격·재고·공급자 매핑이 없는 카탈로그 placeholder.
+  // 가격/원가/채널/재고 관련 섹션은 무의미하므로 상세 페이지에서 숨긴다.
+  const isOptionParent = product.productType === "OPTION_PARENT";
   const mappings = product.productMappings ?? [];
   const costs = product.sellingCosts ?? [];
   const globalCosts = costs.filter((c) => c.channelId == null);
@@ -202,338 +219,327 @@ export default function ProductDetailPage() {
     saveSingleField({ listPrice: vatInputToNet(vatStr) });
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-6">
-          <ProductHeaderBar
-            product={product}
-            onSaveName={(name) => saveSingleField({ name })}
-            actions={
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  onClick={() => router.push(`/products/${product.id}/landing`)}
-                >
-                  <Layout className="h-3.5 w-3.5 mr-1.5" />상세페이지
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  onClick={() => router.push(`/products/${product.id}/manual`)}
-                >
-                  <BookOpen className="h-3.5 w-3.5 mr-1.5" />사용설명서
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="h-8"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Archive className="h-3.5 w-3.5 mr-1.5" />비활성
-                </Button>
-              </>
-            }
-          />
-
-          {product.autoMapped && (
-            <div className="rounded-lg border border-primary/40 bg-brand-muted/40 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-              <div className="text-sm min-w-0">
-                <span className="font-medium text-primary">자동 생성된 상품입니다.</span>{" "}
-                <span className="text-muted-foreground">
-                  SKU/이름/판매가를 검토한 뒤 [검토 완료]를 눌러주세요. 다른 상품과 같은 품목이라면 [합치기]로 통합할 수 있습니다.
-                </span>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <Button size="sm" variant="outline" className="h-8" onClick={() => setMergeDialogOpen(true)}>
-                  합치기
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8"
-                  onClick={() => clearAutoMappedMutation.mutate()}
-                  disabled={clearAutoMappedMutation.isPending}
-                >
-                  {clearAutoMappedMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  검토 완료
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* 1. 개요 */}
-          <ProductKpiCards product={product} cardFeeRate={cardFeeRate} />
-          <ProductCostBreakdownCard
-            product={product}
-            onEdit={
-              product.isSet || product.productType === "ASSEMBLED"
-                ? () => setSetComponentsEditOpen(true)
-                : undefined
-            }
-          />
-          {(product.isSet || product.productType === "ASSEMBLED") && (
-            <ComponentIncomingInfoSections
-              rows={(product.estimatedCostBreakdown ?? []).map((b) => ({
-                componentId: b.componentId,
-                componentName: b.componentName,
-                componentSku: b.componentSku,
-                label: b.label,
-                quantity: b.quantity,
-                shippingPerUnit: b.shippingPerUnit,
-                incomingCostPerUnit: b.incomingCostPerUnit,
-                supplierName: b.supplierName,
-                supplierProductName: b.supplierProductName,
-                incomingCostList: b.incomingCostList,
-              }))}
-            />
-          )}
-          <ProductChannelMarginCard product={product} />
-          {product.isCanonical && (
-            <ProductVariantsCard
-              productId={product.id}
-              taxType={product.taxType}
-              variants={product.variants ?? []}
-              parentSetComponentsEmpty={(product.setComponents ?? []).length === 0}
-            />
-          )}
-          <ProductInfoCard product={product} onEdit={() => setInfoEditOpen(true)} />
-          <ProductDescriptionBlock
-            product={product}
-            onSaveDescription={(description) => saveSingleField({ description: description || null })}
-            onSaveMemo={(memo) => saveSingleField({ memo: memo || null })}
-          />
-
-          {/* 2. 가격·비용 */}
-          <ProductSection
-            title="전사 공통 판매비용"
-            description="모든 채널에 공통으로 적용되는 비용"
-            noPadding
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setCostsEditOpen(true)}
-              >
-                <Pencil className="h-3 w-3 mr-1" />
-                편집
-              </Button>
-            }
-          >
-            <ProductSellingCostsTable costs={globalCosts} />
-          </ProductSection>
-
-          <ProductSection
-            title="채널별 가격 · 비용 · 마진"
-            description="채널 전용 비용 상세는 우측 (i) 버튼"
-            noPadding
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setChannelEditOpen(true)}
-              >
-                <Pencil className="h-3 w-3 mr-1" />
-                편집
-              </Button>
-            }
-          >
-            <ProductChannelPricingTable
-              taxType={product.taxType}
-              baseCost={baseCost}
-              globalCostTotal={globalCostTotal}
-              pricings={product.channelPricings ?? []}
-              costsByChannel={costsByChannel}
-              baseSellingPrice={parseFloat(product.sellingPrice || "0")}
-              baseInboundCost={computeAvgInboundUnitCost(product)}
-              listPriceVat={displayList}
-              sellingPriceVat={displayVat}
-              discount={discount}
-              onSaveListPriceFromVat={saveListPriceFromVat}
-              onSaveSellingPriceFromVat={saveSellingPriceFromVat}
-              productId={product.id}
-              cardFeeRate={cardFeeRate}
-            />
-          </ProductSection>
-
-          <ProductSection
-            title="상세 스펙"
-            description="필터·검색용 구조화된 스펙 정보"
-            noPadding
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setSpecsEditOpen(true)}
-              >
-                <Pencil className="h-3 w-3 mr-1" />
-                편집
-              </Button>
-            }
-          >
-            <ProductSpecsTable values={product.specValues ?? []} />
-          </ProductSection>
-
-          <ProductSection
-            title="고객 옵션"
-            description="고객이 카탈로그·POS 에서 선택하는 옵션 (변형상품과 분리). 옵션값마다 단순 텍스트 / 다른 Product 매핑 / 매장 variant 매핑 중 선택"
-            noPadding
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setOptionsEditOpen(true)}
-              >
-                <Pencil className="h-3 w-3 mr-1" />
-                편집
-              </Button>
-            }
-          >
-            <ProductOptionsTable options={product.productOptions ?? []} />
-          </ProductSection>
-
-          <ProductSection
-            title="추가구매 추천"
-            description="이 상품과 함께 사면 좋은 단독 카탈로그 상품들. 카트 추가 시 손님에게 추천 노출되고, 선택 시 자식 OrderItem(ADDON) 으로 함께 결제됨"
-            noPadding
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setBundlesEditOpen(true)}
-              >
-                <Pencil className="h-3 w-3 mr-1" />
-                편집
-              </Button>
-            }
-          >
-            <ProductBundlesTable bundles={product.bundles ?? []} />
-          </ProductSection>
-
-          {/* 3. 공급·재고 */}
-          <ProductSection
-            title="공급자 매핑"
-            description="이 판매상품으로 환산되는 공급자 상품"
-            noPadding
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setMappingEditOpen(true)}
-              >
-                <Pencil className="h-3 w-3 mr-1" />
-                편집
-              </Button>
-            }
-          >
-            <ProductMappingsTable mappings={mappings} />
-          </ProductSection>
-
-          {mappings.map((m) => (
-            <div key={`shipping-${m.id}`} className="space-y-2">
-              <div className="text-xs text-muted-foreground px-1">
-                {m.supplierProduct.name}
-                {m.supplierProduct.supplierCode ? ` · ${m.supplierProduct.supplierCode}` : ""}
-              </div>
-              <ShippingHistoryCard supplierProductId={m.supplierProduct.id} />
-            </div>
-          ))}
-
-          <ProductInventoryCard product={product} />
-          <ProductSection
-            title="재고 로트 (잔여, 최근 5건)"
-            description="FIFO 소진 순으로 표시"
-            noPadding
-          >
-            <ProductInventoryLotsTable
-              lots={product.inventoryLots ?? []}
-              limit={5}
-              showVariantColumn={!!product.isCanonical}
-            />
-          </ProductSection>
-
-          {/* 4. 구성·관계 (조건부) — 세트/조립 구성품은 위쪽 "구성품 · 예상 원가 분해" 카드로 통합됨 */}
-          {!product.isSet && product.productType !== "ASSEMBLED" && !product.isCanonical && (
-            <ProductBulkCard product={product} />
-          )}
-
-          {/* 5. 미디어 */}
-          <ProductSection
-            title="이미지 · 영상"
-            description="POS 카탈로그·판매 화면에 함께 노출됩니다"
-            noPadding
-          >
-            <ProductMediaManager
-              productId={product.id}
-              imageUrl={product.imageUrl}
-              onImageUrlChange={() =>
-                queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(id) })
+    <ProductsThemeScope>
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-6 p-6">
+            <ProductHeaderBar
+              product={product}
+              onSaveName={(name) => saveSingleField({ name })}
+              actions={
+                <>
+                  <JmButton
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/products/${product.id}/landing`)}
+                  >
+                    <Layout className="size-3.5" />
+                    상세페이지
+                  </JmButton>
+                  <JmButton
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/products/${product.id}/manual`)}
+                  >
+                    <BookOpen className="size-3.5" />
+                    사용설명서
+                  </JmButton>
+                  <JmButton
+                    size="sm"
+                    variant="danger"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Archive className="size-3.5" />
+                    비활성
+                  </JmButton>
+                </>
               }
             />
-          </ProductSection>
 
-          {/* 6. 이력 */}
-          <ProductSection
-            title="재고 이동 이력"
-            description="최근 100건"
-            noPadding
-          >
-            <ProductMovementsTable
-              movements={movementsQuery.data}
-              isLoading={movementsQuery.isPending}
-              showVariantColumn={!!product.isCanonical}
+            {product.autoMapped && (
+              <JmAlert
+                variant="info"
+                title="자동 생성된 상품입니다"
+                action={
+                  <div className="flex shrink-0 gap-2">
+                    <JmButton
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setMergeDialogOpen(true)}
+                    >
+                      합치기
+                    </JmButton>
+                    <JmButton
+                      size="sm"
+                      onClick={() => clearAutoMappedMutation.mutate()}
+                      disabled={clearAutoMappedMutation.isPending}
+                    >
+                      {clearAutoMappedMutation.isPending && (
+                        <JmSpinner size="sm" tone="inverted" />
+                      )}
+                      검토 완료
+                    </JmButton>
+                  </div>
+                }
+              >
+                SKU/이름/판매가를 검토한 뒤 [검토 완료]를 눌러주세요. 다른 상품과
+                같은 품목이라면 [합치기]로 통합할 수 있습니다.
+              </JmAlert>
+            )}
+
+            {/* 1. 개요 */}
+            <ProductKpiCards product={product} cardFeeRate={cardFeeRate} />
+            {!isOptionParent && (
+              <>
+                <ProductCostBreakdownCard
+                  product={product}
+                  onEdit={
+                    product.isSet || product.productType === "ASSEMBLED"
+                      ? () => setSetComponentsEditOpen(true)
+                      : undefined
+                  }
+                />
+                {(product.isSet || product.productType === "ASSEMBLED") && (
+                  <ComponentIncomingInfoSections
+                    rows={(product.estimatedCostBreakdown ?? []).map((b) => ({
+                      componentId: b.componentId,
+                      componentName: b.componentName,
+                      componentSku: b.componentSku,
+                      label: b.label,
+                      quantity: b.quantity,
+                      shippingPerUnit: b.shippingPerUnit,
+                      incomingCostPerUnit: b.incomingCostPerUnit,
+                      supplierName: b.supplierName,
+                      supplierProductName: b.supplierProductName,
+                      incomingCostList: b.incomingCostList,
+                    }))}
+                  />
+                )}
+                <ProductChannelMarginCard product={product} />
+              </>
+            )}
+            {product.isCanonical && (
+              <ProductVariantsCard
+                productId={product.id}
+                taxType={product.taxType}
+                variants={product.variants ?? []}
+                parentSetComponentsEmpty={
+                  (product.setComponents ?? []).length === 0
+                }
+              />
+            )}
+            <ProductInfoCard product={product} onEdit={() => setInfoEditOpen(true)} />
+            <ProductDescriptionBlock
+              product={product}
+              onSaveDescription={(description) =>
+                saveSingleField({ description: description || null })
+              }
+              onSaveMemo={(memo) => saveSingleField({ memo: memo || null })}
             />
-          </ProductSection>
 
-          {/* 7. 가격 변경 이력 — 상품 정가/판매가 수정 시 자동 기록 */}
-          <ProductSection
-            title="가격 변경 이력"
-            description="정가·판매가가 바뀐 시점, 변경자, 사유까지 추적합니다 (최근 100건)"
-            noPadding
-          >
-            <ProductPriceHistoryCard productId={product.id} />
-          </ProductSection>
+            {/* 2. 가격·비용 — OPTION_PARENT 는 자체 가격이 없어 숨김 */}
+            {!isOptionParent && (
+              <>
+                <ProductSection
+                  title="전사 공통 판매비용"
+                  description="모든 채널에 공통으로 적용되는 비용"
+                  noPadding
+                  actions={<EditButton onClick={() => setCostsEditOpen(true)} />}
+                >
+                  <ProductSellingCostsTable costs={globalCosts} />
+                </ProductSection>
 
-          {/* 8. 실판매 단가 이력 — 실제 판매된 OrderItem 의 정가/실판매가/할인율 분포 */}
-          <ProductSection
-            title="실판매 단가 이력"
-            description="POS·주문에서 실제 결제된 단가 분포 (최근 100건). 정가와 다르게 할인 판매된 케이스를 한눈에 확인"
-            noPadding
-          >
-            <ProductSalesPriceHistoryCard productId={product.id} />
-          </ProductSection>
+                <ProductSection
+                  title="채널별 가격 · 비용 · 마진"
+                  description="채널 전용 비용 상세는 우측 (i) 버튼"
+                  noPadding
+                  actions={
+                    <EditButton onClick={() => setChannelEditOpen(true)} />
+                  }
+                >
+                  <ProductChannelPricingTable
+                    taxType={product.taxType}
+                    baseCost={baseCost}
+                    globalCostTotal={globalCostTotal}
+                    pricings={product.channelPricings ?? []}
+                    costsByChannel={costsByChannel}
+                    baseSellingPrice={parseFloat(product.sellingPrice || "0")}
+                    baseInboundCost={computeAvgInboundUnitCost(product)}
+                    listPriceVat={displayList}
+                    sellingPriceVat={displayVat}
+                    discount={discount}
+                    onSaveListPriceFromVat={saveListPriceFromVat}
+                    onSaveSellingPriceFromVat={saveSellingPriceFromVat}
+                    productId={product.id}
+                    cardFeeRate={cardFeeRate}
+                  />
+                </ProductSection>
+              </>
+            )}
+
+            <ProductSection
+              title="상세 스펙"
+              description="필터·검색용 구조화된 스펙 정보"
+              noPadding
+              actions={<EditButton onClick={() => setSpecsEditOpen(true)} />}
+            >
+              <ProductSpecsTable values={product.specValues ?? []} />
+            </ProductSection>
+
+            <ProductSection
+              title={isOptionParent ? "고객 옵션 (대표상품 핵심)" : "고객 옵션"}
+              description="고객이 카탈로그·POS 에서 선택하는 옵션 (변형상품과 분리). 옵션값마다 단순 텍스트 / 다른 Product 매핑 / 매장 variant 매핑 중 선택"
+              noPadding
+              actions={<EditButton onClick={() => setOptionsEditOpen(true)} />}
+            >
+              {isOptionParent && (product.productOptions ?? []).length === 0 && (
+                <div className="m-3 rounded-md border border-[var(--jm-danger-bg)] bg-[var(--jm-danger-bg)] px-3 py-2 text-jm-xs text-[var(--jm-danger-fg)]">
+                  연결된 단품이 없어 카탈로그·POS 에서 선택할 수 없습니다. [편집]
+                  에서 옵션값을 단품에 연결하세요.
+                </div>
+              )}
+              <ProductOptionsTable options={product.productOptions ?? []} />
+            </ProductSection>
+
+            <ProductSection
+              title="추가구매 추천"
+              description="이 상품과 함께 사면 좋은 단독 카탈로그 상품들. 카트 추가 시 손님에게 추천 노출되고, 선택 시 자식 OrderItem(ADDON) 으로 함께 결제됨"
+              noPadding
+              actions={<EditButton onClick={() => setBundlesEditOpen(true)} />}
+            >
+              <ProductBundlesTable bundles={product.bundles ?? []} />
+            </ProductSection>
+
+            {/* 3. 공급·재고 — OPTION_PARENT 는 자체 공급/재고가 없어 숨김 */}
+            {!isOptionParent && (
+              <>
+                <ProductSection
+                  title="공급자 매핑"
+                  description="이 판매상품으로 환산되는 공급자 상품"
+                  noPadding
+                  actions={
+                    <EditButton onClick={() => setMappingEditOpen(true)} />
+                  }
+                >
+                  <ProductMappingsTable mappings={mappings} />
+                </ProductSection>
+
+                {mappings.map((m) => (
+                  <div key={`shipping-${m.id}`} className="space-y-2">
+                    <div className="px-1 text-jm-xs text-[var(--jm-text-muted)]">
+                      {m.supplierProduct.name}
+                      {m.supplierProduct.supplierCode
+                        ? ` · ${m.supplierProduct.supplierCode}`
+                        : ""}
+                    </div>
+                    <ShippingHistoryCard
+                      supplierProductId={m.supplierProduct.id}
+                    />
+                  </div>
+                ))}
+
+                <ProductInventoryCard product={product} />
+                <ProductSection
+                  title="재고 로트 (잔여, 최근 5건)"
+                  description="FIFO 소진 순으로 표시"
+                  noPadding
+                >
+                  <ProductInventoryLotsTable
+                    lots={product.inventoryLots ?? []}
+                    limit={5}
+                    showVariantColumn={!!product.isCanonical}
+                  />
+                </ProductSection>
+              </>
+            )}
+
+            {/* 4. 구성·관계 (조건부) — 세트/조립 구성품은 위쪽 "구성품 · 예상 원가 분해" 카드로 통합됨 */}
+            {!product.isSet &&
+              product.productType !== "ASSEMBLED" &&
+              !product.isCanonical &&
+              !isOptionParent && <ProductBulkCard product={product} />}
+
+            {/* 5. 미디어 */}
+            <ProductSection
+              title="이미지 · 영상"
+              description="POS 카탈로그·판매 화면에 함께 노출됩니다"
+              noPadding
+            >
+              <ProductMediaManager
+                productId={product.id}
+                imageUrl={product.imageUrl}
+                onImageUrlChange={() =>
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.products.detail(id),
+                  })
+                }
+              />
+            </ProductSection>
+
+            {/* 6. 이력 */}
+            <ProductSection
+              title="재고 이동 이력"
+              description="최근 100건"
+              noPadding
+            >
+              <ProductMovementsTable
+                movements={movementsQuery.data}
+                isLoading={movementsQuery.isPending}
+                showVariantColumn={!!product.isCanonical}
+              />
+            </ProductSection>
+
+            {/* 7. 가격 변경 이력 — 상품 정가/판매가 수정 시 자동 기록 */}
+            <ProductSection
+              title="가격 변경 이력"
+              description="정가·판매가가 바뀐 시점, 변경자, 사유까지 추적합니다 (최근 100건)"
+              noPadding
+            >
+              <ProductPriceHistoryCard productId={product.id} />
+            </ProductSection>
+
+            {/* 8. 실판매 단가 이력 — 실제 판매된 OrderItem 의 정가/실판매가/할인율 분포 */}
+            <ProductSection
+              title="실판매 단가 이력"
+              description="POS·주문에서 실제 결제된 단가 분포 (최근 100건). 정가와 다르게 할인 판매된 케이스를 한눈에 확인"
+              noPadding
+            >
+              <ProductSalesPriceHistoryCard productId={product.id} />
+            </ProductSection>
+          </div>
         </div>
       </div>
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>상품을 비활성 처리할까요?</DialogTitle>
-            <DialogDescription>
-              상품 데이터는 유지되며, 목록에서만 숨겨집니다 (매핑·비용·채널가격·이력 모두 보존). 필요 시 복구 가능합니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+      <JmDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <JmDialogContent size="sm">
+          <JmDialogHeader>
+            <JmDialogTitle>상품을 비활성 처리할까요?</JmDialogTitle>
+            <JmDialogDescription>
+              상품 데이터는 유지되며, 목록에서만 숨겨집니다 (매핑·비용·채널가격·이력
+              모두 보존). 필요 시 복구 가능합니다.
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
               취소
-            </Button>
-            <Button
-              variant="destructive"
+            </JmButton>
+            <JmButton
+              variant="danger"
               onClick={() => deleteMutation.mutate()}
               disabled={deleteMutation.isPending}
             >
+              {deleteMutation.isPending && (
+                <JmSpinner size="sm" tone="inverted" />
+              )}
               비활성
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
       <ProductInfoEditSheet
         open={infoEditOpen}
@@ -583,7 +589,6 @@ export default function ProductDetailPage() {
         sourceProductName={product.name}
         onMerged={(targetId) => router.push(`/products/${targetId}`)}
       />
-    </div>
+    </ProductsThemeScope>
   );
 }
-

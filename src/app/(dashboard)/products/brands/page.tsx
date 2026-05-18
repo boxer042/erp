@@ -1,30 +1,50 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Upload, Loader2, X } from "lucide-react";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Library, Pencil, Tag, Trash2, Upload, X } from "lucide-react";
 import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from "@/components/ui/table";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
+  JmBadge,
+  JmButton,
+  JmCard,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDrawer,
+  JmDrawerBody,
+  JmDrawerContent,
+  JmDrawerFooter,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmEmpty,
+  JmFormField,
+  JmIconButton,
+  JmInput,
+  JmSearchInput,
+  JmSkeleton,
+  JmSpinner,
+  JmStat,
+  JmSwitch,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarSearch,
+  JmTooltip,
+  JmTooltipProvider,
+} from "@/jm";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
 import { MediaPickerDialog } from "@/components/media-picker-dialog";
-import { Library } from "lucide-react";
+import { ProductsThemeScope } from "../_theme-scope";
 
 interface Brand {
   id: string;
@@ -38,25 +58,46 @@ interface Brand {
 
 const brandsKey = ["brands"] as const;
 
+// ─────────────────────────────────────────────
+// 스켈레톤 행
+// ─────────────────────────────────────────────
 function BrandSkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-8 w-8 rounded" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-7 w-7 rounded-md" /></TableCell>
-        </TableRow>
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell>
+            <JmSkeleton className="h-8 w-8 rounded" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-32" />
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-8" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-5 w-14 rounded-full" />
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-7 w-7 rounded-md" />
+            </div>
+          </JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
 }
 
+// ─────────────────────────────────────────────
+// 메인 페이지
+// ─────────────────────────────────────────────
 export default function BrandsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [editing, setEditing] = useState<Brand | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -65,86 +106,216 @@ export default function BrandsPage() {
     queryFn: () => apiGet<Brand[]>("/api/brands?includeInactive=true"),
   });
 
-  const filtered = (brandsQuery.data ?? []).filter((b) =>
-    b.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const brands = useMemo(() => brandsQuery.data ?? [], [brandsQuery.data]);
+
+  const filtered = useMemo(() => {
+    if (!appliedSearch) return brands;
+    const q = appliedSearch.toLowerCase();
+    return brands.filter((b) => b.name.toLowerCase().includes(q));
+  }, [brands, appliedSearch]);
+
+  // KPI (로드된 데이터 기준)
+  const stats = useMemo(() => {
+    const total = brands.length;
+    const active = brands.filter((b) => b.isActive).length;
+    const linkedProducts = brands.reduce((s, b) => s + b._count.products, 0);
+    const noLogo = brands.filter((b) => !b.logoUrl).length;
+    return { total, active, linkedProducts, noLogo };
+  }, [brands]);
+
+  const isPending = brandsQuery.isPending;
+  const isError = brandsQuery.isError;
 
   return (
-    <div className="flex h-full flex-col">
-      <DataTableToolbar
-        search={{
-          value: search,
-          onChange: setSearch,
-          onSearch: () => {},
-          placeholder: "브랜드명 검색...",
-        }}
-        onAdd={() => setCreateOpen(true)}
-        addLabel="브랜드 등록"
-        loading={brandsQuery.isFetching}
-        onRefresh={() => qc.invalidateQueries({ queryKey: brandsKey })}
-      />
-      <div className="flex-1 overflow-y-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[60px]">로고</TableHead>
-              <TableHead>이름</TableHead>
-              <TableHead className="text-right">상품 수</TableHead>
-              <TableHead>상태</TableHead>
-              <TableHead className="w-[80px] text-right">액션</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {brandsQuery.isPending ? (
-              <BrandSkeletonRows />
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                  등록된 브랜드가 없습니다
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((b) => (
-                <TableRow
-                  key={b.id}
-                  className="cursor-pointer"
-                  onClick={() => setEditing(b)}
-                >
-                  <TableCell>
-                    {b.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={b.logoUrl} alt="" className="h-8 w-8 rounded object-contain bg-card border border-border" />
-                    ) : (
-                      <div className="h-8 w-8 rounded bg-muted" />
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{b.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{b._count.products}</TableCell>
-                  <TableCell>
-                    <Badge variant={b.isActive ? "success" : "secondary"}>
-                      {b.isActive ? "활성" : "비활성"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => { e.stopPropagation(); setEditing(b); }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+    <ProductsThemeScope>
+      <JmTooltipProvider>
+        <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+          <div className="flex w-full flex-col gap-6 p-4">
+            {/* KPI */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <JmStat
+                label="전체 브랜드"
+                value={isPending ? "—" : stats.total.toLocaleString("ko-KR")}
+                icon={<Tag className="size-4" />}
+                size="sm"
+              />
+              <JmStat
+                label="활성 브랜드"
+                value={isPending ? "—" : stats.active.toLocaleString("ko-KR")}
+                icon={<Tag className="size-4" />}
+                size="sm"
+              />
+              <JmStat
+                label="연결 상품 수"
+                value={
+                  isPending
+                    ? "—"
+                    : stats.linkedProducts.toLocaleString("ko-KR")
+                }
+                icon={<Tag className="size-4" />}
+                size="sm"
+              />
+              <JmStat
+                label="로고 미등록"
+                value={isPending ? "—" : stats.noLogo.toLocaleString("ko-KR")}
+                icon={<Tag className="size-4" />}
+                positiveIsGood={false}
+                size="sm"
+              />
+            </div>
 
-      <BrandCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
-      <BrandEditSheet brand={editing} onClose={() => setEditing(null)} />
-    </div>
+            {/* 메인 카드 */}
+            <JmCard className="overflow-hidden p-0">
+              <JmTableToolbar>
+                <JmTableToolbarSearch>
+                  <JmSearchInput
+                    size="sm"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onClear={() => {
+                      setSearch("");
+                      setAppliedSearch("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                        setAppliedSearch(search);
+                      }
+                    }}
+                    placeholder="브랜드명 검색..."
+                  />
+                </JmTableToolbarSearch>
+                <JmTableToolbarActions>
+                  <JmButton size="sm" onClick={() => setCreateOpen(true)}>
+                    브랜드 등록
+                  </JmButton>
+                </JmTableToolbarActions>
+              </JmTableToolbar>
+
+              <JmTable className="min-w-[520px]">
+                <JmTableHeader>
+                  <JmTableRow>
+                    <JmTableHead className="w-[60px]">로고</JmTableHead>
+                    <JmTableHead>이름</JmTableHead>
+                    <JmTableHead className="w-[90px] text-right">
+                      상품 수
+                    </JmTableHead>
+                    <JmTableHead className="w-[90px]">상태</JmTableHead>
+                    <JmTableHead className="w-[64px] text-right">
+                      관리
+                    </JmTableHead>
+                  </JmTableRow>
+                </JmTableHeader>
+                <JmTableBody>
+                  {isPending ? (
+                    <BrandSkeletonRows />
+                  ) : isError ? (
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell
+                        colSpan={5}
+                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      >
+                        브랜드 목록을 불러오지 못했습니다
+                      </JmTableCell>
+                    </JmTableRow>
+                  ) : filtered.length === 0 ? (
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell colSpan={5} className="py-12">
+                        <JmEmpty
+                          icon={<Tag className="size-8" />}
+                          title={
+                            appliedSearch
+                              ? "검색 결과가 없습니다"
+                              : "등록된 브랜드가 없습니다"
+                          }
+                          description={
+                            appliedSearch
+                              ? "다른 검색어를 입력해보세요"
+                              : "첫 브랜드를 등록해 상품에 연결하세요"
+                          }
+                          action={
+                            !appliedSearch ? (
+                              <JmButton
+                                size="sm"
+                                onClick={() => setCreateOpen(true)}
+                              >
+                                브랜드 등록
+                              </JmButton>
+                            ) : null
+                          }
+                        />
+                      </JmTableCell>
+                    </JmTableRow>
+                  ) : (
+                    filtered.map((b) => (
+                      <JmTableRow
+                        key={b.id}
+                        className="cursor-pointer"
+                        onClick={() => setEditing(b)}
+                      >
+                        <JmTableCell>
+                          {b.logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={b.logoUrl}
+                              alt=""
+                              className="h-8 w-8 rounded object-contain bg-[var(--jm-surface)] border border-[var(--jm-border)]"
+                            />
+                          ) : (
+                            <div className="h-8 w-8 rounded bg-[var(--jm-bg-subtle)]" />
+                          )}
+                        </JmTableCell>
+                        <JmTableCell className="font-medium text-[var(--jm-text)]">
+                          {b.name}
+                        </JmTableCell>
+                        <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
+                          {b._count.products}
+                        </JmTableCell>
+                        <JmTableCell>
+                          <JmBadge
+                            variant={b.isActive ? "success" : "default"}
+                            size="sm"
+                          >
+                            {b.isActive ? "활성" : "비활성"}
+                          </JmBadge>
+                        </JmTableCell>
+                        <JmTableCell>
+                          <div className="flex justify-end">
+                            <JmTooltip content="수정">
+                              <JmIconButton
+                                variant="ghost"
+                                size="sm"
+                                aria-label="수정"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditing(b);
+                                }}
+                              >
+                                <Pencil className="size-3.5" />
+                              </JmIconButton>
+                            </JmTooltip>
+                          </div>
+                        </JmTableCell>
+                      </JmTableRow>
+                    ))
+                  )}
+                </JmTableBody>
+              </JmTable>
+            </JmCard>
+          </div>
+        </div>
+
+        <BrandCreateDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={() => qc.invalidateQueries({ queryKey: brandsKey })}
+        />
+        <BrandEditSheet
+          brand={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => qc.invalidateQueries({ queryKey: brandsKey })}
+        />
+      </JmTooltipProvider>
+    </ProductsThemeScope>
   );
 }
 
@@ -152,8 +323,15 @@ export default function BrandsPage() {
 // 신규 브랜드 등록 Dialog
 // ============================================================
 
-function BrandCreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const qc = useQueryClient();
+function BrandCreateDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreated: () => void;
+}) {
   const [name, setName] = useState("");
   const [memo, setMemo] = useState("");
 
@@ -162,63 +340,93 @@ function BrandCreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       apiMutate("/api/brands", "POST", body),
     onSuccess: () => {
       toast.success("브랜드가 등록되었습니다");
-      qc.invalidateQueries({ queryKey: brandsKey });
+      onCreated();
       setName("");
       setMemo("");
       onOpenChange(false);
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "등록 실패"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "등록 실패"),
   });
 
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    createMutation.mutate({ name: name.trim(), memo: memo.trim() });
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>브랜드 등록</DialogTitle>
-          <DialogDescription>로고는 등록 후 상세에서 업로드합니다</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid gap-1.5">
-            <Label htmlFor="brand-name">브랜드명 *</Label>
-            <Input
-              id="brand-name"
+    <JmDialog open={open} onOpenChange={onOpenChange}>
+      <JmDialogContent size="sm">
+        <JmDialogHeader>
+          <JmDialogTitle>브랜드 등록</JmDialogTitle>
+        </JmDialogHeader>
+        <JmDialogBody className="space-y-3">
+          <JmFormField label="브랜드명" required>
+            <JmInput
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) {
+                if (
+                  e.key === "Enter" &&
+                  !e.nativeEvent.isComposing &&
+                  name.trim()
+                ) {
                   e.preventDefault();
-                  createMutation.mutate({ name: name.trim(), memo: memo.trim() });
+                  handleSubmit();
                 }
               }}
+              placeholder="브랜드명 입력"
             />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="brand-memo">메모</Label>
-            <Input id="brand-memo" value={memo} onChange={(e) => setMemo(e.target.value)} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-          <Button
-            onClick={() => createMutation.mutate({ name: name.trim(), memo: memo.trim() })}
+          </JmFormField>
+          <JmFormField label="메모">
+            <JmInput
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="메모 (선택)"
+            />
+          </JmFormField>
+          <p className="text-[11px] text-[var(--jm-text-subtle)]">
+            로고는 등록 후 수정 화면에서 업로드합니다
+          </p>
+        </JmDialogBody>
+        <JmDialogFooter>
+          <JmButton
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={createMutation.isPending}
+          >
+            취소
+          </JmButton>
+          <JmButton
+            variant="cta"
+            onClick={handleSubmit}
             disabled={!name.trim() || createMutation.isPending}
           >
-            {createMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {createMutation.isPending && (
+              <JmSpinner size="sm" tone="inverted" />
+            )}
             등록
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </JmButton>
+        </JmDialogFooter>
+      </JmDialogContent>
+    </JmDialog>
   );
 }
 
 // ============================================================
-// 브랜드 수정 Sheet (로고 + 모델 관리)
+// 브랜드 수정 Drawer (로고 + 정보 관리)
 // ============================================================
 
-function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () => void }) {
-  const qc = useQueryClient();
+function BrandEditSheet({
+  brand,
+  onClose,
+  onSaved,
+}: {
+  brand: Brand | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [memo, setMemo] = useState("");
@@ -228,10 +436,11 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
   const [uploading, setUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
 
   const open = brand !== null;
 
-  // 시트 열릴 때 form 초기화
+  // 시트 열릴 때 form 초기화 (의도된 렌더 중 setState 패턴)
   if (brand && name === "" && brand.name) {
     setName(brand.name);
     setMemo(brand.memo ?? "");
@@ -251,20 +460,23 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
       }),
     onSuccess: () => {
       toast.success("저장되었습니다");
-      qc.invalidateQueries({ queryKey: brandsKey });
+      onSaved();
       handleClose();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "저장 실패"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "저장 실패"),
   });
 
-  const deleteMutation = useMutation({
+  const deactivateMutation = useMutation({
     mutationFn: () => apiMutate(`/api/brands/${brand!.id}`, "DELETE"),
     onSuccess: () => {
       toast.success("브랜드가 비활성화되었습니다");
-      qc.invalidateQueries({ queryKey: brandsKey });
+      onSaved();
+      setDeactivateConfirmOpen(false);
       handleClose();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "비활성화 실패"),
   });
 
   const handleClose = () => {
@@ -276,11 +488,11 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
     onClose();
   };
 
-  const uploadBlob = async (data: Blob | File, name: string) => {
+  const uploadBlob = async (data: Blob | File, fileName: string) => {
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append("file", data, name);
+      fd.append("file", data, fileName);
       const res = await fetch("/api/brands/upload", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) {
@@ -314,33 +526,38 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
   };
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-        <SheetHeader className="border-b px-5 py-4">
-          <SheetTitle>브랜드 수정</SheetTitle>
-          <SheetDescription className="sr-only">브랜드 정보와 모델을 관리합니다</SheetDescription>
-        </SheetHeader>
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="px-5 py-5 space-y-5">
+    <>
+      <JmDrawer open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+        <JmDrawerContent side="right" size="md">
+          <JmDrawerHeader>
+            <JmDrawerTitle>브랜드 수정</JmDrawerTitle>
+          </JmDrawerHeader>
+          <JmDrawerBody className="space-y-5">
             {/* 로고 */}
             <div className="space-y-2">
-              <Label>로고</Label>
+              <p className="text-jm-sm font-medium text-[var(--jm-text)]">
+                로고
+              </p>
               <div className="flex items-center gap-3">
                 {logoUrl ? (
                   <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logoUrl} alt="" className="h-20 w-20 rounded object-contain bg-card border border-border" />
+                    <img
+                      src={logoUrl}
+                      alt=""
+                      className="h-20 w-20 rounded object-contain bg-[var(--jm-surface)] border border-[var(--jm-border)]"
+                    />
                     <button
                       type="button"
                       onClick={handleRemoveLogo}
-                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground inline-flex items-center justify-center"
+                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-[var(--jm-danger)] text-white inline-flex items-center justify-center"
                       aria-label="로고 제거"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </div>
                 ) : (
-                  <div className="h-20 w-20 rounded border-2 border-dashed border-border flex items-center justify-center text-muted-foreground text-[10px]">
+                  <div className="h-20 w-20 rounded border border-[var(--jm-border)] bg-[var(--jm-bg-subtle)] flex items-center justify-center text-[10px] text-[var(--jm-text-subtle)]">
                     로고 없음
                   </div>
                 )}
@@ -352,74 +569,97 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
                   className="hidden"
                 />
                 <div className="flex flex-col gap-1.5">
-                  <Button
+                  <JmButton
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                   >
-                    {uploading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
+                    {uploading ? (
+                      <JmSpinner size="sm" />
+                    ) : (
+                      <Upload className="size-3.5" />
+                    )}
                     {logoUrl ? "교체" : "업로드"}
-                  </Button>
-                  <Button
+                  </JmButton>
+                  <JmButton
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => setPickerOpen(true)}
                     disabled={uploading}
                   >
-                    <Library className="h-3.5 w-3.5 mr-1" /> 라이브러리
-                  </Button>
+                    <Library className="size-3.5" />
+                    라이브러리
+                  </JmButton>
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground">JPG/PNG/WebP/SVG · 최대 5MB</p>
+              <p className="text-[11px] text-[var(--jm-text-subtle)]">
+                JPG / PNG / WebP / SVG · 최대 5MB
+              </p>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-brand-name">브랜드명 *</Label>
-              <Input id="edit-brand-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <JmFormField label="브랜드명" required>
+              <JmInput
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </JmFormField>
+
+            <JmFormField label="메모">
+              <JmInput
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder="메모 (선택)"
+              />
+            </JmFormField>
+
+            <div className="flex items-center gap-3">
+              <span className="text-jm-sm text-[var(--jm-text)]">활성</span>
+              <JmSwitch
+                checked={isActive}
+                onCheckedChange={(v) => setIsActive(v)}
+                size="sm"
+              />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-brand-memo">메모</Label>
-              <Input id="edit-brand-memo" value={memo} onChange={(e) => setMemo(e.target.value)} />
+          </JmDrawerBody>
+          <JmDrawerFooter className="flex justify-between">
+            <JmButton
+              variant="outline"
+              onClick={() => setDeactivateConfirmOpen(true)}
+              disabled={deactivateMutation.isPending}
+              className="text-[var(--jm-danger-fg)]"
+            >
+              <Trash2 className="size-3.5" />
+              비활성화
+            </JmButton>
+            <div className="flex gap-2">
+              <JmButton variant="ghost" onClick={handleClose}>
+                취소
+              </JmButton>
+              <JmButton
+                variant="cta"
+                onClick={() => updateMutation.mutate()}
+                disabled={!name.trim() || updateMutation.isPending}
+              >
+                {updateMutation.isPending && (
+                  <JmSpinner size="sm" tone="inverted" />
+                )}
+                저장
+              </JmButton>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={isActive} onCheckedChange={(c) => setIsActive(c === true)} />
-              활성
-            </label>
-          </div>
-        </ScrollArea>
-        <div className="border-t px-5 py-4 flex justify-between gap-2">
-          <Button
-            variant="outline"
-            className="text-destructive"
-            onClick={() => {
-              if (confirm("이 브랜드를 비활성화하시겠습니까?")) {
-                deleteMutation.mutate();
-              }
-            }}
-            disabled={deleteMutation.isPending}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            비활성화
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleClose}>취소</Button>
-            <Button onClick={() => updateMutation.mutate()} disabled={!name.trim() || updateMutation.isPending}>
-              {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              저장
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
+          </JmDrawerFooter>
+        </JmDrawerContent>
+      </JmDrawer>
+
       <ImageEditDialog
         open={pendingFile !== null}
         file={pendingFile}
         defaultAspect={16 / 9}
-        onConfirm={async (blob, name) => {
+        onConfirm={async (blob, fileName) => {
           setPendingFile(null);
-          await uploadBlob(blob, name);
+          await uploadBlob(blob, fileName);
         }}
         onCancel={() => setPendingFile(null)}
       />
@@ -433,6 +673,47 @@ function BrandEditSheet({ brand, onClose }: { brand: Brand | null; onClose: () =
         }}
         onClose={() => setPickerOpen(false)}
       />
-    </Sheet>
+
+      {/* 비활성화 확인 Dialog */}
+      <JmDialog
+        open={deactivateConfirmOpen}
+        onOpenChange={(v) => !deactivateMutation.isPending && setDeactivateConfirmOpen(v)}
+      >
+        <JmDialogContent size="sm">
+          <JmDialogHeader>
+            <JmDialogTitle>브랜드 비활성화</JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody>
+            <p className="text-jm-sm text-[var(--jm-text)]">
+              <span className="font-semibold">{brand?.name}</span> 브랜드를
+              비활성화합니다.
+            </p>
+            <p className="mt-2 text-jm-xs text-[var(--jm-text-muted)]">
+              비활성화한 브랜드는 목록에서 숨겨집니다. 연결된 상품에는 영향을
+              주지 않습니다.
+            </p>
+          </JmDialogBody>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setDeactivateConfirmOpen(false)}
+              disabled={deactivateMutation.isPending}
+            >
+              취소
+            </JmButton>
+            <JmButton
+              variant="danger"
+              onClick={() => deactivateMutation.mutate()}
+              disabled={deactivateMutation.isPending}
+            >
+              {deactivateMutation.isPending && (
+                <JmSpinner size="sm" tone="inverted" />
+              )}
+              비활성화
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+    </>
   );
 }

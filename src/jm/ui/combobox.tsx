@@ -172,7 +172,7 @@ export function JmCombobox<T extends JmComboboxItem = JmComboboxItem>({
               </div>
 
               {/* 결과 리스트 */}
-              <div className="flex-1 overflow-y-auto p-1">
+              <div role="listbox" className="flex-1 overflow-y-auto p-1">
                 {filtered.length === 0 ? (
                   <div className="px-3 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
                     {emptyMessage}
@@ -184,6 +184,8 @@ export function JmCombobox<T extends JmComboboxItem = JmComboboxItem>({
                       <button
                         key={item.id}
                         type="button"
+                        role="option"
+                        aria-selected={isSelected}
                         disabled={item.disabled}
                         onClick={() => handleSelect(item)}
                         className={cn(

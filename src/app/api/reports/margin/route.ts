@@ -7,8 +7,8 @@ import { guardAdmin } from "@/lib/api-auth";
 //       (PENDING, CANCELLED, RETURNED 제외)
 //
 // 계산 (각 OrderItem):
-//   revenue        = totalPrice  (VAT 포함 매출)
-//   supplyRevenue  = totalPrice / (1 + product.taxRate)  (공급가액)
+//   supplyRevenue  = totalPrice  (공급가액 — OrderItem.totalPrice 는 이미 세전 저장)
+//   revenue        = totalPrice × (1 + taxRate)  (VAT 포함 매출, 표시용)
 //   costAmount     = Σ(LotConsumption.quantity × LotConsumption.unitCost)
 //                    (LotConsumption 없으면 unitCostSnapshot × quantity로 폴백)
 //   commissionAmt  = totalPrice × channelCommissionRateSnapshot
@@ -199,7 +199,10 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       const totalPrice = Number(item.totalPrice);
       const taxRate =
         item.product.taxType === "TAXABLE" ? Number(item.product.taxRate) : 0;
-      const supplyRevenue = taxRate > 0 ? totalPrice / (1 + taxRate) : totalPrice;
+      // OrderItem.totalPrice 는 이미 세전(공급가액) 저장값.
+      // supplyRevenue = 그대로 / revenue = VAT 가산 (표시용)
+      const supplyRevenue = totalPrice;
+      const revenue = taxRate > 0 ? totalPrice * (1 + taxRate) : totalPrice;
       // 원가: LotConsumption 합계 우선, 없으면 unitCostSnapshot × qty로 폴백
       const lotCost = item.lotConsumptions.reduce(
         (s, lc) => s + Number(lc.quantity) * Number(lc.unitCost),
@@ -227,7 +230,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       const sellingCost =
         item.sellingCostSnapshot != null ? Number(item.sellingCostSnapshot) * qty : 0;
 
-      oRevenue += totalPrice;
+      oRevenue += revenue;
       oSupply += supplyRevenue;
       oCost += cost;
       oComm += commission;
@@ -235,7 +238,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       oSelling += sellingCost;
 
       // 채널 누적
-      chGroup.revenue += totalPrice;
+      chGroup.revenue += revenue;
       chGroup.supplyRevenue += supplyRevenue;
       chGroup.costAmount += cost;
       chGroup.commissionAmount += commission;
@@ -259,7 +262,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       }
       const pGroup = productMap.get(pKey)!;
       pGroup.quantity += qty;
-      pGroup.revenue += totalPrice;
+      pGroup.revenue += revenue;
       pGroup.supplyRevenue += supplyRevenue;
       pGroup.costAmount += cost;
       // 상품의 net profit은 수수료/카드료/판매비용 차감 포함
@@ -286,7 +289,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       }
       const cGroup = categoryMap.get(catKey)!;
       cGroup.quantity += qty;
-      cGroup.revenue += totalPrice;
+      cGroup.revenue += revenue;
       cGroup.supplyRevenue += supplyRevenue;
       cGroup.costAmount += cost;
       cGroup.commissionAmount += commission;

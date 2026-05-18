@@ -55,9 +55,6 @@ function AdminField({ label, value, full }: FieldItem) {
 export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductInfoCardProps) {
   const isCustomer = variant === "customer";
   const displayVat = toVatPrice(product.sellingPrice, product.taxType);
-  const displayList = product.listPrice
-    ? toVatPrice(product.listPrice, product.taxType)
-    : null;
 
   const adminFields: FieldItem[] = [
     { label: "상품명", value: product.name },
@@ -122,20 +119,6 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
     },
     { label: "모델명", value: product.modelName },
     { label: "규격", value: product.spec },
-    {
-      label: "정가 / 판매가",
-      value: (
-        <span className="tabular-nums">
-          {displayList != null ? `₩${fmtPrice(displayList)} / ` : ""}
-          <span className="font-medium">₩{fmtPrice(displayVat)}</span>
-          {product.taxType === "TAXABLE" && (
-            <span className="text-jm-xs text-[var(--jm-text-muted)] ml-1.5">
-              (VAT 포함)
-            </span>
-          )}
-        </span>
-      ),
-    },
     {
       label: "등록일",
       value: product.createdAt ? formatDateOnly(product.createdAt) : null,

@@ -211,12 +211,12 @@ export default async function DashboardPage({
     heatmapOrders,
   ] = await Promise.all([
     prisma.order.aggregate({
-      _sum: { totalAmount: true, commissionAmount: true },
+      _sum: { subtotalAmount: true, commissionAmount: true },
       _count: true,
       where: { ...soldOrderWhere, orderDate: { gte: range.from } },
     }),
     prisma.order.aggregate({
-      _sum: { totalAmount: true },
+      _sum: { subtotalAmount: true },
       where: {
         ...soldOrderWhere,
         orderDate: { gte: range.prevFrom, lt: range.prevTo },
@@ -226,7 +226,7 @@ export default async function DashboardPage({
       .groupBy({
         by: ["channelId"],
         where: { ...soldOrderWhere, orderDate: { gte: range.from } },
-        _sum: { totalAmount: true, commissionAmount: true },
+        _sum: { subtotalAmount: true, commissionAmount: true },
         _count: true,
       })
       .then(async (groups) => {
@@ -245,7 +245,7 @@ export default async function DashboardPage({
                 "(삭제된 채널)"
               : "오프라인",
             orderCount: g._count,
-            totalAmount: Number(g._sum.totalAmount ?? 0),
+            totalAmount: Number(g._sum.subtotalAmount ?? 0),
             commissionAmount: Number(g._sum.commissionAmount ?? 0),
           }))
           .sort((a, b) => b.totalAmount - a.totalAmount);
@@ -297,13 +297,13 @@ export default async function DashboardPage({
     }),
     prisma.order.findMany({
       where: { ...soldOrderWhere, orderDate: { gte: start7Days, lt: endOfToday } },
-      select: { orderDate: true, totalAmount: true },
+      select: { orderDate: true, subtotalAmount: true },
     }),
     // 결제 수단 분포 — 이번 달 SOLD 주문, paymentMethod 기준 매출 합
     prisma.order.groupBy({
       by: ["paymentMethod"],
       where: { ...soldOrderWhere, orderDate: { gte: range.from } },
-      _sum: { totalAmount: true },
+      _sum: { subtotalAmount: true },
     }),
     // 반품률 분자 — 이번 달 RETURNED
     prisma.order.count({
@@ -446,9 +446,9 @@ export default async function DashboardPage({
         customerId: { not: null },
         orderDate: { gte: range.from },
       },
-      _sum: { totalAmount: true },
+      _sum: { subtotalAmount: true },
       _count: true,
-      orderBy: { _sum: { totalAmount: "desc" } },
+      orderBy: { _sum: { subtotalAmount: "desc" } },
       take: 5,
     }),
     prisma.incoming.count({ where: { status: "PENDING" } }),
@@ -601,12 +601,13 @@ export default async function DashboardPage({
     }),
     prisma.order.findMany({
       where: { ...soldOrderWhere, orderDate: { gte: range.from, lt: range.to } },
-      select: { orderDate: true, totalAmount: true },
+      select: { orderDate: true, subtotalAmount: true },
     }),
   ]);
 
   // === 파생 계산 ===
-  // 매출 — totalAmount 합에서 PARTIAL_REFUND 차감액(OrderItem.refundedAmount 합) 차감
+  // 매출 — subtotalAmount(공급가액) 합에서 PARTIAL_REFUND 차감액(OrderItem.refundedAmount 합) 차감.
+  // 부가세 제외 — 매출·이익 지표는 모두 공급가액 기준 (손익계산서와 정합).
   const monthlyRefundedSum = Number(
     monthlyPartialRefundAgg._sum.refundedAmount ?? 0,
   );
@@ -615,12 +616,12 @@ export default async function DashboardPage({
   );
   const totalMonthlySales = Math.max(
     0,
-    Number(monthlySalesAgg._sum.totalAmount ?? 0) - monthlyRefundedSum,
+    Number(monthlySalesAgg._sum.subtotalAmount ?? 0) - monthlyRefundedSum,
   );
   const totalMonthlyCommission = Number(monthlySalesAgg._sum.commissionAmount ?? 0);
   const lastMonthSales = Math.max(
     0,
-    Number(lastMonthSalesAgg._sum.totalAmount ?? 0) - lastMonthRefundedSum,
+    Number(lastMonthSalesAgg._sum.subtotalAmount ?? 0) - lastMonthRefundedSum,
   );
   const monthlyExpenseTotal = Number(monthlyExpenseAgg._sum.amount ?? 0);
 
@@ -668,7 +669,7 @@ export default async function DashboardPage({
     if (dailySalesMap.has(key)) {
       dailySalesMap.set(
         key,
-        (dailySalesMap.get(key) ?? 0) + Number(o.totalAmount),
+        (dailySalesMap.get(key) ?? 0) + Number(o.subtotalAmount),
       );
     }
   }
@@ -696,7 +697,7 @@ export default async function DashboardPage({
   const vipRows = vipGroups.map((g) => ({
     customerId: g.customerId,
     name: vipCustomers.find((c) => c.id === g.customerId)?.name ?? "(이름없음)",
-    total: Number(g._sum.totalAmount ?? 0),
+    total: Number(g._sum.subtotalAmount ?? 0),
     orderCount: g._count,
   }));
 
@@ -826,7 +827,7 @@ export default async function DashboardPage({
   let heatmapMax = 0;
   for (const o of heatmapOrders) {
     const d = new Date(o.orderDate);
-    const v = (heatmapGrid[d.getDay()][d.getHours()] += Number(o.totalAmount));
+    const v = (heatmapGrid[d.getDay()][d.getHours()] += Number(o.subtotalAmount));
     if (v > heatmapMax) heatmapMax = v;
   }
 
@@ -834,7 +835,7 @@ export default async function DashboardPage({
   const paymentMixData = paymentMethodGroups
     .map((g) => ({
       name: PAYMENT_METHOD_LABEL[g.paymentMethod ?? ""] ?? "기타",
-      value: Number(g._sum.totalAmount ?? 0),
+      value: Number(g._sum.subtotalAmount ?? 0),
     }))
     .filter((d) => d.value > 0)
     .sort((a, b) => b.value - a.value);

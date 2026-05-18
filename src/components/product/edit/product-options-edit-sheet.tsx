@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -19,6 +19,7 @@ import {
   JmDrawerTitle,
   JmIconButton,
   JmInput,
+  JmSegmentedControl,
 } from "@/jm";
 import type { ProductDetail, ProductOptionItem } from "../types";
 
@@ -353,57 +354,16 @@ function Body({ product, onOpenChange }: Props) {
               </div>
 
               {draft.values.map((v) => (
-                <div
+                <OptionValueEditor
                   key={v.rowId}
-                  className="grid grid-cols-[1fr_120px_140px_auto] items-center gap-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2"
-                >
-                  <JmInput
-                    size="sm"
-                    value={v.label}
-                    onChange={(e) =>
-                      updateValue(draft.rowId, v.rowId, {
-                        label: e.target.value,
-                      })
-                    }
-                    onFocus={focusCaretEnd}
-                    placeholder="라벨 (화이트, 32GB, 수냉)"
-                    className="text-jm-xs"
-                  />
-                  <JmInput
-                    size="sm"
-                    type="text"
-                    inputMode="numeric"
-                    value={v.addPrice}
-                    onChange={(e) =>
-                      updateValue(draft.rowId, v.rowId, {
-                        addPrice: e.target.value.replace(/[^0-9]/g, ""),
-                      })
-                    }
-                    onFocus={focusCaretEnd}
-                    placeholder="추가가"
-                    className="text-jm-xs tabular-nums"
-                  />
-                  <MappingPicker
-                    value={v}
-                    onChange={(patch) =>
-                      updateValue(draft.rowId, v.rowId, patch)
-                    }
-                    productCandidates={productCandidates}
-                    variantCandidates={variantCandidates}
-                    productsLoading={productsQuery.isPending}
-                  />
-                  <JmIconButton
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => removeValue(draft.rowId, v.rowId)}
-                    disabled={draft.values.length === 1}
-                    aria-label="옵션값 삭제"
-                    className="text-[var(--jm-danger-fg)]"
-                  >
-                    <Trash2 />
-                  </JmIconButton>
-                </div>
+                  value={v}
+                  onChange={(patch) => updateValue(draft.rowId, v.rowId, patch)}
+                  onRemove={() => removeValue(draft.rowId, v.rowId)}
+                  canRemove={draft.values.length > 1}
+                  productCandidates={productCandidates}
+                  variantCandidates={variantCandidates}
+                  productsLoading={productsQuery.isPending}
+                />
               ))}
             </div>
           </div>
@@ -443,93 +403,206 @@ function Body({ product, onOpenChange }: Props) {
   );
 }
 
-function MappingPicker({
+type LinkType = "text" | "swap" | "addon" | "variant";
+
+/** 옵션값 1개 편집 — 라벨 + 연결 방식(세그먼트) + 단품/변형 선택 + 추가가 */
+function OptionValueEditor({
   value,
   onChange,
+  onRemove,
+  canRemove,
   productCandidates,
   variantCandidates,
   productsLoading,
 }: {
   value: ValueDraft;
   onChange: (patch: Partial<ValueDraft>) => void;
+  onRemove: () => void;
+  canRemove: boolean;
   productCandidates: ProductOption[];
   variantCandidates: ProductOption[];
   productsLoading: boolean;
 }) {
-  const mode: "text" | "product" | "variant" = value.mappedProductId
-    ? "product"
-    : value.mappedVariantId
-      ? "variant"
-      : "text";
+  // mappedProductId 가 "" 든 실제 id 든 null 만 아니면 product 연결 상태
+  const linkType: LinkType =
+    value.mappedProductId !== null
+      ? value.mappedMode === "ADDON"
+        ? "addon"
+        : "swap"
+      : value.mappedVariantId !== null
+        ? "variant"
+        : "text";
 
-  const cycleMode = () => {
-    if (mode === "text") {
-      onChange({ mappedProductId: "", mappedVariantId: null, mappedMode: "SWAP" });
-    } else if (mode === "product") {
-      onChange({ mappedProductId: null, mappedVariantId: "" });
-    } else {
+  const setLinkType = (t: LinkType) => {
+    if (t === "text") {
       onChange({ mappedProductId: null, mappedVariantId: null });
+    } else if (t === "swap") {
+      onChange({
+        mappedProductId: value.mappedProductId ?? "",
+        mappedVariantId: null,
+        mappedMode: "SWAP",
+      });
+    } else if (t === "addon") {
+      onChange({
+        mappedProductId: value.mappedProductId ?? "",
+        mappedVariantId: null,
+        mappedMode: "ADDON",
+      });
+    } else {
+      onChange({
+        mappedProductId: null,
+        mappedVariantId: value.mappedVariantId ?? "",
+      });
     }
   };
 
-  const toggleMappedMode = () =>
-    onChange({ mappedMode: value.mappedMode === "SWAP" ? "ADDON" : "SWAP" });
+  const selectedProduct = value.mappedProductId
+    ? (productCandidates.find((p) => p.id === value.mappedProductId) ?? null)
+    : null;
+  const selectedVariant = value.mappedVariantId
+    ? (variantCandidates.find((p) => p.id === value.mappedVariantId) ?? null)
+    : null;
 
   return (
-    <div className="flex flex-col items-stretch gap-1 min-w-[220px]">
-      <div className="flex items-center gap-1">
-        <button
+    <div className="space-y-2.5 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3">
+      {/* 라벨 + 삭제 */}
+      <div className="flex items-center gap-2">
+        <JmInput
+          size="sm"
+          value={value.label}
+          onChange={(e) => onChange({ label: e.target.value })}
+          onFocus={focusCaretEnd}
+          placeholder="옵션값 라벨 (화이트, 32GB, 수냉)"
+          className="flex-1"
+        />
+        <JmIconButton
           type="button"
-          className="text-jm-2xs px-1.5 py-0.5 rounded border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] hover:bg-[var(--jm-surface-muted)]/80 text-[var(--jm-text)] inline-flex items-center gap-0.5 shrink-0 transition-colors"
-          onClick={cycleMode}
-          title="매핑 모드 전환 (텍스트 / Product / Variant)"
+          size="sm"
+          variant="ghost"
+          onClick={onRemove}
+          disabled={!canRemove}
+          aria-label="옵션값 삭제"
+          className="text-[var(--jm-danger-fg)]"
         >
-          {mode === "text" ? "텍스트" : mode === "product" ? "Product" : "Variant"}
-          <ChevronDown className="h-2.5 w-2.5" />
-        </button>
-        {mode === "product" && (
-          <div className="flex-1 min-w-0">
-            <ProductCombobox
-              products={productCandidates}
-              value={value.mappedProductId ?? ""}
-              onChange={(p) => onChange({ mappedProductId: p.id })}
-              placeholder={productsLoading ? "로딩…" : "상품 선택"}
-              clearable={false}
-            />
-          </div>
-        )}
-        {mode === "variant" && (
-          <div className="flex-1 min-w-0">
-            <ProductCombobox
-              products={variantCandidates}
-              value={value.mappedVariantId ?? ""}
-              onChange={(p) => onChange({ mappedVariantId: p.id })}
-              placeholder={
-                productsLoading
-                  ? "로딩…"
-                  : variantCandidates.length === 0
-                    ? "변형 없음"
-                    : "변형 선택"
-              }
-              clearable={false}
-            />
-          </div>
-        )}
+          <Trash2 />
+        </JmIconButton>
       </div>
-      {mode === "product" && (
-        <button
-          type="button"
-          onClick={toggleMappedMode}
-          title={
-            value.mappedMode === "SWAP"
-              ? "SWAP — 옵션 선택 시 메인 라인 productId 가 매핑된 SKU 로 교체됨 (색상·사이즈 변형)"
-              : "ADDON — 옵션 선택 시 자식 OrderItem 자동 추가됨 (메인 + 부속 결제). 일반 추가구매는 BundleProduct 도메인 권장"
-          }
-          className="text-jm-2xs px-1.5 py-0.5 rounded border border-[var(--jm-border)] inline-flex items-center justify-center gap-0.5 bg-[var(--jm-bg)] hover:bg-[var(--jm-surface-muted)]/40 text-[var(--jm-text)] self-start transition-colors"
-        >
-          모드: <span className="font-semibold">{value.mappedMode}</span>
-        </button>
+
+      {/* 연결 방식 */}
+      <div className="space-y-1">
+        <label className="text-jm-2xs text-[var(--jm-text-muted)]">연결 방식</label>
+        <JmSegmentedControl
+          size="sm"
+          ariaLabel="옵션값 연결 방식"
+          value={linkType}
+          onChange={(t) => setLinkType(t as LinkType)}
+          options={[
+            { value: "text", label: "텍스트" },
+            { value: "swap", label: "상품 교체" },
+            { value: "addon", label: "상품 추가" },
+            { value: "variant", label: "변형" },
+          ]}
+        />
+        <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+          {linkType === "text"
+            ? "단순 선택지 — 연결된 단품 없음"
+            : linkType === "swap"
+              ? "이 값 선택 시 주문 상품이 아래 단품으로 교체됩니다 (색상·사이즈)"
+              : linkType === "addon"
+                ? "이 값 선택 시 아래 단품이 별도 라인으로 함께 결제됩니다"
+                : "매장 변형(variant) 으로 연결"}
+        </p>
+      </div>
+
+      {/* 단품 선택 (교체/추가) */}
+      {(linkType === "swap" || linkType === "addon") && (
+        <div className="space-y-1.5">
+          <ProductCombobox
+            products={productCandidates}
+            value={value.mappedProductId ?? ""}
+            onChange={(p) => onChange({ mappedProductId: p.id })}
+            placeholder={productsLoading ? "로딩…" : "연결할 단품 선택"}
+            clearable={false}
+          />
+          {selectedProduct && <SelectedItemCard product={selectedProduct} />}
+        </div>
       )}
+
+      {/* 변형 선택 */}
+      {linkType === "variant" && (
+        <div className="space-y-1.5">
+          <ProductCombobox
+            products={variantCandidates}
+            value={value.mappedVariantId ?? ""}
+            onChange={(p) => onChange({ mappedVariantId: p.id })}
+            placeholder={
+              productsLoading
+                ? "로딩…"
+                : variantCandidates.length === 0
+                  ? "변형 없음"
+                  : "변형 선택"
+            }
+            clearable={false}
+          />
+          {selectedVariant && <SelectedItemCard product={selectedVariant} />}
+        </div>
+      )}
+
+      {/* 추가 금액 — 교체(SWAP)는 단품 가격을 그대로 쓰므로 제외 */}
+      {linkType !== "swap" && (
+        <div className="flex items-center gap-2">
+          <label className="shrink-0 text-jm-2xs text-[var(--jm-text-muted)]">
+            추가 금액
+          </label>
+          <JmInput
+            size="sm"
+            type="text"
+            inputMode="numeric"
+            value={value.addPrice}
+            onChange={(e) =>
+              onChange({ addPrice: e.target.value.replace(/[^0-9]/g, "") })
+            }
+            onFocus={focusCaretEnd}
+            placeholder="0"
+            className="w-32 tabular-nums"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 선택된 단품/변형 카드 — 썸네일 + 이름 + SKU + 가격 */
+function SelectedItemCard({ product }: { product: ProductOption }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-2.5 py-2">
+      {product.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          className="size-9 shrink-0 rounded-md border border-[var(--jm-border)] object-cover"
+        />
+      ) : (
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-jm-xs font-semibold text-[var(--jm-text-muted)]">
+          {product.name.charAt(0)}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-jm-xs font-medium text-[var(--jm-text)]">
+          {product.name}
+        </div>
+        <div className="flex items-center gap-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
+          <span className="font-[family-name:var(--jm-font-mono)]">
+            {product.sku}
+          </span>
+          {product.sellingPrice != null && (
+            <span className="tabular-nums">
+              · ₩{Number(product.sellingPrice).toLocaleString("ko-KR")}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
