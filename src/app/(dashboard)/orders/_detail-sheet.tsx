@@ -2105,12 +2105,23 @@ function ActionFooter({
       }
       break;
     case "PREPARING_PACKED":
-      buttons.push({
-        action: "ship",
-        label: "발송",
-        icon: <Truck className="size-4" />,
-        tone: "primary",
-      });
+      // 매장 인도(매장판매·픽업) 는 발송(송장) 단계 없이 바로 완료.
+      // 기존에 출고확정까지 진행된 매장판매 주문도 여기서 마무리 가능.
+      if (fulfillmentType === "IN_STORE" || fulfillmentType === "PICKUP") {
+        buttons.push({
+          action: "complete",
+          label: fulfillmentType === "IN_STORE" ? "판매완료" : "픽업완료",
+          icon: <CheckCircle2 className="size-4" />,
+          tone: "primary",
+        });
+      } else {
+        buttons.push({
+          action: "ship",
+          label: "발송",
+          icon: <Truck className="size-4" />,
+          tone: "primary",
+        });
+      }
       break;
     case "SHIPPED":
       buttons.push({

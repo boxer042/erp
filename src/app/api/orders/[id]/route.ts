@@ -305,8 +305,12 @@ export async function PUT(
     prepare: { from: "PENDING", to: "PREPARING" },
     pack: { from: "PREPARING", to: "PREPARING_PACKED" },
     ship: { from: "PREPARING_PACKED", to: "SHIPPED" },
-    // SHIPPED→COMPLETED (배송 종결) + PREPARING→COMPLETED (PICKUP 픽업완료 단축)
-    complete: { from: ["SHIPPED", "PREPARING"], to: "COMPLETED" },
+    // SHIPPED→COMPLETED (배송 종결) + PREPARING/PREPARING_PACKED→COMPLETED
+    // (매장 인도 IN_STORE/PICKUP 단축 — 가드에서 fulfillmentType 검사)
+    complete: {
+      from: ["SHIPPED", "PREPARING", "PREPARING_PACKED"],
+      to: "COMPLETED",
+    },
     cancel: { from: ["PENDING", "PREPARING"], to: "CANCELLED" },
     request_return: { from: "COMPLETED", to: "RETURN_REQUESTED" },
     accept_return: { from: "RETURN_REQUESTED", to: "RETURN_ACCEPTED" },
@@ -560,11 +564,12 @@ export async function PUT(
     );
   }
 
-  // PREPARING→COMPLETED 단축 전이는 매장 인도(매장판매 IN_STORE / 픽업 PICKUP) 만 허용.
-  // DELIVERY/SHIPPING(배달·택배) 은 pack→ship→complete 거쳐야 함.
+  // PREPARING / PREPARING_PACKED → COMPLETED 단축 전이는
+  // 매장 인도(매장판매 IN_STORE / 픽업 PICKUP) 만 허용.
+  // DELIVERY/SHIPPING(배달·택배) 은 pack→ship→complete(배송완료) 거쳐야 함.
   if (
     action === "complete" &&
-    order.status === "PREPARING" &&
+    (order.status === "PREPARING" || order.status === "PREPARING_PACKED") &&
     order.fulfillmentType !== "PICKUP" &&
     order.fulfillmentType !== "IN_STORE"
   ) {
