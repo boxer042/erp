@@ -56,6 +56,8 @@ export const orderSchema = z.object({
   fulfillmentType: fulfillmentTypeSchema.default("IN_STORE"),
   expectedShipDate: z.string().optional(),  // YYYY-MM-DD
   paymentMethod: orderPaymentMethodSchema.optional(),
+  /** 세금계산서 발행 요청 — true 면 발행 대기 목록에 노출 (사장이 추후 발행) */
+  taxInvoiceRequested: z.boolean().optional(),
   discountAmount: z.string().default("0"),
   shippingFee: z.string().default("0"),
   shippingPaymentType: shippingPaymentTypeSchema.default("PREPAID"),
@@ -83,6 +85,8 @@ export const orderUpdateSchema = z.object({
   shippingAddress: z.string().optional(),
   channelOrderNo: z.string().optional(),
   memo: z.string().optional(),
+  /** 세금계산서 발행 요청 — 종결 주문 포함 어느 상태에서나 토글 가능 (CANCELLED 제외) */
+  taxInvoiceRequested: z.boolean().optional(),
   trackingCarrier: z.string().optional(),
   trackingNumber: z.string().optional(),
   /** 항목 replace — PENDING 한정. min(1) 보장은 API 측에서 (자유 입력 라인 허용). */

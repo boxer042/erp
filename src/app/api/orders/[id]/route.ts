@@ -172,7 +172,7 @@ export async function GET(
             select: {
               id: true, name: true, sku: true, isSet: true,
               isCanonical: true, canonicalProductId: true,
-              productType: true, sellingPrice: true,
+              productType: true, sellingPrice: true, trackable: true,
               setComponents: {
                 include: { component: { select: { id: true, name: true } } },
               },
@@ -560,14 +560,19 @@ export async function PUT(
     );
   }
 
-  // PREPARING→COMPLETED 단축 전이는 PICKUP(픽업대기) 에만 허용. DELIVERY/SHIPPING 은 pack→ship→complete 거쳐야 함.
+  // PREPARING→COMPLETED 단축 전이는 매장 인도(매장판매 IN_STORE / 픽업 PICKUP) 만 허용.
+  // DELIVERY/SHIPPING(배달·택배) 은 pack→ship→complete 거쳐야 함.
   if (
     action === "complete" &&
     order.status === "PREPARING" &&
-    order.fulfillmentType !== "PICKUP"
+    order.fulfillmentType !== "PICKUP" &&
+    order.fulfillmentType !== "IN_STORE"
   ) {
     return NextResponse.json(
-      { error: "PICKUP(픽업대기) 주문만 PREPARING 단계에서 바로 완료할 수 있습니다" },
+      {
+        error:
+          "매장 인도(매장판매·픽업) 주문만 출고대기 단계에서 바로 완료할 수 있습니다",
+      },
       { status: 400 },
     );
   }
@@ -2010,6 +2015,40 @@ export async function PATCH(
   if (!order) {
     return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 });
   }
+
+  const data = parsed.data;
+
+  // 세금계산서 발행 요청 — 단독 토글이면 종결 주문(완료 등)에서도 허용.
+  // 단순 빌링 플래그라 출고 흐름과 무관 → lockedStatuses 우회 (CANCELLED 만 차단).
+  const isTaxInvoiceOnlyPatch =
+    data.taxInvoiceRequested !== undefined &&
+    data.items === undefined &&
+    data.memo === undefined &&
+    data.fulfillmentType === undefined &&
+    data.expectedShipDate === undefined &&
+    data.recipientName === undefined &&
+    data.recipientPhone === undefined &&
+    data.shippingAddress === undefined &&
+    data.channelOrderNo === undefined &&
+    data.trackingCarrier === undefined &&
+    data.trackingNumber === undefined &&
+    data.discountAmount === undefined &&
+    data.shippingFee === undefined &&
+    data.shippingPaymentType === undefined;
+  if (isTaxInvoiceOnlyPatch) {
+    if (order.status === "CANCELLED") {
+      return NextResponse.json(
+        { error: "취소된 주문은 세금계산서 발행 요청을 변경할 수 없습니다" },
+        { status: 400 },
+      );
+    }
+    const updated = await prisma.order.update({
+      where: { id },
+      data: { taxInvoiceRequested: data.taxInvoiceRequested },
+    });
+    return NextResponse.json(updated);
+  }
+
   // PATCH 가능한 상태: PENDING / PREPARING / PREPARING_PACKED / SHIPPED 만 (출고 흐름 진행 중).
   // 그 외는 잠금 — 항목·송장·출고예정 모두 수정 불가.
   const lockedStatuses = [
@@ -2028,8 +2067,6 @@ export async function PATCH(
       { status: 400 },
     );
   }
-
-  const data = parsed.data;
 
   // 항목 편집 가드 — PENDING 한정 (PREPARING 이상은 재고 차감 + LotConsumption 영향)
   if (data.items !== undefined && order.status !== "PENDING") {
@@ -2148,6 +2185,9 @@ export async function PATCH(
         ? { channelOrderNo: data.channelOrderNo || null }
         : {}),
       ...(data.memo !== undefined ? { memo: data.memo || null } : {}),
+      ...(data.taxInvoiceRequested !== undefined
+        ? { taxInvoiceRequested: data.taxInvoiceRequested }
+        : {}),
       ...(data.trackingCarrier !== undefined
         ? { trackingCarrier: data.trackingCarrier || null }
         : {}),

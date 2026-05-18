@@ -412,6 +412,7 @@ export async function POST(request: NextRequest) {
             : new Date(data.expectedShipDate),
         paymentMethod: data.paymentMethod ?? null,
         paymentStatus,
+        taxInvoiceRequested: data.taxInvoiceRequested ?? false,
         subtotalAmount,
         discountAmount,
         shippingFee,

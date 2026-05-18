@@ -23,6 +23,7 @@ import {
   JmInput,
   JmSelect,
   JmSpinner,
+  JmSwitch,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -119,6 +120,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
     useState<FulfillmentType>("SHIPPING");
   const [expectedShipDate, setExpectedShipDate] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
+  const [taxInvoiceRequested, setTaxInvoiceRequested] = useState(false);
   const [discountAmount, setDiscountAmount] = useState("0");
   const [shippingFee, setShippingFee] = useState("0");
   const [shippingPaymentType, setShippingPaymentType] = useState<
@@ -216,6 +218,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
     setFulfillmentType("SHIPPING");
     setExpectedShipDate("");
     setPaymentMethod("");
+    setTaxInvoiceRequested(false);
     setDiscountAmount("0");
     setShippingFee("0");
     setMemo("");
@@ -305,6 +308,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
         fulfillmentType,
         expectedShipDate: expectedShipDate || undefined,
         paymentMethod: paymentMethod || undefined,
+        taxInvoiceRequested,
         discountAmount: discountAmount || "0",
         shippingFee: shippingFee || "0",
         shippingPaymentType,
@@ -655,6 +659,22 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                   placeholder="미정"
                 />
               </JmFormField>
+              <div className="flex items-center justify-between rounded-xl border border-[var(--jm-border)] px-3 py-2.5">
+                <div className="flex flex-col">
+                  <span className="text-jm-sm font-medium text-[var(--jm-text)]">
+                    세금계산서 발행 요청
+                  </span>
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                    {customerId
+                      ? "발행 대기 목록에 등록됩니다"
+                      : "등록 고객 선택 권장 — 발행 시 사업자 정보 필요"}
+                  </span>
+                </div>
+                <JmSwitch
+                  checked={taxInvoiceRequested}
+                  onCheckedChange={setTaxInvoiceRequested}
+                />
+              </div>
               <JmFormField label="할인">
                 <JmInput
                   type="text"

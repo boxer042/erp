@@ -19,6 +19,7 @@ import {
   ShoppingBag,
   StickyNote,
   Store,
+  Tag,
   ThumbsDown,
   Truck,
   Trash2,
@@ -54,6 +55,7 @@ import {
   JmInput,
   JmSectionLabel,
   JmSeparator,
+  JmSwitch,
   JmSkeleton,
   JmSpinner,
   JmTable,
@@ -141,6 +143,7 @@ interface OrderDetail {
   memo: string | null;
   paymentMethod: string | null;
   paymentStatus: OrderPaymentStatus;
+  taxInvoiceRequested: boolean;
   returnRequestedAt: string | null;
   returnAcceptedAt: string | null;
   returnRejectedAt: string | null;
@@ -197,6 +200,8 @@ interface OrderDetail {
       isCanonical?: boolean;
       /** "OPTION_PARENT" 면 SWAP 옵션값으로 실제 SKU 결정 강제 */
       productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
+      /** 시리얼 발번 대상 여부 — 시리얼 발번 버튼 노출 판단 */
+      trackable?: boolean;
     } | null;
     serviceName: string | null;
     /** 진입 경로 SKU — 자사몰/외부 채널 funnel */
@@ -412,6 +417,34 @@ export function OrderDetailSheet({
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+
+  // 시리얼 소급 발번 — trackable 상품 라인에 시리얼 라벨 발번 후 라벨 인쇄 탭 오픈
+  const issueSerialsMutation = useMutation({
+    mutationFn: () =>
+      apiMutate<{ labels: { code: string }[]; consentMissing: boolean }>(
+        `/api/orders/${orderId}/issue-serials`,
+        "POST",
+      ),
+    onSuccess: (res) => {
+      const codes = res.labels.map((l) => l.code);
+      toast.success(`시리얼 ${codes.length}장 발번 완료`);
+      if (res.consentMissing) {
+        toast.warning(
+          "이 손님은 시리얼 조회 서비스 미동의 — QR 없이 발급되었습니다",
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      if (codes.length > 0) {
+        window.open(
+          `/serial-items/print?codes=${encodeURIComponent(codes.join(","))}&auto=1`,
+          "_blank",
+          "noopener,noreferrer",
+        );
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "발번 실패"),
   });
 
   // 부분 출고 — partialItems(orderItemId, shipQty) + 송장 정보
@@ -750,6 +783,32 @@ export function OrderDetailSheet({
                       영수증
                     </JmButton>
                   )}
+                  <JmButton
+                    variant="ghost"
+                    size="xs"
+                    onClick={() =>
+                      window.open(
+                        `/order-statement/${data.id}/print`,
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                    }
+                  >
+                    <Printer className="size-3.5" />
+                    거래명세표
+                  </JmButton>
+                  {data.status !== "CANCELLED" &&
+                    data.items.some((it) => it.product?.trackable) && (
+                      <JmButton
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => issueSerialsMutation.mutate()}
+                        disabled={issueSerialsMutation.isPending}
+                      >
+                        <Tag className="size-3.5" />
+                        시리얼 발번
+                      </JmButton>
+                    )}
                   {data.status === "PENDING" && !editing && (
                     <JmButton
                       variant="ghost"
@@ -851,6 +910,7 @@ export function OrderDetailSheet({
           <ActionFooter
             status={data.status}
             claimType={data.claimType}
+            fulfillmentType={data.fulfillmentType}
             onTransition={handleTransition}
             pending={transitionPending}
           />
@@ -1526,6 +1586,11 @@ function ReadView({
               )}
               <PaymentStatusBadge status={order.paymentStatus} showPaid />
             </div>
+            <TaxInvoiceToggle
+              orderId={order.id}
+              requested={order.taxInvoiceRequested}
+              disabled={order.status === "CANCELLED"}
+            />
             {(order.returnRequestedAt ||
               order.returnAcceptedAt ||
               order.returnRejectedAt ||
@@ -1963,11 +2028,13 @@ function ItemsEditView({
 function ActionFooter({
   status,
   claimType,
+  fulfillmentType,
   onTransition,
   pending,
 }: {
   status: OrderStatus;
   claimType: OrderClaimType | null;
+  fulfillmentType: FulfillmentType;
   onTransition: (
     action:
       | "prepare"
@@ -2019,12 +2086,23 @@ function ActionFooter({
         icon: <XCircle className="size-4" />,
         tone: "danger-ghost",
       });
-      buttons.push({
-        action: "pack",
-        label: "출고확정",
-        icon: <PackageCheck className="size-4" />,
-        tone: "primary",
-      });
+      // 매장 인도(매장판매·픽업) 는 출고확정·발송 단계 없이 바로 완료.
+      // 택배/배달만 pack→ship→complete 거침.
+      if (fulfillmentType === "IN_STORE" || fulfillmentType === "PICKUP") {
+        buttons.push({
+          action: "complete",
+          label: fulfillmentType === "IN_STORE" ? "판매완료" : "픽업완료",
+          icon: <CheckCircle2 className="size-4" />,
+          tone: "primary",
+        });
+      } else {
+        buttons.push({
+          action: "pack",
+          label: "출고확정",
+          icon: <PackageCheck className="size-4" />,
+          tone: "primary",
+        });
+      }
       break;
     case "PREPARING_PACKED":
       buttons.push({
@@ -2258,6 +2336,55 @@ function SumRow({
       >
         {value < 0 ? "−" : ""}₩{Math.abs(value).toLocaleString("ko-KR")}
       </span>
+    </div>
+  );
+}
+
+/**
+ * 세금계산서 발행 요청 토글 — 종결 주문(완료 등) 포함 어느 상태에서나 변경 가능 (CANCELLED 제외).
+ * 단독 PATCH 라 출고 흐름 잠금을 우회. 토글 즉시 자동 저장.
+ */
+function TaxInvoiceToggle({
+  orderId,
+  requested,
+  disabled,
+}: {
+  orderId: string;
+  requested: boolean;
+  disabled?: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [override, setOverride] = useState<boolean | null>(null);
+  const checked = override ?? requested;
+  const mutation = useMutation({
+    mutationFn: (next: boolean) =>
+      apiMutate(`/api/orders/${orderId}`, "PATCH", {
+        taxInvoiceRequested: next,
+      }),
+    onSuccess: (_d, next) => {
+      toast.success(
+        next ? "세금계산서 발행 요청됨" : "세금계산서 발행 요청 해제됨",
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
+    },
+    onError: (err) => {
+      setOverride(null);
+      toast.error(err instanceof ApiError ? err.message : "저장 실패");
+    },
+  });
+  return (
+    <div className="flex items-center justify-between border-t border-[var(--jm-border)] pt-2 text-jm-xs">
+      <span className="text-[var(--jm-text-muted)]">세금계산서 발행 요청</span>
+      <JmSwitch
+        size="sm"
+        checked={checked}
+        disabled={disabled || mutation.isPending}
+        onCheckedChange={(v) => {
+          setOverride(v);
+          mutation.mutate(v);
+        }}
+      />
     </div>
   );
 }
