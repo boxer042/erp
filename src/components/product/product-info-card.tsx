@@ -15,6 +15,10 @@ interface ProductInfoCardProps {
   variant?: ProductCardVariant;
   /** 편집 버튼 클릭 핸들러 — 제공 시 우측 상단에 "편집" 버튼 노출 */
   onEdit?: () => void;
+  /** 카탈로그 노출/숨김 토글 — 제공 시 "카탈로그 노출" 행에 전환 버튼 노출 */
+  onToggleCatalogHidden?: (hidden: boolean) => void;
+  /** 카탈로그 토글 진행 중 */
+  catalogToggleBusy?: boolean;
 }
 
 interface FieldItem {
@@ -52,9 +56,32 @@ function AdminField({ label, value, full }: FieldItem) {
   );
 }
 
-export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductInfoCardProps) {
+const NOTICE_FIELDS: Array<{ key: keyof ProductDetail; label: string }> = [
+  { key: "countryOfOrigin", label: "원산지" },
+  { key: "manufacturer", label: "제조사" },
+  { key: "importer", label: "수입자" },
+  { key: "certifications", label: "인증·허가" },
+  { key: "manufactureDate", label: "제조일" },
+  { key: "warrantyPolicy", label: "보증 정책" },
+  { key: "asResponsible", label: "A/S 책임자" },
+];
+
+export function ProductInfoCard({
+  product,
+  variant = "admin",
+  onEdit,
+  onToggleCatalogHidden,
+  catalogToggleBusy,
+}: ProductInfoCardProps) {
   const isCustomer = variant === "customer";
   const displayVat = toVatPrice(product.sellingPrice, product.taxType);
+
+  // 상품정보 고시 — 하나라도 채워졌을 때만 노출 (전자상거래법 표시 의무 필드)
+  const noticeFields: FieldItem[] = NOTICE_FIELDS.map((f) => ({
+    label: f.label,
+    value: (product[f.key] as string | null | undefined) ?? null,
+  }));
+  const hasNotice = noticeFields.some((f) => f.value != null && f.value !== "");
 
   const adminFields: FieldItem[] = [
     { label: "상품명", value: product.name },
@@ -140,6 +167,30 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
           </JmBadge>
         ),
     },
+    {
+      label: "카탈로그 노출",
+      value: (
+        <div className="flex items-center gap-1.5">
+          <JmBadge
+            variant={product.catalogHidden ? "warning" : "success"}
+            size="sm"
+            shape="square"
+          >
+            {product.catalogHidden ? "숨김" : "노출"}
+          </JmBadge>
+          {onToggleCatalogHidden && (
+            <JmButton
+              size="xs"
+              variant="outline"
+              disabled={catalogToggleBusy}
+              onClick={() => onToggleCatalogHidden(!product.catalogHidden)}
+            >
+              {product.catalogHidden ? "노출로 전환" : "숨김으로 전환"}
+            </JmButton>
+          )}
+        </div>
+      ),
+    },
     { label: "메모", value: product.memo, full: true },
   ];
 
@@ -180,10 +231,24 @@ export function ProductInfoCard({ product, variant = "admin", onEdit }: ProductI
           ))}
         </dl>
       ) : (
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-jm-sm">
-          {adminFields.map((f) => (
-            <AdminField key={f.label} {...f} />
-          ))}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-jm-sm">
+            {adminFields.map((f) => (
+              <AdminField key={f.label} {...f} />
+            ))}
+          </div>
+          {hasNotice && (
+            <div className="space-y-2 border-t border-[var(--jm-border)] pt-3">
+              <p className="text-jm-2xs font-semibold text-[var(--jm-text-muted)]">
+                상품정보 제공고시
+              </p>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-jm-sm">
+                {noticeFields.map((f) => (
+                  <AdminField key={f.label} {...f} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </ProductSection>

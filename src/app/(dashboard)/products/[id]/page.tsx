@@ -30,6 +30,8 @@ import {
   ProductSpecsTable,
   ProductOptionsTable,
   ProductBundlesTable,
+  ProductParentsTable,
+  ProductRepairUsageTable,
   ProductDescriptionBlock,
   ProductHeaderBar,
   ProductInfoCard,
@@ -72,6 +74,43 @@ function EditButton({ onClick }: { onClick: () => void }) {
       <Pencil className="size-3" />
       편집
     </JmButton>
+  );
+}
+
+/** 상세 그룹 정의 — 시각 구분 + 상단 앵커 내비 공용 */
+type GroupDef = { id: string; label: string };
+
+/** 그룹 헤더 — 좌측 액센트 바 + 굵은 제목. id 로 앵커 점프 대상 */
+function GroupHeader({ id, label }: GroupDef) {
+  return (
+    <div id={id} className="flex scroll-mt-16 items-center gap-2 pt-2">
+      <span className="h-4 w-1 rounded-full bg-[var(--jm-action)]" />
+      <h2 className="text-jm-base font-bold text-[var(--jm-text)]">{label}</h2>
+    </div>
+  );
+}
+
+/** 상단 스티키 그룹 내비 — 클릭 시 해당 그룹으로 스크롤 */
+function SectionNav({ groups }: { groups: GroupDef[] }) {
+  return (
+    <div className="sticky top-0 z-20 -mx-6 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-2">
+      <div className="flex flex-wrap gap-1.5">
+        {groups.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() =>
+              document
+                .getElementById(g.id)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+            className="rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-1 text-jm-xs text-[var(--jm-text-muted)] transition-colors hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]"
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -140,6 +179,22 @@ export default function ProductDetailPage() {
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
+  const toggleCatalogMutation = useMutation({
+    mutationFn: (hidden: boolean) =>
+      apiMutate(`/api/products/${id}`, "PATCH", { catalogHidden: hidden }),
+    onSuccess: (_data, hidden) => {
+      toast.success(
+        hidden
+          ? "카탈로그에서 숨김 처리했습니다"
+          : "카탈로그에 노출하도록 변경했습니다",
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "변경 실패"),
+  });
+
   if (productQuery.isPending) return null; // loading.tsx 가 처리
   if (!product)
     return (
@@ -154,6 +209,17 @@ export default function ProductDetailPage() {
   // OPTION_PARENT — 자체 가격·재고·공급자 매핑이 없는 카탈로그 placeholder.
   // 가격/원가/채널/재고 관련 섹션은 무의미하므로 상세 페이지에서 숨긴다.
   const isOptionParent = product.productType === "OPTION_PARENT";
+
+  // 상단 앵커 내비 그룹 — 가격·비용/공급·재고는 OPTION_PARENT 에서 숨김
+  const navGroups: GroupDef[] = [
+    { id: "grp-overview", label: "개요" },
+    ...(!isOptionParent ? [{ id: "grp-pricing", label: "가격·비용" }] : []),
+    { id: "grp-catalog", label: "구성·옵션" },
+    ...(!isOptionParent ? [{ id: "grp-supply", label: "공급·재고" }] : []),
+    { id: "grp-media", label: "미디어" },
+    { id: "grp-history", label: "이력" },
+  ];
+
   const mappings = product.productMappings ?? [];
   const costs = product.sellingCosts ?? [];
   const globalCosts = costs.filter((c) => c.channelId == null);
@@ -256,6 +322,8 @@ export default function ProductDetailPage() {
               }
             />
 
+            <SectionNav groups={navGroups} />
+
             {product.autoMapped && (
               <JmAlert
                 variant="info"
@@ -287,7 +355,7 @@ export default function ProductDetailPage() {
               </JmAlert>
             )}
 
-            {/* 1. 개요 */}
+            <GroupHeader id="grp-overview" label="개요" />
             <ProductKpiCards product={product} cardFeeRate={cardFeeRate} />
             {!isOptionParent && (
               <>
@@ -328,7 +396,14 @@ export default function ProductDetailPage() {
                 }
               />
             )}
-            <ProductInfoCard product={product} onEdit={() => setInfoEditOpen(true)} />
+            <ProductInfoCard
+              product={product}
+              onEdit={() => setInfoEditOpen(true)}
+              onToggleCatalogHidden={(hidden) =>
+                toggleCatalogMutation.mutate(hidden)
+              }
+              catalogToggleBusy={toggleCatalogMutation.isPending}
+            />
             <ProductDescriptionBlock
               product={product}
               onSaveDescription={(description) =>
@@ -337,9 +412,10 @@ export default function ProductDetailPage() {
               onSaveMemo={(memo) => saveSingleField({ memo: memo || null })}
             />
 
-            {/* 2. 가격·비용 — OPTION_PARENT 는 자체 가격이 없어 숨김 */}
+            {/* 가격·비용 — OPTION_PARENT 는 자체 가격이 없어 숨김 */}
             {!isOptionParent && (
               <>
+                <GroupHeader id="grp-pricing" label="가격·비용" />
                 <ProductSection
                   title="전사 공통 판매비용"
                   description="모든 채널에 공통으로 적용되는 비용"
@@ -377,6 +453,7 @@ export default function ProductDetailPage() {
               </>
             )}
 
+            <GroupHeader id="grp-catalog" label="구성·옵션" />
             <ProductSection
               title="상세 스펙"
               description="필터·검색용 구조화된 스펙 정보"
@@ -410,9 +487,24 @@ export default function ProductDetailPage() {
               <ProductBundlesTable bundles={product.bundles ?? []} />
             </ProductSection>
 
-            {/* 3. 공급·재고 — OPTION_PARENT 는 자체 공급/재고가 없어 숨김 */}
+            <ProductSection
+              title="상위 상품"
+              description="이 상품을 구성품으로 쓰는 세트·조립 상품 (역방향 구성)"
+              noPadding
+            >
+              <ProductParentsTable parents={product.parentProducts ?? []} />
+            </ProductSection>
+
+            {/* 벌크 — 세트/조립/변형/옵션대표가 아닌 단품만 (구성품은 위 원가 분해 카드로 통합) */}
+            {!product.isSet &&
+              product.productType !== "ASSEMBLED" &&
+              !product.isCanonical &&
+              !isOptionParent && <ProductBulkCard product={product} />}
+
+            {/* 공급·재고 — OPTION_PARENT 는 자체 공급/재고가 없어 숨김 */}
             {!isOptionParent && (
               <>
+                <GroupHeader id="grp-supply" label="공급·재고" />
                 <ProductSection
                   title="공급자 매핑"
                   description="이 판매상품으로 환산되는 공급자 상품"
@@ -453,13 +545,7 @@ export default function ProductDetailPage() {
               </>
             )}
 
-            {/* 4. 구성·관계 (조건부) — 세트/조립 구성품은 위쪽 "구성품 · 예상 원가 분해" 카드로 통합됨 */}
-            {!product.isSet &&
-              product.productType !== "ASSEMBLED" &&
-              !product.isCanonical &&
-              !isOptionParent && <ProductBulkCard product={product} />}
-
-            {/* 5. 미디어 */}
+            <GroupHeader id="grp-media" label="미디어" />
             <ProductSection
               title="이미지 · 영상"
               description="POS 카탈로그·판매 화면에 함께 노출됩니다"
@@ -476,7 +562,7 @@ export default function ProductDetailPage() {
               />
             </ProductSection>
 
-            {/* 6. 이력 */}
+            <GroupHeader id="grp-history" label="이력" />
             <ProductSection
               title="재고 이동 이력"
               description="최근 100건"
@@ -489,7 +575,7 @@ export default function ProductDetailPage() {
               />
             </ProductSection>
 
-            {/* 7. 가격 변경 이력 — 상품 정가/판매가 수정 시 자동 기록 */}
+            {/* 가격 변경 이력 — 상품 정가/판매가 수정 시 자동 기록 */}
             <ProductSection
               title="가격 변경 이력"
               description="정가·판매가가 바뀐 시점, 변경자, 사유까지 추적합니다 (최근 100건)"
@@ -498,13 +584,21 @@ export default function ProductDetailPage() {
               <ProductPriceHistoryCard productId={product.id} />
             </ProductSection>
 
-            {/* 8. 실판매 단가 이력 — 실제 판매된 OrderItem 의 정가/실판매가/할인율 분포 */}
+            {/* 실판매 단가 이력 — 실제 판매된 OrderItem 의 정가/실판매가/할인율 분포 */}
             <ProductSection
               title="실판매 단가 이력"
               description="POS·주문에서 실제 결제된 단가 분포 (최근 100건). 정가와 다르게 할인 판매된 케이스를 한눈에 확인"
               noPadding
             >
               <ProductSalesPriceHistoryCard productId={product.id} />
+            </ProductSection>
+
+            <ProductSection
+              title="부속 사용 수리 이력"
+              description="이 상품이 수리 부속으로 소진된 내역 (최근 50건)"
+              noPadding
+            >
+              <ProductRepairUsageTable usages={product.repairUsages ?? []} />
             </ProductSection>
           </div>
         </div>

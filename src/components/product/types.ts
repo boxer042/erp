@@ -174,6 +174,36 @@ export interface BundleProductItem {
   };
 }
 
+/** 역방향 관계 — 이 상품을 구성품으로 쓰는 상위 세트/조립 상품 */
+export interface ParentProductItem {
+  /** SetComponent 링크 id */
+  linkId: string;
+  /** 상위 상품 1개당 이 구성품 소요 수량 */
+  quantity: string;
+  /** 슬롯 라벨 (조립 슬롯) */
+  label: string | null;
+  /** 상위 상품 */
+  id: string;
+  name: string;
+  sku: string;
+  productType: string;
+}
+
+/** 역방향 관계 — 이 상품이 부속으로 소진된 수리 이력 */
+export interface RepairUsageItem {
+  /** RepairPart id */
+  id: string;
+  quantity: string;
+  /** 부속 상태 — USED / LOST */
+  partStatus: string;
+  usedAt: string;
+  ticketId: string;
+  ticketNo: string;
+  /** 수리 티켓 상태 */
+  ticketStatus: string;
+  customerName: string | null;
+}
+
 // 상세 페이지 전체 응답 (GET /api/products/[id])
 export interface ProductDetail {
   id: string;
@@ -218,6 +248,8 @@ export interface ProductDetail {
   assemblyTemplateId?: string | null;
   isActive?: boolean;
   autoMapped?: boolean;
+  /** 카탈로그·POS 노출 숨김 여부 */
+  catalogHidden?: boolean;
   createdAt?: string;
   updatedAt?: string;
   inventory: { quantity: string; safetyStock: string; avgCost?: string | null } | null;
@@ -261,6 +293,10 @@ export interface ProductDetail {
   }>;
   canonicalAggregatedUnitCost?: number;
   canonicalAggregatedQty?: number;
+  /** 역방향 — 이 상품을 구성품으로 쓰는 상위 세트/조립 상품 */
+  parentProducts?: ParentProductItem[];
+  /** 역방향 — 이 상품이 부속으로 소진된 수리 이력 */
+  repairUsages?: RepairUsageItem[];
 }
 
 export interface ProductSpecSlotItem {

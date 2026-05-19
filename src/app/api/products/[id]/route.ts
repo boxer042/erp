@@ -816,6 +816,62 @@ export async function GET(
     }
   }
 
+  // 역방향 관계 — 이 상품을 구성품으로 쓰는 상위 세트/조립 상품
+  const parentLinks = await prisma.setComponent.findMany({
+    where: { componentId: id },
+    select: {
+      id: true,
+      quantity: true,
+      label: true,
+      setProduct: {
+        select: { id: true, name: true, sku: true, productType: true, isActive: true },
+      },
+    },
+  });
+  const parentProducts = parentLinks
+    .filter((l) => l.setProduct.isActive)
+    .map((l) => ({
+      linkId: l.id,
+      quantity: l.quantity.toString(),
+      label: l.label,
+      id: l.setProduct.id,
+      name: l.setProduct.name,
+      sku: l.setProduct.sku,
+      productType: l.setProduct.productType,
+    }));
+
+  // 역방향 관계 — 이 상품이 부속으로 소진된 수리 이력 (최근 50건)
+  const repairPartRows = await prisma.repairPart.findMany({
+    where: { productId: id },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      quantity: true,
+      status: true,
+      createdAt: true,
+      repairTicket: {
+        select: {
+          id: true,
+          ticketNo: true,
+          status: true,
+          createdAt: true,
+          customer: { select: { name: true } },
+        },
+      },
+    },
+  });
+  const repairUsages = repairPartRows.map((r) => ({
+    id: r.id,
+    quantity: r.quantity.toString(),
+    partStatus: r.status,
+    usedAt: r.createdAt,
+    ticketId: r.repairTicket.id,
+    ticketNo: r.repairTicket.ticketNo,
+    ticketStatus: r.repairTicket.status,
+    customerName: r.repairTicket.customer?.name ?? null,
+  }));
+
   return NextResponse.json({
     ...product,
     variants: enrichedVariants,
@@ -828,6 +884,8 @@ export async function GET(
     missingCostCount,
     canonicalAggregatedUnitCost,
     canonicalAggregatedQty,
+    parentProducts,
+    repairUsages,
   });
 }
 
@@ -978,6 +1036,7 @@ export async function PATCH(
     imageUrl?: string | null;
     autoMapped?: boolean;
     trackable?: boolean;
+    catalogHidden?: boolean;
   } = {};
   if (typeof body.sku === "string" && body.sku.trim().length > 0) {
     data.sku = body.sku.trim();
@@ -993,6 +1052,9 @@ export async function PATCH(
   }
   if (typeof body.trackable === "boolean") {
     data.trackable = body.trackable;
+  }
+  if (typeof body.catalogHidden === "boolean") {
+    data.catalogHidden = body.catalogHidden;
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "수정할 필드가 없습니다" }, { status: 400 });
