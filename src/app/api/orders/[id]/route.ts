@@ -1654,6 +1654,14 @@ export async function PUT(
         },
       });
 
+      // 주문 취소 시 — 이 주문으로 발행된 거래명세표도 함께 취소 (status → CANCELLED)
+      if (action === "cancel") {
+        await tx.statement.updateMany({
+          where: { orderId: id, status: { not: "CANCELLED" } },
+          data: { status: "CANCELLED" },
+        });
+      }
+
       // === SALES_CANCELLED — 외상 주문 매출 취소 시 customer ledger 자동 조정 ===
       // 주문 생성 시 외상이면 SALE 잔액이 누적되어 있음 → 매출 취소 시 ADJUSTMENT (credit) 로 차감.
       // 등록 고객(customerId) 있는 외상에만 적용. 비등록 외상은 ledger 자체가 없음.

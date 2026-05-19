@@ -8,6 +8,7 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
+  FilePlus,
   MapPin,
   Package,
   PackageCheck,
@@ -40,6 +41,7 @@ import {
   JmCardTitle,
   JmCombobox,
   JmDialog,
+  JmDialogBody,
   JmDialogContent,
   JmDialogFooter,
   JmDialogHeader,
@@ -83,6 +85,7 @@ import {
   type OrderPaymentStatus,
   type OrderStatus,
 } from "./_types";
+import { DocumentPrintDialog } from "@/components/document-print-dialog";
 import { ExchangeDialog } from "./_exchange-dialog";
 import { formatCurrency } from "./_helpers";
 import { PaymentStatusBadge, ShippingPaymentBadge, StatusBadge } from "./_parts";
@@ -313,11 +316,15 @@ export function OrderDetailSheet({
     Record<string, string>
   >({});
 
-  // 인쇄 미리보기 모달 (시리얼 라벨·영수증·거래명세표 — iframe 임베드)
+  // 인쇄 미리보기 모달 (시리얼 라벨·영수증 — iframe 임베드)
   const [printPreview, setPrintPreview] = useState<{
     title: string;
     src: string;
   } | null>(null);
+  // 거래명세표 — DocumentPrintDialog (공급가액만 토글·PDF 다운로드 제공)
+  const [statementPreviewOpen, setStatementPreviewOpen] = useState(false);
+  // 거래명세표 발행 확인 다이얼로그
+  const [issueStatementOpen, setIssueStatementOpen] = useState(false);
 
   // orderId/open 변경 시 모든 다이얼로그·편집 state 초기화 — 렌더 중 비교 패턴 (effect 회피)
   const resetKey = `${orderId ?? ""}|${open ? "1" : "0"}`;
@@ -343,6 +350,8 @@ export function OrderDetailSheet({
     setRefundDialogOpen(false);
     setRefundDialogPrefill({});
     setPrintPreview(null);
+    setStatementPreviewOpen(false);
+    setIssueStatementOpen(false);
   }
 
   // highlightItemId 가 있고 데이터 로드 후 — 해당 라인으로 스크롤
@@ -451,6 +460,27 @@ export function OrderDetailSheet({
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "발번 실패"),
+  });
+
+  // 거래명세표 발행 — 주문 품목으로 Statement 레코드 생성 (orderId 연결)
+  const issueStatementMutation = useMutation({
+    mutationFn: () =>
+      apiMutate<{ id: string; statementNo: string; alreadyIssued?: boolean }>(
+        `/api/orders/${orderId}/issue-statement`,
+        "POST",
+      ),
+    onSuccess: (res) => {
+      if (res.alreadyIssued) {
+        toast.info(`이미 발행된 거래명세표가 있습니다 (${res.statementNo})`);
+      } else {
+        toast.success(`거래명세표가 발행되었습니다 (${res.statementNo})`);
+      }
+      setIssueStatementOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "발행 실패"),
   });
 
   // 부분 출고 — partialItems(orderItemId, shipQty) + 송장 정보
@@ -791,16 +821,21 @@ export function OrderDetailSheet({
                   <JmButton
                     variant="ghost"
                     size="xs"
-                    onClick={() =>
-                      setPrintPreview({
-                        title: "거래명세표 미리보기",
-                        src: `/order-statement/${data.id}/print`,
-                      })
-                    }
+                    onClick={() => setStatementPreviewOpen(true)}
                   >
                     <Printer className="size-3.5" />
                     거래명세표
                   </JmButton>
+                  {data.status !== "CANCELLED" && (
+                    <JmButton
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setIssueStatementOpen(true)}
+                    >
+                      <FilePlus className="size-3.5" />
+                      거래명세표 발행
+                    </JmButton>
+                  )}
                   {data.status !== "CANCELLED" &&
                     data.items.some((it) => it.product?.trackable) && (
                       <JmButton
@@ -1262,7 +1297,7 @@ export function OrderDetailSheet({
         />
       )}
 
-      {/* 인쇄 미리보기 — 시리얼 라벨·영수증·거래명세표 iframe 모달 */}
+      {/* 인쇄 미리보기 — 시리얼 라벨·영수증 iframe 모달 */}
       <JmDialog
         open={!!printPreview}
         onOpenChange={(o) => !o && setPrintPreview(null)}
@@ -1278,6 +1313,54 @@ export function OrderDetailSheet({
               title={printPreview.title}
             />
           )}
+        </JmDialogContent>
+      </JmDialog>
+
+      {/* 거래명세표 — 공급가액만 토글 제공 */}
+      <DocumentPrintDialog
+        open={statementPreviewOpen}
+        onOpenChange={setStatementPreviewOpen}
+        printPath={data ? `/order-statement/${data.id}/print` : null}
+        title={data ? `거래명세표 — ${data.orderNo}` : "거래명세표"}
+      />
+
+      {/* 거래명세표 발행 확인 */}
+      <JmDialog open={issueStatementOpen} onOpenChange={setIssueStatementOpen}>
+        <JmDialogContent size="sm">
+          <JmDialogHeader>
+            <JmDialogTitle>거래명세표 발행</JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody>
+            <p className="text-jm-sm text-[var(--jm-text)]">
+              주문{" "}
+              <span className="font-semibold">{data?.orderNo}</span> 으로
+              거래명세표를 발행합니다.
+            </p>
+            <p className="mt-2 text-jm-xs text-[var(--jm-text-muted)]">
+              발행한 거래명세표는 거래명세표 목록에 등록되며, 이후 주문이
+              취소되면 함께 취소됩니다. 이미 발행된 거래명세표가 있으면 새로
+              만들지 않습니다.
+            </p>
+          </JmDialogBody>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setIssueStatementOpen(false)}
+              disabled={issueStatementMutation.isPending}
+            >
+              취소
+            </JmButton>
+            <JmButton
+              variant="cta"
+              onClick={() => issueStatementMutation.mutate()}
+              disabled={issueStatementMutation.isPending}
+            >
+              {issueStatementMutation.isPending && (
+                <JmSpinner size="sm" tone="inverted" />
+              )}
+              발행
+            </JmButton>
+          </JmDialogFooter>
         </JmDialogContent>
       </JmDialog>
     </JmDrawer>

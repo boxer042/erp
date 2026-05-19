@@ -5,23 +5,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { CheckCircle, Receipt, Clock, RotateCcw } from "lucide-react";
+import { CheckCircle, Clock, Receipt, RefreshCw, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
+  JmBadge,
+  JmButton,
+  JmCard,
+  JmEmpty,
+  JmIconButton,
+  JmSkeleton,
+  JmSpinner,
+  JmStat,
+  JmSwitch,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarFilters,
+} from "@/jm";
+import { TaxInvoicesThemeScope } from "../_theme-scope";
 
 interface PendingItem {
   id: string;
@@ -50,6 +58,45 @@ interface Response {
   };
 }
 
+function TaxInvoiceSkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-24" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-32" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-28" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-28" />
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-20" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-16" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-5 w-12 rounded-full" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-7 w-20 rounded-md" />
+          </JmTableCell>
+        </JmTableRow>
+      ))}
+    </>
+  );
+}
+
 export default function TaxInvoicesPendingPage() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -76,235 +123,219 @@ export default function TaxInvoicesPendingPage() {
 
   const items = dataQuery.data?.items ?? [];
   const summary = dataQuery.data?.summary;
+  const isPending = dataQuery.isPending;
+  const isError = dataQuery.isError;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <h1 className="text-lg font-semibold">세금계산서 발행 대기</h1>
-        <span className="text-[12px] text-muted-foreground">
-          POS 결제 시 발행 요청한 주문 큐
-        </span>
-        <div className="ml-auto flex items-center gap-2 text-[13px]">
-          <span className="text-muted-foreground">발행 완료 포함</span>
-          <Switch
-            checked={includeInvoiced}
-            onCheckedChange={setIncludeInvoiced}
-          />
-        </div>
-      </div>
+    <TaxInvoicesThemeScope>
+      <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+        <div className="flex w-full flex-col gap-6 p-4">
+          {/* KPI */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <JmStat
+              label="대기 건수"
+              value={isPending ? "—" : (summary?.pendingCount ?? 0).toLocaleString("ko-KR")}
+              icon={<Clock className="size-4" />}
+              hint={isPending ? "" : "발행 미완료"}
+              size="sm"
+            />
+            <JmStat
+              label="대기 합계 (총액)"
+              value={isPending ? "—" : `₩${(summary?.pendingAmount ?? 0).toLocaleString("ko-KR")}`}
+              icon={<Receipt className="size-4" />}
+              hint={isPending ? "" : "공급가액 기준"}
+              size="sm"
+            />
+            <JmStat
+              label="대기 세액 합계"
+              value={isPending ? "—" : `₩${(summary?.pendingTaxAmount ?? 0).toLocaleString("ko-KR")}`}
+              icon={<Receipt className="size-4" />}
+              hint={isPending ? "" : "부가세 합계"}
+              size="sm"
+            />
+          </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
-        <div className="mb-5 grid grid-cols-3 gap-3">
-          <KpiCard
-            icon={<Clock className="size-4" />}
-            label="대기 건수"
-            value={summary?.pendingCount.toLocaleString("ko-KR") ?? "0"}
-            loading={dataQuery.isPending}
-          />
-          <KpiCard
-            icon={<Receipt className="size-4" />}
-            label="대기 합계 (총액)"
-            value={`₩${(summary?.pendingAmount ?? 0).toLocaleString("ko-KR")}`}
-            loading={dataQuery.isPending}
-          />
-          <KpiCard
-            icon={<Receipt className="size-4" />}
-            label="대기 세액 합계"
-            value={`₩${(summary?.pendingTaxAmount ?? 0).toLocaleString("ko-KR")}`}
-            loading={dataQuery.isPending}
-          />
-        </div>
+          {/* 메인 카드 */}
+          <JmCard className="overflow-hidden p-0">
+            <JmTableToolbar>
+              <JmTableToolbarFilters>
+                <div className="flex items-center gap-2">
+                  <span className="text-jm-sm text-[var(--jm-text-muted)]">발행 완료 포함</span>
+                  <JmSwitch
+                    checked={includeInvoiced}
+                    onCheckedChange={setIncludeInvoiced}
+                    size="sm"
+                  />
+                </div>
+              </JmTableToolbarFilters>
+              <JmTableToolbarActions>
+                <JmIconButton
+                  variant="ghost"
+                  size="sm"
+                  aria-label="새로고침"
+                  onClick={() => dataQuery.refetch()}
+                  disabled={dataQuery.isFetching}
+                >
+                  {dataQuery.isFetching ? (
+                    <JmSpinner size="sm" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                </JmIconButton>
+              </JmTableToolbarActions>
+            </JmTableToolbar>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">
-              {includeInvoiced ? "전체 (발행 완료 포함)" : "발행 대기"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-0">
-            <Table className="min-w-[1100px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[110px]">주문일</TableHead>
-                  <TableHead className="w-[140px]">주문번호</TableHead>
-                  <TableHead>고객</TableHead>
-                  <TableHead className="w-[140px]">사업자번호</TableHead>
-                  <TableHead className="w-[120px] text-right">공급가액</TableHead>
-                  <TableHead className="w-[100px] text-right">세액</TableHead>
-                  <TableHead className="w-[100px]">발행</TableHead>
-                  <TableHead className="w-[110px]">동작</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dataQuery.isPending ? (
-                  <SkeletonRows />
-                ) : items.length === 0 ? (
-                  <TableRow>
-                    <TableCell
+            <JmTable className="min-w-[1100px]">
+              <JmTableHeader>
+                <JmTableRow>
+                  <JmTableHead className="w-[110px]">주문일</JmTableHead>
+                  <JmTableHead className="w-[140px]">주문번호</JmTableHead>
+                  <JmTableHead>고객</JmTableHead>
+                  <JmTableHead className="w-[140px]">사업자번호</JmTableHead>
+                  <JmTableHead className="w-[120px] text-right">공급가액</JmTableHead>
+                  <JmTableHead className="w-[100px] text-right">세액</JmTableHead>
+                  <JmTableHead className="w-[100px]">발행</JmTableHead>
+                  <JmTableHead className="w-[110px]">동작</JmTableHead>
+                </JmTableRow>
+              </JmTableHeader>
+              <JmTableBody>
+                {isPending ? (
+                  <TaxInvoiceSkeletonRows />
+                ) : isError ? (
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell
                       colSpan={8}
-                      className="py-12 text-center text-muted-foreground"
+                      className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                     >
-                      {includeInvoiced
-                        ? "세금계산서 발행 요청된 주문이 없습니다"
-                        : "발행 대기 중인 주문이 없습니다"}
-                    </TableCell>
-                  </TableRow>
+                      데이터를 불러오지 못했습니다
+                    </JmTableCell>
+                  </JmTableRow>
+                ) : items.length === 0 ? (
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell colSpan={8} className="py-12">
+                      <JmEmpty
+                        icon={<Receipt className="size-8" />}
+                        title={
+                          includeInvoiced
+                            ? "세금계산서 발행 요청된 주문이 없습니다"
+                            : "발행 대기 중인 주문이 없습니다"
+                        }
+                        description={
+                          includeInvoiced
+                            ? "POS 결제 시 세금계산서를 요청한 주문이 없습니다"
+                            : "발행 완료 포함 토글로 전체 내역을 확인할 수 있습니다"
+                        }
+                      />
+                    </JmTableCell>
+                  </JmTableRow>
                 ) : (
                   items.map((it) => {
                     const supply = it.totalAmount - it.taxAmount;
-                    const isPending = !it.taxInvoicedAt;
+                    const isPendingItem = !it.taxInvoicedAt;
+                    const isMutating =
+                      markMutation.isPending &&
+                      markMutation.variables?.id === it.id;
                     return (
-                      <TableRow key={it.id}>
-                        <TableCell className="font-mono text-[12px] text-muted-foreground">
+                      <JmTableRow key={it.id}>
+                        <JmTableCell className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
                           {format(new Date(it.orderDate), "yyyy-MM-dd")}
-                        </TableCell>
-                        <TableCell>
+                        </JmTableCell>
+                        <JmTableCell>
                           <button
                             type="button"
                             onClick={() => router.push(`/orders/${it.id}`)}
-                            className="font-mono text-[13px] hover:underline"
+                            className="font-[family-name:var(--jm-font-mono)] text-jm-sm text-[var(--jm-action)] hover:underline"
                           >
                             {it.orderNo}
                           </button>
-                        </TableCell>
-                        <TableCell>
+                        </JmTableCell>
+                        <JmTableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium">
+                            <span className="text-jm-sm font-medium text-[var(--jm-text)]">
                               {it.customerName ?? "(미등록)"}
                             </span>
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-jm-xs text-[var(--jm-text-muted)]">
                               {[it.ceo, it.email, it.customerPhone]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
                           </div>
-                        </TableCell>
-                        <TableCell className="font-mono text-[12px]">
+                        </JmTableCell>
+                        <JmTableCell className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text)]">
                           {it.businessNumber ?? (
-                            <span className="text-muted-foreground">
+                            <span className="text-[var(--jm-text-subtle)]">
                               사업자번호 없음
                             </span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        </JmTableCell>
+                        <JmTableCell className="text-right tabular-nums text-jm-sm text-[var(--jm-text)]">
                           ₩{supply.toLocaleString("ko-KR")}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        </JmTableCell>
+                        <JmTableCell className="text-right tabular-nums text-jm-sm text-[var(--jm-text-muted)]">
                           ₩{it.taxAmount.toLocaleString("ko-KR")}
-                        </TableCell>
-                        <TableCell>
-                          {isPending ? (
-                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                        </JmTableCell>
+                        <JmTableCell>
+                          {isPendingItem ? (
+                            <JmBadge variant="warning" size="sm">
                               대기
-                            </Badge>
+                            </JmBadge>
                           ) : (
-                            <div className="flex flex-col">
-                              <Badge variant="default" className="w-fit">
+                            <div className="flex flex-col gap-0.5">
+                              <JmBadge variant="success" size="sm">
                                 완료
-                              </Badge>
-                              <span className="text-[10px] text-muted-foreground">
+                              </JmBadge>
+                              <span className="text-jm-3xs text-[var(--jm-text-muted)]">
                                 {format(new Date(it.taxInvoicedAt!), "MM-dd", {
                                   locale: ko,
                                 })}
                               </span>
                             </div>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          {isPending ? (
-                            <Button
-                              size="sm"
-                              className="h-7 gap-1 text-[12px]"
-                              disabled={
-                                markMutation.isPending &&
-                                markMutation.variables?.id === it.id
-                              }
+                        </JmTableCell>
+                        <JmTableCell>
+                          {isPendingItem ? (
+                            <JmButton
+                              size="xs"
+                              variant="cta"
+                              disabled={isMutating}
                               onClick={() =>
-                                markMutation.mutate({
-                                  id: it.id,
-                                  invoiced: true,
-                                })
+                                markMutation.mutate({ id: it.id, invoiced: true })
                               }
                             >
-                              <CheckCircle className="size-3" />
+                              {isMutating ? (
+                                <JmSpinner size="sm" tone="inverted" />
+                              ) : (
+                                <CheckCircle className="size-3" />
+                              )}
                               발행 완료
-                            </Button>
+                            </JmButton>
                           ) : (
-                            <Button
+                            <JmButton
+                              size="xs"
                               variant="ghost"
-                              size="sm"
-                              className="h-7 gap-1 text-[12px]"
-                              disabled={
-                                markMutation.isPending &&
-                                markMutation.variables?.id === it.id
-                              }
+                              disabled={isMutating}
                               onClick={() =>
-                                markMutation.mutate({
-                                  id: it.id,
-                                  invoiced: false,
-                                })
+                                markMutation.mutate({ id: it.id, invoiced: false })
                               }
                             >
-                              <RotateCcw className="size-3" />
+                              {isMutating ? (
+                                <JmSpinner size="sm" />
+                              ) : (
+                                <RotateCcw className="size-3" />
+                              )}
                               취소
-                            </Button>
+                            </JmButton>
                           )}
-                        </TableCell>
-                      </TableRow>
+                        </JmTableCell>
+                      </JmTableRow>
                     );
                   })
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </JmTableBody>
+            </JmTable>
+          </JmCard>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  loading,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  loading?: boolean;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-[12px] font-medium text-muted-foreground">
-          {label}
-        </CardTitle>
-        <span className="text-muted-foreground">{icon}</span>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-7 w-32" />
-        ) : (
-          <div className="text-xl font-bold tabular-nums">{value}</div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          {Array.from({ length: 8 }).map((__, j) => (
-            <TableCell key={j}>
-              <Skeleton className="h-4 w-20" />
-            </TableCell>
-          ))}
-        </TableRow>
-      ))}
-    </>
+    </TaxInvoicesThemeScope>
   );
 }

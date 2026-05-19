@@ -36,10 +36,10 @@ export default async function QuotationPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ auto?: string }>;
+  searchParams: Promise<{ auto?: string; supplyOnly?: string }>;
 }) {
   const { id } = await params;
-  const { auto } = await searchParams;
+  const { auto, supplyOnly } = await searchParams;
   const { our: OUR_COMPANY, bank: BANK_INFO } = await loadOurCompany();
   const q = await prisma.quotation.findUnique({
     where: { id },
@@ -101,6 +101,7 @@ export default async function QuotationPrintPage({
       memo={q.memo}
       terms={q.terms}
       autoPrint={auto === "1"}
+      supplyOnly={supplyOnly === "1"}
       fillPage
       compactSupplier
       bankName={BANK_INFO.name}

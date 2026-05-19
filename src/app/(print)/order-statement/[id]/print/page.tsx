@@ -46,11 +46,11 @@ export default async function OrderStatementPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ auto?: string }>;
+  searchParams: Promise<{ auto?: string; supplyOnly?: string }>;
 }) {
   const { id } = await params;
   const { our: OUR_COMPANY, bank: BANK_INFO } = await loadOurCompany();
-  const { auto } = await searchParams;
+  const { auto, supplyOnly } = await searchParams;
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -62,6 +62,7 @@ export default async function OrderStatementPrintPage({
             select: {
               name: true,
               sku: true,
+              spec: true,
               unitOfMeasure: true,
               taxType: true,
             },
@@ -91,7 +92,7 @@ export default async function OrderStatementPrintPage({
       buyer={buyer}
       items={order.items.map((it) => ({
         name: it.product?.name ?? it.serviceName ?? "—",
-        spec: it.product?.sku ?? null,
+        spec: it.product?.spec ?? null,
         unitOfMeasure: it.product?.unitOfMeasure ?? "EA",
         quantity: it.quantity.toString(),
         listPrice: (it.listPrice ?? it.unitPrice).toString(),
@@ -107,6 +108,7 @@ export default async function OrderStatementPrintPage({
       totalAmount={order.totalAmount.toString()}
       memo={order.memo}
       autoPrint={auto === "1"}
+      supplyOnly={supplyOnly === "1"}
       fillPage
       compactSupplier
       bankName={BANK_INFO.name}

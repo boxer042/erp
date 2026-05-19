@@ -1,46 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { Button } from "@/components/ui/button";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Pencil, Trash2, FileText, ArrowRightCircle } from "lucide-react";
+  ArrowRightCircle,
+  FileText,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { QuotationSheet, type QuotationFormData } from "@/components/quotation-sheet";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
+  JmBadge,
+  JmButton,
+  JmCard,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmEmpty,
+  JmIconButton,
+  JmSearchInput,
+  JmSegmentedControl,
+  JmSkeleton,
+  JmSpinner,
+  JmStat,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarSearch,
+  JmTooltip,
+  JmTooltipProvider,
+} from "@/jm";
+import { QuotationSheet, type QuotationFormData } from "@/components/quotation-sheet";
 import { ChannelCombobox } from "@/components/channel-combobox";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
 import { DocumentPrintDialog } from "@/components/document-print-dialog";
+import { QuotationsThemeScope } from "./_theme-scope";
 
-function QuotationsSkeletonRows({ rows = 8 }: { rows?: number }) {
-  return (
-    <>
-      {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-20" /></div></TableCell>
-          <TableCell><div className="flex gap-1"><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type QuotationType = "SALES" | "PURCHASE";
 type QuotationStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CONVERTED";
@@ -58,24 +66,6 @@ interface QuotationRow {
   supplier: { id: string; name: string } | null;
   _count: { items: number };
 }
-
-const STATUS_LABEL: Record<QuotationStatus, string> = {
-  DRAFT: "초안",
-  SENT: "발송",
-  ACCEPTED: "수락",
-  REJECTED: "거절",
-  EXPIRED: "만료",
-  CONVERTED: "전환",
-};
-
-const STATUS_VARIANT: Record<QuotationStatus, "default" | "secondary" | "destructive" | "outline" | "warning" | "success"> = {
-  DRAFT: "secondary",
-  SENT: "warning",
-  ACCEPTED: "success",
-  REJECTED: "destructive",
-  EXPIRED: "secondary",
-  CONVERTED: "default",
-};
 
 interface QuotationDetail {
   id: string;
@@ -104,6 +94,56 @@ interface QuotationDetail {
   }>;
 }
 
+const STATUS_LABEL: Record<QuotationStatus, string> = {
+  DRAFT: "초안",
+  SENT: "발송",
+  ACCEPTED: "수락",
+  REJECTED: "거절",
+  EXPIRED: "만료",
+  CONVERTED: "전환",
+};
+
+type JmBadgeVariant = "default" | "outline" | "success" | "warning" | "danger" | "info" | "accent";
+
+const STATUS_BADGE_VARIANT: Record<QuotationStatus, JmBadgeVariant> = {
+  DRAFT: "default",
+  SENT: "warning",
+  ACCEPTED: "success",
+  REJECTED: "danger",
+  EXPIRED: "default",
+  CONVERTED: "info",
+};
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function QuotationsSkeletonRows({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <JmTableRow key={i} className="hover:bg-transparent">
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-28" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-40" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-16 rounded-md" /></JmTableCell>
+          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div></JmTableCell>
+          <JmTableCell>
+            <div className="flex gap-1">
+              <JmSkeleton className="h-7 w-7 rounded-md" />
+              <JmSkeleton className="h-7 w-7 rounded-md" />
+              <JmSkeleton className="h-7 w-7 rounded-md" />
+              <JmSkeleton className="h-7 w-7 rounded-md" />
+            </div>
+          </JmTableCell>
+        </JmTableRow>
+      ))}
+    </>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function QuotationsPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<QuotationType>("SALES");
@@ -111,32 +151,48 @@ export default function QuotationsPage() {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editData, setEditData] = useState<QuotationFormData | null>(null);
+
   /** 미리보기(모달) 대상 견적서 정보 */
   const [previewTarget, setPreviewTarget] = useState<{ id: string; quotationNo: string } | null>(null);
-  /** 전환 다이얼로그 — null 이면 닫힘. 견적서 type 따라 옵션 분기 */
+
+  /** 전환 다이얼로그 */
   const [convertDialog, setConvertDialog] = useState<QuotationRow | null>(null);
-  const [convertTarget, setConvertTarget] = useState<"statement" | "order" | "incoming" | "purchase_order">(
-    "statement",
-  );
+  const [convertTarget, setConvertTarget] = useState<"statement" | "order" | "incoming" | "purchase_order">("statement");
   const [convertChannelId, setConvertChannelId] = useState("");
+
+  /** 삭제 확인 다이얼로그 */
+  const [deleteTarget, setDeleteTarget] = useState<QuotationRow | null>(null);
 
   // 채널 목록 — 전환 다이얼로그용 (활성만)
   const channelsQuery = useQuery({
     queryKey: ["channels-for-convert"],
     queryFn: () =>
-      apiGet<
-        Array<{ id: string; name: string; code: string; commissionRate: string }>
-      >("/api/channels"),
+      apiGet<Array<{ id: string; name: string; code: string; commissionRate: string }>>("/api/channels"),
     enabled: convertDialog !== null,
   });
 
   const quotationsQuery = useQuery({
     queryKey: queryKeys.quotations.list({ type: tab, search: appliedSearch }),
-    queryFn: () => apiGet<QuotationRow[]>(`/api/quotations?type=${tab}&search=${encodeURIComponent(appliedSearch)}`),
+    queryFn: () =>
+      apiGet<QuotationRow[]>(`/api/quotations?type=${tab}&search=${encodeURIComponent(appliedSearch)}`),
   });
   const quotations = quotationsQuery.data ?? [];
   const loading = quotationsQuery.isPending;
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.quotations.all });
+
+  // KPI — 현재 탭 로드된 데이터 기준
+  const stats = useMemo(() => {
+    let sent = 0;
+    let accepted = 0;
+    let totalAmount = 0;
+    for (const q of quotations) {
+      if (q.status === "SENT") sent++;
+      if (q.status === "ACCEPTED") accepted++;
+      totalAmount += parseFloat(q.totalAmount) || 0;
+    }
+    return { total: quotations.length, sent, accepted, totalAmount: Math.round(totalAmount) };
+  }, [quotations]);
 
   const openCreate = () => {
     setEditData(null);
@@ -170,7 +226,6 @@ export default function QuotationsPage() {
         spec: it.spec || "",
         unitOfMeasure: it.unitOfMeasure,
         quantity: it.quantity,
-        // 단가는 "할인 전" 가격으로 로드. listPrice가 0이면 unitPrice로 대체 (구버전 데이터).
         unitPrice: parseFloat(it.listPrice) > 0 ? it.listPrice : it.unitPrice,
         discount: parseFloat(it.discountAmount) > 0 ? it.discountAmount : "",
         isTaxable: it.isTaxable,
@@ -185,6 +240,7 @@ export default function QuotationsPage() {
     mutationFn: (id: string) => apiMutate(`/api/quotations/${id}`, "DELETE"),
     onSuccess: () => {
       toast.success("견적서가 삭제되었습니다");
+      setDeleteTarget(null);
       refresh();
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "삭제에 실패했습니다"),
@@ -209,14 +265,8 @@ export default function QuotationsPage() {
       toast.success(`${label}로 전환됨`);
       refresh();
     },
-    onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : "전환 실패"),
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "전환 실패"),
   });
-
-  const handleDelete = (id: string) => {
-    if (!confirm("정말 삭제하시겠습니까?")) return;
-    deleteMutation.mutate(id);
-  };
 
   const handleConvert = (q: QuotationRow) => {
     if (q.status === "CONVERTED") {
@@ -224,7 +274,6 @@ export default function QuotationsPage() {
       return;
     }
     setConvertDialog(q);
-    // SALES → 거래명세표 (기본), PURCHASE → 발주 (정상 흐름: RFQ → 발주 → 입고)
     setConvertTarget(q.type === "SALES" ? "statement" : "purchase_order");
     setConvertChannelId("");
   };
@@ -248,252 +297,382 @@ export default function QuotationsPage() {
   };
 
   return (
-    <>
-      <div className="flex h-full flex-col">
-        <div className="border-b border-border px-5 py-2.5 flex items-center gap-3">
-          <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px]">
-            <button
-              className={cn("px-3 h-full rounded-md", tab === "SALES" ? "bg-secondary text-foreground" : "text-muted-foreground")}
-              onClick={() => setTab("SALES")}
-            >
-              판매
-            </button>
-            <button
-              className={cn("px-3 h-full rounded-md", tab === "PURCHASE" ? "bg-secondary text-foreground" : "text-muted-foreground")}
-              onClick={() => setTab("PURCHASE")}
-            >
-              매입
-            </button>
-          </div>
-        </div>
-        <DataTableToolbar
-          search={{
-            value: search,
-            onChange: setSearch,
-            onSearch: () => setAppliedSearch(search),
-            placeholder: "견적번호 / 제목 / 상대방 검색",
-          }}
-          onRefresh={refresh}
-          onAdd={openCreate}
-          addLabel="견적서 작성"
-          loading={loading}
-        />
-        <ScrollArea className="flex-1 min-h-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>견적번호</TableHead>
-                <TableHead>{tab === "SALES" ? "고객" : "거래처"}</TableHead>
-                <TableHead>제목</TableHead>
-                <TableHead>견적일자</TableHead>
-                <TableHead>유효기간</TableHead>
-                <TableHead>상태</TableHead>
-                <TableHead className="text-right">합계</TableHead>
-                <TableHead className="w-[130px]">관리</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <QuotationsSkeletonRows />
-              ) : quotations.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">등록된 견적서가 없습니다</TableCell></TableRow>
-              ) : (
-                quotations.map((q) => (
-                  <TableRow key={q.id}>
-                    <TableCell className="font-medium font-mono text-xs">{q.quotationNo}</TableCell>
-                    <TableCell>{tab === "SALES" ? q.customer?.name || "-" : q.supplier?.name || "-"}</TableCell>
-                    <TableCell>{q.title || "-"}</TableCell>
-                    <TableCell>{q.issueDate.slice(0, 10)}</TableCell>
-                    <TableCell>{q.validUntil ? q.validUntil.slice(0, 10) : "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[q.status]}>{STATUS_LABEL[q.status]}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      ₩{Math.round(parseFloat(q.totalAmount)).toLocaleString("ko-KR")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setPreviewTarget({ id: q.id, quotationNo: q.quotationNo })}
-                          title="견적서 보기"
-                        >
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleConvert(q)}
-                          disabled={q.status === "CONVERTED"}
-                          title={
-                            q.status === "CONVERTED"
-                              ? "이미 전환됨"
-                              : q.type === "SALES"
-                                ? "거래명세표/주문으로 전환"
-                                : "입고로 전환"
-                          }
-                        >
-                          <ArrowRightCircle className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(q)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(q.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </ScrollArea>
-      </div>
-
-      <QuotationSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        type={tab}
-        editData={editData}
-        onSaved={(id, no) => {
-          refresh();
-          if (id) setPreviewTarget({ id, quotationNo: no ?? "" });
-        }}
-      />
-
-      <DocumentPrintDialog
-        open={!!previewTarget}
-        onOpenChange={(v) => { if (!v) setPreviewTarget(null); }}
-        printPath={previewTarget ? `/quotations/${previewTarget.id}/print` : null}
-        title={previewTarget ? `견적서 — ${previewTarget.quotationNo}` : "견적서"}
-      />
-
-      {/* 전환 다이얼로그 — 거래명세표 / 주문 / 입고 선택 */}
-      <Dialog
-        open={convertDialog !== null}
-        onOpenChange={(v) => {
-          if (!v) setConvertDialog(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>견적서 전환</DialogTitle>
-            <DialogDescription>
-              {convertDialog && (
-                <span className="font-mono">[{convertDialog.quotationNo}]</span>
-              )}{" "}
-              어디로 전환할지 선택하세요. 원본 견적서는{" "}
-              <span className="font-semibold">CONVERTED</span> 상태로 잠깁니다.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4 py-2">
-            {/* target 선택 */}
-            <div className="space-y-2">
-              <Label>전환 대상</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {convertDialog?.type === "SALES" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setConvertTarget("statement")}
-                      className={`rounded-md border p-3 text-left text-sm ${
-                        convertTarget === "statement"
-                          ? "border-primary bg-secondary"
-                          : "hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="font-semibold">거래명세표</div>
-                      <div className="text-xs text-muted-foreground">
-                        실제 거래 증빙 (Statement)
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConvertTarget("order")}
-                      className={`rounded-md border p-3 text-left text-sm ${
-                        convertTarget === "order"
-                          ? "border-primary bg-secondary"
-                          : "hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="font-semibold">주문</div>
-                      <div className="text-xs text-muted-foreground">
-                        Order 생성 (채널 필수)
-                      </div>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setConvertTarget("purchase_order")}
-                      className={`rounded-md border p-3 text-left text-sm ${
-                        convertTarget === "purchase_order"
-                          ? "border-primary bg-secondary"
-                          : "hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="font-semibold">발주 (권장)</div>
-                      <div className="text-xs text-muted-foreground">
-                        RFQ → 발주 → 입고 정상 흐름
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConvertTarget("incoming")}
-                      className={`rounded-md border p-3 text-left text-sm ${
-                        convertTarget === "incoming"
-                          ? "border-primary bg-secondary"
-                          : "hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="font-semibold">입고 (직접)</div>
-                      <div className="text-xs text-muted-foreground">
-                        발주 단계 건너뛰고 즉시 입고
-                      </div>
-                    </button>
-                  </>
-                )}
-              </div>
+    <QuotationsThemeScope>
+      <JmTooltipProvider>
+        <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+          <div className="flex w-full flex-col gap-6 p-4">
+            {/* KPI */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <JmStat
+                label="견적 건수"
+                value={loading ? "—" : stats.total.toLocaleString("ko-KR")}
+                hint={loading ? "" : tab === "SALES" ? "판매 견적" : "매입 견적"}
+                size="sm"
+              />
+              <JmStat
+                label="발송"
+                value={loading ? "—" : stats.sent.toLocaleString("ko-KR")}
+                hint={loading ? "" : "SENT 상태"}
+                size="sm"
+              />
+              <JmStat
+                label="수락"
+                value={loading ? "—" : stats.accepted.toLocaleString("ko-KR")}
+                hint={loading ? "" : "ACCEPTED 상태"}
+                size="sm"
+              />
+              <JmStat
+                label="견적 합계액"
+                value={loading ? "—" : `₩${stats.totalAmount.toLocaleString("ko-KR")}`}
+                hint={loading ? "" : "합계 기준"}
+                size="sm"
+              />
             </div>
 
-            {/* 주문 전환 시 채널 선택 */}
-            {convertTarget === "order" && (
-              <div className="space-y-2">
-                <Label>채널 (필수)</Label>
-                <ChannelCombobox
-                  channels={channelsQuery.data ?? []}
-                  value={convertChannelId}
-                  onChange={(id) => setConvertChannelId(id)}
-                  placeholder="채널 선택..."
-                  clearable
-                />
-              </div>
-            )}
-          </div>
+            {/* 메인 카드 */}
+            <JmCard className="overflow-hidden p-0">
+              <JmTableToolbar>
+                <JmTableToolbarSearch>
+                  <JmSegmentedControl
+                    options={[
+                      { value: "SALES", label: "판매" },
+                      { value: "PURCHASE", label: "매입" },
+                    ]}
+                    value={tab}
+                    onChange={(v) => setTab(v as QuotationType)}
+                    size="sm"
+                  />
+                  <JmSearchInput
+                    size="sm"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onClear={() => {
+                      setSearch("");
+                      setAppliedSearch("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                        setAppliedSearch(search);
+                      }
+                    }}
+                    placeholder="견적번호 / 제목 / 상대방 검색"
+                  />
+                </JmTableToolbarSearch>
+                <JmTableToolbarActions>
+                  <JmIconButton
+                    variant="ghost"
+                    size="sm"
+                    aria-label="새로고침"
+                    onClick={refresh}
+                    disabled={quotationsQuery.isFetching}
+                  >
+                    {quotationsQuery.isFetching ? (
+                      <JmSpinner size="sm" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                  </JmIconButton>
+                  <JmButton size="sm" onClick={openCreate}>
+                    <Plus className="size-4" />
+                    견적서 작성
+                  </JmButton>
+                </JmTableToolbarActions>
+              </JmTableToolbar>
 
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => setConvertDialog(null)}>
-              취소
-            </Button>
-            <Button
-              onClick={submitConvert}
-              disabled={
-                convertMutation.isPending ||
-                (convertTarget === "order" && !convertChannelId)
-              }
-            >
-              {convertMutation.isPending && (
-                <span className="mr-2 h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              )}
-              전환
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+              <JmTable className="min-w-[960px]">
+                <JmTableHeader>
+                  <JmTableRow>
+                    <JmTableHead>견적번호</JmTableHead>
+                    <JmTableHead>{tab === "SALES" ? "고객" : "거래처"}</JmTableHead>
+                    <JmTableHead>제목</JmTableHead>
+                    <JmTableHead>견적일자</JmTableHead>
+                    <JmTableHead>유효기간</JmTableHead>
+                    <JmTableHead>상태</JmTableHead>
+                    <JmTableHead className="text-right">합계</JmTableHead>
+                    <JmTableHead className="w-[148px]">관리</JmTableHead>
+                  </JmTableRow>
+                </JmTableHeader>
+                <JmTableBody>
+                  {loading ? (
+                    <QuotationsSkeletonRows />
+                  ) : quotationsQuery.isError ? (
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell
+                        colSpan={8}
+                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      >
+                        견적서 목록을 불러오지 못했습니다
+                      </JmTableCell>
+                    </JmTableRow>
+                  ) : quotations.length === 0 ? (
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell colSpan={8} className="py-12">
+                        <JmEmpty
+                          icon={<FileText className="size-8" />}
+                          title="등록된 견적서가 없습니다"
+                          description="첫 견적서를 작성해 고객에게 발송하세요"
+                          action={
+                            <JmButton size="sm" onClick={openCreate}>
+                              <Plus className="size-4" />
+                              견적서 작성
+                            </JmButton>
+                          }
+                        />
+                      </JmTableCell>
+                    </JmTableRow>
+                  ) : (
+                    quotations.map((q) => (
+                      <JmTableRow key={q.id}>
+                        <JmTableCell>
+                          <span className="font-[family-name:var(--jm-font-mono)] text-[12px] text-[var(--jm-text-muted)]">
+                            {q.quotationNo}
+                          </span>
+                        </JmTableCell>
+                        <JmTableCell>
+                          {tab === "SALES" ? q.customer?.name || "-" : q.supplier?.name || "-"}
+                        </JmTableCell>
+                        <JmTableCell>{q.title || "-"}</JmTableCell>
+                        <JmTableCell>{q.issueDate.slice(0, 10)}</JmTableCell>
+                        <JmTableCell>{q.validUntil ? q.validUntil.slice(0, 10) : "-"}</JmTableCell>
+                        <JmTableCell>
+                          <JmBadge variant={STATUS_BADGE_VARIANT[q.status]} size="sm">
+                            {STATUS_LABEL[q.status]}
+                          </JmBadge>
+                        </JmTableCell>
+                        <JmTableCell className="text-right font-medium tabular-nums">
+                          ₩{Math.round(parseFloat(q.totalAmount)).toLocaleString("ko-KR")}
+                        </JmTableCell>
+                        <JmTableCell>
+                          <div className="flex gap-1">
+                            <JmTooltip content="견적서 보기">
+                              <JmIconButton
+                                variant="ghost"
+                                size="sm"
+                                aria-label="견적서 보기"
+                                onClick={() => setPreviewTarget({ id: q.id, quotationNo: q.quotationNo })}
+                              >
+                                <FileText className="size-4" />
+                              </JmIconButton>
+                            </JmTooltip>
+                            <JmTooltip
+                              content={
+                                q.status === "CONVERTED"
+                                  ? "이미 전환됨"
+                                  : q.type === "SALES"
+                                    ? "거래명세표/주문으로 전환"
+                                    : "발주/입고로 전환"
+                              }
+                            >
+                              <JmIconButton
+                                variant="ghost"
+                                size="sm"
+                                aria-label="전환"
+                                onClick={() => handleConvert(q)}
+                                disabled={q.status === "CONVERTED"}
+                              >
+                                <ArrowRightCircle className="size-4" />
+                              </JmIconButton>
+                            </JmTooltip>
+                            <JmTooltip content="수정">
+                              <JmIconButton
+                                variant="ghost"
+                                size="sm"
+                                aria-label="수정"
+                                onClick={() => openEdit(q)}
+                              >
+                                <Pencil className="size-4" />
+                              </JmIconButton>
+                            </JmTooltip>
+                            <JmTooltip content="삭제">
+                              <JmIconButton
+                                variant="ghost"
+                                size="sm"
+                                aria-label="삭제"
+                                onClick={() => setDeleteTarget(q)}
+                              >
+                                <Trash2 className="size-4" />
+                              </JmIconButton>
+                            </JmTooltip>
+                          </div>
+                        </JmTableCell>
+                      </JmTableRow>
+                    ))
+                  )}
+                </JmTableBody>
+              </JmTable>
+            </JmCard>
+          </div>
+        </div>
+
+        {/* 견적서 작성/수정 Sheet */}
+        <QuotationSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          type={tab}
+          editData={editData}
+          onSaved={(id, no) => {
+            refresh();
+            if (id) setPreviewTarget({ id, quotationNo: no ?? "" });
+          }}
+        />
+
+        {/* PDF 미리보기 */}
+        <DocumentPrintDialog
+          open={!!previewTarget}
+          onOpenChange={(v) => { if (!v) setPreviewTarget(null); }}
+          printPath={previewTarget ? `/quotations/${previewTarget.id}/print` : null}
+          title={previewTarget ? `견적서 — ${previewTarget.quotationNo}` : "견적서"}
+        />
+
+        {/* 삭제 확인 다이얼로그 */}
+        <JmDialog
+          open={deleteTarget !== null}
+          onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}
+        >
+          <JmDialogContent size="sm">
+            <JmDialogHeader>
+              <JmDialogTitle>견적서 삭제</JmDialogTitle>
+              <JmDialogDescription>
+                <span className="font-[family-name:var(--jm-font-mono)]">[{deleteTarget?.quotationNo}]</span>{" "}
+                견적서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+              </JmDialogDescription>
+            </JmDialogHeader>
+            <JmDialogFooter>
+              <JmButton
+                variant="ghost"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteMutation.isPending}
+              >
+                취소
+              </JmButton>
+              <JmButton
+                variant="danger"
+                onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
+                삭제
+              </JmButton>
+            </JmDialogFooter>
+          </JmDialogContent>
+        </JmDialog>
+
+        {/* 전환 다이얼로그 */}
+        <JmDialog
+          open={convertDialog !== null}
+          onOpenChange={(v) => { if (!v) setConvertDialog(null); }}
+        >
+          <JmDialogContent size="sm">
+            <JmDialogHeader>
+              <JmDialogTitle>견적서 전환</JmDialogTitle>
+              <JmDialogDescription>
+                {convertDialog && (
+                  <span className="font-[family-name:var(--jm-font-mono)]">[{convertDialog.quotationNo}]</span>
+                )}{" "}
+                어디로 전환할지 선택하세요. 원본 견적서는{" "}
+                <span className="font-semibold">CONVERTED</span> 상태로 잠깁니다.
+              </JmDialogDescription>
+            </JmDialogHeader>
+
+            <JmDialogBody>
+              <div className="flex flex-col gap-4">
+                {/* 전환 대상 선택 */}
+                <div className="space-y-2">
+                  <p className="text-[13px] font-medium text-[var(--jm-text)]">전환 대상</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {convertDialog?.type === "SALES" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setConvertTarget("statement")}
+                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                            convertTarget === "statement"
+                              ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                              : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
+                          }`}
+                        >
+                          <div className="font-semibold text-[var(--jm-text)]">거래명세표</div>
+                          <div className="text-[12px] text-[var(--jm-text-muted)]">실제 거래 증빙 (Statement)</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConvertTarget("order")}
+                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                            convertTarget === "order"
+                              ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                              : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
+                          }`}
+                        >
+                          <div className="font-semibold text-[var(--jm-text)]">주문</div>
+                          <div className="text-[12px] text-[var(--jm-text-muted)]">Order 생성 (채널 필수)</div>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setConvertTarget("purchase_order")}
+                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                            convertTarget === "purchase_order"
+                              ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                              : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
+                          }`}
+                        >
+                          <div className="font-semibold text-[var(--jm-text)]">발주 (권장)</div>
+                          <div className="text-[12px] text-[var(--jm-text-muted)]">RFQ → 발주 → 입고 정상 흐름</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConvertTarget("incoming")}
+                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                            convertTarget === "incoming"
+                              ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                              : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
+                          }`}
+                        >
+                          <div className="font-semibold text-[var(--jm-text)]">입고 (직접)</div>
+                          <div className="text-[12px] text-[var(--jm-text-muted)]">발주 단계 건너뛰고 즉시 입고</div>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* 주문 전환 시 채널 선택 */}
+                {convertTarget === "order" && (
+                  <div className="space-y-2">
+                    <p className="text-[13px] font-medium text-[var(--jm-text)]">채널 (필수)</p>
+                    <ChannelCombobox
+                      channels={channelsQuery.data ?? []}
+                      value={convertChannelId}
+                      onChange={(id) => setConvertChannelId(id)}
+                      placeholder="채널 선택..."
+                      clearable
+                    />
+                  </div>
+                )}
+              </div>
+            </JmDialogBody>
+
+            <JmDialogFooter>
+              <JmButton variant="ghost" onClick={() => setConvertDialog(null)}>
+                취소
+              </JmButton>
+              <JmButton
+                variant="cta"
+                onClick={submitConvert}
+                disabled={
+                  convertMutation.isPending ||
+                  (convertTarget === "order" && !convertChannelId)
+                }
+              >
+                {convertMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
+                전환
+              </JmButton>
+            </JmDialogFooter>
+          </JmDialogContent>
+        </JmDialog>
+      </JmTooltipProvider>
+    </QuotationsThemeScope>
   );
 }

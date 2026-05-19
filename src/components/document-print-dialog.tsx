@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import {
   JmButton,
   JmDialog,
   JmDialogContent,
   JmDialogHeader,
   JmDialogTitle,
+  JmSwitch,
 } from "@/jm";
 import { FileDown, Printer } from "lucide-react";
 
@@ -22,8 +24,25 @@ type Props = {
  * 견적서·거래명세표 등 PDF 인쇄 페이지를 새 탭이 아닌 모달로 띄우는 공용 다이얼로그.
  * iframe으로 기존 `/[id]/print` 라우트를 그대로 임베드 (PDFViewer 툴바·다운로드 그대로 사용).
  * 헤더 우측에 [PDF 다운로드] 버튼은 동일 path에 ?auto=1 붙여 새 탭 (다운로드 강제)으로 연다.
+ *
+ * "공급가액만" 토글 — 켜면 세액 컬럼·세액 합계를 빼고 공급가액 기준으로만 출력한다
+ * (`?supplyOnly=1` 쿼리 → 인쇄 페이지가 DocumentPdf 에 전달).
  */
 export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Props) {
+  const [supplyOnly, setSupplyOnly] = useState(false);
+
+  /** printPath 에 supplyOnly / auto 쿼리를 합쳐 최종 URL 생성 */
+  const buildPath = (auto?: boolean): string | null => {
+    if (!printPath) return null;
+    const params = new URLSearchParams();
+    if (supplyOnly) params.set("supplyOnly", "1");
+    if (auto) params.set("auto", "1");
+    const qs = params.toString();
+    return qs ? `${printPath}?${qs}` : printPath;
+  };
+
+  const iframeSrc = buildPath();
+
   return (
     <JmDialog open={open} onOpenChange={onOpenChange}>
       <JmDialogContent
@@ -32,15 +51,19 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
       >
         <JmDialogHeader className="flex flex-row items-center justify-between border-b border-[var(--jm-border)] px-4 py-3 space-y-0">
           <JmDialogTitle className="text-jm-base">{title}</JmDialogTitle>
-          <div className="flex items-center gap-2 mr-8">
+          <div className="flex items-center gap-3 mr-8">
+            <label className="flex cursor-pointer items-center gap-2 text-jm-sm text-[var(--jm-text)]">
+              <JmSwitch checked={supplyOnly} onCheckedChange={setSupplyOnly} />
+              <span>공급가액만 (세액 제외)</span>
+            </label>
+            <span className="h-5 w-px bg-[var(--jm-border)]" />
             <JmButton
               variant="outline"
               size="sm"
               disabled={!printPath}
               onClick={() => {
-                if (!printPath) return;
-                const url = `${printPath}${printPath.includes("?") ? "&" : "?"}auto=1`;
-                window.open(url, "_blank");
+                const url = buildPath(true);
+                if (url) window.open(url, "_blank");
               }}
             >
               <FileDown className="size-3.5" />
@@ -53,8 +76,8 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
               onClick={() => {
                 // 모달 안 iframe에 인쇄 명령 — react-pdf의 <PDFViewer>는 자체 인쇄 버튼 제공이라
                 // 가장 안정적인 건 새 탭에서 print 다이얼로그 띄우는 것.
-                if (!printPath) return;
-                window.open(`${printPath}`, "_blank");
+                const url = buildPath();
+                if (url) window.open(url, "_blank");
               }}
             >
               <Printer className="size-3.5" />
@@ -62,10 +85,10 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
             </JmButton>
           </div>
         </JmDialogHeader>
-        {printPath ? (
+        {iframeSrc ? (
           <iframe
-            key={printPath}
-            src={printPath}
+            key={iframeSrc}
+            src={iframeSrc}
             className="size-full flex-1 border-0"
             title={title}
           />

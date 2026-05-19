@@ -56,6 +56,8 @@ interface DocumentPdfProps {
   autoPrint?: boolean;
   fillPage?: boolean;
   compactSupplier?: boolean;
+  /** true 면 세액 컬럼·세액 합계를 숨기고 공급가액 기준으로만 출력 */
+  supplyOnly?: boolean;
   bankName?: string | null;
   bankHolder?: string | null;
   bankAccount?: string | null;
@@ -147,6 +149,7 @@ const s = StyleSheet.create({
 });
 
 const COLS = [4, 17, 12, 6, 7, 11, 8, 11, 13, 11]; // percentages, sum=100
+const COLS_NO_TAX = [4, 19, 13, 7, 8, 13, 9, 13, 14]; // 세액 컬럼 제외, sum=100
 
 function PartyCompact({ label, info }: { label: string; info: PartyInfo }) {
   const rows: { label: string; value: string; bold?: boolean }[] = [];
@@ -318,6 +321,8 @@ function PdfContent(props: DocumentPdfProps) {
   const bankLine = bankParts.join(" ");
 
   const isCompact = !!props.compactSupplier;
+  const supplyOnly = !!props.supplyOnly;
+  const cols = supplyOnly ? COLS_NO_TAX : COLS;
 
   const docTitle = `${props.supplier.name}_${props.buyer.name}_${props.documentNo}`;
 
@@ -440,9 +445,11 @@ function PdfContent(props: DocumentPdfProps) {
             }}
           >
             <Text style={{ fontSize: 16, fontWeight: "bold", letterSpacing: 1 }}>
-              ₩{fmt(props.totalAmount)}
+              ₩{fmt(supplyOnly ? props.subtotalAmount : props.totalAmount)}
             </Text>
-            <Text style={{ marginLeft: 6, fontSize: 8 }}>(VAT 포함)</Text>
+            <Text style={{ marginLeft: 6, fontSize: 8 }}>
+              {supplyOnly ? "(공급가액)" : "(VAT 포함)"}
+            </Text>
           </View>
         </View>
 
@@ -450,16 +457,22 @@ function PdfContent(props: DocumentPdfProps) {
         <View style={s.itemTable}>
           {/* Header */}
           <View style={s.itemHeaderRow}>
-            <ItemCell widthPct={COLS[0]} align="center">#</ItemCell>
-            <ItemCell widthPct={COLS[1]} align="left">품명</ItemCell>
-            <ItemCell widthPct={COLS[2]} align="left">규격</ItemCell>
-            <ItemCell widthPct={COLS[3]} align="center">단위</ItemCell>
-            <ItemCell widthPct={COLS[4]} align="right">수량</ItemCell>
-            <ItemCell widthPct={COLS[5]} align="right">단가</ItemCell>
-            <ItemCell widthPct={COLS[6]} align="right">할인</ItemCell>
-            <ItemCell widthPct={COLS[7]} align="right">실제단가</ItemCell>
-            <ItemCell widthPct={COLS[8]} align="right">공급가액</ItemCell>
-            <ItemCell widthPct={COLS[9]} align="right" last>세액</ItemCell>
+            <ItemCell widthPct={cols[0]} align="center">#</ItemCell>
+            <ItemCell widthPct={cols[1]} align="left">품명</ItemCell>
+            <ItemCell widthPct={cols[2]} align="left">규격</ItemCell>
+            <ItemCell widthPct={cols[3]} align="center">단위</ItemCell>
+            <ItemCell widthPct={cols[4]} align="right">수량</ItemCell>
+            <ItemCell widthPct={cols[5]} align="right">단가</ItemCell>
+            <ItemCell widthPct={cols[6]} align="right">할인</ItemCell>
+            <ItemCell widthPct={cols[7]} align="right">실제단가</ItemCell>
+            <ItemCell widthPct={cols[8]} align="right" last={supplyOnly}>
+              공급가액
+            </ItemCell>
+            {!supplyOnly && (
+              <ItemCell widthPct={cols[9]} align="right" last>
+                세액
+              </ItemCell>
+            )}
           </View>
 
           {/* Body */}
@@ -479,22 +492,26 @@ function PdfContent(props: DocumentPdfProps) {
                   isLast ? { borderBottomWidth: 0 } : {},
                 ]}
               >
-                <ItemCell widthPct={COLS[0]} align="center">{idx + 1}</ItemCell>
-                <ItemCell widthPct={COLS[1]} align="left">{it.name}</ItemCell>
-                <ItemCell widthPct={COLS[2]} align="left">{it.spec || ""}</ItemCell>
-                <ItemCell widthPct={COLS[3]} align="center">{it.unitOfMeasure}</ItemCell>
-                <ItemCell widthPct={COLS[4]} align="right">
+                <ItemCell widthPct={cols[0]} align="center">{idx + 1}</ItemCell>
+                <ItemCell widthPct={cols[1]} align="left">{it.name}</ItemCell>
+                <ItemCell widthPct={cols[2]} align="left">{it.spec || ""}</ItemCell>
+                <ItemCell widthPct={cols[3]} align="center">{it.unitOfMeasure}</ItemCell>
+                <ItemCell widthPct={cols[4]} align="right">
                   {qty.toLocaleString("ko-KR")}
                 </ItemCell>
-                <ItemCell widthPct={COLS[5]} align="right">{fmt(list)}</ItemCell>
-                <ItemCell widthPct={COLS[6]} align="right">
+                <ItemCell widthPct={cols[5]} align="right">{fmt(list)}</ItemCell>
+                <ItemCell widthPct={cols[6]} align="right">
                   {disc > 0 ? fmt(disc) : ""}
                 </ItemCell>
-                <ItemCell widthPct={COLS[7]} align="right">{fmt(actual)}</ItemCell>
-                <ItemCell widthPct={COLS[8]} align="right">{fmt(supply)}</ItemCell>
-                <ItemCell widthPct={COLS[9]} align="right" last>
-                  {taxAmount > 0 ? fmt(taxAmount) : ""}
+                <ItemCell widthPct={cols[7]} align="right">{fmt(actual)}</ItemCell>
+                <ItemCell widthPct={cols[8]} align="right" last={supplyOnly}>
+                  {fmt(supply)}
                 </ItemCell>
+                {!supplyOnly && (
+                  <ItemCell widthPct={cols[9]} align="right" last>
+                    {taxAmount > 0 ? fmt(taxAmount) : ""}
+                  </ItemCell>
+                )}
               </View>
             );
           })}
@@ -520,25 +537,37 @@ function PdfContent(props: DocumentPdfProps) {
             borderColor: BORDER,
           }}
         >
-          <SumCell label="품목수" value={`${props.items.length}건`} />
-          <SumCell label="공급가액" value={`₩${fmt(props.subtotalAmount)}`} />
           <SumCell
-            label="세액"
-            value={
-              parseFloat(String(props.taxAmount)) > 0
-                ? `₩${fmt(props.taxAmount)}`
-                : ""
-            }
+            label="품목수"
+            value={`${props.items.length}건`}
+            widthPct={supplyOnly ? 25 : 20}
           />
+          <SumCell
+            label="공급가액"
+            value={`₩${fmt(props.subtotalAmount)}`}
+            widthPct={supplyOnly ? 25 : 20}
+          />
+          {!supplyOnly && (
+            <SumCell
+              label="세액"
+              value={
+                parseFloat(String(props.taxAmount)) > 0
+                  ? `₩${fmt(props.taxAmount)}`
+                  : ""
+              }
+            />
+          )}
           <SumCell
             label="할인합계"
             value={totalDiscount > 0 ? `-₩${fmt(totalDiscount)}` : ""}
+            widthPct={supplyOnly ? 25 : 20}
           />
           <SumCell
             label="합계금액"
-            value={`₩${fmt(props.totalAmount)}`}
+            value={`₩${fmt(supplyOnly ? props.subtotalAmount : props.totalAmount)}`}
             bold
             last
+            widthPct={supplyOnly ? 25 : 20}
           />
         </View>
 
@@ -618,16 +647,18 @@ function SumCell({
   value,
   bold,
   last,
+  widthPct = 20,
 }: {
   label: string;
   value: string;
   bold?: boolean;
   last?: boolean;
+  widthPct?: number;
 }) {
   return (
     <View
       style={{
-        width: "20%",
+        width: `${widthPct}%`,
         paddingHorizontal: 5,
         paddingVertical: 4,
         borderRightWidth: last ? 0 : BW,
