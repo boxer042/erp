@@ -2047,7 +2047,8 @@ export async function PATCH(
     data.trackingNumber === undefined &&
     data.discountAmount === undefined &&
     data.shippingFee === undefined &&
-    data.shippingPaymentType === undefined;
+    data.shippingPaymentType === undefined &&
+    data.shippingCostBorne === undefined;
   if (isTaxInvoiceOnlyPatch) {
     if (order.status === "CANCELLED") {
       return NextResponse.json(
@@ -2206,6 +2207,9 @@ export async function PATCH(
         : {}),
       ...(data.trackingNumber !== undefined
         ? { trackingNumber: data.trackingNumber || null }
+        : {}),
+      ...(data.shippingCostBorne !== undefined
+        ? { shippingCostBorne: parseFloat(data.shippingCostBorne || "0") }
         : {}),
       ...recalcPatch,
     },

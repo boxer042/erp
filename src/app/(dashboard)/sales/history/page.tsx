@@ -99,6 +99,14 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: "SALES_CANCELLED", label: "매출취소" },
 ];
 
+const FULFILLMENT_LABEL: Record<string, string> = {
+  IN_STORE: "매장판매",
+  PICKUP: "픽업",
+  DELIVERY: "배달",
+  QUICK: "퀵",
+  SHIPPING: "택배",
+};
+
 const PAYMENT_METHOD_OPTIONS = [
   { value: "ALL", label: "결제수단 전체" },
   { value: "CASH", label: "현금" },
@@ -558,6 +566,7 @@ export default function SalesHistoryPage() {
                 <JmTableRow>
                   <JmTableHead className="w-[120px]">일시</JmTableHead>
                   <JmTableHead className="w-[60px]">타입</JmTableHead>
+                  <JmTableHead className="w-[80px]">출고방식</JmTableHead>
                   <JmTableHead className="w-[160px]">번호</JmTableHead>
                   <JmTableHead className="w-[120px]">출고</JmTableHead>
                   <JmTableHead className="w-[110px]">결제</JmTableHead>
@@ -571,12 +580,12 @@ export default function SalesHistoryPage() {
               <JmTableBody>
                 {isPending ? (
                   Array.from({ length: 8 }).map((_, i) => (
-                    <TableRowSkeleton key={i} cols={10} />
+                    <TableRowSkeleton key={i} cols={11} />
                   ))
                 ) : isError ? (
                   <JmTableRow>
                     <JmTableCell
-                      colSpan={10}
+                      colSpan={11}
                       className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
                     >
                       판매내역을 불러오지 못했습니다
@@ -613,6 +622,18 @@ export default function SalesHistoryPage() {
                         </JmTableCell>
                         <JmTableCell>
                           <TypeBadge type={row.type} />
+                        </JmTableCell>
+                        <JmTableCell>
+                          {row.fulfillmentType ? (
+                            <span className="text-[12px] text-[var(--jm-text)]">
+                              {FULFILLMENT_LABEL[row.fulfillmentType] ??
+                                row.fulfillmentType}
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-[var(--jm-text-subtle)]">
+                              —
+                            </span>
+                          )}
                         </JmTableCell>
                         <JmTableCell>
                           <div className="flex flex-col gap-0">

@@ -1314,8 +1314,9 @@ enum OrderClaimReason {
 enum FulfillmentType {
   IN_STORE // 매장 즉시판매 (POS 결제 + 즉시 인도, 워크보드 미노출)
   PICKUP // 매장 픽업 대기 (결제 후 추후 방문 수령, 워크보드 노출)
-  DELIVERY // 자체 배달 (당일·근거리)
-  SHIPPING // 택배 발송
+  DELIVERY // 자체 배달 (매장 직원·차량, 당일·근거리)
+  QUICK // 퀵 호출 (외부 퀵 업체 — 접수번호·퀵비 매장 부담)
+  SHIPPING // 택배 발송 (외부 택배사 + 송장번호)
 }
 
 /**
@@ -1378,6 +1379,11 @@ model Order {
    * PICKUP fulfillmentType 은 배송비 자체가 무관 (default PREPAID 두되 무시).
    */
   shippingPaymentType ShippingPaymentType @default(PREPAID) @map("shipping_payment_type")
+  /**
+   * 배송 원가 (매장 지불) — 이 주문 출고에 매장이 실제로 지불한 퀵비·택배비.
+   * shippingFee(손님에게 청구) 와 별개. 마진 리포트가 이 값을 순익에서 차감.
+   */
+  shippingCostBorne   Decimal             @default(0) @map("shipping_cost_borne") @db.Decimal(15, 2)
   taxAmount           Decimal             @default(0) @map("tax_amount") @db.Decimal(15, 2)
   totalAmount         Decimal             @default(0) @map("total_amount") @db.Decimal(15, 2)
   commissionAmount    Decimal             @default(0) @map("commission_amount") @db.Decimal(15, 2)

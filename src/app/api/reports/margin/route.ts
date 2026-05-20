@@ -34,6 +34,7 @@ interface OrderSummary {
   commissionAmount: number;
   cardFeeAmount: number;
   sellingCostAmount: number;
+  shippingCostAmount: number;
   netProfit: number;
   marginRate: number;
 }
@@ -47,6 +48,7 @@ interface PeriodAggregate {
   commissionAmount: number;
   cardFeeAmount: number;
   sellingCostAmount: number;
+  shippingCostAmount: number;
   opexAmount: number;
   opexByCategory: { category: string; amount: number }[];
   netProfit: number;
@@ -63,6 +65,7 @@ interface ChannelGroup {
   commissionAmount: number;
   cardFeeAmount: number;
   sellingCostAmount: number;
+  shippingCostAmount: number;
   netProfit: number;
   marginRate: number;
 }
@@ -132,6 +135,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
     commissionAmount: 0,
     cardFeeAmount: 0,
     sellingCostAmount: 0,
+    shippingCostAmount: 0,
     opexAmount: 0,
     opexByCategory: [],
     netProfit: 0,
@@ -186,6 +190,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
         commissionAmount: 0,
         cardFeeAmount: 0,
         sellingCostAmount: 0,
+        shippingCostAmount: 0,
         netProfit: 0,
         marginRate: 0,
       });
@@ -298,7 +303,11 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       cGroup.netProfit += supplyRevenue - cost - commission - cardFee - sellingCost;
     }
 
-    const oNetProfit = oSupply - oCost - oComm - oCard - oSelling;
+    // 배송 원가(매장 지불) — 주문 단위. 마진에서 차감.
+    const oShipCost = Number(order.shippingCostBorne);
+    chGroup.shippingCostAmount += oShipCost;
+    const oNetProfit =
+      oSupply - oCost - oComm - oCard - oSelling - oShipCost;
     const oMarginRate = oSupply > 0 ? (oNetProfit / oSupply) * 100 : 0;
 
     orderRows.push({
@@ -313,6 +322,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       commissionAmount: Math.round(oComm),
       cardFeeAmount: Math.round(oCard),
       sellingCostAmount: Math.round(oSelling),
+      shippingCostAmount: Math.round(oShipCost),
       netProfit: Math.round(oNetProfit),
       marginRate: Number(oMarginRate.toFixed(1)),
     });
@@ -325,6 +335,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
     summary.commissionAmount += oComm;
     summary.cardFeeAmount += oCard;
     summary.sellingCostAmount += oSelling;
+    summary.shippingCostAmount += oShipCost;
   }
 
   summary.netProfit =
@@ -333,6 +344,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
     summary.commissionAmount -
     summary.cardFeeAmount -
     summary.sellingCostAmount -
+    summary.shippingCostAmount -
     summary.opexAmount;
   summary.marginRate =
     summary.supplyRevenue > 0 ? (summary.netProfit / summary.supplyRevenue) * 100 : 0;
@@ -343,6 +355,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
   summary.commissionAmount = Math.round(summary.commissionAmount);
   summary.cardFeeAmount = Math.round(summary.cardFeeAmount);
   summary.sellingCostAmount = Math.round(summary.sellingCostAmount);
+  summary.shippingCostAmount = Math.round(summary.shippingCostAmount);
   summary.opexAmount = Math.round(summary.opexAmount);
   summary.netProfit = Math.round(summary.netProfit);
   summary.marginRate = Number(summary.marginRate.toFixed(1));
@@ -350,7 +363,12 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
   // 채널 그룹 마무리
   const channelGroups: ChannelGroup[] = Array.from(channelMap.values()).map((g) => {
     const np =
-      g.supplyRevenue - g.costAmount - g.commissionAmount - g.cardFeeAmount - g.sellingCostAmount;
+      g.supplyRevenue -
+      g.costAmount -
+      g.commissionAmount -
+      g.cardFeeAmount -
+      g.sellingCostAmount -
+      g.shippingCostAmount;
     const mr = g.supplyRevenue > 0 ? (np / g.supplyRevenue) * 100 : 0;
     return {
       ...g,
@@ -360,6 +378,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       commissionAmount: Math.round(g.commissionAmount),
       cardFeeAmount: Math.round(g.cardFeeAmount),
       sellingCostAmount: Math.round(g.sellingCostAmount),
+      shippingCostAmount: Math.round(g.shippingCostAmount),
       netProfit: Math.round(np),
       marginRate: Number(mr.toFixed(1)),
     };

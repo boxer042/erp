@@ -45,6 +45,7 @@ interface OrderRow {
   costAmount: number;
   commissionAmount: number;
   cardFeeAmount: number;
+  shippingCostAmount?: number;
   netProfit: number;
   marginRate: number;
 }
@@ -558,6 +559,7 @@ export default function MarginReportPage() {
                       <TableHead className="text-right">원가</TableHead>
                       <TableHead className="text-right">수수료</TableHead>
                       <TableHead className="text-right">카드료</TableHead>
+                      <TableHead className="text-right">배송원가</TableHead>
                       <TableHead className="text-right">실순이익</TableHead>
                       <TableHead className="text-right">마진율</TableHead>
                     </TableRow>
@@ -572,6 +574,7 @@ export default function MarginReportPage() {
                         <TableCell className="text-right tabular-nums">₩{fmt(o.costAmount)}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(o.commissionAmount)}</TableCell>
                         <TableCell className="text-right tabular-nums">{o.cardFeeAmount > 0 ? `₩${fmt(o.cardFeeAmount)}` : "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums">{o.shippingCostAmount && o.shippingCostAmount > 0 ? `₩${fmt(o.shippingCostAmount)}` : "—"}</TableCell>
                         <TableCell className={`text-right tabular-nums font-semibold ${o.netProfit >= 0 ? "text-primary" : "text-red-400"}`}>
                           ₩{fmt(o.netProfit)}
                         </TableCell>

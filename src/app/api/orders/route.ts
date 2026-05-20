@@ -395,6 +395,8 @@ export async function POST(request: NextRequest) {
     .reduce((sum, i) => sum + i.totalPrice, 0);
   const discountAmount = parseFloat(data.discountAmount || "0");
   const shippingFee = parseFloat(data.shippingFee || "0");
+  // 배송 원가(매장 지불) — totalAmount 에 더하지 않음 (손님 청구 아님). 마진에서만 차감.
+  const shippingCostBorne = parseFloat(data.shippingCostBorne || "0");
   // 부가세 — 과세 항목 비율로 할인 안분 후 10%
   const taxableRatio = subtotalAmount > 0 ? taxableSubtotal / subtotalAmount : 0;
   const taxableNet = taxableSubtotal - discountAmount * taxableRatio;
@@ -438,6 +440,7 @@ export async function POST(request: NextRequest) {
         discountAmount,
         shippingFee,
         shippingPaymentType: data.shippingPaymentType,
+        shippingCostBorne,
         taxAmount,
         totalAmount,
         commissionAmount,

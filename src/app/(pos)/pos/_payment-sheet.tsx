@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
+import { formatComma, parseComma } from "@/lib/utils";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
 import { calcCartTotals } from "@/components/pos/cart-helpers";
 import { submitCheckout } from "@/components/pos/checkout-submit";
@@ -24,11 +25,17 @@ const METHODS: { value: PaymentMethod; label: string; sub?: string }[] = [
   { value: "UNPAID", label: "외상", sub: "고객 미수금" },
 ];
 
-type FulfillmentType = "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
+type FulfillmentType =
+  | "IN_STORE"
+  | "PICKUP"
+  | "DELIVERY"
+  | "QUICK"
+  | "SHIPPING";
 const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string; sub: string }[] = [
   { value: "IN_STORE", label: "매장판매", sub: "즉시 인도 · 종결" },
   { value: "PICKUP", label: "픽업 대기", sub: "추후 방문 수령" },
-  { value: "DELIVERY", label: "배달", sub: "당일·근거리" },
+  { value: "DELIVERY", label: "배달", sub: "자체 배달" },
+  { value: "QUICK", label: "퀵", sub: "퀵 호출 · 매장 부담" },
   { value: "SHIPPING", label: "택배", sub: "ERP 출고 워크보드" },
 ];
 
@@ -273,6 +280,8 @@ function Body({
   const [shippingPaymentType, setShippingPaymentType] = useState<
     "PREPAID" | "COD" | "STORE_BURDEN"
   >("PREPAID");
+  // 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 손님 청구와 무관, 마진에서만 차감.
+  const [shippingCostBorne, setShippingCostBorne] = useState("");
 
   // 결제 대상 = 상품 + 임대 + 수리(미연결: repairTicketId 없는 즉석 수리). 수리는 자체 픽업 흐름이 별도라
   // RepairTicket 픽업은 RepairDetail 의 PickupSheet 에서 처리. 여기선 카트 라인만.
@@ -362,6 +371,9 @@ function Body({
         taxInvoiceRequested,
         fulfillmentType: effectiveFulfillment,
         shippingPaymentType: needsShippingInfo ? shippingPaymentType : undefined,
+        shippingCostBorne: needsShippingInfo
+          ? parseFloat(parseComma(shippingCostBorne) || "0")
+          : undefined,
         shipping: needsShippingInfo
           ? {
               recipientName: shippingRecipientName.trim() || session.customerName,
@@ -389,7 +401,12 @@ function Body({
       let statementId: string | null = null;
       if (session.customerId) {
         try {
-          const stmt = await issueStatement({ ...session, items: allItems });
+          // data.id = 방금 생성된 주문 id — 거래명세표를 주문에 연결해
+          // 이후 주문 취소 시 거래명세표도 함께 취소되게 한다.
+          const stmt = await issueStatement(
+            { ...session, items: allItems },
+            data.id,
+          );
           statementId = stmt.id;
         } catch {
           /* 거래명세표 실패해도 결제는 완료됨 — silent */
@@ -653,7 +670,9 @@ function Body({
               <div className="mt-2 flex flex-col gap-2 rounded-2xl bg-[var(--jm-bg)] p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-semibold text-[var(--jm-text)]">
-                    {effectiveFulfillment === "DELIVERY" ? "배달지" : "택배 발송지"}
+                    {effectiveFulfillment === "SHIPPING"
+                      ? "택배 발송지"
+                      : "배달지"}
                   </span>
                   {session.customerId && (session.customerName || session.customerPhone) && (
                     <button
@@ -724,6 +743,26 @@ function Body({
                       );
                     })}
                   </div>
+                </div>
+                {/* 배송 원가 (매장 지불) — 우리가 낸 퀵비·택배비 */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                    배송 원가 (매장 지불)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatComma(shippingCostBorne)}
+                    onChange={(e) =>
+                      setShippingCostBorne(parseComma(e.target.value))
+                    }
+                    onFocus={(e) => e.currentTarget.select()}
+                    placeholder="우리가 낸 퀵비·택배비 (선택)"
+                    className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
+                  />
+                  <span className="text-[10px] text-[var(--jm-text-muted)]">
+                    손님 청구와 무관 — 마진 리포트에서 순익 차감용
+                  </span>
                 </div>
                 <span className="text-[11px] text-[var(--jm-text-muted)]">
                   결제 후 ERP <strong>출고 워크보드</strong>로 자동 진입합니다

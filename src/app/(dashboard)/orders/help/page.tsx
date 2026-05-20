@@ -62,7 +62,7 @@ function Toc() {
   const items = [
     { href: "#overview", label: "1. 개요 — 3축 모델" },
     { href: "#shipping", label: "2. 출고 흐름 (5단계)" },
-    { href: "#fulfillment", label: "2-1. 출고 방식 (4종) — 매장판매 · 픽업 · 배달 · 택배" },
+    { href: "#fulfillment", label: "2-1. 출고 방식 (5종) — 매장판매 · 픽업 · 배달 · 퀵 · 택배" },
     { href: "#workboard", label: "2-2. 워크보드 필터·검색 사용법" },
     { href: "#partial", label: "3. 부분 처리 / 분할 발송 정책" },
     { href: "#options", label: "4. 옵션 도메인 — SWAP / ADDON / OPTION_PARENT" },
@@ -268,9 +268,9 @@ function SectionShipping() {
 
 function SectionFulfillment() {
   return (
-    <Section id="fulfillment" title="2-1. 출고 방식 (4종) — 매장판매 · 픽업 · 배달 · 택배">
+    <Section id="fulfillment" title="2-1. 출고 방식 (5종) — 매장판매 · 픽업 · 배달 · 퀵 · 택배">
       <p>
-        모든 주문은 4가지 <code className="text-jm-2xs">fulfillmentType</code> 중
+        모든 주문은 5가지 <code className="text-jm-2xs">fulfillmentType</code> 중
         하나로 분기됩니다. 출고 방식에 따라 위 5단계 흐름이 그대로 적용되거나
         단축됩니다.
       </p>
@@ -309,7 +309,19 @@ function SectionFulfillment() {
             <td className="py-2 font-mono text-jm-xs">DELIVERY</td>
             <td className="py-2">배달</td>
             <td className="py-2">
-              자체 배달 (당일·근거리). 위 5단계 전체 흐름 적용.
+              <strong>매장 자체 배달</strong> (매장 직원·차량, 당일·근거리). 위
+              5단계 전체 흐름 적용. 송장 개념 없음 — 발송 처리만.
+            </td>
+          </tr>
+          <tr className="border-b border-[var(--jm-border-subtle)]">
+            <td className="py-2 font-mono text-jm-xs">QUICK</td>
+            <td className="py-2">퀵</td>
+            <td className="py-2">
+              <strong>외부 퀵 업체 호출</strong>. 위 5단계 전체 흐름 적용. 퀵
+              업체명·접수번호 입력은 선택. <strong>퀵비는 매장 부담</strong>이
+              일반적이라 우측 패널의{" "}
+              <code className="text-jm-2xs">배송 원가(매장 지불)</code> 에
+              기록 → 마진 리포트에서 자동 차감.
             </td>
           </tr>
           <tr>
@@ -350,7 +362,7 @@ function SectionFulfillment() {
             <code className="rounded bg-[var(--jm-surface)] px-1 py-0.5">
               COMPLETED
             </code>{" "}
-            + DELIVERY/SHIPPING → 라벨 <strong>"배송완료"</strong>
+            + DELIVERY/QUICK/SHIPPING → 라벨 <strong>"배송완료"</strong>
           </li>
         </ul>
       </div>

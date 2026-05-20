@@ -82,7 +82,7 @@ interface CheckoutBody {
    * 미지정 시 IN_STORE (매장 즉시 인도, 즉시 종결).
    * PICKUP/DELIVERY/SHIPPING 은 ERP 워크보드로 진입.
    */
-  fulfillmentType?: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
+  fulfillmentType?: "IN_STORE" | "PICKUP" | "DELIVERY" | "QUICK" | "SHIPPING";
   /** DELIVERY/SHIPPING 일 때 받는 사람·연락처·주소 (받는사람 이름은 customerName 재활용) */
   shippingRecipientName?: string | null;
   shippingRecipientPhone?: string | null;
@@ -94,6 +94,8 @@ interface CheckoutBody {
    * IN_STORE/PICKUP fulfillmentType 은 의미 없음 (default PREPAID 두되 무시).
    */
   shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
+  /** 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 마진에서만 차감, 손님 청구 무관 */
+  shippingCostBorne?: number;
 }
 
 function genNo(prefix: string) {
@@ -420,7 +422,12 @@ export async function POST(request: NextRequest) {
 
   // 출고 방식 결정 — 임대만 IN_STORE 강제 (자산 인계가 매장 필수).
   // 수리는 사용자 선택 허용 (수리 완료된 기기를 배송으로 받는 케이스 종종 발생).
-  const fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" =
+  const fulfillmentType:
+    | "IN_STORE"
+    | "PICKUP"
+    | "DELIVERY"
+    | "QUICK"
+    | "SHIPPING" =
     body.rentalRecords && body.rentalRecords.length > 0
       ? "IN_STORE"
       : (body.fulfillmentType ?? "IN_STORE");
@@ -474,6 +481,8 @@ export async function POST(request: NextRequest) {
           discountAmount: 0,
           shippingFee: 0,
           shippingPaymentType: body.shippingPaymentType ?? "PREPAID",
+          // 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 마진에서만 차감.
+          shippingCostBorne: body.shippingCostBorne ?? 0,
           taxAmount,
           totalAmount,
           commissionAmount: 0,

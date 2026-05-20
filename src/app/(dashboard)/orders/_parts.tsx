@@ -203,7 +203,13 @@ export function StatusBadge({
   channelId?: string | null;
   claimType?: OrderClaimType | null;
   isExchangeReplacement?: boolean;
-  fulfillmentType?: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" | null;
+  fulfillmentType?:
+    | "IN_STORE"
+    | "PICKUP"
+    | "DELIVERY"
+    | "QUICK"
+    | "SHIPPING"
+    | null;
 }) {
   const { variant, icon: Icon } = resolveStatusVisual(status, {
     claimType,

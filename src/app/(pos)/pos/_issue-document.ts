@@ -80,8 +80,14 @@ export async function issueQuotation(session: CartSession): Promise<{ id: string
 /**
  * 거래명세표 발행 — POS 카트 → /api/statements POST → statement.id 반환.
  * 결제 직전 또는 즉시 증빙용. quotation 우회 직접 발행.
+ *
+ * orderId 를 넘기면 해당 주문에 연결된다 — 결제 직후 발행 시 전달하면
+ * 이후 주문 취소 시 거래명세표도 함께 취소된다.
  */
-export async function issueStatement(session: CartSession): Promise<{ id: string; statementNo: string }> {
+export async function issueStatement(
+  session: CartSession,
+  orderId?: string | null,
+): Promise<{ id: string; statementNo: string }> {
   if (!session.customerId) {
     throw new Error("거래명세표는 고객 연결이 필요합니다");
   }
@@ -95,6 +101,7 @@ export async function issueStatement(session: CartSession): Promise<{ id: string
     customerId: session.customerId,
     customerNameSnapshot: session.customerName ?? undefined,
     customerPhoneSnapshot: session.customerPhone ?? undefined,
+    orderId: orderId ?? undefined,
     items: mapCartItems(session.items),
   };
   return apiMutate<{ id: string; statementNo: string }>(

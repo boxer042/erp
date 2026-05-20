@@ -27,8 +27,9 @@ export const orderItemSchema = z
 export const fulfillmentTypeSchema = z.enum([
   "IN_STORE", // 매장 즉시판매 (POS 결제 + 즉시 인도)
   "PICKUP",   // 매장 픽업 대기 (결제 후 추후 방문 수령)
-  "DELIVERY", // 자체 배달
-  "SHIPPING", // 택배
+  "DELIVERY", // 자체 배달 (매장 직원·차량)
+  "QUICK",    // 퀵 호출 (외부 퀵 업체)
+  "SHIPPING", // 택배 (외부 택배사)
 ]);
 export const shippingPaymentTypeSchema = z.enum([
   "PREPAID",       // 손님 결제 시 함께 (자사몰/일반 POS 택배)
@@ -61,6 +62,8 @@ export const orderSchema = z.object({
   discountAmount: z.string().default("0"),
   shippingFee: z.string().default("0"),
   shippingPaymentType: shippingPaymentTypeSchema.default("PREPAID"),
+  /** 배송 원가 (매장 지불) — 우리가 낸 퀵비·택배비. 마진에서 차감, 손님 청구 무관 */
+  shippingCostBorne: z.string().default("0"),
   memo: z.string().optional(),
   items: z.array(orderItemSchema).min(1, "주문 항목을 추가해주세요"),
 });
@@ -94,6 +97,7 @@ export const orderUpdateSchema = z.object({
   discountAmount: z.string().optional(),
   shippingFee: z.string().optional(),
   shippingPaymentType: shippingPaymentTypeSchema.optional(),
+  shippingCostBorne: z.string().optional(),
 });
 
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;

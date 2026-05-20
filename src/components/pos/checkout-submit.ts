@@ -3,7 +3,12 @@ import { calcDiscountPerUnit } from "@/lib/utils";
 import type { CartSession } from "@/components/pos/sessions-context";
 
 export type CheckoutAction = "order" | "quotation" | "statement";
-export type FulfillmentType = "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
+export type FulfillmentType =
+  | "IN_STORE"
+  | "PICKUP"
+  | "DELIVERY"
+  | "QUICK"
+  | "SHIPPING";
 
 export interface ShippingInfo {
   recipientName?: string | null;
@@ -23,6 +28,8 @@ export interface CheckoutPayloadOptions {
   shipping?: ShippingInfo;
   /** 배송비 결제 방식 — IN_STORE/PICKUP 은 무관. DELIVERY/SHIPPING 만 의미 */
   shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
+  /** 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 마진에서만 차감 */
+  shippingCostBorne?: number;
 }
 
 export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayloadOptions) {
@@ -138,6 +145,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
     rentalRecords,
     fulfillmentType,
     shippingPaymentType: opts.shippingPaymentType ?? "PREPAID",
+    shippingCostBorne: isInStore ? 0 : opts.shippingCostBorne ?? 0,
     shippingRecipientName: shipping?.recipientName ?? null,
     shippingRecipientPhone: shipping?.recipientPhone ?? null,
     shippingAddress: shipping?.address ?? null,

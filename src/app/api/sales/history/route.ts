@@ -60,7 +60,13 @@ export type SalesHistoryRow = {
   status: OrderStatus | "PICKED_UP" | "RETURNED";
   claimType: OrderClaimType | null;
   claimReason: OrderClaimReason | null;
-  fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING" | null;
+  fulfillmentType:
+    | "IN_STORE"
+    | "PICKUP"
+    | "DELIVERY"
+    | "QUICK"
+    | "SHIPPING"
+    | null;
   /** 거래액 — VAT 포함 (고객 청구 총액). 표시용 */
   amount: number;
   /**

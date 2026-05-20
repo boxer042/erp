@@ -96,6 +96,7 @@ const FULFILLMENT_OPTIONS: { value: FulfillmentType; label: string }[] = [
   { value: "IN_STORE", label: "매장판매" },
   { value: "PICKUP", label: "픽업 대기" },
   { value: "DELIVERY", label: "배달" },
+  { value: "QUICK", label: "퀵" },
   { value: "SHIPPING", label: "택배" },
 ];
 
@@ -140,6 +141,7 @@ interface OrderDetail {
   discountAmount: string;
   shippingFee: string;
   shippingPaymentType: "PREPAID" | "COD" | "STORE_BURDEN";
+  shippingCostBorne: string;
   taxAmount: string;
   totalAmount: string;
   commissionAmount: string;
@@ -241,6 +243,8 @@ interface EditForm {
   recipientName: string;
   recipientPhone: string;
   shippingAddress: string;
+  /** 배송 원가(매장 지불) — 사후 수정용. 저장 시 net 으로 (PriceInputDialog 가 net 반환) */
+  shippingCostBorne: string;
   memo: string;
 }
 
@@ -268,6 +272,7 @@ function toEditForm(o: OrderDetail): EditForm {
     recipientName: o.recipientName ?? "",
     recipientPhone: o.recipientPhone ?? "",
     shippingAddress: o.shippingAddress ?? "",
+    shippingCostBorne: String(o.shippingCostBorne ?? "0"),
     memo: o.memo ?? "",
   };
 }
@@ -389,6 +394,7 @@ export function OrderDetailSheet({
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
         shippingAddress: form.shippingAddress,
+        shippingCostBorne: form.shippingCostBorne || "0",
         memo: form.memo,
       }),
     onSuccess: () => {
@@ -991,7 +997,9 @@ export function OrderDetailSheet({
         <JmDialogContent size="md">
           <JmDialogHeader>
             <JmDialogTitle>
-              발송 처리 — 이번 회차 송장
+              {data?.fulfillmentType === "SHIPPING"
+                ? "발송 처리 — 이번 회차 송장"
+                : "배달 처리"}
               {data && data.shipments && data.shipments.length > 0 && (
                 <span className="ml-2 text-jm-xs font-normal text-[var(--jm-text-muted)]">
                   ({data.shipments.length + 1}차)
@@ -1032,28 +1040,63 @@ export function OrderDetailSheet({
               </button>
             </div>
 
-            <div className="rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-2.5 py-2 text-jm-2xs text-[var(--jm-info-fg)]">
-              💡 이 송장은 <strong>이번 회차</strong> 에만 적용됩니다. 다음 회차
-              발송 시 다른 송장번호 사용 가능 — 회차별로 따로 보관됩니다.
-            </div>
+            {data?.fulfillmentType === "SHIPPING" ? (
+              <>
+                <div className="rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-2.5 py-2 text-jm-2xs text-[var(--jm-info-fg)]">
+                  💡 이 송장은 <strong>이번 회차</strong> 에만 적용됩니다. 다음
+                  회차 발송 시 다른 송장번호 사용 가능 — 회차별로 따로
+                  보관됩니다.
+                </div>
 
-            <JmFormField label="택배사">
-              <JmInput
-                value={trackingCarrier}
-                onChange={(e) => setTrackingCarrier(e.target.value)}
-                placeholder="예: CJ대한통운 / 자체배달"
-              />
-            </JmFormField>
-            <JmFormField
-              label="송장번호"
-              hint="빈 채로 진행 시 발송만 처리되고 송장은 발송 이력 카드에서 추후 수정 가능합니다."
-            >
-              <JmInput
-                value={trackingNumber}
-                onChange={(e) => setTrackingNumber(e.target.value)}
-                placeholder="송장번호"
-              />
-            </JmFormField>
+                <JmFormField label="택배사">
+                  <JmInput
+                    value={trackingCarrier}
+                    onChange={(e) => setTrackingCarrier(e.target.value)}
+                    placeholder="예: CJ대한통운"
+                  />
+                </JmFormField>
+                <JmFormField
+                  label="송장번호"
+                  hint="빈 채로 진행 시 발송만 처리되고 송장은 발송 이력 카드에서 추후 수정 가능합니다."
+                >
+                  <JmInput
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder="송장번호"
+                  />
+                </JmFormField>
+              </>
+            ) : data?.fulfillmentType === "QUICK" ? (
+              <>
+                <div className="rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-2.5 py-2 text-jm-2xs text-[var(--jm-info-fg)]">
+                  💡 퀵 호출 — 업체와 접수번호 입력은 선택입니다. 퀵비는 우측
+                  패널의 <strong>배송 원가(매장 지불)</strong> 에 기록하세요.
+                </div>
+
+                <JmFormField label="퀵 업체 (선택)">
+                  <JmInput
+                    value={trackingCarrier}
+                    onChange={(e) => setTrackingCarrier(e.target.value)}
+                    placeholder="예: 퀵퀵 / 인성데이타"
+                  />
+                </JmFormField>
+                <JmFormField
+                  label="퀵 접수번호 (선택)"
+                  hint="퀵 업체에서 받은 접수번호를 기록 (선택)"
+                >
+                  <JmInput
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder="퀵 접수번호"
+                  />
+                </JmFormField>
+              </>
+            ) : (
+              // DELIVERY (자체 배달) — 송장 영역 없음
+              <div className="rounded-md border border-[var(--jm-info-border)] bg-[var(--jm-info-bg)] px-2.5 py-2 text-jm-2xs text-[var(--jm-info-fg)]">
+                💡 자체 배달은 송장번호 없이 발송 처리됩니다.
+              </div>
+            )}
 
             {shipMode === "partial" && data && (
               <div className="space-y-1.5 border-t border-[var(--jm-border)] pt-3">
@@ -1634,10 +1677,10 @@ function ReadView({
         </JmTable>
       </JmCard>
 
-      {/* 송장 사전 등록 — PREPARING 단계에서 미리 송장 발급 (출고확정 시 자동 prefill). 매장 인도(IN_STORE/PICKUP) 제외 */}
+      {/* 송장 사전 등록 — PREPARING + SHIPPING(택배)/QUICK(퀵) 만. DELIVERY(자체 배달)는 송장 개념 없음 */}
       {order.status === "PREPARING" &&
-        order.fulfillmentType !== "IN_STORE" &&
-        order.fulfillmentType !== "PICKUP" && (
+        (order.fulfillmentType === "SHIPPING" ||
+          order.fulfillmentType === "QUICK") && (
           <PreShipmentTrackingCard order={order} />
         )}
 
@@ -1913,6 +1956,20 @@ function EditView({
                   />
                 </JmFormField>
               </div>
+              <JmFormField
+                label="배송 원가 (매장 지불)"
+                hint="우리가 낸 퀵비·택배비 — 손님 청구와 무관, 마진에서 차감 (VAT 제외 금액)"
+              >
+                <JmInput
+                  type="text"
+                  inputMode="numeric"
+                  value={formatComma(form.shippingCostBorne)}
+                  onChange={(e) =>
+                    set("shippingCostBorne", parseComma(e.target.value))
+                  }
+                  onFocus={focusCaretEnd}
+                />
+              </JmFormField>
             </>
           )}
         </JmCardContent>

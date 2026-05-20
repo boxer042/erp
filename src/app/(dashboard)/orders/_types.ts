@@ -37,7 +37,12 @@ export type OrderClaimReason =
   | "SIZE_COLOR"
   | "OTHER";
 
-export type FulfillmentType = "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
+export type FulfillmentType =
+  | "IN_STORE"
+  | "PICKUP"
+  | "DELIVERY"
+  | "QUICK"
+  | "SHIPPING";
 
 /**
  * 매장 인도 여부 — IN_STORE(즉시판매) 또는 PICKUP(픽업대기) 둘 다 손님이 매장에서 받음.
@@ -409,6 +414,7 @@ export const FULFILLMENT_LABELS: Record<FulfillmentType, string> = {
   IN_STORE: "매장판매",
   PICKUP: "픽업",
   DELIVERY: "배달",
+  QUICK: "퀵",
   SHIPPING: "택배",
 };
 

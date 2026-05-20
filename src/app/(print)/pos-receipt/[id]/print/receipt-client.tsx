@@ -23,7 +23,7 @@ interface Data {
   };
   customer: { name: string; phone: string } | null;
   channel: string;
-  fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "SHIPPING";
+  fulfillmentType: "IN_STORE" | "PICKUP" | "DELIVERY" | "QUICK" | "SHIPPING";
   shippingAddress: string | null;
   recipientName: string | null;
   recipientPhone: string | null;
