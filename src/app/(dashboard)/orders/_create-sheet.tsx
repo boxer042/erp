@@ -860,7 +860,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
 
                     <JmFormField
                       label="배송 원가 (매장 지불)"
-                      hint="우리가 낸 퀵비·택배비 — 손님 청구와 무관, 마진에서 차감"
+                      hint="우리가 낸 퀵비·택배비 — 손님 청구와 독립 (복합 케이스 가능). 매장 부담분만 입력 → 마진 차감"
                     >
                       <button
                         type="button"

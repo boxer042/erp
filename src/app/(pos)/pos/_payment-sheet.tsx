@@ -15,6 +15,7 @@ import {
   deriveTempColor,
 } from "@/components/pos/temp-customer";
 import { BottomSheet } from "./_components/bottom-sheet";
+import { PriceInputDialog } from "./_components/price-input-dialog";
 import { issueStatement } from "./_issue-document";
 
 type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
@@ -280,8 +281,10 @@ function Body({
   const [shippingPaymentType, setShippingPaymentType] = useState<
     "PREPAID" | "COD" | "STORE_BURDEN"
   >("PREPAID");
-  // 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 손님 청구와 무관, 마진에서만 차감.
+  // 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 손님 청구와 독립적 (복합 케이스 가능),
+  // 마진에서만 차감. 입력값은 net(세전) — PriceInputDialog 가 net 반환.
   const [shippingCostBorne, setShippingCostBorne] = useState("");
+  const [shipCostDialogOpen, setShipCostDialogOpen] = useState(false);
 
   // 결제 대상 = 상품 + 임대 + 수리(미연결: repairTicketId 없는 즉석 수리). 수리는 자체 픽업 흐름이 별도라
   // RepairTicket 픽업은 RepairDetail 의 PickupSheet 에서 처리. 여기선 카트 라인만.
@@ -744,24 +747,29 @@ function Body({
                     })}
                   </div>
                 </div>
-                {/* 배송 원가 (매장 지불) — 우리가 낸 퀵비·택배비 */}
+                {/* 배송 원가 (매장 지불) — 우리가 낸 퀵비·택배비. 가격 드로워 사용 */}
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                     배송 원가 (매장 지불)
                   </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formatComma(shippingCostBorne)}
-                    onChange={(e) =>
-                      setShippingCostBorne(parseComma(e.target.value))
-                    }
-                    onFocus={(e) => e.currentTarget.select()}
-                    placeholder="우리가 낸 퀵비·택배비 (선택)"
-                    className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShipCostDialogOpen(true)}
+                    className="flex h-10 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
+                  >
+                    <span className="tabular-nums">
+                      {parseFloat(shippingCostBorne || "0") > 0
+                        ? `₩${Math.round(parseFloat(shippingCostBorne) * 1.1).toLocaleString("ko-KR")}`
+                        : "—"}
+                    </span>
+                    <span className="text-[10px] text-[var(--jm-text-muted)]">
+                      수정
+                    </span>
+                  </button>
                   <span className="text-[10px] text-[var(--jm-text-muted)]">
-                    손님 청구와 무관 — 마진 리포트에서 순익 차감용
+                    손님 청구(배송비)와 독립 — 복합 케이스(손님 일부 + 매장
+                    일부) 가능. <strong>매장 부담분만</strong> 입력 → 마진에서
+                    차감.
                   </span>
                 </div>
                 <span className="text-[11px] text-[var(--jm-text-muted)]">
@@ -824,6 +832,19 @@ function Body({
           onCancel={() => setRegisterPromptOpen(false)}
         />
       )}
+
+      {/* 배송 원가 (매장 지불) — 가격 드로워. VAT 포함 입력, net 으로 저장 */}
+      <PriceInputDialog
+        open={shipCostDialogOpen}
+        onOpenChange={setShipCostDialogOpen}
+        initialNet={parseFloat(shippingCostBorne || "0") || 0}
+        taxType="TAXABLE"
+        title="배송 원가 (매장 지불)"
+        onSubmit={(net) => {
+          setShippingCostBorne(String(net));
+          setShipCostDialogOpen(false);
+        }}
+      />
     </BottomSheet>
   );
 }
