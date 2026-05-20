@@ -142,6 +142,10 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
   const [shippingPaymentType, setShippingPaymentType] = useState<
     "PREPAID" | "COD" | "STORE_BURDEN"
   >("PREPAID");
+  // 착불(COD) 로 전환 시 매장 부담 금액 자동 리셋 — 착불은 매장 회계 무관
+  useEffect(() => {
+    if (shippingPaymentType === "COD") setShippingCostBorne("0");
+  }, [shippingPaymentType]);
   const [memo, setMemo] = useState("");
   const [items, setItems] = useState<OrderItemForm[]>([]);
   const [productPick, setProductPick] = useState("");
@@ -858,23 +862,26 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
                       </div>
                     </JmFormField>
 
-                    <JmFormField
-                      label="배송 원가 (매장 지불)"
-                      hint="우리가 낸 퀵비·택배비 — 손님 청구와 독립 (복합 케이스 가능). 매장 부담분만 입력 → 마진 차감"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setShipCostDialogOpen(true)}
-                        className="flex h-10 w-full items-center justify-between rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:border-[var(--jm-border-strong)]"
+                    {/* 배송 원가 (매장 지불) — 착불(COD) 제외, 매장 회계 무관 */}
+                    {shippingPaymentType !== "COD" && (
+                      <JmFormField
+                        label="배송 원가 (매장 지불)"
+                        hint="우리가 낸 퀵비·택배비 — 손님 청구와 독립 (복합 케이스 가능). 매장 부담분만 입력 → 마진 차감"
                       >
-                        <span className="tabular-nums">
-                          {parseFloat(shippingCostBorne || "0") === 0
-                            ? "—"
-                            : `₩${Math.round(parseFloat(shippingCostBorne || "0") * 1.1).toLocaleString("ko-KR")}`}
-                        </span>
-                        <span className="text-jm-2xs text-[var(--jm-text-muted)]">수정</span>
-                      </button>
-                    </JmFormField>
+                        <button
+                          type="button"
+                          onClick={() => setShipCostDialogOpen(true)}
+                          className="flex h-10 w-full items-center justify-between rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:border-[var(--jm-border-strong)]"
+                        >
+                          <span className="tabular-nums">
+                            {parseFloat(shippingCostBorne || "0") === 0
+                              ? "—"
+                              : `₩${Math.round(parseFloat(shippingCostBorne || "0") * 1.1).toLocaleString("ko-KR")}`}
+                          </span>
+                          <span className="text-jm-2xs text-[var(--jm-text-muted)]">수정</span>
+                        </button>
+                      </JmFormField>
+                    )}
                   </>
                 )}
               </div>

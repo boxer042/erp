@@ -2068,20 +2068,23 @@ function EditView({
                   />
                 </JmFormField>
               </div>
-              <JmFormField
-                label="배송 원가 (매장 지불)"
-                hint="우리가 낸 퀵비·택배비 — 손님 청구와 독립 (복합 케이스 가능). 매장 부담분만 입력. VAT 제외 금액"
-              >
-                <JmInput
-                  type="text"
-                  inputMode="numeric"
-                  value={formatComma(form.shippingCostBorne)}
-                  onChange={(e) =>
-                    set("shippingCostBorne", parseComma(e.target.value))
-                  }
-                  onFocus={focusCaretEnd}
-                />
-              </JmFormField>
+              {/* 배송 원가 (매장 지불) — 착불(COD) 제외, 매장 회계 무관 */}
+              {order.shippingPaymentType !== "COD" && (
+                <JmFormField
+                  label="배송 원가 (매장 지불)"
+                  hint="우리가 낸 퀵비·택배비 — 손님 청구와 독립 (복합 케이스 가능). 매장 부담분만 입력. VAT 제외 금액"
+                >
+                  <JmInput
+                    type="text"
+                    inputMode="numeric"
+                    value={formatComma(form.shippingCostBorne)}
+                    onChange={(e) =>
+                      set("shippingCostBorne", parseComma(e.target.value))
+                    }
+                    onFocus={focusCaretEnd}
+                  />
+                </JmFormField>
+              )}
             </>
           )}
         </JmCardContent>

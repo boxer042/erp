@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -285,6 +285,10 @@ function Body({
   // 마진에서만 차감. 입력값은 net(세전) — PriceInputDialog 가 net 반환.
   const [shippingCostBorne, setShippingCostBorne] = useState("");
   const [shipCostDialogOpen, setShipCostDialogOpen] = useState(false);
+  // 착불(COD) 로 전환 시 매장 부담 금액 자동 리셋 — 착불은 매장 회계 무관
+  useEffect(() => {
+    if (shippingPaymentType === "COD") setShippingCostBorne("");
+  }, [shippingPaymentType]);
 
   // 결제 대상 = 상품 + 임대 + 수리(미연결: repairTicketId 없는 즉석 수리). 수리는 자체 픽업 흐름이 별도라
   // RepairTicket 픽업은 RepairDetail 의 PickupSheet 에서 처리. 여기선 카트 라인만.
@@ -747,31 +751,33 @@ function Body({
                     })}
                   </div>
                 </div>
-                {/* 배송 원가 (매장 지불) — 우리가 낸 퀵비·택배비. 가격 드로워 사용 */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-                    배송 원가 (매장 지불)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShipCostDialogOpen(true)}
-                    className="flex h-10 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
-                  >
-                    <span className="tabular-nums">
-                      {parseFloat(shippingCostBorne || "0") > 0
-                        ? `₩${Math.round(parseFloat(shippingCostBorne) * 1.1).toLocaleString("ko-KR")}`
-                        : "—"}
+                {/* 배송 원가 (매장 지불) — 착불 제외 (착불은 매장 회계 무관) */}
+                {shippingPaymentType !== "COD" && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                      배송 원가 (매장 지불)
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setShipCostDialogOpen(true)}
+                      className="flex h-10 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
+                    >
+                      <span className="tabular-nums">
+                        {parseFloat(shippingCostBorne || "0") > 0
+                          ? `₩${Math.round(parseFloat(shippingCostBorne) * 1.1).toLocaleString("ko-KR")}`
+                          : "—"}
+                      </span>
+                      <span className="text-[10px] text-[var(--jm-text-muted)]">
+                        수정
+                      </span>
+                    </button>
                     <span className="text-[10px] text-[var(--jm-text-muted)]">
-                      수정
+                      손님 청구(배송비)와 독립 — 복합 케이스(손님 일부 + 매장
+                      일부) 가능. <strong>매장 부담분만</strong> 입력 →
+                      마진에서 차감.
                     </span>
-                  </button>
-                  <span className="text-[10px] text-[var(--jm-text-muted)]">
-                    손님 청구(배송비)와 독립 — 복합 케이스(손님 일부 + 매장
-                    일부) 가능. <strong>매장 부담분만</strong> 입력 → 마진에서
-                    차감.
-                  </span>
-                </div>
+                  </div>
+                )}
                 <span className="text-[11px] text-[var(--jm-text-muted)]">
                   결제 후 ERP <strong>출고 워크보드</strong>로 자동 진입합니다
                 </span>
