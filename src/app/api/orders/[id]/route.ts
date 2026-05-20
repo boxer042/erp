@@ -2063,6 +2063,46 @@ export async function PATCH(
     return NextResponse.json(updated);
   }
 
+  // 출고방식 + 배송원가(매장 지불) 만의 메타 수정 — 종결 주문(완료/반품/교환)에서도 허용.
+  // 용도: 퀵 backfill (DELIVERY 로 기록된 과거 주문을 QUICK 으로 분류) + 빠뜨린 퀵비 사후 입력.
+  // 출고 흐름·재고·청구액 무관 → lockedStatuses 우회 (CANCELLED 만 차단).
+  const isMetadataOnlyPatch =
+    (data.fulfillmentType !== undefined ||
+      data.shippingCostBorne !== undefined) &&
+    data.items === undefined &&
+    data.memo === undefined &&
+    data.expectedShipDate === undefined &&
+    data.recipientName === undefined &&
+    data.recipientPhone === undefined &&
+    data.shippingAddress === undefined &&
+    data.channelOrderNo === undefined &&
+    data.trackingCarrier === undefined &&
+    data.trackingNumber === undefined &&
+    data.discountAmount === undefined &&
+    data.shippingFee === undefined &&
+    data.shippingPaymentType === undefined &&
+    data.taxInvoiceRequested === undefined;
+  if (isMetadataOnlyPatch) {
+    if (order.status === "CANCELLED") {
+      return NextResponse.json(
+        { error: "취소된 주문은 메타 수정도 차단됩니다" },
+        { status: 400 },
+      );
+    }
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        ...(data.fulfillmentType !== undefined
+          ? { fulfillmentType: data.fulfillmentType }
+          : {}),
+        ...(data.shippingCostBorne !== undefined
+          ? { shippingCostBorne: parseFloat(data.shippingCostBorne || "0") }
+          : {}),
+      },
+    });
+    return NextResponse.json(updated);
+  }
+
   // PATCH 가능한 상태: PENDING / PREPARING / PREPARING_PACKED / SHIPPED 만 (출고 흐름 진행 중).
   // 그 외는 잠금 — 항목·송장·출고예정 모두 수정 불가.
   const lockedStatuses = [

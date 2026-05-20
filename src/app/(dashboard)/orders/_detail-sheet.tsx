@@ -330,6 +330,11 @@ export function OrderDetailSheet({
   const [statementPreviewOpen, setStatementPreviewOpen] = useState(false);
   // 거래명세표 발행 확인 다이얼로그
   const [issueStatementOpen, setIssueStatementOpen] = useState(false);
+  // 배송 메타 사후 수정 (완료된 주문에서 출고방식·배송원가만 backfill)
+  const [metaEditOpen, setMetaEditOpen] = useState(false);
+  const [metaFulfillment, setMetaFulfillment] =
+    useState<FulfillmentType>("DELIVERY");
+  const [metaShipCost, setMetaShipCost] = useState("0");
 
   // orderId/open 변경 시 모든 다이얼로그·편집 state 초기화 — 렌더 중 비교 패턴 (effect 회피)
   const resetKey = `${orderId ?? ""}|${open ? "1" : "0"}`;
@@ -357,6 +362,7 @@ export function OrderDetailSheet({
     setPrintPreview(null);
     setStatementPreviewOpen(false);
     setIssueStatementOpen(false);
+    setMetaEditOpen(false);
   }
 
   // highlightItemId 가 있고 데이터 로드 후 — 해당 라인으로 스크롤
@@ -487,6 +493,23 @@ export function OrderDetailSheet({
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "발행 실패"),
+  });
+
+  // 배송 메타 사후 수정 — 완료된 주문에서 출고방식·배송원가만 backfill 용도
+  const metaEditMutation = useMutation({
+    mutationFn: () =>
+      apiMutate(`/api/orders/${orderId}`, "PATCH", {
+        fulfillmentType: metaFulfillment,
+        shippingCostBorne: metaShipCost || "0",
+      }),
+    onSuccess: () => {
+      toast.success("배송 메타가 수정됐습니다");
+      setMetaEditOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "수정 실패"),
   });
 
   // 부분 출고 — partialItems(orderItemId, shipQty) + 송장 정보
@@ -842,6 +865,27 @@ export function OrderDetailSheet({
                       거래명세표 발행
                     </JmButton>
                   )}
+                  {/* 배송 메타 사후 수정 — 완료된 주문(잠금)에서 출고방식·배송원가만 backfill */}
+                  {data.status !== "CANCELLED" &&
+                    data.status !== "PENDING" &&
+                    data.status !== "PREPARING" &&
+                    data.status !== "PREPARING_PACKED" &&
+                    data.status !== "SHIPPED" && (
+                      <JmButton
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => {
+                          setMetaFulfillment(data.fulfillmentType);
+                          setMetaShipCost(
+                            String(data.shippingCostBorne ?? "0"),
+                          );
+                          setMetaEditOpen(true);
+                        }}
+                      >
+                        <Truck className="size-3.5" />
+                        배송 메타 수정
+                      </JmButton>
+                    )}
                   {data.status !== "CANCELLED" &&
                     data.items.some((it) => it.product?.trackable) && (
                       <JmButton
@@ -1402,6 +1446,74 @@ export function OrderDetailSheet({
                 <JmSpinner size="sm" tone="inverted" />
               )}
               발행
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+
+      {/* 배송 메타 사후 수정 — 완료된 주문에서 출고방식·배송원가만 backfill */}
+      <JmDialog open={metaEditOpen} onOpenChange={setMetaEditOpen}>
+        <JmDialogContent size="sm">
+          <JmDialogHeader>
+            <JmDialogTitle>배송 메타 수정</JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody className="space-y-4">
+            <p className="text-jm-xs text-[var(--jm-text-muted)]">
+              완료된 주문이라 다른 항목은 잠겨있습니다. <strong>퀵 backfill</strong>{" "}
+              · <strong>퀵비(배송 원가) 사후 입력</strong> 용도. 매출/재고에는
+              영향 없고 마진 리포트의 순익만 갱신됩니다.
+            </p>
+            <JmFormField label="출고방식">
+              <div className="grid grid-cols-3 gap-2">
+                {FULFILLMENT_OPTIONS.map((opt) => {
+                  const active = metaFulfillment === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setMetaFulfillment(opt.value)}
+                      className={`h-10 rounded-xl border-2 text-jm-sm font-medium transition-colors ${
+                        active
+                          ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                          : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </JmFormField>
+            <JmFormField
+              label="배송 원가 (매장 지불)"
+              hint="우리가 낸 퀵비·택배비 — VAT 제외 금액. 마진 리포트에서 차감됨"
+            >
+              <JmInput
+                type="text"
+                inputMode="numeric"
+                value={formatComma(metaShipCost)}
+                onChange={(e) => setMetaShipCost(parseComma(e.target.value))}
+                onFocus={focusCaretEnd}
+              />
+            </JmFormField>
+          </JmDialogBody>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setMetaEditOpen(false)}
+              disabled={metaEditMutation.isPending}
+            >
+              취소
+            </JmButton>
+            <JmButton
+              variant="cta"
+              onClick={() => metaEditMutation.mutate()}
+              disabled={metaEditMutation.isPending}
+            >
+              {metaEditMutation.isPending && (
+                <JmSpinner size="sm" tone="inverted" />
+              )}
+              저장
             </JmButton>
           </JmDialogFooter>
         </JmDialogContent>
