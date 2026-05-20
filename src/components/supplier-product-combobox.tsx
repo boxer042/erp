@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { JmCombobox, type JmComboboxItem } from "@/jm";
+import { JmBadge, JmCombobox, type JmComboboxItem } from "@/jm";
 import { normalizeSearch } from "@/lib/utils";
 
 interface SupplierProductCostItem {
@@ -21,6 +21,8 @@ interface SupplierProduct {
   unitPrice: string;
   unitOfMeasure: string;
   incomingCosts?: SupplierProductCostItem[];
+  /** 이 거래처상품이 이미 연결된 판매상품들 — 행에 "매핑 N" 배지로 표시 */
+  productMappings?: Array<{ id: string; product: { id: string; name: string } }>;
 }
 
 type SpItem = JmComboboxItem & {
@@ -78,6 +80,7 @@ export function SupplierProductCombobox({
       }}
       renderItem={(item) => {
         const s = item.sp;
+        const mappedCount = s.productMappings?.length ?? 0;
         return (
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <span className="flex-1 truncate text-[var(--jm-text)]">
@@ -86,6 +89,17 @@ export function SupplierProductCombobox({
                 <span className="ml-1 text-[var(--jm-text-muted)]">· {s.spec}</span>
               )}
             </span>
+            {mappedCount > 0 && (
+              <JmBadge
+                variant="warning"
+                size="sm"
+                shape="square"
+                className="shrink-0 text-jm-2xs"
+                title={s.productMappings!.map((m) => m.product.name).join(", ")}
+              >
+                매핑 {mappedCount}
+              </JmBadge>
+            )}
             {s.supplierCode && (
               <span className="text-jm-xs text-[var(--jm-text-muted)] shrink-0 font-[family-name:var(--jm-font-mono)]">
                 {s.supplierCode}

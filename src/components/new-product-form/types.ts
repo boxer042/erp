@@ -33,6 +33,12 @@ export interface SupplierProduct {
   isTaxable: boolean;
   memo: string | null;
   incomingCosts?: SupplierProductCostItem[];
+  /** 이 거래처상품이 이미 연결된 판매상품들 — 중복 매핑 경고용 */
+  productMappings?: Array<{
+    id: string;
+    conversionRate: string;
+    product: { id: string; name: string; sku: string; sellingPrice: string };
+  }>;
 }
 
 export interface CostRow {

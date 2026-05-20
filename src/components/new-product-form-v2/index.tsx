@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { focusCaretEnd } from "@/jm/lib/focus";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   JmButton,
@@ -1736,6 +1737,29 @@ export function NewProductForm({
                               <p className="mb-2 text-jm-2xs font-medium text-[var(--jm-text-muted)]">
                                 선택한 공급상품 정보
                               </p>
+                              {sp.productMappings && sp.productMappings.length > 0 && (
+                                <div className="mb-3 rounded-md border border-[var(--jm-warning-fg)]/30 bg-[var(--jm-warning-bg)] px-3 py-2 text-jm-xs leading-relaxed text-[var(--jm-warning-fg)]">
+                                  이 거래처상품은 이미{" "}
+                                  <span className="font-semibold">
+                                    {sp.productMappings.length}개 판매상품
+                                  </span>
+                                  에 매핑돼 있어요:{" "}
+                                  {sp.productMappings.map((m, i) => (
+                                    <span key={m.id}>
+                                      {i > 0 ? ", " : ""}
+                                      <Link
+                                        href={`/products/${m.product.id}`}
+                                        target="_blank"
+                                        className="font-medium underline"
+                                      >
+                                        {m.product.name}
+                                      </Link>
+                                    </span>
+                                  ))}
+                                  . 새 판매상품에 다시 매핑하면 환산비율이 달라
+                                  재고·원가가 분리될 수 있습니다.
+                                </div>
+                              )}
                               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                                 {rows.map((r) => (
                                   <div key={r.label}>
