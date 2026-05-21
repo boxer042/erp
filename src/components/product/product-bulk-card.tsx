@@ -179,6 +179,7 @@ export function ProductBulkCard({ product }: ProductBulkCardProps) {
                       { value: "L", label: "L" },
                       { value: "g", label: "g" },
                       { value: "kg", label: "kg" },
+                      { value: "m", label: "m" },
                       { value: "cm", label: "cm" },
                       { value: "mm", label: "mm" },
                     ]}
