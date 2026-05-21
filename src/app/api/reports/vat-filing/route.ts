@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
   const quarter = quarterParam ? parseInt(quarterParam) : curQuarter;
   const { from, to, label } = getQuarterRange(year, quarter);
 
-  const [orders, incomings, supplierReturns, expenses, customerPayments, supplierPayments] = await Promise.all([
+  const [orders, shippingBorneRows, incomings, supplierReturns, expenses, customerPayments, supplierPayments] = await Promise.all([
     prisma.order.findMany({
       where: {
         status: {
@@ -148,6 +148,15 @@ export async function GET(request: NextRequest) {
           },
         },
       },
+    }),
+    // 매장 부담 배송 원가 — 별도 Expense 가 아니므로 매입세액에 추가 가산 (전부 과세 가정)
+    prisma.order.findMany({
+      where: {
+        shippingCostBorne: { gt: 0 },
+        status: { not: "CANCELLED" },
+        orderDate: { gte: from, lt: to },
+      },
+      select: { shippingCostBorne: true },
     }),
     prisma.incoming.findMany({
       where: {
@@ -421,6 +430,25 @@ export async function GET(request: NextRequest) {
     } else {
       expenseMap.set(e.category, {
         category: e.category,
+        supplyAmount: net,
+        vatAmount: vat,
+      });
+    }
+  }
+  // 매장 부담 배송 원가 (net 저장) → SHIPPING 카테고리에 합산 + 매입세액 가산
+  for (const o of shippingBorneRows) {
+    const net = Number(o.shippingCostBorne);
+    if (net <= 0) continue;
+    const vat = net * 0.1;
+    expenseSupply += net;
+    expenseVat += vat;
+    const existing = expenseMap.get("SHIPPING");
+    if (existing) {
+      existing.supplyAmount += net;
+      existing.vatAmount += vat;
+    } else {
+      expenseMap.set("SHIPPING", {
+        category: "SHIPPING",
         supplyAmount: net,
         vatAmount: vat,
       });

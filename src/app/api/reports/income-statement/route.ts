@@ -88,7 +88,7 @@ interface PeriodReport {
 }
 
 async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
-  const [orders, incomings, supplierReturns, expenses] = await Promise.all([
+  const [orders, shippingBorneRows, incomings, supplierReturns, expenses] = await Promise.all([
     prisma.order.findMany({
       where: {
         status: { in: [...REVENUE_BEARING_STATUSES] },
@@ -115,6 +115,17 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
           },
         },
       },
+    }),
+    // 매장 부담 배송 원가 (Order.shippingCostBorne, 세전 net) — 별도 Expense 가 아니므로
+    // 일반 경비 합계에 SHIPPING 카테고리로 합산 + 매입세액 가산 (전부 과세 가정).
+    // status=CANCELLED 만 제외 (취소 전 이미 송장 발행/지급된 경우 그대로 비용).
+    prisma.order.findMany({
+      where: {
+        shippingCostBorne: { gt: 0 },
+        status: { not: "CANCELLED" },
+        orderDate: { gte: from, lt: to },
+      },
+      select: { shippingCostBorne: true },
     }),
     // 입고 — taxAmount 필드는 저장 안 되므로 items.totalPrice × 0.1 로 계산
     // 추가로 SupplierProduct.incomingCosts (perUnit=true) 의 매입세액도 가산
@@ -278,6 +289,16 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
     prev.amount += net;
     if (e.isTaxable) prev.taxableSum += net;
     opexMap.set(e.category, prev);
+  }
+  // 매장 부담 배송 원가 — 이미 net 저장이라 환산 불필요. 과세 가정 → 매입세액 가산.
+  for (const o of shippingBorneRows) {
+    const net = Number(o.shippingCostBorne);
+    if (net <= 0) continue;
+    inputVatFromExpenses += net * 0.1;
+    const prev = opexMap.get("SHIPPING") ?? { amount: 0, taxableSum: 0 };
+    prev.amount += net;
+    prev.taxableSum += net;
+    opexMap.set("SHIPPING", prev);
   }
   const categories = Array.from(opexMap.entries())
     .map(([category, v]) => ({

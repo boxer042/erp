@@ -122,10 +122,13 @@ export async function GET(request: NextRequest) {
     QUICK: "퀵",
     SHIPPING: "택배",
   };
+  // Order.shippingCostBorne 은 세전(net) 저장. Expense.amount 는 VAT 포함(gross) 저장 컨벤션 →
+  // 표시·합계 일관성을 위해 1.1 gross-up 해서 노출. 추후 비과세 케이스 생기면 isTaxable 분기 필요.
+  const grossUp = (net: number) => Math.round(net * 1.1);
   const virtualShippingEntries = shippingOrders.map((o) => ({
     id: `virtual-shipping-${o.id}`,
     date: o.orderDate.toISOString(),
-    amount: String(o.shippingCostBorne),
+    amount: String(grossUp(Number(o.shippingCostBorne))),
     category: "SHIPPING",
     description: `주문 ${o.orderNo} 배송 원가 (매장 부담)`,
     isTaxable: true,
@@ -152,7 +155,7 @@ export async function GET(request: NextRequest) {
     recoverable: false,
   }));
   const virtualShippingTotal = shippingOrders.reduce(
-    (s, o) => s + Number(o.shippingCostBorne),
+    (s, o) => s + grossUp(Number(o.shippingCostBorne)),
     0,
   );
 

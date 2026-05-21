@@ -87,6 +87,7 @@ import {
 } from "./_types";
 import { CustomerPaymentDialog } from "@/components/customer-payment-dialog";
 import { DocumentPrintDialog } from "@/components/document-print-dialog";
+import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 import { ExchangeDialog } from "./_exchange-dialog";
 import { formatCurrency } from "./_helpers";
 import { PaymentStatusBadge, ShippingPaymentBadge, StatusBadge } from "./_parts";
@@ -338,6 +339,8 @@ export function OrderDetailSheet({
   const [metaFulfillment, setMetaFulfillment] =
     useState<FulfillmentType>("DELIVERY");
   const [metaShipCost, setMetaShipCost] = useState("0");
+  // 배송 원가 가격 드로워 (PriceInputDialog) — VAT 포함 입력 UX
+  const [shipCostDialogOpen, setShipCostDialogOpen] = useState(false);
   // 외상 주문 수금 등록 다이얼로그
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
@@ -1503,15 +1506,20 @@ export function OrderDetailSheet({
             </JmFormField>
             <JmFormField
               label="배송 원가 (매장 지불)"
-              hint="우리가 낸 퀵비·택배비 — VAT 제외 금액. 마진 리포트에서 차감됨"
+              hint="우리가 낸 퀵비·택배비 — VAT 포함 금액 입력. 마진 리포트·경비에서 차감됨"
             >
-              <JmInput
-                type="text"
-                inputMode="numeric"
-                value={formatComma(metaShipCost)}
-                onChange={(e) => setMetaShipCost(parseComma(e.target.value))}
-                onFocus={focusCaretEnd}
-              />
+              <button
+                type="button"
+                onClick={() => setShipCostDialogOpen(true)}
+                className="flex h-10 w-full items-center justify-between rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:border-[var(--jm-border-strong)]"
+              >
+                <span className="tabular-nums">
+                  {parseFloat(metaShipCost || "0") === 0
+                    ? "—"
+                    : `₩${Math.round(parseFloat(metaShipCost) * 1.1).toLocaleString("ko-KR")}`}
+                </span>
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">수정</span>
+              </button>
             </JmFormField>
           </JmDialogBody>
           <JmDialogFooter>
@@ -1535,6 +1543,19 @@ export function OrderDetailSheet({
           </JmDialogFooter>
         </JmDialogContent>
       </JmDialog>
+
+      {/* 배송 원가 가격 드로워 — VAT 포함 입력 UX, net 으로 저장 (POS 와 동일 패턴) */}
+      <PriceInputDialog
+        open={shipCostDialogOpen}
+        onOpenChange={setShipCostDialogOpen}
+        initialNet={parseFloat(metaShipCost || "0") || 0}
+        taxType="TAXABLE"
+        title="배송 원가 (매장 지불)"
+        onSubmit={(net) => {
+          setMetaShipCost(String(net));
+          setShipCostDialogOpen(false);
+        }}
+      />
 
       {/* 외상 주문 수금 등록 — 고객·금액·메모 prefill 후 dialog 안에서 사용자가 확인 */}
       {data && data.customerId && (
