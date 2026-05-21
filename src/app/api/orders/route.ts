@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import type { OrderStatus, FulfillmentType, Prisma } from "@prisma/client";
 import { classifyBoardGroup, getKrToday } from "@/lib/orders/board";
 import { recordAudit } from "@/lib/audit";
+import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 
 function generateOrderNo() {
   const now = new Date();
@@ -486,23 +487,29 @@ export async function POST(request: NextRequest) {
   }
 
   // UNPAID 면 customerLedger SALE 기록 (POS checkout 과 동일 정책)
+  // date 는 order.orderDate 로 명시 — 기본값(now()) 쓰면 paymentDate(자정) 보다 늦어져
+  // rebalance 시 RECEIPT 가 먼저 처리되어 잔액이 음수로 계산되는 버그 발생.
   if (data.paymentMethod === "UNPAID" && data.customerId) {
-    const last = await prisma.customerLedger.findFirst({
-      where: { customerId: data.customerId },
-      orderBy: { date: "desc" },
-    });
-    const prevBalance = last ? Number(last.balance) : 0;
-    await prisma.customerLedger.create({
-      data: {
-        customerId: data.customerId,
-        type: "SALE",
-        description: `주문 ${order.orderNo}`,
-        debitAmount: totalAmount,
-        creditAmount: 0,
-        balance: prevBalance + totalAmount,
-        referenceId: order.id,
-        referenceType: "ORDER",
-      },
+    await prisma.$transaction(async (tx) => {
+      const last = await tx.customerLedger.findFirst({
+        where: { customerId: data.customerId! },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      });
+      const prevBalance = last ? Number(last.balance) : 0;
+      await tx.customerLedger.create({
+        data: {
+          customerId: data.customerId!,
+          date: order.orderDate,
+          type: "SALE",
+          description: `주문 ${order.orderNo}`,
+          debitAmount: totalAmount,
+          creditAmount: 0,
+          balance: prevBalance + totalAmount,
+          referenceId: order.id,
+          referenceType: "ORDER",
+        },
+      });
+      await rebalanceCustomerLedger(tx, data.customerId!);
     });
   }
 

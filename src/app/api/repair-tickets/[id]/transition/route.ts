@@ -4,6 +4,7 @@ import { guardUser } from "@/lib/api-auth";
 import { calcRepairTotals, genApprovalToken } from "@/lib/repair";
 import { restoreRepairPart } from "@/lib/repair-inventory";
 import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
+import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 import type {
   RepairApprovalMethod,
   OrderPaymentMethod,
@@ -203,26 +204,32 @@ export async function POST(
       }
 
       if (paymentMethod === "UNPAID" && ticket.customerId) {
-        const last = await prisma.customerLedger.findFirst({
-          where: { customerId: ticket.customerId },
-          orderBy: { date: "desc" },
-        });
-        const prevBalance = last ? Number(last.balance) : 0;
-        // 거절·진단비 케이스 라벨 분기 — 원장에서 정상 수리 매출과 구분 (사후 분석/정산 시 명확)
-        const description = ticket.quoteRejectedAt
-          ? `수리 ${ticket.ticketNo} (거절·진단비)`
-          : `수리 ${ticket.ticketNo}`;
-        await prisma.customerLedger.create({
-          data: {
-            customerId: ticket.customerId,
-            type: "SALE",
-            description,
-            debitAmount: finalAmt,
-            creditAmount: 0,
-            balance: prevBalance + finalAmt,
-            referenceId: ticket.id,
-            referenceType: "REPAIR_TICKET",
-          },
+        // date 는 pickedUpAt 으로 명시 (현재 픽업 처리 시각). RECEIPT(자정) 와 정렬 일관성 보장.
+        const customerId = ticket.customerId;
+        await prisma.$transaction(async (tx) => {
+          const last = await tx.customerLedger.findFirst({
+            where: { customerId },
+            orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+          });
+          const prevBalance = last ? Number(last.balance) : 0;
+          // 거절·진단비 케이스 라벨 분기 — 원장에서 정상 수리 매출과 구분 (사후 분석/정산 시 명확)
+          const description = ticket.quoteRejectedAt
+            ? `수리 ${ticket.ticketNo} (거절·진단비)`
+            : `수리 ${ticket.ticketNo}`;
+          await tx.customerLedger.create({
+            data: {
+              customerId,
+              date: pickupAt,
+              type: "SALE",
+              description,
+              debitAmount: finalAmt,
+              creditAmount: 0,
+              balance: prevBalance + finalAmt,
+              referenceId: ticket.id,
+              referenceType: "REPAIR_TICKET",
+            },
+          });
+          await rebalanceCustomerLedger(tx, customerId);
         });
       }
       return NextResponse.json(updated);

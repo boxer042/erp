@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 
 function genRentalNo() {
   const now = new Date();
@@ -171,15 +172,17 @@ export async function POST(request: NextRequest) {
         data: { status: isActiveNow ? "RENTED" : asset.status },
       });
     // UNPAID이면 고객원장 기록
+    // date 는 임대 시작일(startDate) 로 명시 — RECEIPT(자정) 와 정렬 일관성 보장
     if (paymentMethod === "UNPAID") {
       const last = await tx.customerLedger.findFirst({
         where: { customerId },
-        orderBy: { date: "desc" },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       });
       const prev = last ? Number(last.balance) : 0;
       await tx.customerLedger.create({
         data: {
           customerId,
+          date: start,
           type: "SALE",
           description: `임대 ${r.rentalNo}`,
           debitAmount: rentalAmount,
@@ -189,6 +192,7 @@ export async function POST(request: NextRequest) {
           referenceType: "RENTAL",
         },
       });
+      await rebalanceCustomerLedger(tx, customerId);
     }
       return r;
     });

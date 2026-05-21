@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureBulkStock, fifoConsume, isOversellAllowed } from "@/lib/inventory/fifo";
 import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
+import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 
 type Action = "order" | "quotation" | "statement";
 
@@ -858,15 +859,17 @@ export async function POST(request: NextRequest) {
       }
 
       // CustomerLedger — 외상(UNPAID)이면 매출(debit) 기록
+      // date 는 order.orderDate 로 명시 — RECEIPT(자정) 와 정렬 일관성 보장
       if (body.customerId && body.paymentMethod === "UNPAID") {
         const last = await tx.customerLedger.findFirst({
           where: { customerId: body.customerId },
-          orderBy: { date: "desc" },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         });
         const prevBalance = last ? Number(last.balance) : 0;
         await tx.customerLedger.create({
           data: {
             customerId: body.customerId,
+            date: order.orderDate,
             type: "SALE",
             description: `POS 주문 ${order.orderNo}`,
             debitAmount: totalAmount,
@@ -876,6 +879,7 @@ export async function POST(request: NextRequest) {
             referenceType: "ORDER",
           },
         });
+        await rebalanceCustomerLedger(tx, body.customerId);
       }
 
       return order;
