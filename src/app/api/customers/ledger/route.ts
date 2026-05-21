@@ -52,8 +52,9 @@ export async function GET(request: NextRequest) {
       include: {
         customer: { select: { id: true, name: true } },
       },
-      // 날짜는 최신순, 같은 날짜 내에서도 최신 생성순 → 잔액이 위에서 아래로 단조감소
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      // 날짜는 최신순(desc), 같은 날짜 내에서는 발생순(asc) → 한 날 안에서 매출 → 수금 흐름이 자연스럽게 읽힘.
+      // (현재 잔액 lookup 은 line 89 의 desc/desc 가 담당하므로 분리.)
+      orderBy: [{ date: "desc" }, { createdAt: "asc" }],
       take: 1000,
     }),
     // types 필터가 적용되면 REFUND 도 포함된 경우만 환불 내역 노출 (필터 일관성)
