@@ -50,14 +50,14 @@ export function LedgerView({
       <JmTableHeader className="sticky top-0 z-10">
         <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
           {!selectedCustomerId && (
-            <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">고객</JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">고객</JmTableHead>
           )}
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">유형</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">설명</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">참조</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">차변 (매출)</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">대변 (수금)</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">미수 잔액</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">유형</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">설명</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">참조</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">차변 (매출)</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">대변 (수금)</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">미수 잔액</JmTableHead>
         </JmTableRow>
       </JmTableHeader>
       <JmTableBody>
@@ -70,7 +70,7 @@ export function LedgerView({
               이월 잔액 ({format(from, "yyyy-MM-dd")} 기준)
             </JmTableCell>
             <JmTableCell className={cn(
-              "px-2 py-1.5 text-right font-medium tabular-nums",
+              "px-3 py-2.5 text-right font-medium tabular-nums",
               // 과수금(음수) 만 빨강. 정상 미수(양수)·0 은 기본
               selectedCustomerSummary.openingBalance < 0
                 ? "text-[var(--jm-danger-fg)]"
@@ -112,14 +112,14 @@ export function LedgerView({
                   onDoubleClick={() => onEntryDoubleClick(e)}
                 >
                   {!selectedCustomerId && (
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">{e.customer.name}</JmTableCell>
+                    <JmTableCell className="px-3 py-2.5 truncate">{e.customer.name}</JmTableCell>
                   )}
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center">
+                  <JmTableCell className="px-3 py-2.5 text-center">
                     <JmBadge variant={TYPE_JM_VARIANTS[e.type]} size="sm" shape="square">
                       {TYPE_LABELS[e.type]}
                     </JmBadge>
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">
+                  <JmTableCell className="px-3 py-2.5 truncate">
                     <span className="inline-flex items-center gap-1.5">
                       {e.description}
                       {e.paymentKind && e.paymentKind !== "MIXED" && (
@@ -129,17 +129,17 @@ export function LedgerView({
                       )}
                     </span>
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center text-[var(--jm-text-muted)] text-xs">
+                  <JmTableCell className="px-3 py-2.5 text-center text-[var(--jm-text-muted)] text-xs">
                     {e.referenceType ?? "-"}
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">
                     {parseFloat(e.debitAmount) > 0 ? `₩${formatAmount(e.debitAmount)}` : "-"}
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">
                     {parseFloat(e.creditAmount) > 0 ? `₩${formatAmount(e.creditAmount)}` : "-"}
                   </JmTableCell>
                   <JmTableCell className={cn(
-                    "px-2 py-1.5 text-right font-medium tabular-nums",
+                    "px-3 py-2.5 text-right font-medium tabular-nums",
                     !isRefundLog && parseFloat(e.balance) < 0 && "text-[var(--jm-danger-fg)]",
                   )}>
                     {isRefundLog ? (

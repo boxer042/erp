@@ -67,17 +67,17 @@ export function ItemsView({
       <JmTableHeader className="sticky top-0 z-10">
         <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
           {!selectedSupplierId && (
-            <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">거래처</JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">거래처</JmTableHead>
           )}
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">입고번호</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">품명</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">규격</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">단위</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">수량</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">단가</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">할인</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">합계 (VAT포함)</JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">입금</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">입고번호</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">품명</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">규격</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">단위</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">수량</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">단가</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">할인</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">합계 (VAT포함)</JmTableHead>
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">입금</JmTableHead>
           <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">잔액</JmTableHead>
         </JmTableRow>
       </JmTableHeader>
@@ -91,7 +91,7 @@ export function ItemsView({
               이월 잔액 ({format(from, "yyyy-MM-dd")} 기준)
             </JmTableCell>
             <JmTableCell className={cn(
-              "px-2 py-1.5 text-right font-medium tabular-nums",
+              "px-3 py-2.5 text-right font-medium tabular-nums",
               // 과지급(음수) 만 빨강. 정상 미지급(양수)·0 은 기본
               selectedSupplierSummary.openingBalance < 0
                 ? "text-[var(--jm-danger-fg)]"
@@ -133,12 +133,12 @@ export function ItemsView({
                     onDoubleClick={() => onEntryDoubleClick(p)}
                   >
                     {!selectedSupplierId && (
-                      <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">{p.supplier.name}</JmTableCell>
+                      <JmTableCell className="px-3 py-2.5 truncate">{p.supplier.name}</JmTableCell>
                     )}
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center">
+                    <JmTableCell className="px-3 py-2.5 text-center">
                       <JmBadge variant={TYPE_JM_VARIANTS[p.type]} size="sm" shape="square">{TYPE_LABELS[p.type]}</JmBadge>
                     </JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)] truncate">
+                    <JmTableCell className="px-3 py-2.5 text-[var(--jm-text-muted)] truncate">
                       <span className="inline-flex items-center gap-1.5">
                         {p.description}
                         {p.paymentKind && p.paymentKind !== "MIXED" && (
@@ -148,23 +148,23 @@ export function ItemsView({
                         )}
                       </span>
                     </JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)]">—</JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center text-[var(--jm-text-muted)]">—</JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">
+                    <JmTableCell className="px-3 py-2.5 text-[var(--jm-text-muted)]">—</JmTableCell>
+                    <JmTableCell className="px-3 py-2.5 text-center text-[var(--jm-text-muted)]">—</JmTableCell>
+                    <JmTableCell className="px-3 py-2.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
+                    <JmTableCell className="px-3 py-2.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
+                    <JmTableCell className="px-3 py-2.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
+                    <JmTableCell className="px-3 py-2.5 text-right tabular-nums">
                       {parseFloat(p.debitAmount) > 0
                         ? <>₩{formatAmount(p.debitAmount)}</>
                         : <span className="text-[var(--jm-text-muted)]">—</span>}
                     </JmTableCell>
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">
+                    <JmTableCell className="px-3 py-2.5 text-right tabular-nums">
                       {parseFloat(p.creditAmount) > 0
                         ? <>₩{formatAmount(p.creditAmount)}</>
                         : <span className="text-[var(--jm-text-muted)]">—</span>}
                     </JmTableCell>
                     <JmTableCell className={cn(
-                      "px-2 py-1.5 text-right font-medium tabular-nums",
+                      "px-3 py-2.5 text-right font-medium tabular-nums",
                       // 과지급(음수) 만 빨강
                       parseFloat(p.balance) < 0 && "text-[var(--jm-danger-fg)]",
                     )}>
@@ -190,26 +190,26 @@ export function ItemsView({
                   onClick={() => onIncomingClick(it.incomingId)}
                 >
                   {!selectedSupplierId && (
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">{it.supplier.name}</JmTableCell>
+                    <JmTableCell className="px-3 py-2.5 truncate">{it.supplier.name}</JmTableCell>
                   )}
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-xs text-[var(--jm-text-muted)] truncate">{it.incomingNo}</JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">
+                  <JmTableCell className="px-3 py-2.5 text-xs text-[var(--jm-text-muted)] truncate">{it.incomingNo}</JmTableCell>
+                  <JmTableCell className="px-3 py-2.5 truncate">
                     <span className="font-medium">{it.supplierProduct.name}</span>
                     {it.supplierProduct.supplierCode && (
                       <span className="ml-1 text-xs text-[var(--jm-text-muted)]">({it.supplierProduct.supplierCode})</span>
                     )}
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)] truncate">{it.supplierProduct.spec ?? ""}</JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center text-[var(--jm-text-muted)]">{it.supplierProduct.unitOfMeasure}</JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">{qty.toLocaleString("ko-KR")}</JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">{formatAmount(up)}</JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">
+                  <JmTableCell className="px-3 py-2.5 text-[var(--jm-text-muted)] truncate">{it.supplierProduct.spec ?? ""}</JmTableCell>
+                  <JmTableCell className="px-3 py-2.5 text-center text-[var(--jm-text-muted)]">{it.supplierProduct.unitOfMeasure}</JmTableCell>
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">{qty.toLocaleString("ko-KR")}</JmTableCell>
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">{formatAmount(up)}</JmTableCell>
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">
                     {disc > 0 ? <span className="text-[var(--jm-danger-fg)]">-{formatAmount(disc)}</span> : ""}
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">{formatAmount(totalWithTax)}</JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">{formatAmount(totalWithTax)}</JmTableCell>
+                  <JmTableCell className="px-3 py-2.5 text-right text-[var(--jm-text-muted)]">—</JmTableCell>
                   <JmTableCell className={cn(
-                    "px-2 py-1.5 text-right font-medium tabular-nums",
+                    "px-3 py-2.5 text-right font-medium tabular-nums",
                     // 과지급(음수) 만 빨강
                     row.balance !== null && row.balance < 0 && "text-[var(--jm-danger-fg)]",
                   )}>

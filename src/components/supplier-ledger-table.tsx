@@ -130,26 +130,26 @@ export function SupplierLedgerTable({
       <JmTableHeader className="sticky top-0 z-10">
         <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
           {showSupplierColumn && (
-            <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">
               거래처
             </JmTableHead>
           )}
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">
             유형
           </JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">
             설명
           </JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">
             참조
           </JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">
             차변 (매입)
           </JmTableHead>
-          <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">
             대변 (결제)
           </JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">
+          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">
             잔액
           </JmTableHead>
         </JmTableRow>
@@ -165,7 +165,7 @@ export function SupplierLedgerTable({
             </JmTableCell>
             <JmTableCell
               className={cn(
-                "px-2 py-1.5 text-right font-medium tabular-nums",
+                "px-3 py-2.5 text-right font-medium tabular-nums",
                 // 과지급(음수) 만 빨강. 정상 미지급(양수)·0 은 기본
                 opening.amount < 0
                   ? "text-[var(--jm-danger-fg)]"
@@ -217,34 +217,34 @@ export function SupplierLedgerTable({
                   }
                 >
                   {showSupplierColumn && (
-                    <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">
+                    <JmTableCell className="px-3 py-2.5 truncate">
                       {e.supplier?.name ?? "-"}
                     </JmTableCell>
                   )}
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center">
+                  <JmTableCell className="px-3 py-2.5 text-center">
                     <JmBadge variant={TYPE_VARIANTS[e.type]} size="sm" shape="square">
                       {TYPE_LABELS[e.type]}
                     </JmBadge>
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 truncate">
+                  <JmTableCell className="px-3 py-2.5 truncate">
                     {e.description}
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center text-[var(--jm-text-muted)] text-xs">
+                  <JmTableCell className="px-3 py-2.5 text-center text-[var(--jm-text-muted)] text-xs">
                     {e.referenceType ?? "-"}
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">
                     {parseFloat(e.debitAmount) > 0
                       ? `₩${formatAmount(e.debitAmount)}`
                       : "-"}
                   </JmTableCell>
-                  <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right tabular-nums">
+                  <JmTableCell className="px-3 py-2.5 text-right tabular-nums">
                     {parseFloat(e.creditAmount) > 0
                       ? `₩${formatAmount(e.creditAmount)}`
                       : "-"}
                   </JmTableCell>
                   <JmTableCell
                     className={cn(
-                      "px-2 py-1.5 text-right font-medium tabular-nums",
+                      "px-3 py-2.5 text-right font-medium tabular-nums",
                       parseFloat(e.balance) < 0 && "text-[var(--jm-danger-fg)]",
                     )}
                   >

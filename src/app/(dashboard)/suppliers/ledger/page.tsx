@@ -522,7 +522,7 @@ export default function SupplierLedgerPage() {
                       return (
                         <label
                           key={t}
-                          className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs cursor-pointer text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] transition-colors"
+                          className="flex items-center gap-2 w-full rounded-md px-3 py-2.5 text-xs cursor-pointer text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] transition-colors"
                         >
                           <JmCheckbox
                             checked={checked}
@@ -703,13 +703,13 @@ export default function SupplierLedgerPage() {
                 </colgroup>
                 <JmTableHeader className="sticky top-0 z-10">
                   <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-                    {!selectedSupplierId && <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">거래처</JmTableHead>}
-                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">유형</JmTableHead>
-                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 font-medium">설명</JmTableHead>
-                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-center font-medium">참조</JmTableHead>
-                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">차변 (매입)</JmTableHead>
-                    <JmTableHead className="border-r border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">대변 (결제)</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-2 text-right font-medium">잔액</JmTableHead>
+                    {!selectedSupplierId && <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">거래처</JmTableHead>}
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">유형</JmTableHead>
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">설명</JmTableHead>
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">참조</JmTableHead>
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">차변 (매입)</JmTableHead>
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">대변 (결제)</JmTableHead>
+                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">잔액</JmTableHead>
                   </JmTableRow>
                 </JmTableHeader>
                 <JmTableBody>
@@ -723,20 +723,20 @@ export default function SupplierLedgerPage() {
                       {Array.from({ length: 3 }).map((_, ri) => (
                         <JmTableRow key={`sk-${gi}-${ri}`} className="hover:bg-transparent">
                           {!selectedSupplierId && (
-                            <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-24" /></JmTableCell>
+                            <JmTableCell className="px-3 py-2.5"><JmSkeleton className="h-4 w-24" /></JmTableCell>
                           )}
-                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-center">
+                          <JmTableCell className="px-3 py-2.5 text-center">
                             <JmSkeleton className="h-5 w-12 rounded-md mx-auto" />
                           </JmTableCell>
-                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-40" /></JmTableCell>
-                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5"><JmSkeleton className="h-4 w-16 mx-auto" /></JmTableCell>
-                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right">
+                          <JmTableCell className="px-3 py-2.5"><JmSkeleton className="h-4 w-40" /></JmTableCell>
+                          <JmTableCell className="px-3 py-2.5"><JmSkeleton className="h-4 w-16 mx-auto" /></JmTableCell>
+                          <JmTableCell className="px-3 py-2.5 text-right">
                             <div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div>
                           </JmTableCell>
-                          <JmTableCell className="border-r border-[var(--jm-border)] px-2 py-1.5 text-right">
+                          <JmTableCell className="px-3 py-2.5 text-right">
                             <div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div>
                           </JmTableCell>
-                          <JmTableCell className="px-2 py-1.5 text-right">
+                          <JmTableCell className="px-3 py-2.5 text-right">
                             <div className="flex justify-end"><JmSkeleton className="h-4 w-24" /></div>
                           </JmTableCell>
                         </JmTableRow>
