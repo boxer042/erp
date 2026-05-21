@@ -8,12 +8,25 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { format, startOfMonth, endOfMonth, startOfDay, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Pencil, Trash2, Loader2, ExternalLink, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Loader2,
+  ExternalLink,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Coins,
+  Receipt,
+  RotateCcw,
+  TrendingDown,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
   JmBadge,
   JmButton,
+  JmCard,
   JmCheckbox,
   JmDatePicker,
   JmDateRangePicker,
@@ -23,11 +36,15 @@ import {
   JmDialogFooter,
   JmDialogHeader,
   JmDialogTitle,
+  JmEmpty,
   JmIconButton,
   JmInput,
+  JmPill,
+  JmSearchInput,
   JmSelect,
   JmSkeleton,
   JmSpinner,
+  JmStat,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -35,9 +52,12 @@ import {
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarFilters,
+  JmTableToolbarSearch,
 } from "@/jm";
 import { cn } from "@/lib/utils";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { formatComma, parseComma, toCSV, downloadCSV } from "@/lib/utils";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { CustomerCombobox } from "@/components/customer-combobox";
@@ -607,144 +627,165 @@ export default function ExpensesPage() {
     downloadCSV(`경비_${fromStr}-${toStr}.csv`, csv);
   };
 
+  // KPI — 기간 합계 / 회수예정 / 실비용 / 건수 (회수예정 0 일 때도 4개 유지)
+  const kpiCount = total;
+  const periodPresets = [
+    { value: "thisMonth", label: "이번달" },
+    { value: "lastMonth", label: "지난달" },
+    { value: "last3", label: "최근3개월" },
+    { value: "all", label: "전체" },
+  ] as const;
+
   return (
-    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-      <DataTableToolbar
-        search={{ value: search, onChange: setSearch, onSearch: fetchData, placeholder: "설명 검색" }}
-        onRefresh={fetchData}
-        onAdd={openCreate}
-        filters={
-          <JmButton
-            variant="outline"
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex w-full flex-col gap-6 p-4">
+        {/* KPI 4종 */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <JmStat
+            label="기간 지출"
+            value={loading ? "—" : `₩${formatPrice(periodTotals.all)}`}
+            icon={<Receipt className="size-4" />}
+            hint={loading ? "" : `${kpiCount.toLocaleString("ko-KR")}건`}
             size="sm"
-            onClick={handleExport}
-            disabled={loading || total === 0}
-          >
-            <Download />
-            <span>CSV</span>
-          </JmButton>
-        }
-        addLabel="경비 추가"
-        loading={loading}
-      />
+          />
+          <JmStat
+            label="회수예정"
+            value={loading ? "—" : `₩${formatPrice(periodTotals.recoverable)}`}
+            icon={<RotateCcw className="size-4" />}
+            hint={loading ? "" : "추후 회수 가능"}
+            positiveIsGood={false}
+            size="sm"
+          />
+          <JmStat
+            label="실비용 (순 지출)"
+            value={loading ? "—" : `₩${formatPrice(periodTotals.net)}`}
+            icon={<TrendingDown className="size-4" />}
+            hint={loading ? "" : "회수예정 차감"}
+            positiveIsGood={false}
+            size="sm"
+          />
+          <JmStat
+            label="기간"
+            value={
+              from && to
+                ? `${format(from, "MM.dd")} – ${format(to, "MM.dd")}`
+                : "전체"
+            }
+            icon={<Coins className="size-4" />}
+            hint={currentPresetLabel}
+            size="sm"
+          />
+        </div>
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* 왼쪽: 기간 필터 + 카테고리별 합계 */}
-        <aside className="w-64 flex-shrink-0 border-r border-[var(--jm-border)] flex flex-col overflow-hidden">
-          {/* 기간 프리셋 */}
-          <div className="px-3 pt-3 flex flex-wrap gap-1 shrink-0">
-            {(["thisMonth", "lastMonth", "last3", "all"] as const).map((p) => {
-              const labels = { thisMonth: "이번달", lastMonth: "지난달", last3: "최근3개월", all: "전체" };
-              const active = currentPresetLabel === labels[p];
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => applyPreset(p)}
-                  className={cn(
-                    "px-2 h-6 rounded text-jm-2xs border transition-colors",
-                    active
-                      ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)]"
-                      : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
-                  )}
-                >
-                  {labels[p]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 기간 선택 */}
-          <div className="px-3 pt-2 shrink-0">
-            <JmDateRangePicker
-              size="sm"
-              value={{ from, to }}
-              onChange={(range) => {
-                setFrom(range?.from);
-                setTo(range?.to);
-              }}
-              placeholder="기간 선택"
-            />
-          </div>
-
-          {/* 기간 합계 */}
-          <div className="border-t border-[var(--jm-border)] mt-3 p-3 shrink-0 space-y-0.5">
-            <p className="text-jm-2xs text-[var(--jm-text-muted)]">기간 합계</p>
-            <p className="text-jm-md font-bold tabular-nums text-[var(--jm-text)]">
-              ₩{formatPrice(periodTotals.all)}
-            </p>
-            {periodTotals.recoverable > 0 && (
-              <>
-                <p className="text-jm-2xs text-[var(--jm-warning-fg)] tabular-nums">
-                  회수예정 ₩{formatPrice(periodTotals.recoverable)}
-                </p>
-                <p className="text-jm-2xs text-[var(--jm-text-muted)] tabular-nums">
-                  실비용 ₩{formatPrice(periodTotals.net)}
-                </p>
-              </>
-            )}
-          </div>
-
-          {/* 카테고리 목록 */}
-          <div className="py-1 overflow-y-auto flex-1 min-h-0 border-t border-[var(--jm-border)]">
-            <button
-              type="button"
-              className={cn(
-                "w-full text-left px-3 py-2.5 text-jm-sm flex justify-between items-center transition-colors",
-                categoryFilter === "ALL"
-                  ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] font-medium"
-                  : "text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
-              )}
-              onClick={() => setCategoryFilter("ALL")}
-            >
-              <span>전체</span>
-              <span className="tabular-nums text-jm-2xs text-[var(--jm-text-muted)]">
-                ₩{formatPrice(periodTotals.all)}
-              </span>
-            </button>
-            {CATEGORIES.map((cat) => {
-              const s = summary.find((x) => x.category === cat);
-              const t = s?.total ?? 0;
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  className={cn(
-                    "w-full text-left px-3 py-2.5 text-jm-sm flex justify-between items-center transition-colors",
-                    categoryFilter === cat
-                      ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] font-medium"
-                      : "text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]",
-                  )}
-                  onClick={() => setCategoryFilter(cat)}
-                >
-                  <span>{CATEGORY_LABELS[cat]}</span>
-                  <span
-                    className={cn(
-                      "tabular-nums text-jm-2xs",
-                      t > 0 ? "text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]",
-                    )}
-                  >
-                    {t > 0 ? `₩${formatPrice(t)}` : "-"}
+        {/* 메인 카드 */}
+        <JmCard className="overflow-hidden p-0">
+          <JmTableToolbar>
+            <JmTableToolbarSearch>
+              <JmSearchInput
+                size="sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClear={() => setSearch("")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    fetchData();
+                  }
+                }}
+                placeholder="설명·메모·거래처"
+              />
+            </JmTableToolbarSearch>
+            <JmTableToolbarFilters>
+              {/* 기간 프리셋 — 세그먼티드 */}
+              <div className="flex h-8 items-center gap-1 rounded-lg bg-[var(--jm-surface-muted)] px-1">
+                {periodPresets.map((p) => {
+                  const active = currentPresetLabel === p.label;
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => applyPreset(p.value)}
+                      className={`rounded-md px-2 py-0.5 text-[12px] font-medium transition-colors ${
+                        active
+                          ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
+                          : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <JmDateRangePicker
+                size="sm"
+                value={{ from, to }}
+                onChange={(range) => {
+                  setFrom(range?.from);
+                  setTo(range?.to);
+                }}
+                placeholder="기간 선택"
+                className="w-[240px]"
+              />
+              {/* 카테고리 pills */}
+              <span className="mx-1 h-5 w-px bg-[var(--jm-border)]" />
+              <JmPill
+                size="sm"
+                active={categoryFilter === "ALL"}
+                onClick={() => setCategoryFilter("ALL")}
+              >
+                전체
+                {periodTotals.all > 0 && (
+                  <span className="ml-1 tabular-nums text-[10px] opacity-70">
+                    ₩{formatPrice(periodTotals.all)}
                   </span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+                )}
+              </JmPill>
+              {CATEGORIES.map((cat) => {
+                const s = summary.find((x) => x.category === cat);
+                const t = s?.total ?? 0;
+                return (
+                  <JmPill
+                    key={cat}
+                    size="sm"
+                    active={categoryFilter === cat}
+                    onClick={() => setCategoryFilter(cat)}
+                  >
+                    {CATEGORY_LABELS[cat]}
+                    {t > 0 && (
+                      <span className="ml-1 tabular-nums text-[10px] opacity-70">
+                        ₩{formatPrice(t)}
+                      </span>
+                    )}
+                  </JmPill>
+                );
+              })}
+            </JmTableToolbarFilters>
+            <JmTableToolbarActions>
+              <JmButton
+                variant="outline"
+                size="sm"
+                onClick={handleExport}
+                disabled={loading || total === 0}
+              >
+                <Download className="size-4" />
+                <span>CSV</span>
+              </JmButton>
+              <JmButton variant="cta" size="sm" onClick={openCreate}>
+                경비 추가
+              </JmButton>
+            </JmTableToolbarActions>
+          </JmTableToolbar>
 
-        {/* 오른쪽: 경비 목록 */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <JmTable className="min-w-[800px]">
+          <div className="overflow-x-auto">
+            <JmTable className="min-w-[900px]">
               <JmTableHeader>
-                <JmTableRow className="bg-[var(--jm-surface-muted)] hover:bg-[var(--jm-surface-muted)]">
-                  <JmTableHead>날짜</JmTableHead>
-                  <JmTableHead>카테고리</JmTableHead>
+                <JmTableRow>
+                  <JmTableHead className="w-[100px]">날짜</JmTableHead>
+                  <JmTableHead className="w-[100px]">카테고리</JmTableHead>
                   <JmTableHead>설명</JmTableHead>
-                  <JmTableHead>결제</JmTableHead>
+                  <JmTableHead className="w-[100px]">결제</JmTableHead>
                   <JmTableHead>메모</JmTableHead>
-                  <JmTableHead className="text-right">금액</JmTableHead>
-                  <JmTableHead className="w-16" />
+                  <JmTableHead className="w-[140px] text-right">금액</JmTableHead>
+                  <JmTableHead className="w-[80px]" />
                 </JmTableRow>
               </JmTableHeader>
               <JmTableBody>
@@ -769,34 +810,40 @@ export default function ExpensesPage() {
                   ))
                 ) : filtered.length === 0 ? (
                   <JmTableRow className="hover:bg-transparent">
-                    <JmTableCell colSpan={7} className="text-center py-8 text-[var(--jm-text-muted)]">
-                      경비 내역이 없습니다
+                    <JmTableCell colSpan={7} className="py-12">
+                      <JmEmpty
+                        icon={<Receipt className="size-8" />}
+                        title="해당 기간 경비 내역이 없습니다"
+                        description="기간이나 카테고리 필터를 바꾸거나 새 경비를 추가하세요"
+                      />
                     </JmTableCell>
                   </JmTableRow>
                 ) : (
                   filtered.map((e) => (
                     <JmTableRow key={e.id}>
-                      <JmTableCell className="text-[var(--jm-text-muted)]">
+                      <JmTableCell className="text-[var(--jm-text-muted)] text-jm-xs tabular-nums">
                         {format(new Date(e.date), "yyyy.MM.dd", { locale: ko })}
                       </JmTableCell>
-                      <JmTableCell>
+                      <JmTableCell className="text-jm-sm">
                         {CATEGORY_LABELS[e.category] ?? e.category}
                       </JmTableCell>
                       <JmTableCell className="whitespace-normal">
-                        {e.description}
-                        {e.recoverable && (
-                          <JmBadge variant="warning" size="sm" className="ml-2">
-                            회수예정
-                          </JmBadge>
-                        )}
-                        {e.referenceType === "ORDER_SHIPPING_BORNE" && (
-                          <JmBadge variant="info" size="sm" className="ml-2">
-                            주문 자동
-                          </JmBadge>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>{e.description}</span>
+                          {e.recoverable && (
+                            <JmBadge variant="warning" size="sm">
+                              회수예정
+                            </JmBadge>
+                          )}
+                          {e.referenceType === "ORDER_SHIPPING_BORNE" && (
+                            <JmBadge variant="info" size="sm">
+                              주문 자동
+                            </JmBadge>
+                          )}
+                        </div>
                       </JmTableCell>
                       <JmTableCell className="text-[var(--jm-text-muted)] text-jm-xs">
-                        {e.paymentMethod ? (PAYMENT_METHOD_LABELS[e.paymentMethod] ?? e.paymentMethod) : "-"}
+                        {e.paymentMethod ? (PAYMENT_METHOD_LABELS[e.paymentMethod] ?? e.paymentMethod) : "—"}
                       </JmTableCell>
                       <JmTableCell className="text-[var(--jm-text-muted)] text-jm-xs whitespace-normal">
                         {e.memo ?? ""}
@@ -840,11 +887,14 @@ export default function ExpensesPage() {
                 <JmTableFooter>
                   <JmTableRow className="hover:bg-[var(--jm-surface-muted)]">
                     <JmTableCell colSpan={5} className="text-jm-xs text-[var(--jm-text-muted)]">
-                      {total}건 중 {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
+                      {total}건 중 {(page - 1) * PAGE_SIZE + 1}–
+                      {Math.min(page * PAGE_SIZE, total)}
                     </JmTableCell>
                     <JmTableCell className="text-right tabular-nums">
                       <div className="flex flex-col items-end gap-0.5">
-                        <div className="font-bold">총 지출 ₩{formatPrice(filteredTotal)}</div>
+                        <div className="font-bold">
+                          총 지출 ₩{formatPrice(filteredTotal)}
+                        </div>
                         {filteredRecoverable > 0 && (
                           <>
                             <div className="text-jm-xs text-[var(--jm-warning-fg)]">
@@ -863,32 +913,41 @@ export default function ExpensesPage() {
               )}
             </JmTable>
           </div>
+
+          {/* 페이지네이션 */}
           {total > PAGE_SIZE && (
-            <div className="flex items-center justify-center gap-2 border-t border-[var(--jm-border)] py-2 shrink-0">
-              <JmIconButton
-                variant="outline"
-                size="sm"
-                aria-label="이전 페이지"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft />
-              </JmIconButton>
-              <span className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
-                {page} / {totalPages}
+            <div className="flex items-center justify-between border-t border-[var(--jm-border)] px-4 py-2.5">
+              <span className="text-[12px] text-[var(--jm-text-muted)]">
+                총 {total.toLocaleString("ko-KR")}건 ·{" "}
+                {((page - 1) * PAGE_SIZE + 1).toLocaleString("ko-KR")}–
+                {Math.min(page * PAGE_SIZE, total).toLocaleString("ko-KR")}
               </span>
-              <JmIconButton
-                variant="outline"
-                size="sm"
-                aria-label="다음 페이지"
-                disabled={page >= totalPages || loading}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                <ChevronRight />
-              </JmIconButton>
+              <div className="flex items-center gap-2">
+                <JmIconButton
+                  variant="outline"
+                  size="sm"
+                  aria-label="이전 페이지"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft />
+                </JmIconButton>
+                <span className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
+                  {page} / {totalPages}
+                </span>
+                <JmIconButton
+                  variant="outline"
+                  size="sm"
+                  aria-label="다음 페이지"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight />
+                </JmIconButton>
+              </div>
             </div>
           )}
-        </div>
+        </JmCard>
       </div>
 
       {/* ── 경비 등록/수정 다이얼로그 ── */}
