@@ -19,6 +19,7 @@ import {
   JmDialogHeader,
   JmDialogTitle,
   JmInput,
+  JmSelect,
 } from "@/jm";
 
 import { ProductSection } from "./product-section";
@@ -167,14 +168,20 @@ export function ProductBulkCard({ product }: ProductBulkCardProps) {
                   <label className="text-jm-xs text-[var(--jm-text-muted)]">
                     벌크 단위
                   </label>
-                  <JmInput
+                  <JmSelect
                     size="sm"
                     value={form.unitOfMeasure}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, unitOfMeasure: e.target.value }))
+                    onChange={(v) =>
+                      setForm((p) => ({ ...p, unitOfMeasure: v || "mL" }))
                     }
-                    onFocus={focusCaretEnd}
-                    placeholder="mL"
+                    options={[
+                      { value: "mL", label: "mL" },
+                      { value: "L", label: "L" },
+                      { value: "g", label: "g" },
+                      { value: "kg", label: "kg" },
+                      { value: "cm", label: "cm" },
+                      { value: "mm", label: "mm" },
+                    ]}
                   />
                 </div>
                 <div className="space-y-2">
