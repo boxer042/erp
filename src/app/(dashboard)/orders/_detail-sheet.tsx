@@ -339,6 +339,9 @@ export function OrderDetailSheet({
   const [metaFulfillment, setMetaFulfillment] =
     useState<FulfillmentType>("DELIVERY");
   const [metaShipCost, setMetaShipCost] = useState("0");
+  const [metaShippingPaymentType, setMetaShippingPaymentType] = useState<
+    "PREPAID" | "COD" | "STORE_BURDEN"
+  >("PREPAID");
   // 배송 원가 가격 드로워 (PriceInputDialog) — VAT 포함 입력 UX
   const [shipCostDialogOpen, setShipCostDialogOpen] = useState(false);
   // 외상 주문 수금 등록 다이얼로그
@@ -504,12 +507,13 @@ export function OrderDetailSheet({
       toast.error(err instanceof ApiError ? err.message : "발행 실패"),
   });
 
-  // 배송 메타 사후 수정 — 완료된 주문에서 출고방식·배송원가만 backfill 용도
+  // 배송 메타 사후 수정 — 완료된 주문에서 출고방식·배송원가·배송비결제만 backfill 용도
   const metaEditMutation = useMutation({
     mutationFn: () =>
       apiMutate(`/api/orders/${orderId}`, "PATCH", {
         fulfillmentType: metaFulfillment,
         shippingCostBorne: metaShipCost || "0",
+        shippingPaymentType: metaShippingPaymentType,
       }),
     onSuccess: () => {
       toast.success("배송 메타가 수정됐습니다");
@@ -899,6 +903,7 @@ export function OrderDetailSheet({
                           setMetaShipCost(
                             String(data.shippingCostBorne ?? "0"),
                           );
+                          setMetaShippingPaymentType(data.shippingPaymentType);
                           setMetaEditOpen(true);
                         }}
                       >
@@ -1505,6 +1510,36 @@ export function OrderDetailSheet({
               </div>
             </JmFormField>
             <JmFormField
+              label="배송비 결제"
+              hint="선불 = 손님 결제 / 착불 = 도착 시 손님 지불 / 무료 = 매장 부담"
+            >
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { value: "PREPAID", label: "선불" },
+                    { value: "COD", label: "착불" },
+                    { value: "STORE_BURDEN", label: "무료" },
+                  ] as const
+                ).map((opt) => {
+                  const active = metaShippingPaymentType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setMetaShippingPaymentType(opt.value)}
+                      className={`h-10 rounded-xl border-2 text-jm-sm font-medium transition-colors ${
+                        active
+                          ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
+                          : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </JmFormField>
+            <JmFormField
               label="배송 원가 (매장 지불)"
               hint="우리가 낸 퀵비·택배비 — VAT 포함 금액 입력. 마진 리포트·경비에서 차감됨"
             >
@@ -1611,6 +1646,9 @@ function ReadView({
             </Field>
             {order.fulfillmentType !== "IN_STORE" && order.fulfillmentType !== "PICKUP" && (
               <>
+                <Field label="배송비 결제" icon={<Banknote className="size-3.5" />}>
+                  <ShippingPaymentBadge type={order.shippingPaymentType} />
+                </Field>
                 <Field label="출고 예정일" icon={<CalendarClock className="size-3.5" />}>
                   {order.expectedShipDate
                     ? new Date(order.expectedShipDate).toLocaleDateString("ko-KR")
@@ -1882,13 +1920,6 @@ function ReadView({
             {Number(order.shippingFee) > 0 && (
               <SumRow label="배송비" value={Number(order.shippingFee)} muted />
             )}
-            {/* 배송비 결제 방식 — 배송 주문일 때만 (매장 인도 IN_STORE/PICKUP 은 배송 자체 무관) */}
-            {order.fulfillmentType !== "IN_STORE" && order.fulfillmentType !== "PICKUP" && (
-              <div className="flex items-center justify-between text-jm-xs text-[var(--jm-text-muted)]">
-                <span>배송비 결제</span>
-                <ShippingPaymentBadge type={order.shippingPaymentType} />
-              </div>
-            )}
             <SumRow label="부가세" value={Number(order.taxAmount)} muted />
             {Number(order.commissionAmount) > 0 && (
               <SumRow
@@ -1907,15 +1938,16 @@ function ReadView({
               )}
               <PaymentStatusBadge status={order.paymentStatus} showPaid />
             </div>
-            {/* 매장 부담 배송 원가 — 손님 청구와 무관 (내부 비용, 마진 리포트에서 차감) */}
+            {/* 매장 부담 배송 원가 — 손님 청구와 무관 (내부 비용, 마진 리포트에서 차감).
+                 저장은 세전(net) 이지만 표시는 VAT 포함(gross) 으로 통일 — 다른 비용 행과 일관. */}
             {Number(order.shippingCostBorne) > 0 && (
               <div className="mt-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-2.5 py-2 text-jm-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-[var(--jm-text-muted)]">
-                    배송 원가 (매장 부담)
+                    배송 원가 (매장 부담, VAT 포함)
                   </span>
                   <span className="tabular-nums text-[var(--jm-text)]">
-                    ₩{Math.round(Number(order.shippingCostBorne)).toLocaleString("ko-KR")}
+                    ₩{Math.round(Number(order.shippingCostBorne) * 1.1).toLocaleString("ko-KR")}
                   </span>
                 </div>
                 <p className="mt-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
