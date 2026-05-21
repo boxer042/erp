@@ -1658,6 +1658,21 @@ export function NewProductForm({
                                 value={mapping.supplierProductId}
                                 onChange={(sp) => {
                                   setMapping((prev) => ({ ...prev, supplierProductId: sp.id }));
+                                  // 거래처상품 데이터로 기본 정보 자동 채움
+                                  // (사용자가 이미 입력/수정한 값은 보존 — 빈 값/기본값일 때만 채움)
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    name: prev.name || sp.name,
+                                    spec: prev.spec || sp.spec || "",
+                                    unitOfMeasure:
+                                      prev.unitOfMeasure === "EA" && sp.unitOfMeasure
+                                        ? sp.unitOfMeasure
+                                        : prev.unitOfMeasure,
+                                    taxType:
+                                      prev.taxType === "TAXABLE" && sp.isTaxable === false
+                                        ? "TAX_FREE"
+                                        : prev.taxType,
+                                  }));
                                   if (mapping.syncName) {
                                     setForm((prev) => ({ ...prev, name: sp.name, spec: sp.spec || "" }));
                                   }
@@ -2021,6 +2036,8 @@ export function NewProductForm({
                                         { value: "L", label: "L" },
                                         { value: "g", label: "g" },
                                         { value: "kg", label: "kg" },
+                                        { value: "cm", label: "cm" },
+                                        { value: "mm", label: "mm" },
                                       ]}
                                     />
                                   </div>

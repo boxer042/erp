@@ -30,6 +30,8 @@ export const STEP_LABEL: Record<StepId, string> = {
 /**
  * 상품 유형 + 채널 보유 여부에 따라 스텝 흐름을 만든다.
  * - OPTION_PARENT: 자체 가격·재고가 없어 가격/채널 스텝 제외, 옵션 구성 대신 들어감
+ * - FINISHED/PARTS: 거래처상품을 먼저 골라 기본 정보를 자동 채우기 — supplier → basic 순서
+ * - SET/ASSEMBLED: 거래처 스텝이 없어 basic 먼저
  * - 채널이 없으면 channels 스텝 생략
  */
 export function buildSteps(
@@ -40,23 +42,18 @@ export function buildSteps(
     return ["type", "basic", "options", "review"];
   }
 
-  const steps: StepId[] = ["type", "basic"];
-
   if (productType === "FINISHED" || productType === "PARTS") {
-    steps.push("supplier");
-  }
-  if (productType === "SET" || productType === "ASSEMBLED") {
-    steps.push("components");
-  }
-  if (productType === "PARTS") {
-    steps.push("parents");
+    const steps: StepId[] = ["type", "supplier", "basic"];
+    if (productType === "PARTS") steps.push("parents");
+    steps.push("pricing");
+    if (hasChannels) steps.push("channels");
+    steps.push("review");
+    return steps;
   }
 
-  steps.push("pricing");
-  if (hasChannels) {
-    steps.push("channels");
-  }
+  // SET / ASSEMBLED
+  const steps: StepId[] = ["type", "basic", "components", "pricing"];
+  if (hasChannels) steps.push("channels");
   steps.push("review");
-
   return steps;
 }

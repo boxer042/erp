@@ -20,6 +20,8 @@ interface SupplierProduct {
   supplierCode?: string | null;
   unitPrice: string;
   unitOfMeasure: string;
+  /** 과세 여부 — onChange 콜백에서 판매상품 세금유형 자동 채움에 사용 */
+  isTaxable?: boolean;
   incomingCosts?: SupplierProductCostItem[];
   /** 이 거래처상품이 이미 연결된 판매상품들 — 행에 "매핑 N" 배지로 표시 */
   productMappings?: Array<{ id: string; product: { id: string; name: string } }>;

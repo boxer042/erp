@@ -52,6 +52,8 @@ export const UNITS_OF_MEASURE = [
   { value: "G", label: "g" },
   { value: "L", label: "L" },
   { value: "ML", label: "mL" },
+  { value: "CM", label: "cm" },
+  { value: "MM", label: "mm" },
   { value: "SET", label: "세트" },
   { value: "PACK", label: "팩" },
 ] as const;

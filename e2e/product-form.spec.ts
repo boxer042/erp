@@ -11,7 +11,7 @@ import { test, expect } from "@playwright/test";
  */
 
 test.describe("상품 등록 폼 — 스텝 마법사", () => {
-  test("유형 선택 → 완제품 스텝 마법사 진입 + 기본 정보 검증", async ({
+  test("유형 선택 → 완제품 (거래처-기본 순서) + 기본 정보 검증", async ({
     page,
   }) => {
     await page.goto("/products/new");
@@ -21,10 +21,14 @@ test.describe("상품 등록 폼 — 스텝 마법사", () => {
       page.getByText("어떤 상품을 등록하시겠어요?"),
     ).toBeVisible();
 
-    // 완제품 선택 → 기본 정보 스텝 진입
+    // 완제품 선택 — FINISHED/PARTS 는 거래처 연결이 먼저
     await page.getByRole("button", { name: /완제품/ }).click();
+    await expect(page.getByText("거래처 연결").first()).toBeVisible();
 
-    await expect(page.getByText("기본 정보").first()).toBeVisible();
+    // 거래처 미지정 상태로 다음 — supplier 스텝은 skippable
+    await page.getByRole("button", { name: "다음" }).click();
+
+    // 두 번째 스텝 = 기본 정보 — 상품명 입력 필드 노출
     const nameInput = page.getByPlaceholder("상품명을 입력하세요");
     await expect(nameInput).toBeVisible();
 
@@ -32,10 +36,10 @@ test.describe("상품 등록 폼 — 스텝 마법사", () => {
     await page.getByRole("button", { name: "다음" }).click();
     await expect(page.getByText("상품명을 입력해주세요")).toBeVisible();
 
-    // 상품명 입력 후 다음 → 거래처 연결 스텝으로 진행
+    // 상품명 입력 후 다음 → 다음 스텝(가격) 진입 = 기본 정보 필드 사라짐
     await nameInput.fill(`E2E완제품 ${Date.now()}`);
     await page.getByRole("button", { name: "다음" }).click();
-    await expect(page.getByText("거래처 연결").first()).toBeVisible();
+    await expect(nameInput).toBeHidden();
 
     // 이전 → 기본 정보로 복귀
     await page.getByRole("button", { name: "이전" }).click();
