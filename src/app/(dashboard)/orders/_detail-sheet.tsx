@@ -85,6 +85,7 @@ import {
   type OrderPaymentStatus,
   type OrderStatus,
 } from "./_types";
+import { CustomerPaymentDialog } from "@/components/customer-payment-dialog";
 import { DocumentPrintDialog } from "@/components/document-print-dialog";
 import { ExchangeDialog } from "./_exchange-dialog";
 import { formatCurrency } from "./_helpers";
@@ -129,6 +130,8 @@ interface OrderDetail {
   status: OrderStatus;
   fulfillmentType: FulfillmentType;
   expectedShipDate: string | null;
+  customerId: string | null;
+  customer: { id: string; name: string } | null;
   customerName: string | null;
   customerPhone: string | null;
   recipientName: string | null;
@@ -335,6 +338,8 @@ export function OrderDetailSheet({
   const [metaFulfillment, setMetaFulfillment] =
     useState<FulfillmentType>("DELIVERY");
   const [metaShipCost, setMetaShipCost] = useState("0");
+  // 외상 주문 수금 등록 다이얼로그
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   // orderId/open 변경 시 모든 다이얼로그·편집 state 초기화 — 렌더 중 비교 패턴 (effect 회피)
   const resetKey = `${orderId ?? ""}|${open ? "1" : "0"}`;
@@ -363,6 +368,7 @@ export function OrderDetailSheet({
     setStatementPreviewOpen(false);
     setIssueStatementOpen(false);
     setMetaEditOpen(false);
+    setPaymentDialogOpen(false);
   }
 
   // highlightItemId 가 있고 데이터 로드 후 — 해당 라인으로 스크롤
@@ -855,6 +861,17 @@ export function OrderDetailSheet({
                     <Printer className="size-3.5" />
                     거래명세표
                   </JmButton>
+                  {/* 외상 주문 수금 등록 — UNPAID + 등록 고객일 때만 (비등록 외상은 ledger 없음) */}
+                  {data.paymentStatus === "UNPAID" && data.customerId && (
+                    <JmButton
+                      variant="cta"
+                      size="xs"
+                      onClick={() => setPaymentDialogOpen(true)}
+                    >
+                      <Banknote className="size-3.5" />
+                      수금 등록
+                    </JmButton>
+                  )}
                   {data.status !== "CANCELLED" && (
                     <JmButton
                       variant="ghost"
@@ -1518,6 +1535,28 @@ export function OrderDetailSheet({
           </JmDialogFooter>
         </JmDialogContent>
       </JmDialog>
+
+      {/* 외상 주문 수금 등록 — 고객·금액·메모 prefill 후 dialog 안에서 사용자가 확인 */}
+      {data && data.customerId && (
+        <CustomerPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          fixedCustomer={{
+            id: data.customerId,
+            name: data.customer?.name ?? data.customerName ?? "",
+          }}
+          initialAmount={String(Math.round(Number(data.totalAmount)))}
+          initialMemo={`주문 ${data.orderNo} 수금`}
+          onSaved={() => {
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.orders.detail(orderId ?? ""),
+            });
+            queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.ledger.customers() });
+          }}
+        />
+      )}
     </JmDrawer>
   );
 }
@@ -1847,6 +1886,22 @@ function ReadView({
               )}
               <PaymentStatusBadge status={order.paymentStatus} showPaid />
             </div>
+            {/* 매장 부담 배송 원가 — 손님 청구와 무관 (내부 비용, 마진 리포트에서 차감) */}
+            {Number(order.shippingCostBorne) > 0 && (
+              <div className="mt-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-2.5 py-2 text-jm-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--jm-text-muted)]">
+                    배송 원가 (매장 부담)
+                  </span>
+                  <span className="tabular-nums text-[var(--jm-text)]">
+                    ₩{Math.round(Number(order.shippingCostBorne)).toLocaleString("ko-KR")}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
+                  손님 청구와 무관 — 마진 리포트·경비에서 자동 차감
+                </p>
+              </div>
+            )}
             <TaxInvoiceToggle
               orderId={order.id}
               requested={order.taxInvoiceRequested}

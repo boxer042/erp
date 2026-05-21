@@ -143,6 +143,7 @@ export async function GET(
     where: { id },
     include: {
       channel: { select: { name: true, code: true, commissionRate: true } },
+      customer: { select: { id: true, name: true } },
       createdBy: { select: { name: true } },
       // 교환으로 생성된 새 주문 link (이 주문에서 시작된 교환)
       exchangeOrder: {

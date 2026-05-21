@@ -177,6 +177,8 @@ export async function GET(request: NextRequest) {
       paymentMethod: true,
       paymentStatus: true,
       totalAmount: true,
+      shippingFee: true,
+      shippingCostBorne: true,
       status: true,
       claimType: true,
       claimReason: true,
@@ -312,6 +314,8 @@ export async function GET(request: NextRequest) {
     claimReason: OrderClaimReason | null;
     fulfillmentType: string | null;
     amount: number;
+    shippingFee: number;
+    shippingCostBorne: number;
   };
 
   const orderRows: Row[] = orders.map((o) => ({
@@ -329,6 +333,8 @@ export async function GET(request: NextRequest) {
     claimReason: o.claimReason,
     fulfillmentType: o.fulfillmentType,
     amount: Number(o.totalAmount),
+    shippingFee: Number(o.shippingFee ?? 0),
+    shippingCostBorne: Number(o.shippingCostBorne ?? 0),
   }));
 
   const orphanRepairRows: Row[] = orphanTickets.map((t) => ({
@@ -347,6 +353,8 @@ export async function GET(request: NextRequest) {
     claimReason: null,
     fulfillmentType: null,
     amount: Number(t.finalAmount),
+    shippingFee: 0,
+    shippingCostBorne: 0,
   }));
 
   const orphanRentalRows: Row[] = orphanRentals.map((r) => ({
@@ -365,6 +373,8 @@ export async function GET(request: NextRequest) {
     claimReason: null,
     fulfillmentType: null,
     amount: Number(r.finalAmount),
+    shippingFee: 0,
+    shippingCostBorne: 0,
   }));
 
   const filteredOrders = type
@@ -390,6 +400,8 @@ export async function GET(request: NextRequest) {
       "클레임유형",
       "클레임사유",
       "출고방식",
+      "손님청구배송비",
+      "매장부담배송원가",
       "금액",
     ]
       .map(csvEscape)
@@ -412,6 +424,8 @@ export async function GET(request: NextRequest) {
         r.claimType ? CLAIM_TYPE_LABEL[r.claimType] : "",
         r.claimReason ? CLAIM_REASON_LABEL[r.claimReason] : "",
         r.fulfillmentType ? FULFILLMENT_LABEL[r.fulfillmentType] : "",
+        r.shippingFee.toString(),
+        r.shippingCostBorne.toString(),
         r.amount.toString(),
       ]
         .map(csvEscape)

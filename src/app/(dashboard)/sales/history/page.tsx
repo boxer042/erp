@@ -561,7 +561,7 @@ export default function SalesHistoryPage() {
             </div>
           )}
 
-          <JmTable className="min-w-[1400px]">
+          <JmTable className="min-w-[1500px]">
               <JmTableHeader>
                 <JmTableRow>
                   <JmTableHead className="w-[120px]">일시</JmTableHead>
@@ -574,18 +574,24 @@ export default function SalesHistoryPage() {
                   <JmTableHead className="w-[120px]">채널</JmTableHead>
                   <JmTableHead>고객</JmTableHead>
                   <JmTableHead className="w-[90px]">결제수단</JmTableHead>
+                  <JmTableHead
+                    className="w-[100px] text-right"
+                    title="매장 부담 — 우리가 지불한 배송/퀵 원가 (마진 리포트·경비에서 자동 차감)"
+                  >
+                    매장부담
+                  </JmTableHead>
                   <JmTableHead className="w-[120px] text-right">금액</JmTableHead>
                 </JmTableRow>
               </JmTableHeader>
               <JmTableBody>
                 {isPending ? (
                   Array.from({ length: 8 }).map((_, i) => (
-                    <TableRowSkeleton key={i} cols={11} />
+                    <TableRowSkeleton key={i} cols={12} />
                   ))
                 ) : isError ? (
                   <JmTableRow>
                     <JmTableCell
-                      colSpan={11}
+                      colSpan={12}
                       className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
                     >
                       판매내역을 불러오지 못했습니다
@@ -593,7 +599,7 @@ export default function SalesHistoryPage() {
                   </JmTableRow>
                 ) : rows.length === 0 ? (
                   <JmTableRow className="hover:bg-transparent">
-                    <JmTableCell colSpan={10} className="py-12">
+                    <JmTableCell colSpan={12} className="py-12">
                       <JmEmpty
                         icon={<ShoppingBag className="size-8" />}
                         title="해당 기간 판매내역이 없습니다"
@@ -701,6 +707,22 @@ export default function SalesHistoryPage() {
                             ? PAYMENT_METHOD_LABEL[row.paymentMethod] ??
                               row.paymentMethod
                             : "—"}
+                        </JmTableCell>
+                        <JmTableCell
+                          className="text-right text-[12px] tabular-nums"
+                          title={
+                            row.shippingCostBorne > 0
+                              ? "매장 부담 배송/퀵 원가 (세전) — 손님 청구와 무관"
+                              : undefined
+                          }
+                        >
+                          {row.shippingCostBorne > 0 ? (
+                            <span className="text-[var(--jm-text-muted)]">
+                              −₩{Math.round(row.shippingCostBorne).toLocaleString("ko-KR")}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--jm-text-subtle)]">—</span>
+                          )}
                         </JmTableCell>
                         <JmTableCell className="text-right">
                           <SalesAmountCell row={row} />

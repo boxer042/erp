@@ -44,6 +44,10 @@ export interface CustomerPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fixedCustomer?: { id: string; name: string };
+  /** 신규 등록 시 금액 prefill — fixedCustomer 와 함께 사용 (주문 → 수금 등록 등). 편집 모드에선 무시 */
+  initialAmount?: string;
+  /** 신규 등록 메모 prefill (예: 주문번호) */
+  initialMemo?: string;
   initialPayment?: {
     id: string;
     customer: { id: string; name: string };
@@ -74,6 +78,8 @@ export function CustomerPaymentDialog({
   open,
   onOpenChange,
   fixedCustomer,
+  initialAmount,
+  initialMemo,
   initialPayment,
   onSaved,
 }: CustomerPaymentDialogProps) {
@@ -114,11 +120,11 @@ export function CustomerPaymentDialog({
       setForm({
         customerId: fixedCustomer.id,
         customerName: fixedCustomer.name,
-        amount: "",
+        amount: initialAmount ?? "",
         paymentDate: todayIso(),
         method: "TRANSFER",
         kind: "MIXED",
-        memo: "",
+        memo: initialMemo ?? "",
       });
     } else {
       setForm({
@@ -131,7 +137,7 @@ export function CustomerPaymentDialog({
         memo: "",
       });
     }
-  }, [open, initialPayment, fixedCustomer]);
+  }, [open, initialPayment, fixedCustomer, initialAmount, initialMemo]);
 
   const customersQuery = useQuery({
     queryKey: queryKeys.customers.list(),

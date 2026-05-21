@@ -67,7 +67,96 @@ export async function GET(request: NextRequest) {
       : {}),
   };
 
-  const [entries, total] = await Promise.all([
+  // ── 주문 매장 부담 배송 원가 — 가상 경비 행으로 합산 ────────────────────
+  // Order.shippingCostBorne 은 별도 Expense 가 아니라 Order 필드.
+  // 사용자가 같은 비용을 중복 입력하지 않도록 가상 행으로 노출 + 합계 가산.
+  // 카테고리 필터가 SHIPPING 이거나 없을 때만 포함.
+  const includeOrderShipping =
+    !supplierId && (!category || category === "SHIPPING");
+  const orderShippingDateFilter: Prisma.OrderWhereInput =
+    from || to
+      ? {
+          orderDate: {
+            ...(from ? { gte: new Date(from) } : {}),
+            ...(to ? { lt: new Date(to) } : {}),
+          },
+        }
+      : {};
+  const shippingOrders = includeOrderShipping
+    ? await prisma.order.findMany({
+        where: {
+          shippingCostBorne: { gt: 0 },
+          status: { not: "CANCELLED" },
+          ...orderShippingDateFilter,
+          ...(q
+            ? {
+                OR: [
+                  { orderNo: { contains: q, mode: "insensitive" as const } },
+                  { customerName: { contains: q, mode: "insensitive" as const } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          orderNo: true,
+          orderDate: true,
+          shippingCostBorne: true,
+          paymentMethod: true,
+          customerId: true,
+          customerName: true,
+          fulfillmentType: true,
+          channel: { select: { name: true } },
+          customer: { select: { id: true, name: true } },
+        },
+        orderBy: { orderDate: "desc" },
+        take: 5000,
+      })
+    : [];
+
+  // 가상 행 — Expense 인터페이스 모양
+  const FULFILLMENT_LABEL: Record<string, string> = {
+    IN_STORE: "매장",
+    PICKUP: "픽업",
+    DELIVERY: "배달",
+    QUICK: "퀵",
+    SHIPPING: "택배",
+  };
+  const virtualShippingEntries = shippingOrders.map((o) => ({
+    id: `virtual-shipping-${o.id}`,
+    date: o.orderDate.toISOString(),
+    amount: String(o.shippingCostBorne),
+    category: "SHIPPING",
+    description: `주문 ${o.orderNo} 배송 원가 (매장 부담)`,
+    isTaxable: true,
+    supplierId: null,
+    supplier: null,
+    customerId: o.customerId,
+    customer: o.customer,
+    createdBy: null,
+    referenceId: o.id,
+    referenceType: "ORDER_SHIPPING_BORNE",
+    memo: [
+      o.customerName ? `손님: ${o.customerName}` : null,
+      o.channel?.name ? `채널: ${o.channel.name}` : null,
+      o.fulfillmentType
+        ? `출고: ${FULFILLMENT_LABEL[o.fulfillmentType] ?? o.fulfillmentType}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null,
+    attachmentUrl: null,
+    attachmentPath: null,
+    attachmentName: null,
+    paymentMethod: o.paymentMethod,
+    recoverable: false,
+  }));
+  const virtualShippingTotal = shippingOrders.reduce(
+    (s, o) => s + Number(o.shippingCostBorne),
+    0,
+  );
+
+  const [realEntries, total] = await Promise.all([
     prisma.expense.findMany({
       where,
       include: {
@@ -76,11 +165,30 @@ export async function GET(request: NextRequest) {
         createdBy: { select: { id: true, name: true } },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: pageSize,
-      skip: (page - 1) * pageSize,
+      // 가상 행도 함께 페이지네이션 하려면 raw fetch 후 merge. shippingOrders 가 보통 적음.
+      take: includeOrderShipping ? 5000 : pageSize,
+      skip: includeOrderShipping ? 0 : (page - 1) * pageSize,
     }),
     prisma.expense.count({ where }),
   ]);
+
+  // 가상 행과 합쳐 정렬 후 페이지네이션 (가상 행 포함 시만)
+  let entries = realEntries as unknown[];
+  if (includeOrderShipping) {
+    const merged = [
+      ...(realEntries.map((e) => ({
+        ...e,
+        date: e.date.toISOString(),
+      })) as unknown[]),
+      ...virtualShippingEntries,
+    ].sort((a, b) => {
+      const ad = (a as { date: string }).date;
+      const bd = (b as { date: string }).date;
+      return ad < bd ? 1 : ad > bd ? -1 : 0;
+    });
+    const start = (page - 1) * pageSize;
+    entries = merged.slice(start, start + pageSize);
+  }
 
   // 카테고리별 합계 (기간 필터만 적용 — 카테고리/검색 필터와 무관)
   const allInPeriod = await prisma.expense.findMany({
@@ -108,6 +216,12 @@ export async function GET(request: NextRequest) {
     totalsAll += amt;
     if (e.recoverable) totalsRecoverable += amt;
   }
+  // 가상 주문 배송 원가도 SHIPPING summary 에 합산 (기간 전체 — 페이지 외 포함)
+  if (includeOrderShipping && virtualShippingTotal > 0) {
+    const slot = (summaryMap["SHIPPING"] ??= { total: 0, recoverable: 0 });
+    slot.total += virtualShippingTotal;
+    totalsAll += virtualShippingTotal;
+  }
   const summary = Object.entries(summaryMap).map(([category, v]) => ({
     category,
     label: CATEGORY_LABELS[category as ExpenseCategoryKey] ?? category,
@@ -117,8 +231,10 @@ export async function GET(request: NextRequest) {
   }));
 
   // 영수증 첨부가 있는 항목은 signed URL 재발급 (private 버킷)
-  const pathsToSign = entries
-    .map((e) => e.attachmentPath)
+  type EntryShape = { attachmentPath?: string | null; attachmentUrl?: string | null };
+  const typedEntries = entries as EntryShape[];
+  const pathsToSign = typedEntries
+    .map((e) => e.attachmentPath ?? null)
     .filter((p): p is string => Boolean(p));
   let signedMap: Record<string, string> = {};
   if (pathsToSign.length > 0) {
@@ -133,16 +249,21 @@ export async function GET(request: NextRequest) {
       }, {});
     }
   }
-  const entriesWithSignedUrls = entries.map((e) =>
+  const entriesWithSignedUrls = typedEntries.map((e) =>
     e.attachmentPath && signedMap[e.attachmentPath]
       ? { ...e, attachmentUrl: signedMap[e.attachmentPath] }
       : e,
   );
 
+  // total — 가상 행 포함 시 실제+가상 합. 페이지네이션 표시용.
+  const totalCount = includeOrderShipping
+    ? total + virtualShippingEntries.length
+    : total;
+
   return NextResponse.json({
     entries: entriesWithSignedUrls,
     summary,
-    total,
+    total: totalCount,
     page,
     pageSize,
     totals: { all: totalsAll, recoverable: totalsRecoverable, net: totalsAll - totalsRecoverable },

@@ -60,6 +60,10 @@ export interface SalesHistoryRow {
     | null;
   amount: number;
   netAmount: number;
+  /** 손님 청구 배송비 (세전). orphan 은 0 */
+  shippingFee: number;
+  /** 매장 부담 배송 원가 (세전). orphan 은 0 */
+  shippingCostBorne: number;
   isExchangeReplacement: boolean;
   sourceId: string;
   isOrphan: boolean;

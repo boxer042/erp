@@ -79,6 +79,10 @@ export type SalesHistoryRow = {
    * UI 의 strike + 차감 표시에 사용.
    */
   partialRefundAmount: number;
+  /** 손님 청구 배송비 (세전, gross). Order 만. orphan 은 0. */
+  shippingFee: number;
+  /** 매장 부담 배송 원가 (세전, net). Order 만. orphan 은 0. */
+  shippingCostBorne: number;
   /** 교환 새 주문 (-EX) 인지 — 마진 리포트는 항상 제외, 이 페이지는 토글로만 노출 */
   isExchangeReplacement: boolean;
   /** 연결된 원천 — 판매:Order id, 수리:ticket id (orphan), 임대:rental id (orphan) */
@@ -212,6 +216,8 @@ export async function GET(request: NextRequest) {
       paymentStatus: true,
       totalAmount: true,
       subtotalAmount: true,
+      shippingFee: true,
+      shippingCostBorne: true,
       status: true,
       claimType: true,
       claimReason: true,
@@ -392,6 +398,8 @@ export async function GET(request: NextRequest) {
       amount,
       netAmount: isReversed ? 0 : partialNet,
       partialRefundAmount: isPartial ? partialRefundAmount : 0,
+      shippingFee: Number(o.shippingFee ?? 0),
+      shippingCostBorne: Number(o.shippingCostBorne ?? 0),
       isExchangeReplacement: (o.exchangedFromOrders?.length ?? 0) > 0,
       sourceId: o.id,
       isOrphan: false,
@@ -422,6 +430,8 @@ export async function GET(request: NextRequest) {
       amount,
       netAmount: amount,
       partialRefundAmount: 0,
+      shippingFee: 0,
+      shippingCostBorne: 0,
       isExchangeReplacement: false,
       sourceId: t.id,
       isOrphan: true,
@@ -451,6 +461,8 @@ export async function GET(request: NextRequest) {
       amount,
       netAmount: amount,
       partialRefundAmount: 0,
+      shippingFee: 0,
+      shippingCostBorne: 0,
       isExchangeReplacement: false,
       sourceId: r.id,
       isOrphan: true,

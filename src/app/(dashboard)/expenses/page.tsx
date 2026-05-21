@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -65,6 +66,7 @@ import {
 export default function ExpensesPage() {
   const now = new Date();
 
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   // 캘린더 필터 (Date 타입)
@@ -357,6 +359,11 @@ export default function ExpensesPage() {
   const openEdit = async (e: Expense) => {
     if (e.referenceType === "INVENTORY_MOVEMENT") {
       toast.error("내 상품 사용 경비는 수정할 수 없습니다");
+      return;
+    }
+    if (e.referenceType === "ORDER_SHIPPING_BORNE") {
+      toast.info("주문의 배송 원가는 주문 상세에서 수정합니다");
+      if (e.referenceId) router.push(`/orders?id=${e.referenceId}`);
       return;
     }
     setEditingId(e.id);
@@ -780,6 +787,11 @@ export default function ExpensesPage() {
                         {e.recoverable && (
                           <JmBadge variant="warning" size="sm" className="ml-2">
                             회수예정
+                          </JmBadge>
+                        )}
+                        {e.referenceType === "ORDER_SHIPPING_BORNE" && (
+                          <JmBadge variant="info" size="sm" className="ml-2">
+                            주문 자동
                           </JmBadge>
                         )}
                       </JmTableCell>
