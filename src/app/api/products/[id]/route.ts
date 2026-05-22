@@ -1030,14 +1030,34 @@ export async function PUT(
       }
     }
 
-    // 대표(canonical) 저장 시 자식 변형들의 name 도 항상 동기화.
-    // 변형은 설계상 canonical 과 같은 이름을 가지며 차이는 SKU 와 variableComponents 로만 표현.
-    // 이름 변경 여부와 무관하게 매번 updateMany 호출 — 이미 같으면 no-op 이고, 과거에 캐스케이드
-    // 없이 이름이 바뀌어 누적된 stale 변형을 한 번의 재저장으로 복구할 수 있게 의도적으로 무조건 실행.
+    // 대표(canonical) 저장 시 자식 변형들의 본질 식별 필드 모두 동기화.
+    // 변형은 설계상 canonical 과 같은 상품 (조립 구성품 일부만 다름) — 시리얼발번·보증·브랜드·
+    // 이미지·카테고리 등은 항상 동일해야 카탈로그·POS·인벤토리에서 일관 동작.
+    // SKU·가격은 variant 마다 다를 수 있어 의도적으로 제외.
+    // 변경 여부와 무관하게 매번 호출 — 과거 cascade 없이 누적된 stale 변형을 한 번의 재저장으로 복구.
     if (before?.isCanonical) {
       await tx.product.updateMany({
         where: { canonicalProductId: id },
-        data: { name: updated.name },
+        data: {
+          name: updated.name,
+          trackable: updated.trackable,
+          warrantyMonths: updated.warrantyMonths,
+          warrantyPolicy: updated.warrantyPolicy,
+          brand: updated.brand,
+          brandId: updated.brandId,
+          modelName: updated.modelName,
+          spec: updated.spec,
+          imageUrl: updated.imageUrl,
+          description: updated.description,
+          categoryId: updated.categoryId,
+          zeroRateEligible: updated.zeroRateEligible,
+          countryOfOrigin: updated.countryOfOrigin,
+          manufacturer: updated.manufacturer,
+          importer: updated.importer,
+          certifications: updated.certifications,
+          asResponsible: updated.asResponsible,
+          catalogHidden: updated.catalogHidden,
+        },
       });
     }
 
@@ -1088,19 +1108,27 @@ export async function PATCH(
     return NextResponse.json({ error: "수정할 필드가 없습니다" }, { status: 400 });
   }
   try {
-    // name 변경 시 — 대표면 자식 변형 name 도 cascade. 한 트랜잭션으로 묶어 정합성 보장.
-    if (typeof data.name === "string") {
+    // canonical cascade 대상 필드 — name/imageUrl/trackable/catalogHidden.
+    // sku 는 variant 별로 고유, autoMapped/assemblyTemplateId 는 기술적 식별값이라 제외.
+    const cascadeFields = ["name", "imageUrl", "trackable", "catalogHidden"] as const;
+    const hasCascadeField = cascadeFields.some((f) => f in data);
+    if (hasCascadeField) {
       const updated = await prisma.$transaction(async (tx) => {
         const before = await tx.product.findUnique({
           where: { id },
-          select: { name: true, isCanonical: true },
+          select: { isCanonical: true },
         });
         const row = await tx.product.update({ where: { id }, data });
         // PUT 과 동일 — 변경 여부 무관, canonical 이면 항상 cascade (stale 복구용)
         if (before?.isCanonical) {
+          const cascadeData: Record<string, unknown> = {};
+          if ("name" in data) cascadeData.name = row.name;
+          if ("imageUrl" in data) cascadeData.imageUrl = row.imageUrl;
+          if ("trackable" in data) cascadeData.trackable = row.trackable;
+          if ("catalogHidden" in data) cascadeData.catalogHidden = row.catalogHidden;
           await tx.product.updateMany({
             where: { canonicalProductId: id },
-            data: { name: row.name },
+            data: cascadeData,
           });
         }
         return row;
