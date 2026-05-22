@@ -925,7 +925,9 @@ model SetComponent {
   slot         AssemblyTemplateSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
   createdAt    DateTime              @default(now()) @map("created_at")
 
-  @@unique([setProductId, componentId])
+  // 같은 부속을 서로 다른 슬롯에 배치하는 ASSEMBLED 케이스 지원을 위해 unique 제거.
+  // 중복 판정은 UI 가 (슬롯키, componentId) 튜플 기준으로 처리.
+  @@index([setProductId, componentId])
   @@index([slotLabelId])
   @@index([slotId])
   @@map("set_components")
@@ -2137,6 +2139,14 @@ enum RepairType {
   DROP_OFF // 맡김수리 — 받아두고 며칠 내 수리 후 픽업
 }
 
+// 수리 작업의 성격 — RepairType(시간 축, ON_SITE/DROP_OFF) 와는 직교.
+// REPAIR: 일반 수리 (기존 흐름, 기본값)
+// CUSTOM_BUILD: 리빌드 — 손님 부품을 받아 추가 부속·공임으로 새 구성품 조립. 의미만 다르고 데이터 흐름은 RepairTicket 그대로.
+enum RepairWorkKind {
+  REPAIR
+  CUSTOM_BUILD
+}
+
 enum RepairPartStatus {
   USED // 정상 사용 — 청구 포함
   LOST // 손실 (수리 실패·교체로 망가짐) — 청구 제외, 재고는 차감 유지 → 매출원가 손실
@@ -2172,6 +2182,8 @@ model RepairTicket {
   id                     String                   @id @default(uuid())
   ticketNo               String                   @unique @map("ticket_no")
   type                   RepairType               @default(ON_SITE)
+  // 작업 성격 — REPAIR(기본) / CUSTOM_BUILD(리빌드). RepairType 과 직교.
+  workKind               RepairWorkKind           @default(REPAIR) @map("work_kind")
   customerId             String?                  @map("customer_id")
   customer               Customer?                @relation(fields: [customerId], references: [id])
   customerMachineId      String?                  @map("customer_machine_id")
