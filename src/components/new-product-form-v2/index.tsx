@@ -34,6 +34,7 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 import { AssemblyTemplateCombobox } from "@/components/assembly-template-combobox";
 import { AssemblyPresetCombobox } from "@/components/assembly-preset-combobox";
+import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate } from "@/lib/api-client";
@@ -183,6 +184,11 @@ export function NewProductForm({
   const [manualVatPrice, setManualVatPrice] = useState("");
   const [manualSupplyPrice, setManualSupplyPrice] = useState("");
   const [lastEdited, setLastEdited] = useState<"rate" | "amount" | "price" | "supply" | null>(null);
+  const [listPriceDialogOpen, setListPriceDialogOpen] = useState(false);
+  // 할인% / 할인금액 입력 — 타이핑 중에는 raw 입력값, 블러 후에는 계산된 값 표시
+  const [discountPctInput, setDiscountPctInput] = useState("");
+  const [discountAmtInput, setDiscountAmtInput] = useState("");
+  const [discountInputActive, setDiscountInputActive] = useState<"pct" | "amt" | null>(null);
 
   const [cardFeeRate, setCardFeeRate] = useState<number>(0);
 
@@ -815,7 +821,15 @@ export function NewProductForm({
     return v;
   };
   const getSubmitPrice = () => toNetPrice(form.sellingPrice);
-  const getSubmitListPrice = () => toNetPrice(form.listPrice || form.sellingPrice);
+  // 정가는 항상 VAT 포함으로 저장 (PriceInputDialog 입출력 통일 — vatIncluded 모드와 독립)
+  // 빈 값/0 이면 그대로 "0" → DB listPrice=0 (정가 미설정 = 할인 표시 안 함)
+  const getSubmitListPrice = () => {
+    const v = parseFloat(form.listPrice || "0");
+    if (v <= 0) return "0";
+    const rate = parseFloat(form.taxRate || "0.1");
+    const isTaxable = form.taxType !== "TAX_FREE" && !form.zeroRateEligible;
+    return isTaxable && rate > 0 ? String(Math.round(v / (1 + rate))) : String(v);
+  };
 
   const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error("상품명을 입력해주세요"); return; }
@@ -2446,6 +2460,224 @@ export function NewProductForm({
 
                   {/* 가격 계산기 */}
                   {productType !== "OPTION_PARENT" && PricePanel()}
+
+                  {/* 정가 & 할인 — 선택. 카탈로그에 strikethrough 정가 노출하고 싶을 때만 입력 */}
+                  {productType !== "OPTION_PARENT" && (() => {
+                    const lpVat = parseFloat(form.listPrice || "0");
+                    const spRaw = parseFloat(form.sellingPrice || "0");
+                    const rate = parseFloat(form.taxRate || "0.1");
+                    const isTaxable = form.taxType !== "TAX_FREE" && !form.zeroRateEligible;
+                    const spVat = form.vatIncluded
+                      ? spRaw
+                      : isTaxable && rate > 0
+                        ? Math.round(spRaw * (1 + rate))
+                        : spRaw;
+                    const lpNet = isTaxable && rate > 0 && lpVat > 0
+                      ? Math.round(lpVat / (1 + rate))
+                      : lpVat;
+                    const spNet = isTaxable && rate > 0 && spVat > 0
+                      ? Math.round(spVat / (1 + rate))
+                      : spVat;
+                    const hasList = lpVat > 0;
+                    const discountAmt = hasList && lpVat > spVat ? lpVat - spVat : 0;
+                    const discountPct = hasList && lpVat > 0 && discountAmt > 0
+                      ? ((discountAmt / lpVat) * 100).toFixed(1)
+                      : null;
+                    return (
+                      <section>
+                        <SectionTitle
+                          title="정가 & 할인"
+                          badge={
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                              선택 — 카탈로그 할인 노출용
+                            </span>
+                          }
+                        />
+                        <JmCard className="overflow-hidden">
+                          <JmCardContent className="space-y-3">
+                            {/* 정가 입력 */}
+                            <div className="flex items-center gap-3">
+                              <span className="w-16 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
+                                정가
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setListPriceDialogOpen(true)}
+                                className="flex-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-right text-jm-sm tabular-nums transition-colors hover:bg-[var(--jm-surface-muted)]"
+                              >
+                                {hasList ? (
+                                  <span className="font-semibold text-[var(--jm-text)]">
+                                    ₩{formatComma(String(lpVat))}
+                                  </span>
+                                ) : (
+                                  <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                                    탭하여 입력
+                                  </span>
+                                )}
+                              </button>
+                              {hasList && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setForm((prev) => ({ ...prev, listPrice: "0" }))
+                                  }
+                                  className="text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                                >
+                                  지우기
+                                </button>
+                              )}
+                            </div>
+
+                            {/* 할인 표시 (read-only, 자동 계산) */}
+                            {!hasList ? (
+                              <p className="text-jm-2xs text-[var(--jm-text-muted)] leading-relaxed">
+                                정가를 입력하면 카탈로그에 strikethrough 로 할인 노출됩니다 (정가
+                                ↘ 판매가). 비워두면 할인 표시 없음.
+                              </p>
+                            ) : discountAmt === 0 ? (
+                              <div className="rounded-md border border-[var(--jm-warning-fg)]/30 bg-[var(--jm-warning-bg)] px-3 py-2 text-jm-2xs text-[var(--jm-warning-fg)]">
+                                정가가 판매가({formatComma(String(spVat))}원) 이하라 할인이
+                                표시되지 않습니다. 정가를 판매가보다 높게 입력하세요.
+                              </div>
+                            ) : (
+                              <div className="rounded-md bg-[var(--jm-success-bg)] px-3 py-2 text-jm-sm font-semibold tabular-nums text-[var(--jm-success-fg)]">
+                                할인 ₩{formatComma(String(discountAmt))} ({discountPct}% off)
+                              </div>
+                            )}
+
+                            {/* 할인% / 할인금액 자유 입력 — 양방향. 정가 설정 시에만 노출 */}
+                            {hasList && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="relative">
+                                  <JmInput
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="할인%"
+                                    value={
+                                      discountInputActive === "pct"
+                                        ? discountPctInput
+                                        : discountPct ?? ""
+                                    }
+                                    onFocus={(e) => {
+                                      setDiscountInputActive("pct");
+                                      setDiscountPctInput(discountPct ?? "");
+                                      focusCaretEnd(e);
+                                    }}
+                                    onBlur={() => setDiscountInputActive(null)}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setDiscountPctInput(v);
+                                      setDiscountInputActive("pct");
+                                      const pct = parseFloat(v);
+                                      if (
+                                        !isNaN(pct) &&
+                                        pct >= 0 &&
+                                        pct <= 100
+                                      ) {
+                                        const newSpVat = Math.round(
+                                          lpVat * (1 - pct / 100),
+                                        );
+                                        setManualVatPrice(String(newSpVat));
+                                        setLastEdited("price");
+                                      }
+                                    }}
+                                    className="h-9 pr-7 text-right"
+                                  />
+                                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-jm-xs text-[var(--jm-text-muted)]">
+                                    %
+                                  </span>
+                                </div>
+                                <div className="relative">
+                                  <JmInput
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="할인금액"
+                                    value={
+                                      discountInputActive === "amt"
+                                        ? formatComma(discountAmtInput)
+                                        : discountAmt > 0
+                                          ? formatComma(String(discountAmt))
+                                          : ""
+                                    }
+                                    onFocus={(e) => {
+                                      setDiscountInputActive("amt");
+                                      setDiscountAmtInput(
+                                        discountAmt > 0 ? String(discountAmt) : "",
+                                      );
+                                      focusCaretEnd(e);
+                                    }}
+                                    onBlur={() => setDiscountInputActive(null)}
+                                    onChange={(e) => {
+                                      const raw = parseComma(e.target.value);
+                                      setDiscountAmtInput(raw);
+                                      setDiscountInputActive("amt");
+                                      const amt = parseFloat(raw);
+                                      if (!isNaN(amt) && amt >= 0 && amt <= lpVat) {
+                                        const newSpVat = Math.max(0, lpVat - amt);
+                                        setManualVatPrice(String(newSpVat));
+                                        setLastEdited("price");
+                                      }
+                                    }}
+                                    className="h-9 pr-8 text-right"
+                                  />
+                                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-jm-xs text-[var(--jm-text-muted)]">
+                                    원
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 빠른 할인% 칩 — 자유 입력과 병행 (탭 한 번 단축) */}
+                            {hasList && (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                                  빠른 할인%:
+                                </span>
+                                {[5, 10, 15, 20, 30].map((pct) => {
+                                  const newSpVat = Math.round(lpVat * (1 - pct / 100));
+                                  return (
+                                    <button
+                                      key={pct}
+                                      type="button"
+                                      onClick={() => {
+                                        setManualVatPrice(String(newSpVat));
+                                        setLastEdited("price");
+                                      }}
+                                      className="rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2 py-0.5 text-jm-2xs text-[var(--jm-text)] transition-colors hover:bg-[var(--jm-surface-muted)]"
+                                    >
+                                      {pct}%
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* PriceInputDialog 정가 입력 */}
+                            <PriceInputDialog
+                              open={listPriceDialogOpen}
+                              onOpenChange={setListPriceDialogOpen}
+                              title="정가 입력"
+                              initialNet={lpNet}
+                              taxType={form.taxType as "TAXABLE" | "TAX_FREE"}
+                              isZeroRate={form.zeroRateEligible}
+                              originalPrice={spNet > 0 ? spNet : undefined}
+                              onSubmit={(netInput) => {
+                                if (netInput <= 0) {
+                                  setForm((prev) => ({ ...prev, listPrice: "0" }));
+                                  return;
+                                }
+                                const vat =
+                                  isTaxable && rate > 0
+                                    ? Math.round(netInput * (1 + rate))
+                                    : netInput;
+                                setForm((prev) => ({ ...prev, listPrice: String(vat) }));
+                              }}
+                            />
+                          </JmCardContent>
+                        </JmCard>
+                      </section>
+                    );
+                  })()}
 
                   </>
                   )}
