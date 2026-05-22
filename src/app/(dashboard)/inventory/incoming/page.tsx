@@ -310,9 +310,9 @@ function IncomingPageInner() {
       };
       return updated;
     });
-    // 수량 셀로 포커스
+    // 신규 상품이면 규격 셀로 포커스 (수량보다 먼저 규격 입력이 자연스러움)
     setTimeout(() => {
-      const el = document.querySelector(`[data-row="${index}"][data-field="quantity"]`) as HTMLInputElement;
+      const el = document.querySelector(`[data-row="${index}"][data-field="spec"]`) as HTMLInputElement;
       el?.focus();
       el?.select();
     }, 50);
@@ -334,7 +334,7 @@ function IncomingPageInner() {
       return updated;
     });
     setTimeout(() => {
-      const el = document.querySelector(`[data-row="${index}"][data-field="unitPrice"]`) as HTMLInputElement;
+      const el = document.querySelector(`[data-row="${index}"][data-field="spec"]`) as HTMLInputElement;
       el?.focus(); el?.select();
     }, 50);
   };

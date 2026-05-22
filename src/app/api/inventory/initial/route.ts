@@ -85,7 +85,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const results = await prisma.$transaction(async (tx) => {
+  let results;
+  try {
+    results = await prisma.$transaction(async (tx) => {
     const created: Array<{ supplierProductId: string; name: string }> = [];
     let lotsCreated = 0;
     let inventoryUpdates = 0;
@@ -171,6 +173,18 @@ export async function POST(request: NextRequest) {
         supplierProductName = sp.name;
         created.push({ supplierProductId: sp.id, name: sp.name });
       } else if (supplierProductId) {
+        // 폼이 열려있는 동안 다른 경로(예: incoming 취소 시 cleanupOrphanedSupplierProduct)로
+        // SP 가 hard-delete 된 경우 — update 가 P2025 를 던지지 않고 통과하면
+        // 후속 inventoryLot.create 에서 FK 위반(P2003) 으로 폭발. 명시적으로 존재 확인.
+        const existing = await tx.supplierProduct.findUnique({
+          where: { id: supplierProductId },
+          select: { id: true },
+        });
+        if (!existing) {
+          throw new Error(
+            `선택한 공급상품을 찾을 수 없습니다 (id=${supplierProductId}). 페이지를 새로고침한 후 다시 시도해주세요.`,
+          );
+        }
         const sp = await tx.supplierProduct.update({
           where: { id: supplierProductId },
           data: {
@@ -271,7 +285,12 @@ export async function POST(request: NextRequest) {
     }
 
     return { created, lotsCreated, inventoryUpdates };
-  });
+    });
+  } catch (e: unknown) {
+    // 폼이 열린 상태에서 다른 경로로 SP 가 hard-delete 된 경우 등 — 사용자에게 친절한 메시지.
+    const message = e instanceof Error ? e.message : "초기등록 처리 중 오류가 발생했습니다";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 
   return NextResponse.json({
     success: true,

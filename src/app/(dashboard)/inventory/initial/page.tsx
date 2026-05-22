@@ -260,20 +260,38 @@ export default function InitialInventoryPage() {
       };
       return updated;
     });
-    focusFieldNextTick(index, "unitPrice");
+    focusFieldNextTick(index, "spec");
   };
 
   const handleCreateNewInline = (index: number, name: string) => {
     setItems((prev) => {
       const updated = [...prev];
+      const existing = updated[index];
+      // 이미 값이 입력된 행이면 SP 식별 필드만 비우고 수량·단가·메모 등은 보존
+      // (입고등록과 동일 패턴). 빈 행이면 풀 초기화.
+      const hasData = existing.quantity || existing.unitPrice;
       updated[index] = {
-        ...emptyItem(),
+        ...existing,
+        supplierProductId: "",
         supplierProductName: name,
+        supplierCode: "",
         isNew: true,
+        pendingSourceRow: undefined,
+        ...(hasData
+          ? {}
+          : {
+              spec: "",
+              unitOfMeasure: "EA",
+              quantity: "",
+              unitPrice: "",
+              discount: "",
+              supplyAmount: "",
+              memo: "",
+            }),
       };
       return updated;
     });
-    focusFieldNextTick(index, "unitPrice");
+    focusFieldNextTick(index, "spec");
   };
 
   const updateItem = (index: number, field: keyof ItemForm, value: string) => {
