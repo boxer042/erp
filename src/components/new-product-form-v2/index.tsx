@@ -2954,25 +2954,43 @@ export function NewProductForm({
                           </section>
                         )}
 
-                        {productType !== "OPTION_PARENT" && (
-                          <section>
-                            <SectionTitle title="가격" />
-                            <JmCard><JmCardContent>
-                              <div className="flex items-center justify-between">
-                                <span className="text-jm-xs text-[var(--jm-text-muted)]">판매가·마진</span>
-                                <EditButton to="pricing" />
-                              </div>
-                              <ReviewRow
-                                label="판매가 (VAT 포함)"
-                                value={`₩${(parseFloat(form.sellingPrice || "0")).toLocaleString("ko-KR")}`}
-                              />
-                              <ReviewRow
-                                label="원가"
-                                value={`₩${Math.round(activeCalcPrice.totalCost).toLocaleString("ko-KR")}`}
-                              />
-                            </JmCardContent></JmCard>
-                          </section>
-                        )}
+                        {productType !== "OPTION_PARENT" && (() => {
+                          // 판매가·원가 모두 VAT 포함으로 통일 표시.
+                          // - 판매가: form.vatIncluded=true 면 이미 VAT 포함, 아니면 (1+taxRate) 곱
+                          // - 원가: activeCalcPrice.totalCost 는 항상 세전 → (1+taxRate) 곱
+                          //   (FIXED 비용은 사용자가 VAT 포함으로 입력하기에 그 원본 규모와 일치)
+                          const reviewIsTaxable = form.taxType !== "TAX_FREE";
+                          const reviewTaxRate = reviewIsTaxable
+                            ? parseFloat(form.taxRate || "0.1")
+                            : 0;
+                          const rawSelling = parseFloat(form.sellingPrice || "0");
+                          const sellingVatIncl =
+                            form.vatIncluded || !reviewIsTaxable
+                              ? rawSelling
+                              : Math.round(rawSelling * (1 + reviewTaxRate));
+                          const costVatIncl = Math.round(
+                            activeCalcPrice.totalCost * (1 + reviewTaxRate),
+                          );
+                          return (
+                            <section>
+                              <SectionTitle title="가격" />
+                              <JmCard><JmCardContent>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-jm-xs text-[var(--jm-text-muted)]">판매가·마진</span>
+                                  <EditButton to="pricing" />
+                                </div>
+                                <ReviewRow
+                                  label="판매가 (VAT 포함)"
+                                  value={`₩${sellingVatIncl.toLocaleString("ko-KR")}`}
+                                />
+                                <ReviewRow
+                                  label="원가 (VAT 포함)"
+                                  value={`₩${costVatIncl.toLocaleString("ko-KR")}`}
+                                />
+                              </JmCardContent></JmCard>
+                            </section>
+                          );
+                        })()}
 
                         {productType !== "OPTION_PARENT" && channels.length > 0 && (
                           <section>
