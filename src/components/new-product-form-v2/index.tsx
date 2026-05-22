@@ -34,6 +34,10 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 import { AssemblyTemplateCombobox } from "@/components/assembly-template-combobox";
 import { AssemblyPresetCombobox } from "@/components/assembly-preset-combobox";
+import {
+  QuickAssemblyTemplateDialog,
+  type QuickTemplate,
+} from "@/components/quick-assembly-template-dialog";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -150,6 +154,8 @@ export function NewProductForm({
     warrantyMonths: "",
     /** 카탈로그 비노출 — 옵션 swap 대상 SKU 단독 노출 차단 (P006 가습기-블랙 같은 케이스) */
     catalogHidden: false,
+    /** 가변 상품(canonical) — 부속 조합이 다른 변형들의 대표 상품 (조립상품 한정) */
+    isCanonical: false,
   });
 
   // 변형(variant) 연결 — URL `?canonicalProductId=<id>` 로 진입 시 자동 채움
@@ -270,6 +276,7 @@ export function NewProductForm({
   const [savePresetOpen, setSavePresetOpen] = useState(false);
   const [savePresetName, setSavePresetName] = useState("");
   const [savePresetSubmitting, setSavePresetSubmitting] = useState(false);
+  const [quickTemplateOpen, setQuickTemplateOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
@@ -312,6 +319,7 @@ export function NewProductForm({
       trackable: false,
       warrantyMonths: "",
       catalogHidden: false,
+      isCanonical: false,
     });
     setMapping({ supplierId: "", supplierProductId: "", conversionRate: "1", isProvisional: false, syncName: false });
     setSupplierProducts([]);
@@ -485,11 +493,12 @@ export function NewProductForm({
     };
   }, [productType, templates.length]);
 
-  // 템플릿 선택 시: setComponents를 슬롯 기본값으로 채우고 조립비 자동 설정
-  const applyTemplate = (tid: string) => {
+  // 템플릿 선택 시: setComponents를 슬롯 기본값으로 채우고 조립비 자동 설정.
+  // preloaded — 인라인 신규 등록 직후 state 반영 전에 즉시 적용용.
+  const applyTemplate = (tid: string, preloaded?: TemplateDetail) => {
     setTemplateId(tid);
     setPresetId("");
-    const t = templates.find((x) => x.id === tid);
+    const t = preloaded ?? templates.find((x) => x.id === tid);
     if (!t) return;
     setSetComponents(
       t.slots
@@ -884,6 +893,11 @@ export function NewProductForm({
           listPrice: getSubmitListPrice(),
           sellingPrice: getSubmitPrice(),
           canonicalProductId: canonicalProductId || null,
+          // 가변(canonical) 은 조립상품 한정. 다른 타입 또는 변형 연결(canonicalProductId 있음) 이면 강제 false.
+          isCanonical:
+            productType === "ASSEMBLED" && !canonicalProductId
+              ? form.isCanonical
+              : false,
           containerSize: bulkUsable ? containerSize || null : null,
           assemblyTemplateId: productType === "ASSEMBLED" && templateId ? templateId : null,
           warrantyMonths: form.warrantyMonths ? parseInt(form.warrantyMonths, 10) : null,
@@ -2184,8 +2198,8 @@ export function NewProductForm({
                     </section>
                   )}
 
-                  {/* 조립 템플릿/프리셋 — ASSEMBLED일 때만 */}
-                  {currentStep === "components" && productType === "ASSEMBLED" && templates.length > 0 && (
+                  {/* 조립 템플릿/프리셋 — ASSEMBLED 일 때 항상 표시 (템플릿 없으면 인라인 등록 진입점 노출) */}
+                  {currentStep === "components" && productType === "ASSEMBLED" && (
                     <section>
                       <SectionTitle
                         title="조립 템플릿"
@@ -2194,17 +2208,31 @@ export function NewProductForm({
                       <JmCard><JmCardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="flex flex-col gap-1">
                           <label className="text-jm-xs text-[var(--jm-text-muted)]">템플릿</label>
-                          <AssemblyTemplateCombobox
-                            templates={templates.map((t) => ({ id: t.id, name: t.name }))}
-                            value={templateId}
-                            onChange={(id) => {
-                              if (id) applyTemplate(id);
-                              else {
-                                setTemplateId("");
-                                setPresetId("");
-                              }
-                            }}
-                          />
+                          <div className="flex gap-2">
+                            <div className="min-w-0 flex-1">
+                              <AssemblyTemplateCombobox
+                                templates={templates.map((t) => ({ id: t.id, name: t.name }))}
+                                value={templateId}
+                                onChange={(id) => {
+                                  if (id) applyTemplate(id);
+                                  else {
+                                    setTemplateId("");
+                                    setPresetId("");
+                                  }
+                                }}
+                              />
+                            </div>
+                            <JmButton
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setQuickTemplateOpen(true)}
+                              className="shrink-0 h-9"
+                            >
+                              <Plus className="size-3.5" />
+                              새 템플릿
+                            </JmButton>
+                          </div>
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="text-jm-xs text-[var(--jm-text-muted)]">프리셋</label>
@@ -2237,6 +2265,26 @@ export function NewProductForm({
                             </JmButton>
                           </div>
                         </div>
+                        {/* 가변(canonical) 토글 — 부속 조합이 다른 변형들의 대표 상품으로 등록 */}
+                        {!canonicalProductId && (
+                          <div className="sm:col-span-2 flex items-start gap-3 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+                            <JmCheckbox
+                              id="isCanonical"
+                              checked={form.isCanonical}
+                              onCheckedChange={(v) =>
+                                setForm((p) => ({ ...p, isCanonical: v === true }))
+                              }
+                            />
+                            <label htmlFor="isCanonical" className="flex-1 cursor-pointer">
+                              <span className="block text-jm-sm font-medium">
+                                가변 상품(대표)으로 등록
+                              </span>
+                              <span className="block text-jm-2xs text-[var(--jm-text-muted)]">
+                                부속 조합이 다른 변형들의 대표 상품 — 자기 재고는 없고, 변형 SKU 들의 재고를 그룹으로 모아 보여줍니다.
+                              </span>
+                            </label>
+                          </div>
+                        )}
                       </JmCardContent></JmCard>
                     </section>
                   )}
@@ -3034,6 +3082,16 @@ export function NewProductForm({
           />
         );
       })()}
+
+      <QuickAssemblyTemplateDialog
+        open={quickTemplateOpen}
+        onOpenChange={setQuickTemplateOpen}
+        onCreated={(t: QuickTemplate) => {
+          // 신규 템플릿을 목록 맨 앞에 추가하고 즉시 적용 (state 반영 전에 객체 직접 전달).
+          setTemplates((prev) => [t, ...prev]);
+          applyTemplate(t.id, t);
+        }}
+      />
 
       <JmDialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
         <JmDialogContent>
