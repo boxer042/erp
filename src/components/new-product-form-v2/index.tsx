@@ -429,14 +429,23 @@ export function NewProductForm({
         toast.error("구성 상품을 모두 선택해주세요");
         return false;
       }
+      // 슬롯이 다르면 같은 상품도 OK — (슬롯키, productId) 조합으로만 중복 판정.
+      // 슬롯 없는 SET 은 모두 같은 버킷("")이라 productId 단일 검사와 동일 동작.
       const seen = new Set<string>();
       for (const c of setComponents) {
-        const id = c.product!.id;
-        if (seen.has(id)) {
-          toast.error("구성 상품이 중복됩니다");
+        const slotKey = c.slotId
+          ? `SID:${c.slotId}`
+          : c.slotLabelId
+            ? `LID:${c.slotLabelId}`
+            : c.label?.trim()
+              ? `LBL:${c.label.trim()}`
+              : "";
+        const key = `${slotKey}|${c.product!.id}`;
+        if (seen.has(key)) {
+          toast.error("같은 슬롯에 같은 구성 상품이 중복됩니다");
           return false;
         }
-        seen.add(id);
+        seen.add(key);
       }
     }
     if (stepId === "options") {
@@ -858,14 +867,22 @@ export function NewProductForm({
         toast.error("구성 상품을 모두 선택해주세요");
         return;
       }
+      // 슬롯이 다르면 같은 상품도 OK — (슬롯키, productId) 조합으로만 중복 판정 (validateStep 과 동일).
       const seen = new Set<string>();
       for (const c of setComponents) {
-        const id = c.product!.id;
-        if (seen.has(id)) {
-          toast.error("구성 상품이 중복됩니다");
+        const slotKey = c.slotId
+          ? `SID:${c.slotId}`
+          : c.slotLabelId
+            ? `LID:${c.slotLabelId}`
+            : c.label?.trim()
+              ? `LBL:${c.label.trim()}`
+              : "";
+        const key = `${slotKey}|${c.product!.id}`;
+        if (seen.has(key)) {
+          toast.error("같은 슬롯에 같은 구성 상품이 중복됩니다");
           return;
         }
-        seen.add(id);
+        seen.add(key);
       }
     }
 

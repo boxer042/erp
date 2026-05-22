@@ -161,12 +161,21 @@ function ProductSetComponentsEditSheetContent({
   const saveMutation = useMutation({
     mutationFn: () => {
       const filled = rows.filter((r) => r.product);
+      // 슬롯이 다르면 같은 상품도 OK — (슬롯키, productId) 조합으로만 중복 판정.
       const seen = new Set<string>();
       for (const r of filled) {
-        if (seen.has(r.product!.id)) {
-          throw new Error("중복된 구성품이 있습니다");
+        const slotKey = r.slotId
+          ? `SID:${r.slotId}`
+          : r.slotLabelId
+            ? `LID:${r.slotLabelId}`
+            : r.label.trim()
+              ? `LBL:${r.label.trim()}`
+              : "";
+        const key = `${slotKey}|${r.product!.id}`;
+        if (seen.has(key)) {
+          throw new Error("같은 슬롯에 같은 구성품이 중복됩니다");
         }
-        seen.add(r.product!.id);
+        seen.add(key);
       }
       return replaceSetComponents(
         product.id,
