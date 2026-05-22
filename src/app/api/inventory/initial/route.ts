@@ -199,6 +199,10 @@ export async function POST(request: NextRequest) {
 
       if (!supplierProductId) continue;
 
+      // 수량 0 — 상품·단가만 카탈로그용으로 등록하고 재고는 발생시키지 않음.
+      // 로트/Inventory/Movement 모두 스킵. SP create/update 만 위에서 끝났음.
+      if (mergedQty === 0) continue;
+
       const mappings = supplierProductId && mappingsBySp.has(supplierProductId)
         ? mappingsBySp.get(supplierProductId)!
         : await tx.productMapping.findMany({

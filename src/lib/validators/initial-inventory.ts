@@ -12,7 +12,7 @@ const initialInventoryItemSchema = z.object({
   supplierProductId: z.string().optional(),
   newSupplierProduct: newSupplierProductSchema.optional(),
   quantity: z.string().min(1, "수량을 입력해주세요")
-    .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "수량은 0보다 큰 숫자여야 합니다"),
+    .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, "수량은 0 이상이어야 합니다"),
   unitPrice: z.string().min(1, "단가를 입력해주세요")
     .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, "단가는 0 이상이어야 합니다"),
   originalPrice: z.string().optional(),
