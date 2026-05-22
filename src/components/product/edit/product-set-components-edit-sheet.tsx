@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Loader2, Plus, Trash2, ExternalLink } from "lucide-react";
+import { Loader2, Plus, X, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
-import { focusCaretEnd } from "@/jm/lib/focus";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { replaceSetComponents } from "@/lib/product-mutations";
@@ -69,6 +69,7 @@ function ProductSetComponentsEditSheetContent({
   product,
 }: ProductSetComponentsEditSheetProps) {
   const queryClient = useQueryClient();
+  const isAssembled = product.productType === "ASSEMBLED";
 
   const productsQuery = useQuery({
     queryKey: queryKeys.products.list({ scope: "components", excludeId: product.id }),
@@ -76,6 +77,47 @@ function ProductSetComponentsEditSheetContent({
     // 이 옵션 없으면 기존 구성에 벌크가 들어있어도 콤보박스에서 이름이 안 뜨고 재선택 불가.
     queryFn: () => apiGet<ProductOption[]>("/api/products?isSet=false&isBulk=all"),
     select: (data) => data.filter((p) => p.id !== product.id),
+  });
+
+  // 슬롯라벨 마스터 — 콤보박스 후보 + 카테고리 필터 lookup. ASSEMBLED 일 때만.
+  type SlotLabelData = {
+    id: string;
+    name: string;
+    isActive: boolean;
+    categoryId: string | null;
+  };
+  const slotLabelsQuery = useQuery({
+    queryKey: queryKeys.assemblySlotLabels.list(),
+    queryFn: () => apiGet<SlotLabelData[]>("/api/assembly-slot-labels"),
+    enabled: isAssembled,
+  });
+  const slotLabels = useMemo(
+    () => (slotLabelsQuery.data ?? []).filter((l) => l.isActive),
+    [slotLabelsQuery.data],
+  );
+  const slotLabelCategoryById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const l of slotLabels) map.set(l.id, l.categoryId);
+    return map;
+  }, [slotLabels]);
+
+  // 신규 슬롯라벨 인라인 등록 — 등록 페이지와 동일 패턴
+  const createSlotLabelMutation = useMutation({
+    mutationFn: (payload: { name: string; rowId: string }) =>
+      apiMutate<{ id: string; name: string }>(
+        "/api/assembly-slot-labels",
+        "POST",
+        { name: payload.name },
+      ).then((label) => ({ label, rowId: payload.rowId })),
+    onSuccess: ({ label, rowId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assemblySlotLabels.all });
+      setRows((prev) =>
+        prev.map((r) =>
+          r.rowId === rowId ? { ...r, slotLabelId: label.id, label: label.name } : r,
+        ),
+      );
+    },
+    onError: () => toast.error("라벨 생성 실패"),
   });
 
   const [rows, setRows] = useState<RowState[]>(() => {
@@ -207,35 +249,68 @@ function ProductSetComponentsEditSheetContent({
             </div>
           )}
 
-          {rows.map((row) => (
-            <div
-              key={row.rowId}
-              className="rounded-md border border-[var(--jm-border)] p-3 space-y-2"
-            >
-              {/* 슬롯 정보 뱃지 — 템플릿 슬롯 또는 슬롯라벨 정보가 있을 때만 */}
-              {(row.slotId || row.slotLabelId) && (
-                <div className="flex items-center gap-1.5 text-jm-2xs">
-                  <span className="text-[var(--jm-text-muted)]">슬롯</span>
-                  <JmBadge variant={row.slotId ? "info" : "default"} size="sm" shape="square">
-                    {row.label || "(이름 없음)"}
-                  </JmBadge>
-                  {!row.slotId && (
-                    <span className="text-[var(--jm-text-muted)]">
-                      (템플릿 슬롯 미연결 — 프리셋 저장 대상 아님)
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_140px_auto] gap-2 items-end">
-                <FieldSm label="구성품">
-                  <ProductCombobox
-                    products={products}
-                    value={row.product?.id ?? ""}
-                    onChange={(p) => update(row.rowId, { product: p })}
-                    filterType="component"
+          {rows.map((row) => {
+            // 슬롯라벨에 카테고리가 지정돼 있으면 그 카테고리의 상품만 노출.
+            // 미지정이면 전체. 현재 선택된 상품은 카테고리 불일치여도 보존.
+            const slotCategoryId = row.slotLabelId
+              ? slotLabelCategoryById.get(row.slotLabelId) ?? null
+              : null;
+            const productsForRow = slotCategoryId
+              ? products.filter(
+                  (p) =>
+                    p.categoryId === slotCategoryId || p.id === row.product?.id,
+                )
+              : products;
+            // 템플릿 슬롯과 미연결인 경우 안내 (프리셋 저장 대상 아님)
+            const showSlotWarning = row.slotLabelId && !row.slotId;
+            return (
+              <div
+                key={row.rowId}
+                className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2.5"
+              >
+                {isAssembled && (
+                  <AssemblySlotLabelCombobox
+                    labels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
+                    value={row.slotLabelId ?? ""}
+                    onChange={(id, name) =>
+                      update(row.rowId, {
+                        slotLabelId: id || null,
+                        label: name,
+                      })
+                    }
+                    onCreateNew={(name) =>
+                      createSlotLabelMutation.mutate({ name, rowId: row.rowId })
+                    }
+                    placeholder={
+                      row.label && !row.slotLabelId
+                        ? `${row.label} (재선택 필요)`
+                        : "라벨 선택..."
+                    }
                   />
-                </FieldSm>
-                <FieldSm label="수량 (세트 1개당)">
+                )}
+                <ProductCombobox
+                  products={productsForRow}
+                  value={row.product?.id ?? ""}
+                  onChange={(p) => update(row.rowId, { product: p })}
+                  filterType="component"
+                  placeholder={
+                    slotCategoryId
+                      ? "카테고리 내 구성 상품 선택..."
+                      : "구성 상품 선택..."
+                  }
+                />
+                {!isAssembled && (
+                  <JmInput
+                    size="sm"
+                    value={row.label}
+                    onChange={(e) => update(row.rowId, { label: e.target.value })}
+                    placeholder="라벨 (선택) — 메인, 보너스 등"
+                  />
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                    수량
+                  </span>
                   <JmInput
                     size="sm"
                     type="text"
@@ -247,30 +322,35 @@ function ProductSetComponentsEditSheetContent({
                         update(row.rowId, { quantity: v });
                       }
                     }}
-                    onFocus={focusCaretEnd}
+                    className="h-9 w-20 text-right"
                   />
-                </FieldSm>
-                <FieldSm label="라벨 (선택)">
-                  <JmInput
-                    size="sm"
-                    value={row.label}
-                    onChange={(e) => update(row.rowId, { label: e.target.value })}
-                    onFocus={focusCaretEnd}
-                    placeholder="메인, 보너스 등"
-                  />
-                </FieldSm>
-                <JmIconButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => remove(row.rowId)}
-                  aria-label="행 삭제"
-                >
-                  <Trash2 />
-                </JmIconButton>
+                  {showSlotWarning ? (
+                    <JmBadge variant="default" size="sm" shape="square" className="ml-auto">
+                      슬롯 미연결
+                    </JmBadge>
+                  ) : row.slotId ? (
+                    <JmBadge variant="info" size="sm" shape="square" className="ml-auto">
+                      슬롯 연결됨
+                    </JmBadge>
+                  ) : (
+                    <span className="ml-auto" />
+                  )}
+                  {rows.length > 1 && (
+                    <JmIconButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label="구성품 삭제"
+                      className="text-[var(--jm-danger-fg)]"
+                      onClick={() => remove(row.rowId)}
+                    >
+                      <X />
+                    </JmIconButton>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           <JmButton
             type="button"
@@ -280,7 +360,7 @@ function ProductSetComponentsEditSheetContent({
             onClick={addRow}
           >
             <Plus />
-            <span>구성품 추가</span>
+            <span>구성 상품 추가</span>
           </JmButton>
         </div>
 
@@ -549,14 +629,5 @@ function ProductSetComponentsEditSheetContent({
         </JmDialog>
       )}
     </JmDrawerContent>
-  );
-}
-
-function FieldSm({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <label className="text-jm-xs text-[var(--jm-text-muted)]">{label}</label>
-      {children}
-    </div>
   );
 }
