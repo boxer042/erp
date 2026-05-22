@@ -916,9 +916,15 @@ export async function PUT(
     : parseFloat(data.listPrice ?? data.sellingPrice);
 
   // 가격 변경 이력 — 현재 DB 값 미리 조회 (업데이트 후 diff 비교용)
+  // name/isCanonical 도 같이 가져와서 대표 상품 이름 변경 시 자식 변형들에 cascade.
   const before = await prisma.product.findUnique({
     where: { id },
-    select: { listPrice: true, sellingPrice: true },
+    select: {
+      listPrice: true,
+      sellingPrice: true,
+      name: true,
+      isCanonical: true,
+    },
   });
   const oldListPrice = before ? Number(before.listPrice) : 0;
   const oldSellingPrice = before ? Number(before.sellingPrice) : 0;
@@ -1024,6 +1030,17 @@ export async function PUT(
       }
     }
 
+    // 대표(canonical) 저장 시 자식 변형들의 name 도 항상 동기화.
+    // 변형은 설계상 canonical 과 같은 이름을 가지며 차이는 SKU 와 variableComponents 로만 표현.
+    // 이름 변경 여부와 무관하게 매번 updateMany 호출 — 이미 같으면 no-op 이고, 과거에 캐스케이드
+    // 없이 이름이 바뀌어 누적된 stale 변형을 한 번의 재저장으로 복구할 수 있게 의도적으로 무조건 실행.
+    if (before?.isCanonical) {
+      await tx.product.updateMany({
+        where: { canonicalProductId: id },
+        data: { name: updated.name },
+      });
+    }
+
     return updated;
   });
 
@@ -1071,6 +1088,25 @@ export async function PATCH(
     return NextResponse.json({ error: "수정할 필드가 없습니다" }, { status: 400 });
   }
   try {
+    // name 변경 시 — 대표면 자식 변형 name 도 cascade. 한 트랜잭션으로 묶어 정합성 보장.
+    if (typeof data.name === "string") {
+      const updated = await prisma.$transaction(async (tx) => {
+        const before = await tx.product.findUnique({
+          where: { id },
+          select: { name: true, isCanonical: true },
+        });
+        const row = await tx.product.update({ where: { id }, data });
+        // PUT 과 동일 — 변경 여부 무관, canonical 이면 항상 cascade (stale 복구용)
+        if (before?.isCanonical) {
+          await tx.product.updateMany({
+            where: { canonicalProductId: id },
+            data: { name: row.name },
+          });
+        }
+        return row;
+      });
+      return NextResponse.json(updated);
+    }
     const updated = await prisma.product.update({ where: { id }, data });
     return NextResponse.json(updated);
   } catch (e) {
