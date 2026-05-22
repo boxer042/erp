@@ -15,6 +15,7 @@ import {
   JmCardContent,
   JmCardHeader,
   JmCardTitle,
+  JmContainer,
   JmDialog,
   JmDialogContent,
   JmDialogDescription,
@@ -27,8 +28,10 @@ import {
   JmDrawerFooter,
   JmDrawerHeader,
   JmDrawerTitle,
+  JmIconButton,
   JmInput,
   JmSpinner,
+  JmStat,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -276,54 +279,46 @@ export default function TemplateDetailPage({
 
   return (
     <ProductsThemeScope>
-      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6 p-6">
-            {/* 뒤로가기 */}
-            <div className="flex items-center gap-2">
-              <JmButton variant="ghost" size="sm" onClick={handleBack}>
-                <ArrowLeft className="size-3.5" />
-                목록
-              </JmButton>
-            </div>
+      <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+        {/* 스티키 헤더 — 페이지 폭 제한 없이 가로 꽉 채움 */}
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+          <JmIconButton aria-label="뒤로" onClick={handleBack} size="sm">
+            <ArrowLeft />
+          </JmIconButton>
+          <div className="flex items-center gap-2">
+            <span className="text-jm-base font-semibold">{template.name}</span>
+            {template.isActive ? (
+              <JmBadge variant="success" size="sm">활성</JmBadge>
+            ) : (
+              <JmBadge variant="default" size="sm">비활성</JmBadge>
+            )}
+          </div>
+        </div>
 
-            {/* 헤더 정보 카드 */}
-            <JmCard>
-              <JmCardHeader>
-                <JmCardTitle className="flex items-center gap-2">
-                  <span>{template.name}</span>
-                  {template.isActive ? (
-                    <JmBadge variant="success" size="sm">활성</JmBadge>
-                  ) : (
-                    <JmBadge variant="default" size="sm">비활성</JmBadge>
-                  )}
-                </JmCardTitle>
-                {template.description && (
-                  <p className="text-jm-sm text-[var(--jm-text-muted)]">
-                    {template.description}
-                  </p>
-                )}
-              </JmCardHeader>
-              <JmCardContent>
-                <div className="grid grid-cols-2 gap-4 text-jm-sm">
-                  <div>
-                    <span className="text-[var(--jm-text-muted)]">기본 조립비: </span>
-                    <span>
-                      {template.defaultLaborCost
-                        ? `₩${Number(template.defaultLaborCost).toLocaleString("ko-KR")}`
-                        : "-"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--jm-text-muted)]">슬롯 수: </span>
-                    <span>{template.slots.length}</span>
-                  </div>
-                </div>
-              </JmCardContent>
-            </JmCard>
+        <JmContainer width="default" padded={false} className="space-y-6 p-6">
+          {/* 설명 (있을 때만) */}
+          {template.description && (
+            <p className="text-jm-sm text-[var(--jm-text-muted)]">
+              {template.description}
+            </p>
+          )}
 
-            {/* 슬롯 카드 */}
-            <JmCard>
+          {/* KPI — 기본 조립비 / 슬롯 수 / 프리셋 수 */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <JmStat
+              label="기본 조립비"
+              value={
+                template.defaultLaborCost
+                  ? `₩${Number(template.defaultLaborCost).toLocaleString("ko-KR")}`
+                  : "-"
+              }
+            />
+            <JmStat label="슬롯 수" value={`${template.slots.length}개`} />
+            <JmStat label="프리셋 수" value={`${template.presets.length}개`} />
+          </div>
+
+          {/* 슬롯 카드 */}
+          <JmCard>
               <JmCardHeader>
                 <JmCardTitle>슬롯 ({template.slots.length}개)</JmCardTitle>
               </JmCardHeader>
@@ -461,8 +456,7 @@ export default function TemplateDetailPage({
                 )}
               </JmCardContent>
             </JmCard>
-          </div>
-        </div>
+        </JmContainer>
       </div>
 
       {/* 프리셋 등록/수정 Drawer */}

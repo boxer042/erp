@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import {
+  JmTabs,
+  JmTabsList,
+  JmTabsTrigger,
+} from "@/jm";
 import { LabelsView, TemplatesView } from "./_parts";
 import { ProductsThemeScope } from "../_theme-scope";
 
@@ -11,79 +16,21 @@ export default function AssemblyTemplatesPage() {
 
   return (
     <ProductsThemeScope>
-      <div className="flex h-full">
-        <aside
-          className="w-[180px] shrink-0 flex flex-col"
-          style={{
-            borderRight: "1px solid var(--jm-border)",
-            background: "var(--jm-surface)",
-          }}
-        >
-          <div
-            className="px-3 py-3 text-xs font-medium"
-            style={{ color: "var(--jm-text-muted)" }}
-          >
-            조립템플릿
-          </div>
-          <nav className="flex flex-col px-2 gap-0.5">
-            <SidebarItem active={view === "templates"} onClick={() => setView("templates")}>
-              템플릿 관리
-            </SidebarItem>
-            <SidebarItem active={view === "labels"} onClick={() => setView("labels")}>
-              슬롯라벨 관리
-            </SidebarItem>
-          </nav>
-        </aside>
+      <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+        {/* 상단 탭 — sticky */}
+        <div className="sticky top-0 z-10 bg-[var(--jm-bg)] px-4 pt-3">
+          <JmTabs value={view} onValueChange={(v) => setView(v as View)}>
+            <JmTabsList variant="line">
+              <JmTabsTrigger value="templates">템플릿 관리</JmTabsTrigger>
+              <JmTabsTrigger value="labels">슬롯라벨 관리</JmTabsTrigger>
+            </JmTabsList>
+          </JmTabs>
+        </div>
 
-        <main className="flex-1 min-w-0 flex flex-col bg-[var(--jm-bg)]">
+        <main className="flex min-w-0 flex-1 flex-col">
           {view === "templates" ? <TemplatesView /> : <LabelsView />}
         </main>
       </div>
     </ProductsThemeScope>
-  );
-}
-
-function SidebarItem({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-left text-sm px-3 py-1.5 rounded-md transition-colors"
-      style={
-        active
-          ? {
-              background: "var(--jm-surface-muted)",
-              color: "var(--jm-text)",
-              fontWeight: 500,
-            }
-          : {
-              color: "var(--jm-text-muted)",
-            }
-      }
-      onMouseEnter={(e) => {
-        if (!active) {
-          (e.currentTarget as HTMLButtonElement).style.background =
-            "var(--jm-surface-muted)";
-          (e.currentTarget as HTMLButtonElement).style.color = "var(--jm-text)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          (e.currentTarget as HTMLButtonElement).style.background = "";
-          (e.currentTarget as HTMLButtonElement).style.color =
-            "var(--jm-text-muted)";
-        }
-      }}
-    >
-      {children}
-    </button>
   );
 }
