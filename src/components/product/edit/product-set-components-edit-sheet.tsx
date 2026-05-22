@@ -58,7 +58,9 @@ function ProductSetComponentsEditSheetContent({
 
   const productsQuery = useQuery({
     queryKey: queryKeys.products.list({ scope: "components", excludeId: product.id }),
-    queryFn: () => apiGet<ProductOption[]>("/api/products?isSet=false"),
+    // isBulk=all — 벌크 SKU(엔진오일 벌크 등)도 BOM 후보에 포함. 기본값은 벌크 제외라
+    // 이 옵션 없으면 기존 구성에 벌크가 들어있어도 콤보박스에서 이름이 안 뜨고 재선택 불가.
+    queryFn: () => apiGet<ProductOption[]>("/api/products?isSet=false&isBulk=all"),
     select: (data) => data.filter((p) => p.id !== product.id),
   });
 
