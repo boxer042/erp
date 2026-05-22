@@ -2572,32 +2572,35 @@ export function NewProductForm({
                               <span className="w-16 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
                                 정가
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => setListPriceDialogOpen(true)}
-                                className="flex-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-right text-jm-sm tabular-nums transition-colors hover:bg-[var(--jm-surface-muted)]"
-                              >
-                                {hasList ? (
-                                  <span className="font-semibold text-[var(--jm-text)]">
-                                    ₩{formatComma(String(lpVat))}
-                                  </span>
-                                ) : (
-                                  <span className="text-jm-xs text-[var(--jm-text-muted)]">
-                                    탭하여 입력
-                                  </span>
-                                )}
-                              </button>
-                              {hasList && (
+                              <div className="relative flex-1">
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    setForm((prev) => ({ ...prev, listPrice: "0" }))
-                                  }
-                                  className="text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                                  onClick={() => setListPriceDialogOpen(true)}
+                                  className="w-full rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 pr-10 text-right text-jm-sm tabular-nums transition-colors hover:bg-[var(--jm-surface-muted)]"
                                 >
-                                  지우기
+                                  {hasList ? (
+                                    <span className="font-semibold text-[var(--jm-text)]">
+                                      ₩{formatComma(String(lpVat))}
+                                    </span>
+                                  ) : (
+                                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                                      탭하여 입력
+                                    </span>
+                                  )}
                                 </button>
-                              )}
+                                {hasList && (
+                                  <button
+                                    type="button"
+                                    aria-label="정가 지우기"
+                                    onClick={() =>
+                                      setForm((prev) => ({ ...prev, listPrice: "0" }))
+                                    }
+                                    className="absolute right-1.5 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-[var(--jm-text-muted)] transition-colors hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]"
+                                  >
+                                    <X className="size-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             {/* 할인 표시 (read-only, 자동 계산) */}
@@ -3107,7 +3110,28 @@ export function NewProductForm({
               }
               const vat =
                 isTaxable && rate > 0 ? Math.round(netInput * (1 + rate)) : netInput;
-              setForm((prev) => ({ ...prev, listPrice: String(vat) }));
+              // 판매가 미설정(0) 상태면 정가와 동일하게 자동 채움 — 할인 없음 기본값.
+              // 사용자가 이미 판매가를 입력했으면 유지 (할인 적용 의도 보존).
+              setForm((prev) => ({
+                ...prev,
+                listPrice: String(vat),
+                sellingPrice:
+                  parseFloat(prev.sellingPrice || "0") <= 0
+                    ? String(vat)
+                    : prev.sellingPrice,
+                vatIncluded:
+                  parseFloat(prev.sellingPrice || "0") <= 0 ? true : prev.vatIncluded,
+              }));
+              // sellingPrice 가 calculator effect 가 아니라 정가에서 채워졌으므로
+              // calculator 의 lastEdited 도 "price" 로 동기화해 마진 재계산되게 함
+              if (
+                parseFloat(form.sellingPrice || "0") <= 0 &&
+                manualVatPrice === "" &&
+                lastEdited === null
+              ) {
+                setManualVatPrice(String(vat));
+                setLastEdited("price");
+              }
             }}
           />
         );

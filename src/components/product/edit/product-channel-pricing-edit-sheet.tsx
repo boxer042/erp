@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { focusCaretEnd } from "@/jm/lib/focus";
@@ -277,30 +277,33 @@ function ProductChannelPricingEditSheetContent({
                 <span className="w-16 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
                   정가
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setListPriceDialogOpen(true)}
-                  className="flex-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-right text-jm-sm tabular-nums transition-colors hover:bg-[var(--jm-surface-muted)]"
-                >
-                  {hasList ? (
-                    <span className="font-semibold text-[var(--jm-text)]">
-                      ₩{formatComma(String(lpVat))}
-                    </span>
-                  ) : (
-                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
-                      탭하여 입력 — 할인 노출용
-                    </span>
-                  )}
-                </button>
-                {hasList && (
+                <div className="relative flex-1">
                   <button
                     type="button"
-                    onClick={() => setOfflineListVat("")}
-                    className="text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                    onClick={() => setListPriceDialogOpen(true)}
+                    className="w-full rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 pr-10 text-right text-jm-sm tabular-nums transition-colors hover:bg-[var(--jm-surface-muted)]"
                   >
-                    지우기
+                    {hasList ? (
+                      <span className="font-semibold text-[var(--jm-text)]">
+                        ₩{formatComma(String(lpVat))}
+                      </span>
+                    ) : (
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                        탭하여 입력 — 할인 노출용
+                      </span>
+                    )}
                   </button>
-                )}
+                  {hasList && (
+                    <button
+                      type="button"
+                      aria-label="정가 지우기"
+                      onClick={() => setOfflineListVat("")}
+                      className="absolute right-1.5 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-[var(--jm-text-muted)] transition-colors hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* 판매가 (필수) */}
@@ -308,21 +311,33 @@ function ProductChannelPricingEditSheetContent({
                 <span className="w-16 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
                   판매가
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setSellingPriceDialogOpen(true)}
-                  className="flex-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-right text-jm-sm tabular-nums transition-colors hover:bg-[var(--jm-surface-muted)]"
-                >
-                  {spVat > 0 ? (
-                    <span className="font-semibold text-[var(--jm-text)]">
-                      ₩{formatComma(String(spVat))}
-                    </span>
-                  ) : (
-                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
-                      탭하여 입력
-                    </span>
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setSellingPriceDialogOpen(true)}
+                    className="w-full rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 pr-10 text-right text-jm-sm tabular-nums transition-colors hover:bg-[var(--jm-surface-muted)]"
+                  >
+                    {spVat > 0 ? (
+                      <span className="font-semibold text-[var(--jm-text)]">
+                        ₩{formatComma(String(spVat))}
+                      </span>
+                    ) : (
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                        탭하여 입력
+                      </span>
+                    )}
+                  </button>
+                  {spVat > 0 && (
+                    <button
+                      type="button"
+                      aria-label="판매가 지우기"
+                      onClick={() => setOfflineSellingVat("")}
+                      className="absolute right-1.5 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-[var(--jm-text-muted)] transition-colors hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]"
+                    >
+                      <X className="size-3.5" />
+                    </button>
                   )}
-                </button>
+                </div>
               </div>
 
               {/* 할인 표시 + 입력 — 정가 설정 시에만 노출 */}
@@ -570,7 +585,12 @@ function ProductChannelPricingEditSheetContent({
             setOfflineListVat("");
             return;
           }
-          setOfflineListVat(netToVatStored(net));
+          const vatStored = netToVatStored(net);
+          setOfflineListVat(vatStored);
+          // 판매가 미설정(0) 상태면 정가와 동일하게 자동 채움 — 할인 없음 기본값
+          if (spVat <= 0) {
+            setOfflineSellingVat(vatStored);
+          }
         }}
       />
 
