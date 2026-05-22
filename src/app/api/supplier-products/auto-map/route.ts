@@ -12,7 +12,7 @@ export async function POST() {
 
   const targets = await prisma.supplierProduct.findMany({
     where: { isActive: true, productMappings: { none: {} } },
-    select: { id: true, name: true, spec: true, unitOfMeasure: true, listPrice: true },
+    select: { id: true, name: true, spec: true, unitOfMeasure: true },
     orderBy: { createdAt: "asc" },
   });
 

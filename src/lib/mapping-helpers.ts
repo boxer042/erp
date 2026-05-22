@@ -6,7 +6,6 @@ type AutoProductInput = {
   name: string;
   spec?: string | null;
   unitOfMeasure: string;
-  listPrice: Prisma.Decimal | number | string;
 };
 
 export async function createAutoMappedProductForSupplierProduct(
@@ -17,14 +16,14 @@ export async function createAutoMappedProductForSupplierProduct(
   for (let i = 0; i < 3; i++) {
     const sku = `AUTO-${randomBytes(4).toString("hex").toUpperCase()}`;
     try {
+      // 자동 매핑 상품은 가격을 생성하지 않는다 — listPrice/sellingPrice 둘 다 0 (default).
+      // 운영자가 [검토 완료] 단계에서 직접 가격을 입력한다.
       const p = await tx.product.create({
         data: {
           name: sp.name,
           spec: sp.spec || null,
           sku,
           unitOfMeasure: sp.unitOfMeasure,
-          listPrice: sp.listPrice as never,
-          sellingPrice: 0,
           autoMapped: true,
         },
         select: { id: true },
@@ -134,7 +133,7 @@ export async function ensureMappingForSupplierProducts(
 
   const sps = await tx.supplierProduct.findMany({
     where: { id: { in: unmapped } },
-    select: { id: true, name: true, spec: true, unitOfMeasure: true, listPrice: true },
+    select: { id: true, name: true, spec: true, unitOfMeasure: true },
   });
 
   let created = 0;
