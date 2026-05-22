@@ -290,6 +290,8 @@ export function NewProductForm({
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [saveTemplateName, setSaveTemplateName] = useState("");
   const [saveTemplateSubmitting, setSaveTemplateSubmitting] = useState(false);
+  // 슬롯별 가변(isVariable) 마킹 — row.id 키
+  const [variableSlotIds, setVariableSlotIds] = useState<Set<string>>(() => new Set());
 
   const [submitting, setSubmitting] = useState(false);
   const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
@@ -2241,6 +2243,7 @@ export function NewProductForm({
                               size="sm"
                               onClick={() => {
                                 setSaveTemplateName(form.name || "");
+                                setVariableSlotIds(new Set());
                                 setSaveTemplateOpen(true);
                               }}
                               disabled={
@@ -3162,23 +3165,40 @@ export function NewProductForm({
               <div className="mb-1 text-jm-xs font-medium text-[var(--jm-text-muted)]">
                 저장될 슬롯 ({setComponents.filter((r) => r.label?.trim()).length}개)
               </div>
-              <ul className="space-y-0.5 text-jm-xs text-[var(--jm-text)]">
+              <ul className="space-y-1 text-jm-xs text-[var(--jm-text)]">
                 {setComponents
                   .filter((r) => r.label?.trim())
                   .map((r, i) => (
                     <li key={r.id} className="flex items-center gap-1.5">
                       <span className="text-[var(--jm-text-muted)]">{i + 1}.</span>
-                      <span className="font-medium">{r.label}</span>
-                      <span className="text-[var(--jm-text-muted)]">×</span>
-                      <span>{r.quantity || "1"}</span>
+                      <span className="font-medium min-w-0 truncate">{r.label}</span>
+                      <span className="text-[var(--jm-text-muted)] shrink-0">×</span>
+                      <span className="shrink-0">{r.quantity || "1"}</span>
                       {r.product && (
                         <span className="ml-1 text-[var(--jm-text-muted)] truncate">
                           ({r.product.name})
                         </span>
                       )}
+                      <label className="ml-auto flex items-center gap-1 text-jm-2xs text-[var(--jm-text-muted)] cursor-pointer whitespace-nowrap shrink-0">
+                        <JmCheckbox
+                          checked={variableSlotIds.has(r.id)}
+                          onCheckedChange={(v) => {
+                            setVariableSlotIds((prev) => {
+                              const next = new Set(prev);
+                              if (v === true) next.add(r.id);
+                              else next.delete(r.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        가변
+                      </label>
                     </li>
                   ))}
               </ul>
+              <p className="mt-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
+                가변 슬롯 — 같은 템플릿으로 부속만 다른 변형 상품을 만들 때 표시.
+              </p>
             </div>
             {assemblyFixedCost > 0 && (
               <p className="text-jm-2xs text-[var(--jm-text-muted)]">
@@ -3222,7 +3242,7 @@ export function NewProductForm({
                         order: idx,
                         defaultProductId: r.product?.id ?? null,
                         defaultQuantity: r.quantity || "1",
-                        isVariable: false,
+                        isVariable: variableSlotIds.has(r.id),
                       })),
                     },
                   );

@@ -61,6 +61,7 @@ import { ProductSpecsEditSheet } from "@/components/product/edit/product-specs-e
 import { ProductOptionsEditSheet } from "@/components/product/edit/product-options-edit-sheet";
 import { ProductBundlesEditSheet } from "@/components/product/edit/product-bundles-edit-sheet";
 import { ProductSetComponentsEditSheet } from "@/components/product/edit/product-set-components-edit-sheet";
+import { AssemblyRegisterSheet } from "@/components/assembly/assembly-register-sheet";
 import { ProductMediaManager } from "@/components/product-media-manager";
 import { ShippingHistoryCard } from "@/components/shipping-history-card";
 import type { ProductDetail } from "@/components/product/types";
@@ -127,6 +128,7 @@ export default function ProductDetailPage() {
   const [optionsEditOpen, setOptionsEditOpen] = useState(false);
   const [bundlesEditOpen, setBundlesEditOpen] = useState(false);
   const [setComponentsEditOpen, setSetComponentsEditOpen] = useState(false);
+  const [assemblyRegisterOpen, setAssemblyRegisterOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
   const productQuery = useQuery({
@@ -364,6 +366,13 @@ export default function ProductDetailPage() {
                   onEdit={
                     product.isSet || product.productType === "ASSEMBLED"
                       ? () => setSetComponentsEditOpen(true)
+                      : undefined
+                  }
+                  // 일반 ASSEMBLED 상품(canonical 아님) 에 [조립실적 추가] 노출.
+                  // canonical 은 ProductVariantsCard 의 자체 버튼이 우선이라 중복 안 띄움.
+                  onAddAssembly={
+                    product.productType === "ASSEMBLED" && !product.isCanonical
+                      ? () => setAssemblyRegisterOpen(true)
                       : undefined
                   }
                 />
@@ -675,6 +684,15 @@ export default function ProductDetailPage() {
         open={setComponentsEditOpen}
         onOpenChange={setSetComponentsEditOpen}
         product={product}
+      />
+      <AssemblyRegisterSheet
+        open={assemblyRegisterOpen}
+        onOpenChange={setAssemblyRegisterOpen}
+        initialProductId={product.id}
+        showProductPicker={false}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: queryKeys.products.all })
+        }
       />
       <ProductMergeDialog
         open={mergeDialogOpen}

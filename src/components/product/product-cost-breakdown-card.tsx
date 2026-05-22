@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import {
   JmBadge,
   JmButton,
@@ -28,9 +28,11 @@ const SOURCE_LABEL: Record<
 interface Props {
   product: ProductDetail;
   onEdit?: () => void;
+  /** 조립실적 추가 진입 — ASSEMBLED 일 때만 노출 */
+  onAddAssembly?: () => void;
 }
 
-export function ProductCostBreakdownCard({ product, onEdit }: Props) {
+export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Props) {
   const breakdown = product.estimatedCostBreakdown ?? [];
   const isComposite = product.productType === "ASSEMBLED" || product.isSet;
   if (!isComposite) return null;
@@ -49,11 +51,21 @@ export function ProductCostBreakdownCard({ product, onEdit }: Props) {
       }
       noPadding
       actions={
-        onEdit ? (
-          <JmButton size="sm" variant="outline" onClick={onEdit}>
-            <Pencil />
-            <span>편집</span>
-          </JmButton>
+        onEdit || onAddAssembly ? (
+          <div className="flex gap-1.5">
+            {onAddAssembly && (
+              <JmButton size="sm" variant="cta" onClick={onAddAssembly}>
+                <Plus />
+                <span>조립실적 추가</span>
+              </JmButton>
+            )}
+            {onEdit && (
+              <JmButton size="sm" variant="outline" onClick={onEdit}>
+                <Pencil />
+                <span>편집</span>
+              </JmButton>
+            )}
+          </div>
         ) : undefined
       }
     >
