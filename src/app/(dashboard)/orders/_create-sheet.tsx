@@ -15,6 +15,12 @@ import {
   JmButton,
   JmCombobox,
   JmDatePicker,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
   JmDrawer,
   JmDrawerBody,
   JmDrawerContent,
@@ -71,6 +77,7 @@ interface ProductOption {
   sellingPrice: string;
   imageUrl?: string | null;
   isCanonical?: boolean;
+  canonicalProductId?: string | null;
   unitOfMeasure: string;
 }
 
@@ -154,6 +161,11 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [shippingDialogOpen, setShippingDialogOpen] = useState(false);
   const [shipCostDialogOpen, setShipCostDialogOpen] = useState(false);
+  // 대표(canonical) 상품 선택 시 열리는 변형 픽업 다이얼로그. null = 닫힘.
+  const [variantPickFor, setVariantPickFor] = useState<{
+    canonicalId: string;
+    canonicalName: string;
+  } | null>(null);
 
   const channelsQuery = useQuery({
     queryKey: ["channels"],
@@ -201,18 +213,20 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
     [customersQuery.data],
   );
 
-  // 상품 combobox — canonical 제외 (변형 미확정 prepare 차단 회피)
+  // 상품 combobox — 대표(canonical) + 단품만 노출. 변형(canonicalProductId 보유)은 대표 선택 시
+  // 열리는 variant 다이얼로그에서만 보이게 해서 같은 이름·다른 SKU 가 평탄하게 깔리는 혼란 제거.
   const productItems = useMemo(
     () =>
       (productsQuery.data ?? [])
-        .filter((p) => !p.isCanonical)
+        .filter((p) => !p.canonicalProductId)
         .map((p) => ({
           id: p.id,
-          label: p.name,
+          label: p.isCanonical ? `${p.name} · 대표(변형 선택)` : p.name,
           description: p.sku,
           sku: p.sku,
           sellingPrice: p.sellingPrice,
           imageUrl: p.imageUrl ?? null,
+          isCanonical: !!p.isCanonical,
         })),
     [productsQuery.data],
   );
@@ -256,9 +270,19 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
     setDiscountDialogOpen(false);
     setShippingDialogOpen(false);
     setShipCostDialogOpen(false);
+    setVariantPickFor(null);
   }, [open]);
 
   const addItem = (item: (typeof productItems)[number]) => {
+    // 대표(canonical) — 변형 선택 다이얼로그로 분기. 라인은 변형 확정 후에만 추가.
+    if (item.isCanonical) {
+      setVariantPickFor({
+        canonicalId: item.id,
+        canonicalName: item.label.replace(/ · 대표\(변형 선택\)$/, ""),
+      });
+      setProductPick("");
+      return;
+    }
     setItems((prev) => [
       ...prev,
       {
@@ -273,6 +297,23 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
       },
     ]);
     setProductPick("");
+  };
+
+  const handleVariantPicked = (variant: PickedVariant) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        kind: "product",
+        productId: variant.id,
+        productName: variant.name,
+        sku: variant.sku,
+        imageUrl: variant.imageUrl ?? null,
+        quantity: "1",
+        unitPrice: variant.sellingPrice,
+        optionValueIds: [],
+      },
+    ]);
+    setVariantPickFor(null);
   };
 
   // 기술료 라인 추가 — 프리셋 선택 또는 빈 라인 직접 추가
@@ -412,7 +453,7 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
               {/* 상품 검색 */}
               <JmFormField
                 label={`상품 ${items.length > 0 ? `· ${items.length}건` : ""}`}
-                hint="대표(canonical) 상품은 변형 미확정으로 prepare 시 차단되므로 목록에서 제외됩니다."
+                hint="대표(canonical) 선택 시 변형 선택 창이 자동으로 열립니다. 변형은 대표 안에서만 보입니다."
               >
                 <JmCombobox
                   items={productItems}
@@ -1016,6 +1057,19 @@ export function OrderCreateSheet({ open, onOpenChange, onCreated }: Props) {
           title="배송 원가 (매장 지불)"
           onSubmit={(net) => setShippingCostBorne(String(net))}
         />
+
+        {/* 대표 상품 → 변형 선택 다이얼로그 */}
+        {variantPickFor && (
+          <VariantPickDialog
+            canonicalId={variantPickFor.canonicalId}
+            canonicalName={variantPickFor.canonicalName}
+            open
+            onOpenChange={(o) => {
+              if (!o) setVariantPickFor(null);
+            }}
+            onPick={handleVariantPicked}
+          />
+        )}
       </JmDrawerContent>
     </JmDrawer>
   );
@@ -1147,5 +1201,177 @@ function OrderItemOptionsCard({
         );
       })}
     </div>
+  );
+}
+
+/** 변형 픽업 다이얼로그가 반환하는 결과 — 부모는 이걸로 라인 1개 추가. */
+interface PickedVariant {
+  id: string;
+  name: string;
+  sku: string;
+  sellingPrice: string;
+  imageUrl: string | null;
+}
+
+interface VariantDetail {
+  id: string;
+  name: string;
+  sku: string;
+  sellingPrice: string;
+  imageUrl?: string | null;
+  variableComponents?: { slotLabel: string; componentName: string }[];
+}
+
+interface VariantPickDialogProps {
+  canonicalId: string;
+  canonicalName: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onPick: (variant: PickedVariant) => void;
+}
+
+/**
+ * 대표(canonical) 상품에서 어떤 변형(variant) 인지 선택하는 모달.
+ * POS 의 VariantSelectSheet 와 같은 의도 — 같은 이름·다른 SKU 가 평탄하게 나와 헤깔리는 문제 해결.
+ *
+ * /api/products/{id} 가 variants[]·variableComponents 를 반환 (POS 와 동일 contract).
+ * 옵션(productOption) 은 라인 추가 후 OrderItemOptionsCard 가 처리하므로 여기선 변형만.
+ */
+function VariantPickDialog({
+  canonicalId,
+  canonicalName,
+  open,
+  onOpenChange,
+  onPick,
+}: VariantPickDialogProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const productQuery = useQuery<{
+    id: string;
+    name: string;
+    variants: VariantDetail[];
+  }>({
+    queryKey: ["product-detail-variants", canonicalId],
+    queryFn: () =>
+      apiGet<{ id: string; name: string; variants: VariantDetail[] }>(
+        `/api/products/${canonicalId}`,
+      ),
+    enabled: open,
+  });
+
+  const variants = productQuery.data?.variants ?? [];
+
+  const confirm = () => {
+    const picked = variants.find((v) => v.id === selectedId);
+    if (!picked) return;
+    onPick({
+      id: picked.id,
+      name: picked.name,
+      sku: picked.sku,
+      sellingPrice: picked.sellingPrice,
+      imageUrl: picked.imageUrl ?? null,
+    });
+  };
+
+  return (
+    <JmDialog open={open} onOpenChange={onOpenChange}>
+      <JmDialogContent size="xl">
+        <JmDialogHeader>
+          <JmDialogTitle>변형 선택 — {canonicalName}</JmDialogTitle>
+        </JmDialogHeader>
+        <JmDialogBody>
+          {productQuery.isPending ? (
+            <div className="flex items-center justify-center py-10 text-jm-sm text-[var(--jm-text-subtle)]">
+              <JmSpinner size="sm" />
+              <span className="ml-2">불러오는 중…</span>
+            </div>
+          ) : variants.length === 0 ? (
+            <div className="rounded-2xl bg-[var(--jm-surface-muted)] py-10 text-center text-jm-sm text-[var(--jm-text-subtle)]">
+              등록된 변형이 없습니다 — 상품 페이지에서 추가하세요
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {variants.map((v) => {
+                const active = selectedId === v.id;
+                const price = parseFloat(v.sellingPrice) || 0;
+                const priceGross = Math.round(price * 1.1);
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedId(v.id)}
+                    onDoubleClick={() => {
+                      setSelectedId(v.id);
+                      onPick({
+                        id: v.id,
+                        name: v.name,
+                        sku: v.sku,
+                        sellingPrice: v.sellingPrice,
+                        imageUrl: v.imageUrl ?? null,
+                      });
+                    }}
+                    className={`flex items-center gap-3 rounded-2xl border-2 p-3 text-left transition-colors ${
+                      active
+                        ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                        : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
+                    }`}
+                  >
+                    {v.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={v.imageUrl}
+                        alt={v.name}
+                        className="size-14 shrink-0 rounded-xl bg-[var(--jm-surface-muted)] object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
+                        <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+                          <path
+                            d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
+                            stroke="currentColor"
+                            strokeWidth="1.3"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="line-clamp-1 text-jm-sm font-semibold text-[var(--jm-text)]">
+                        {v.name}
+                      </span>
+                      <span className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
+                        {v.sku}
+                      </span>
+                      {v.variableComponents && v.variableComponents.length > 0 && (
+                        <span className="mt-0.5 line-clamp-2 text-jm-xs text-[var(--jm-text-muted)]">
+                          {v.variableComponents
+                            .map((c) => `${c.slotLabel}: ${c.componentName}`)
+                            .join(" · ")}
+                        </span>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+                        VAT 포함
+                      </div>
+                      <div className="text-jm-sm font-semibold tabular-nums text-[var(--jm-text)]">
+                        ₩{priceGross.toLocaleString("ko-KR")}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </JmDialogBody>
+        <JmDialogFooter>
+          <JmButton variant="outline" onClick={() => onOpenChange(false)}>
+            취소
+          </JmButton>
+          <JmButton onClick={confirm} disabled={!selectedId}>
+            선택
+          </JmButton>
+        </JmDialogFooter>
+      </JmDialogContent>
+    </JmDialog>
   );
 }
