@@ -34,14 +34,10 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 import { AssemblyTemplateCombobox } from "@/components/assembly-template-combobox";
 import { AssemblyPresetCombobox } from "@/components/assembly-preset-combobox";
-import {
-  QuickAssemblyTemplateDialog,
-  type QuickTemplate,
-} from "@/components/quick-assembly-template-dialog";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiMutate } from "@/lib/api-client";
+import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import type { CategoryOption } from "@/components/new-product-form/types";
@@ -290,7 +286,10 @@ export function NewProductForm({
   const [savePresetOpen, setSavePresetOpen] = useState(false);
   const [savePresetName, setSavePresetName] = useState("");
   const [savePresetSubmitting, setSavePresetSubmitting] = useState(false);
-  const [quickTemplateOpen, setQuickTemplateOpen] = useState(false);
+  // 현재 구성된 setComponents 를 새 조립템플릿으로 저장
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+  const [saveTemplateSubmitting, setSaveTemplateSubmitting] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
@@ -2240,11 +2239,18 @@ export function NewProductForm({
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => setQuickTemplateOpen(true)}
+                              onClick={() => {
+                                setSaveTemplateName(form.name || "");
+                                setSaveTemplateOpen(true);
+                              }}
+                              disabled={
+                                // 슬롯라벨이 채워진 유효한 행이 1개 이상이어야 저장 가능
+                                !setComponents.some((r) => r.label && r.label.trim())
+                              }
                               className="shrink-0 h-9"
                             >
                               <Plus className="size-3.5" />
-                              새 템플릿
+                              템플릿으로 저장
                             </JmButton>
                           </div>
                         </div>
@@ -3137,15 +3143,120 @@ export function NewProductForm({
         );
       })()}
 
-      <QuickAssemblyTemplateDialog
-        open={quickTemplateOpen}
-        onOpenChange={setQuickTemplateOpen}
-        onCreated={(t: QuickTemplate) => {
-          // 신규 템플릿을 목록 맨 앞에 추가하고 즉시 적용 (state 반영 전에 객체 직접 전달).
-          setTemplates((prev) => [t, ...prev]);
-          applyTemplate(t.id, t);
-        }}
-      />
+      {/* 현재 구성을 새 조립템플릿으로 저장 */}
+      <JmDialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>현재 구성을 템플릿으로 저장</JmDialogTitle>
+          </JmDialogHeader>
+          <div className="flex flex-col gap-3 px-6 py-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-jm-xs text-[var(--jm-text-muted)]">템플릿명</label>
+              <JmInput
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                placeholder="예: 3HP 공기압축기"
+              />
+            </div>
+            <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-2.5">
+              <div className="mb-1 text-jm-xs font-medium text-[var(--jm-text-muted)]">
+                저장될 슬롯 ({setComponents.filter((r) => r.label?.trim()).length}개)
+              </div>
+              <ul className="space-y-0.5 text-jm-xs text-[var(--jm-text)]">
+                {setComponents
+                  .filter((r) => r.label?.trim())
+                  .map((r, i) => (
+                    <li key={r.id} className="flex items-center gap-1.5">
+                      <span className="text-[var(--jm-text-muted)]">{i + 1}.</span>
+                      <span className="font-medium">{r.label}</span>
+                      <span className="text-[var(--jm-text-muted)]">×</span>
+                      <span>{r.quantity || "1"}</span>
+                      {r.product && (
+                        <span className="ml-1 text-[var(--jm-text-muted)] truncate">
+                          ({r.product.name})
+                        </span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            {assemblyFixedCost > 0 && (
+              <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+                기본 조립비 {assemblyFixedCost.toLocaleString("ko-KR")}원도 함께 저장됩니다.
+              </p>
+            )}
+          </div>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setSaveTemplateOpen(false)}
+              disabled={saveTemplateSubmitting}
+            >
+              취소
+            </JmButton>
+            <JmButton
+              onClick={async () => {
+                const name = saveTemplateName.trim();
+                if (!name) {
+                  toast.error("템플릿명을 입력해주세요");
+                  return;
+                }
+                const validRows = setComponents.filter((r) => r.label?.trim());
+                if (validRows.length === 0) {
+                  toast.error("슬롯 라벨이 있는 구성품이 1개 이상 필요합니다");
+                  return;
+                }
+                setSaveTemplateSubmitting(true);
+                try {
+                  const created = await apiMutate<TemplateDetail>(
+                    "/api/assembly-templates",
+                    "POST",
+                    {
+                      name,
+                      defaultLaborCost:
+                        assemblyFixedCost > 0 ? String(assemblyFixedCost) : null,
+                      isActive: true,
+                      slots: validRows.map((r, idx) => ({
+                        label: r.label!.trim(),
+                        slotLabelId: r.slotLabelId || null,
+                        order: idx,
+                        defaultProductId: r.product?.id ?? null,
+                        defaultQuantity: r.quantity || "1",
+                        isVariable: false,
+                      })),
+                    },
+                  );
+                  toast.success("조립 템플릿이 등록되었습니다");
+                  // 신규 템플릿을 목록에 추가하고 현재 행에 slotId 를 연결 — preset 저장 흐름과 정합.
+                  setTemplates((prev) => [created, ...prev]);
+                  setTemplateId(created.id);
+                  const slotByOrder = new Map(
+                    created.slots.map((s) => [s.order, s.id]),
+                  );
+                  setSetComponents((prev) =>
+                    prev.map((r, idx) => {
+                      const matchingSlotId = slotByOrder.get(idx);
+                      return matchingSlotId ? { ...r, slotId: matchingSlotId } : r;
+                    }),
+                  );
+                  setSaveTemplateOpen(false);
+                  setSaveTemplateName("");
+                } catch (err) {
+                  toast.error(
+                    err instanceof ApiError ? err.message : "템플릿 저장 실패",
+                  );
+                } finally {
+                  setSaveTemplateSubmitting(false);
+                }
+              }}
+              disabled={saveTemplateSubmitting}
+            >
+              {saveTemplateSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              저장
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
       <JmDialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
         <JmDialogContent>
