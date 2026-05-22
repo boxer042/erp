@@ -2472,12 +2472,6 @@ export function NewProductForm({
                       : isTaxable && rate > 0
                         ? Math.round(spRaw * (1 + rate))
                         : spRaw;
-                    const lpNet = isTaxable && rate > 0 && lpVat > 0
-                      ? Math.round(lpVat / (1 + rate))
-                      : lpVat;
-                    const spNet = isTaxable && rate > 0 && spVat > 0
-                      ? Math.round(spVat / (1 + rate))
-                      : spVat;
                     const hasList = lpVat > 0;
                     const discountAmt = hasList && lpVat > spVat ? lpVat - spVat : 0;
                     const discountPct = hasList && lpVat > 0 && discountAmt > 0
@@ -2652,27 +2646,6 @@ export function NewProductForm({
                               </div>
                             )}
 
-                            {/* PriceInputDialog 정가 입력 */}
-                            <PriceInputDialog
-                              open={listPriceDialogOpen}
-                              onOpenChange={setListPriceDialogOpen}
-                              title="정가 입력"
-                              initialNet={lpNet}
-                              taxType={form.taxType as "TAXABLE" | "TAX_FREE"}
-                              isZeroRate={form.zeroRateEligible}
-                              originalPrice={spNet > 0 ? spNet : undefined}
-                              onSubmit={(netInput) => {
-                                if (netInput <= 0) {
-                                  setForm((prev) => ({ ...prev, listPrice: "0" }));
-                                  return;
-                                }
-                                const vat =
-                                  isTaxable && rate > 0
-                                    ? Math.round(netInput * (1 + rate))
-                                    : netInput;
-                                setForm((prev) => ({ ...prev, listPrice: String(vat) }));
-                              }}
-                            />
                           </JmCardContent>
                         </JmCard>
                       </section>
@@ -3023,6 +2996,43 @@ export function NewProductForm({
           }));
         }}
       />
+
+      {/* 정가 입력 드로워 — 최상위 fragment 에 두어 transform 가진 조상 영향 받지 않음 */}
+      {(() => {
+        const lpVat = parseFloat(form.listPrice || "0");
+        const spRaw = parseFloat(form.sellingPrice || "0");
+        const rate = parseFloat(form.taxRate || "0.1");
+        const isTaxable = form.taxType !== "TAX_FREE" && !form.zeroRateEligible;
+        const spVat = form.vatIncluded
+          ? spRaw
+          : isTaxable && rate > 0
+            ? Math.round(spRaw * (1 + rate))
+            : spRaw;
+        const lpNet =
+          isTaxable && rate > 0 && lpVat > 0 ? Math.round(lpVat / (1 + rate)) : lpVat;
+        const spNet =
+          isTaxable && rate > 0 && spVat > 0 ? Math.round(spVat / (1 + rate)) : spVat;
+        return (
+          <PriceInputDialog
+            open={listPriceDialogOpen}
+            onOpenChange={setListPriceDialogOpen}
+            title="정가 입력"
+            initialNet={lpNet}
+            taxType={form.taxType as "TAXABLE" | "TAX_FREE"}
+            isZeroRate={form.zeroRateEligible}
+            originalPrice={spNet > 0 ? spNet : undefined}
+            onSubmit={(netInput) => {
+              if (netInput <= 0) {
+                setForm((prev) => ({ ...prev, listPrice: "0" }));
+                return;
+              }
+              const vat =
+                isTaxable && rate > 0 ? Math.round(netInput * (1 + rate)) : netInput;
+              setForm((prev) => ({ ...prev, listPrice: String(vat) }));
+            }}
+          />
+        );
+      })()}
 
       <JmDialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
         <JmDialogContent>
