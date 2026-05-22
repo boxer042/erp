@@ -41,24 +41,13 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
   const sorted = [...breakdown].sort((a, b) => b.subtotal - a.subtotal);
   const total = sorted.reduce((s, b) => s + b.subtotal, 0);
 
-  // 표기 통일 — 상품등록 확인 스텝과 동일하게 모든 금액 VAT 포함으로 노출.
-  // taxType=TAX_FREE 이면 rate=0 라 그대로. 그 외는 (1+taxRate) 곱.
-  // FIXED 비용은 사용자가 VAT 포함으로 입력하므로 그 입력 규모와도 일치.
-  const taxRate =
-    product.taxType !== "TAX_FREE"
-      ? parseFloat(product.taxRate ?? "0.1")
-      : 0;
-  const vatMul = 1 + taxRate;
-  const vatPrice = (n: number) => Math.round(n * vatMul);
-
   return (
     <ProductSection
       title="구성품 · 예상 원가 분해"
       description={
-        (product.productType === "ASSEMBLED"
+        product.productType === "ASSEMBLED"
           ? "조립상품 구성 부품 · 단가 · 소계 (비용 큰 항목부터)"
-          : "세트 상품 구성품 · 단가 · 소계") +
-        (taxRate > 0 ? " — 모든 금액 VAT 포함" : "")
+          : "세트 상품 구성품 · 단가 · 소계"
       }
       noPadding
       actions={
@@ -144,20 +133,20 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
                         {b.quantity.toLocaleString("ko-KR")}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
-                        ₩{fmtPrice(vatPrice(b.supplierUnitPrice ?? 0))}
+                        ₩{fmtPrice(Math.round(b.supplierUnitPrice ?? 0))}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                         {(b.shippingPerUnit ?? 0) > 0
-                          ? `₩${fmtPrice(vatPrice(b.shippingPerUnit ?? 0))}`
+                          ? `₩${fmtPrice(Math.round(b.shippingPerUnit ?? 0))}`
                           : "-"}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
                         {(b.incomingCostPerUnit ?? 0) > 0
-                          ? `₩${fmtPrice(vatPrice(b.incomingCostPerUnit ?? 0))}`
+                          ? `₩${fmtPrice(Math.round(b.incomingCostPerUnit ?? 0))}`
                           : "-"}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
-                        ₩{fmtPrice(vatPrice(b.unitCost))}
+                        ₩{fmtPrice(Math.round(b.unitCost))}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-right tabular-nums">
                         <div className="flex flex-col items-end">
@@ -168,7 +157,7 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
                                 : "text-[var(--jm-text)]"
                             }
                           >
-                            ₩{fmtPrice(vatPrice(b.subtotal))}
+                            ₩{fmtPrice(Math.round(b.subtotal))}
                           </span>
                           {total > 0 && (
                             <span className="text-jm-2xs text-[var(--jm-text-muted)]">
@@ -193,17 +182,17 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
                     구성품 합계
                   </JmTableCell>
                   <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
-                    ₩{fmtPrice(vatPrice(sumSupplier))}
+                    ₩{fmtPrice(Math.round(sumSupplier))}
                   </JmTableCell>
                   <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
-                    ₩{fmtPrice(vatPrice(sumShipping))}
+                    ₩{fmtPrice(Math.round(sumShipping))}
                   </JmTableCell>
                   <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
-                    ₩{fmtPrice(vatPrice(sumIncoming))}
+                    ₩{fmtPrice(Math.round(sumIncoming))}
                   </JmTableCell>
                   <JmTableCell />
                   <JmTableCell className="px-3 py-2 text-right tabular-nums font-semibold text-[var(--jm-text)]">
-                    ₩{fmtPrice(vatPrice(total))}
+                    ₩{fmtPrice(Math.round(total))}
                   </JmTableCell>
                   <JmTableCell />
                 </JmTableRow>
