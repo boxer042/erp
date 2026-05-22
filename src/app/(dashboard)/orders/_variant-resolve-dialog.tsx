@@ -9,6 +9,7 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   JmButton,
   JmDialog,
+  JmDialogBody,
   JmDialogContent,
   JmDialogFooter,
   JmDialogHeader,
@@ -211,7 +212,7 @@ export function VariantResolveDialog({
           </p>
         </JmDialogHeader>
 
-        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto py-2">
+        <JmDialogBody className="flex flex-col gap-4">
           {!allLoaded ? (
             <div className="flex items-center justify-center gap-2 py-10 text-[var(--jm-text-muted)]">
               <JmSpinner />
@@ -237,7 +238,7 @@ export function VariantResolveDialog({
               />
             ))
           )}
-        </div>
+        </JmDialogBody>
 
         <JmDialogFooter>
           <JmButton

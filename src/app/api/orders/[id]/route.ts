@@ -1661,6 +1661,15 @@ export async function PUT(
           where: { orderId: id, status: { not: "CANCELLED" } },
           data: { status: "CANCELLED" },
         });
+        // 주문 취소 시 — 이 주문 라인에 발번된 시리얼 라벨(SALE)도 정리.
+        // cancel 은 PENDING/PREPARING 한정 → 손님에게 라벨이 가지 않은 상태이므로 삭제 안전.
+        // 정책: issue-serials 가 CANCELLED 주문 발번을 차단하므로, 기존 발번분도 제거해 정합 유지.
+        const itemIds = order.items.map((i) => i.id);
+        if (itemIds.length > 0) {
+          await tx.serialItem.deleteMany({
+            where: { orderItemId: { in: itemIds }, source: "SALE" },
+          });
+        }
       }
 
       // === SALES_CANCELLED — 외상 주문 매출 취소 시 customer ledger 자동 조정 ===
@@ -2278,6 +2287,20 @@ export async function DELETE(
     return NextResponse.json({ error: "대기 상태의 주문만 삭제할 수 있습니다" }, { status: 400 });
   }
 
-  await prisma.order.delete({ where: { id } });
+  // SerialItem 정리 → Order 삭제. OrderItem 의 SerialItem 관계는 onDelete:SetNull 이라
+  // cascade 만으로는 라벨이 orphan(orderItemId=null) 으로 남음. 명시적으로 먼저 정리.
+  await prisma.$transaction(async (tx) => {
+    const items = await tx.orderItem.findMany({
+      where: { orderId: id },
+      select: { id: true },
+    });
+    const itemIds = items.map((i) => i.id);
+    if (itemIds.length > 0) {
+      await tx.serialItem.deleteMany({
+        where: { orderItemId: { in: itemIds }, source: "SALE" },
+      });
+    }
+    await tx.order.delete({ where: { id } });
+  });
   return NextResponse.json({ success: true });
 }

@@ -27,6 +27,7 @@ import {
   JmButton,
   JmDateRangePicker,
   JmDialog,
+  JmDialogBody,
   JmDialogContent,
   JmDialogFooter,
   JmDialogHeader,
@@ -903,7 +904,7 @@ export default function InitialInventoryPage() {
             <JmDialogHeader>
               <JmDialogTitle>초기 등록 확인</JmDialogTitle>
             </JmDialogHeader>
-            <div className="space-y-3 text-jm-sm text-[var(--jm-text)]">
+            <JmDialogBody className="space-y-3 text-jm-sm text-[var(--jm-text)]">
               <p>
                 거래처 <strong>{selectedSupplierName}</strong>의{" "}
                 <strong>{totals.validCount}건</strong> 공급상품/재고를 초기등록합니다.
@@ -918,7 +919,7 @@ export default function InitialInventoryPage() {
                 <p>· 1회성 작업입니다. 같은 공급상품에 이미 초기등록이 있으면 거부됩니다</p>
                 <p>· 거래처 원장(미지급금)에는 영향 없습니다</p>
               </div>
-            </div>
+            </JmDialogBody>
             <JmDialogFooter>
               <JmButton variant="ghost" onClick={() => setConfirmOpen(false)}>
                 취소
@@ -948,14 +949,14 @@ export default function InitialInventoryPage() {
             <JmDialogHeader>
               <JmDialogTitle>거래처 변경 — 입력 중인 데이터 삭제</JmDialogTitle>
             </JmDialogHeader>
-            <div className="space-y-2 text-jm-sm text-[var(--jm-text)]">
+            <JmDialogBody className="space-y-2 text-jm-sm text-[var(--jm-text)]">
               <p>
                 현재 입력 중인 <strong>{totals.validCount}건</strong>의 데이터가 모두 사라집니다. 진행할까요?
               </p>
               <p className="text-[var(--jm-text-muted)] text-jm-xs">
                 다음 거래처: <strong>{supplierChangeConfirm?.nextName}</strong>
               </p>
-            </div>
+            </JmDialogBody>
             <JmDialogFooter>
               <JmButton variant="ghost" onClick={() => setSupplierChangeConfirm(null)}>
                 취소

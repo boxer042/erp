@@ -13,6 +13,7 @@ import {
   JmButton,
   JmDatePicker,
   JmDialog,
+  JmDialogBody,
   JmDialogContent,
   JmDialogDescription,
   JmDialogFooter,
@@ -629,7 +630,7 @@ export function AssemblyRegisterSheet({
             </JmDialogDescription>
           </JmDialogHeader>
           {newVariantData && (
-            <div className="space-y-3 py-2">
+            <JmDialogBody className="space-y-3">
               <div className="grid grid-cols-[80px_1fr] items-center gap-2 text-jm-sm">
                 <label className="text-right text-[var(--jm-text-muted)]">상품명</label>
                 <JmInput size="sm" value={newVariantData.name} disabled />
@@ -643,7 +644,7 @@ export function AssemblyRegisterSheet({
                   onFocus={focusCaretEnd}
                 />
               </div>
-            </div>
+            </JmDialogBody>
           )}
           <JmDialogFooter>
             <JmButton
