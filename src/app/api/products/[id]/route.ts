@@ -962,7 +962,10 @@ export async function PUT(
       },
     });
 
-    // 가격 변경 이력 — listPrice / sellingPrice 가 실제로 바뀐 경우에만 row 생성
+    // 가격 변경 이력 — listPrice / sellingPrice 가 실제로 바뀐 경우에만 row 생성.
+    // 단, oldPrice === 0 은 "초기 미설정 → 첫 입력" 으로 보고 이력에서 제외 (자동매핑
+    // 상품의 첫 가격 입력이 "0 → X 상승" 처럼 잘못 표시되던 버그 방지). 명시적으로
+    // 0 으로 리셋한 경우(oldPrice > 0, newPrice = 0) 는 진짜 변경이라 이력 기록.
     const historyRows: Array<{
       productId: string;
       field: string;
@@ -973,9 +976,9 @@ export async function PUT(
       reason: string | null;
       changedById: string | null;
     }> = [];
-    if (oldListPrice !== newListPrice) {
+    if (oldListPrice !== newListPrice && oldListPrice > 0) {
       const diff = newListPrice - oldListPrice;
-      const pct = oldListPrice > 0 ? (diff / oldListPrice) * 100 : 0;
+      const pct = (diff / oldListPrice) * 100;
       historyRows.push({
         productId: id,
         field: "LIST",
@@ -987,9 +990,9 @@ export async function PUT(
         changedById: user?.id ?? null,
       });
     }
-    if (oldSellingPrice !== newSellingPrice) {
+    if (oldSellingPrice !== newSellingPrice && oldSellingPrice > 0) {
       const diff = newSellingPrice - oldSellingPrice;
-      const pct = oldSellingPrice > 0 ? (diff / oldSellingPrice) * 100 : 0;
+      const pct = (diff / oldSellingPrice) * 100;
       historyRows.push({
         productId: id,
         field: "SELLING",
