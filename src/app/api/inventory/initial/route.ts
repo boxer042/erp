@@ -88,10 +88,6 @@ export async function POST(request: NextRequest) {
   let results;
   try {
     results = await prisma.$transaction(async (tx) => {
-    const created: Array<{ supplierProductId: string; name: string }> = [];
-    let lotsCreated = 0;
-    let inventoryUpdates = 0;
-
     // 같은 공급상품(기존 spId 또는 신규 name+spec)끼리 묶어 1로트로 합산
     type ParsedRow = {
       qty: number;
@@ -123,27 +119,53 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 매핑 일괄 조회 (N+1 방지) — 기존 spId 그룹만 해당
+    // Phase 1 — 기존 spId 일괄 조회 (존재 검증 + 매핑) — N+1 방지
     const existingSpIds = [...groupMap.entries()]
       .filter(([key]) => key.startsWith("existing:"))
       .map(([, rows]) => rows[0].supplierProductId!)
       .filter(Boolean);
+
+    const existingSps = existingSpIds.length > 0
+      ? await tx.supplierProduct.findMany({
+          where: { id: { in: existingSpIds } },
+          select: { id: true, name: true },
+        })
+      : [];
     const allMappings = existingSpIds.length > 0
       ? await tx.productMapping.findMany({
           where: { supplierProductId: { in: existingSpIds } },
           select: { supplierProductId: true, productId: true, conversionRate: true },
         })
       : [];
+
+    const existingSpMap = new Map(existingSps.map((sp) => [sp.id, sp]));
+    const missingSpId = existingSpIds.find((id) => !existingSpMap.has(id));
+    if (missingSpId) {
+      throw new Error(
+        `선택한 공급상품을 찾을 수 없습니다 (id=${missingSpId}). 페이지를 새로고침한 후 다시 시도해주세요.`,
+      );
+    }
+
     const mappingsBySp = new Map<string, typeof allMappings>();
     for (const m of allMappings) {
       if (!mappingsBySp.has(m.supplierProductId)) mappingsBySp.set(m.supplierProductId, []);
       mappingsBySp.get(m.supplierProductId)!.push(m);
     }
 
+    // Phase 2 — 그룹별 SP create/update (병렬)
+    type GroupData = {
+      supplierProductId: string;
+      supplierProductName: string;
+      mergedQty: number;
+      mergedUnitPrice: number;
+      mergedOriginalPrice: number | null;
+      mergedDiscountAmount: number | null;
+      memo: string | undefined;
+    };
+
+    const spOps: Promise<GroupData>[] = [];
     for (const [, rows] of groupMap) {
       const firstRow = rows[0];
-
-      // 합산 수량 및 가중평균 단가
       const mergedQty = rows.reduce((s, r) => s + r.qty, 0);
       const totalCost = rows.reduce((s, r) => s + r.qty * r.unitPrice, 0);
       const mergedUnitPrice = mergedQty > 0 ? totalCost / mergedQty : 0;
@@ -153,143 +175,210 @@ export async function POST(request: NextRequest) {
       // listPrice 기준은 가장 비싼 행(정가), unitPrice는 가중평균(실제 원가)
       const canonicalRow = rows.reduce((best, r) => r.unitPrice > best.unitPrice ? r : best, firstRow);
 
-      let supplierProductId = firstRow.supplierProductId;
-      let supplierProductName = "";
+      const base = {
+        mergedQty,
+        mergedUnitPrice,
+        mergedOriginalPrice,
+        mergedDiscountAmount,
+        memo: firstRow.memo,
+      };
 
-      if (!supplierProductId && firstRow.newSupplierProduct) {
-        const sp = await tx.supplierProduct.create({
-          data: {
-            supplierId: firstRow.supplierId,
-            name: firstRow.newSupplierProduct.name,
-            spec: firstRow.newSupplierProduct.spec || null,
-            supplierCode: firstRow.newSupplierProduct.supplierCode || null,
-            unitOfMeasure: firstRow.newSupplierProduct.unitOfMeasure || "EA",
-            listPrice: canonicalRow.originalPrice ?? canonicalRow.unitPrice,
-            unitPrice: mergedUnitPrice,
-            source: "INITIAL",
-          },
-        });
-        supplierProductId = sp.id;
-        supplierProductName = sp.name;
-        created.push({ supplierProductId: sp.id, name: sp.name });
-      } else if (supplierProductId) {
-        // 폼이 열려있는 동안 다른 경로(예: incoming 취소 시 cleanupOrphanedSupplierProduct)로
-        // SP 가 hard-delete 된 경우 — update 가 P2025 를 던지지 않고 통과하면
-        // 후속 inventoryLot.create 에서 FK 위반(P2003) 으로 폭발. 명시적으로 존재 확인.
-        const existing = await tx.supplierProduct.findUnique({
-          where: { id: supplierProductId },
-          select: { id: true },
-        });
-        if (!existing) {
-          throw new Error(
-            `선택한 공급상품을 찾을 수 없습니다 (id=${supplierProductId}). 페이지를 새로고침한 후 다시 시도해주세요.`,
-          );
-        }
-        const sp = await tx.supplierProduct.update({
-          where: { id: supplierProductId },
-          data: {
-            unitPrice: mergedUnitPrice,
-            ...(canonicalRow.originalPrice != null ? { listPrice: canonicalRow.originalPrice } : {}),
-            ...(firstRow.spec !== undefined ? { spec: firstRow.spec || null } : {}),
-          },
-        });
-        supplierProductName = sp.name;
-        created.push({ supplierProductId: sp.id, name: sp.name });
-      }
-
-      if (!supplierProductId) continue;
-
-      // 수량 0 — 상품·단가만 카탈로그용으로 등록하고 재고는 발생시키지 않음.
-      // 로트/Inventory/Movement 모두 스킵. SP create/update 만 위에서 끝났음.
-      if (mergedQty === 0) continue;
-
-      const mappings = supplierProductId && mappingsBySp.has(supplierProductId)
-        ? mappingsBySp.get(supplierProductId)!
-        : await tx.productMapping.findMany({
-            where: { supplierProductId },
-            select: { productId: true, conversionRate: true },
-          });
-
-      if (mappings.length === 0) {
-        await tx.inventoryLot.create({
-          data: {
-            supplierProduct: { connect: { id: supplierProductId } },
-            receivedQty: mergedQty,
-            remainingQty: mergedQty,
-            unitCost: mergedUnitPrice,
-            originalPrice: mergedOriginalPrice,
-            discountAmount: mergedDiscountAmount,
-            receivedAt: new Date(),
-            source: "INITIAL",
-            memo: firstRow.memo || "초기등록",
-          },
-        });
-        lotsCreated++;
-        continue;
-      }
-
-      for (const mapping of mappings) {
-        const rate = Number(mapping.conversionRate);
-        const addQty = mergedQty * rate;
-        const addUnitCost = mergedUnitPrice / rate;
-        const addOriginal = mergedOriginalPrice != null ? mergedOriginalPrice / rate : null;
-        const addDiscount = mergedDiscountAmount != null ? mergedDiscountAmount / rate : null;
-
-        const lot = await tx.inventoryLot.create({
-          data: {
-            product: { connect: { id: mapping.productId } },
-            supplierProduct: { connect: { id: supplierProductId } },
-            receivedQty: addQty,
-            remainingQty: addQty,
-            unitCost: addUnitCost,
-            originalPrice: addOriginal,
-            discountAmount: addDiscount,
-            receivedAt: new Date(),
-            source: "INITIAL",
-            memo: firstRow.memo || "초기등록",
-          },
-        });
-        lotsCreated++;
-
-        const existingInv = await tx.inventory.findUnique({
-          where: { productId: mapping.productId },
-        });
-        const prevQty = existingInv ? Number(existingInv.quantity) : 0;
-        const prevAvgCost = existingInv?.avgCost != null ? Number(existingInv.avgCost) : null;
-        const newAvgCost = computeMovingAverage(prevQty, prevAvgCost, addQty, addUnitCost);
-
-        const inventory = await tx.inventory.upsert({
-          where: { productId: mapping.productId },
-          update: {
-            quantity: { increment: addQty },
-            avgCost: newAvgCost,
-            avgCostUpdatedAt: new Date(),
-          },
-          create: {
-            productId: mapping.productId,
-            quantity: addQty,
-            avgCost: newAvgCost,
-            avgCostUpdatedAt: new Date(),
-          },
-        });
-
-        await tx.inventoryMovement.create({
-          data: {
-            inventoryId: inventory.id,
-            type: "INITIAL",
-            quantity: addQty,
-            balanceAfter: inventory.quantity,
-            referenceId: lot.id,
-            referenceType: "INITIAL_REGISTRATION",
-            memo: firstRow.memo || `초기등록 ${supplierProductName}`,
-          },
-        });
-        inventoryUpdates++;
+      if (!firstRow.supplierProductId && firstRow.newSupplierProduct) {
+        const newSp = firstRow.newSupplierProduct;
+        spOps.push(
+          tx.supplierProduct
+            .create({
+              data: {
+                supplierId: firstRow.supplierId,
+                name: newSp.name,
+                spec: newSp.spec || null,
+                supplierCode: newSp.supplierCode || null,
+                unitOfMeasure: newSp.unitOfMeasure || "EA",
+                listPrice: canonicalRow.originalPrice ?? canonicalRow.unitPrice,
+                unitPrice: mergedUnitPrice,
+                source: "INITIAL",
+              },
+            })
+            .then((sp) => ({ ...base, supplierProductId: sp.id, supplierProductName: sp.name })),
+        );
+      } else if (firstRow.supplierProductId) {
+        const spId = firstRow.supplierProductId;
+        spOps.push(
+          tx.supplierProduct
+            .update({
+              where: { id: spId },
+              data: {
+                unitPrice: mergedUnitPrice,
+                ...(canonicalRow.originalPrice != null ? { listPrice: canonicalRow.originalPrice } : {}),
+                ...(firstRow.spec !== undefined ? { spec: firstRow.spec || null } : {}),
+              },
+            })
+            .then((sp) => ({ ...base, supplierProductId: sp.id, supplierProductName: sp.name })),
+        );
       }
     }
 
+    const groupResults = await Promise.all(spOps);
+    const created: Array<{ supplierProductId: string; name: string }> = groupResults.map((g) => ({
+      supplierProductId: g.supplierProductId,
+      name: g.supplierProductName,
+    }));
+
+    // Phase 3 — 로트 plan (메모리만, 조회·생성 없음)
+    type LotPlan = {
+      supplierProductId: string;
+      productId: string | null;
+      addQty: number;
+      addUnitCost: number;
+      addOriginal: number | null;
+      addDiscount: number | null;
+      lotMemo: string;
+      movementMemo: string;
+    };
+    const lotPlans: LotPlan[] = [];
+    for (const g of groupResults) {
+      // 수량 0 — 카탈로그용. 로트/Inventory/Movement 스킵.
+      if (g.mergedQty === 0) continue;
+
+      const mappings = mappingsBySp.get(g.supplierProductId) ?? [];
+      const lotMemo = g.memo || "초기등록";
+      const movementMemo = g.memo || `초기등록 ${g.supplierProductName}`;
+
+      if (mappings.length === 0) {
+        lotPlans.push({
+          supplierProductId: g.supplierProductId,
+          productId: null,
+          addQty: g.mergedQty,
+          addUnitCost: g.mergedUnitPrice,
+          addOriginal: g.mergedOriginalPrice,
+          addDiscount: g.mergedDiscountAmount,
+          lotMemo,
+          movementMemo,
+        });
+        continue;
+      }
+
+      for (const m of mappings) {
+        const rate = Number(m.conversionRate);
+        lotPlans.push({
+          supplierProductId: g.supplierProductId,
+          productId: m.productId,
+          addQty: g.mergedQty * rate,
+          addUnitCost: g.mergedUnitPrice / rate,
+          addOriginal: g.mergedOriginalPrice != null ? g.mergedOriginalPrice / rate : null,
+          addDiscount: g.mergedDiscountAmount != null ? g.mergedDiscountAmount / rate : null,
+          lotMemo,
+          movementMemo,
+        });
+      }
+    }
+
+    // Phase 4 — 모든 로트 1쿼리 createManyAndReturn
+    const now = new Date();
+    const createdLots = lotPlans.length > 0
+      ? await tx.inventoryLot.createManyAndReturn({
+          data: lotPlans.map((p) => ({
+            productId: p.productId,
+            supplierProductId: p.supplierProductId,
+            receivedQty: p.addQty,
+            remainingQty: p.addQty,
+            unitCost: p.addUnitCost,
+            originalPrice: p.addOriginal,
+            discountAmount: p.addDiscount,
+            receivedAt: now,
+            source: "INITIAL" as const,
+            memo: p.lotMemo,
+          })),
+          select: { id: true },
+        })
+      : [];
+    const lotsCreated = createdLots.length;
+
+    // Phase 5 — 상품 매핑된 plan 만 inventory 처리 (오르판은 끝)
+    const productPlans = lotPlans
+      .map((p, i) => ({ ...p, lotId: createdLots[i]!.id }))
+      .filter((p): p is typeof p & { productId: string } => p.productId !== null);
+
+    const productIds = Array.from(new Set(productPlans.map((p) => p.productId)));
+    const existingInventories = productIds.length > 0
+      ? await tx.inventory.findMany({
+          where: { productId: { in: productIds } },
+          select: { productId: true, quantity: true, avgCost: true },
+        })
+      : [];
+    const inventoryByProduct = new Map(existingInventories.map((inv) => [inv.productId, inv]));
+
+    // 같은 product 에 여러 lot 가 붙으면 운동 평균을 순차 누적 — 원본 동작과 동일
+    const plansByProduct = new Map<string, typeof productPlans>();
+    for (const p of productPlans) {
+      if (!plansByProduct.has(p.productId)) plansByProduct.set(p.productId, []);
+      plansByProduct.get(p.productId)!.push(p);
+    }
+
+    type MovementPayload = {
+      inventoryId: string;
+      type: "INITIAL";
+      quantity: number;
+      balanceAfter: number;
+      referenceId: string;
+      referenceType: string;
+      memo: string;
+    };
+
+    const upsertOps: Promise<MovementPayload[]>[] = [];
+    for (const [productId, plans] of plansByProduct) {
+      const existing = inventoryByProduct.get(productId);
+      const prevQty = existing ? Number(existing.quantity) : 0;
+      const prevAvgCost = existing?.avgCost != null ? Number(existing.avgCost) : null;
+
+      let runningQty = prevQty;
+      let runningAvg = prevAvgCost;
+      const partial: Omit<MovementPayload, "inventoryId">[] = [];
+      for (const p of plans) {
+        runningAvg = computeMovingAverage(runningQty, runningAvg, p.addQty, p.addUnitCost);
+        runningQty += p.addQty;
+        partial.push({
+          type: "INITIAL",
+          quantity: p.addQty,
+          balanceAfter: runningQty,
+          referenceId: p.lotId,
+          referenceType: "INITIAL_REGISTRATION",
+          memo: p.movementMemo,
+        });
+      }
+      const totalAdd = runningQty - prevQty;
+
+      upsertOps.push(
+        tx.inventory
+          .upsert({
+            where: { productId },
+            update: {
+              quantity: { increment: totalAdd },
+              avgCost: runningAvg,
+              avgCostUpdatedAt: now,
+            },
+            create: {
+              productId,
+              quantity: totalAdd,
+              avgCost: runningAvg,
+              avgCostUpdatedAt: now,
+            },
+            select: { id: true },
+          })
+          .then((inv) => partial.map((m) => ({ ...m, inventoryId: inv.id }))),
+      );
+    }
+
+    const movementsNested = await Promise.all(upsertOps);
+    const allMovements = movementsNested.flat();
+
+    if (allMovements.length > 0) {
+      await tx.inventoryMovement.createMany({ data: allMovements });
+    }
+    const inventoryUpdates = allMovements.length;
+
     return { created, lotsCreated, inventoryUpdates };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   } catch (e: unknown) {
     // 폼이 열린 상태에서 다른 경로로 SP 가 hard-delete 된 경우 등 — 사용자에게 친절한 메시지.
     const message = e instanceof Error ? e.message : "초기등록 처리 중 오류가 발생했습니다";
