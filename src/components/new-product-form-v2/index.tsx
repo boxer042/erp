@@ -219,17 +219,31 @@ export function NewProductForm({
     newOptionValueRow(),
   ]);
 
-  // 조립 슬롯 라벨 마스터 — 구성상품 라벨 콤보박스에서 선택/생성
+  // 조립 슬롯 라벨 마스터 — 구성상품 라벨 콤보박스에서 선택/생성.
+  // 라벨에 카테고리가 지정돼 있으면 구성품 콤보박스가 그 카테고리의 상품만 노출.
   const queryClient = useQueryClient();
+  type SlotLabelData = {
+    id: string;
+    name: string;
+    isActive: boolean;
+    categoryId: string | null;
+    category: { id: string; name: string } | null;
+  };
   const slotLabelsQuery = useQuery({
     queryKey: queryKeys.assemblySlotLabels.list(),
-    queryFn: () => apiGet<Array<{ id: string; name: string; isActive: boolean }>>("/api/assembly-slot-labels"),
+    queryFn: () => apiGet<SlotLabelData[]>("/api/assembly-slot-labels"),
     enabled: productType === "ASSEMBLED",
   });
   const slotLabels = useMemo(
     () => (slotLabelsQuery.data ?? []).filter((l) => l.isActive),
     [slotLabelsQuery.data],
   );
+  // slotLabelId → categoryId 빠른 조회용
+  const slotLabelCategoryById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const l of slotLabels) map.set(l.id, l.categoryId);
+    return map;
+  }, [slotLabels]);
   const productNameItems = useMemo(
     () => existingProducts.map((p) => ({ id: p.id, name: p.name, badge: p.sku })),
     [existingProducts],
@@ -2302,6 +2316,18 @@ export function NewProductForm({
                             const lineTotal = hasCost
                               ? parseFloat(row.product!.unitCost || "0") * parseFloat(row.quantity || "1")
                               : 0;
+                            // 슬롯라벨에 카테고리가 지정돼 있으면 그 카테고리의 상품만 보여준다.
+                            // 미지정이면 전체 (기존 동작). 현재 선택된 상품은 카테고리 불일치여도 보존해 표시.
+                            const slotCategoryId = row.slotLabelId
+                              ? slotLabelCategoryById.get(row.slotLabelId) ?? null
+                              : null;
+                            const productsForRow = slotCategoryId
+                              ? existingProducts.filter(
+                                  (p) =>
+                                    p.categoryId === slotCategoryId ||
+                                    p.id === row.product?.id,
+                                )
+                              : existingProducts;
                             return (
                               <div
                                 key={row.id}
@@ -2329,14 +2355,18 @@ export function NewProductForm({
                                   />
                                 )}
                                 <ProductCombobox
-                                  products={existingProducts}
+                                  products={productsForRow}
                                   value={row.product?.id ?? ""}
                                   onChange={(p) =>
                                     setSetComponents((prev) =>
                                       prev.map((r, i) => (i === idx ? { ...r, product: p } : r)),
                                     )
                                   }
-                                  placeholder="구성 상품 선택..."
+                                  placeholder={
+                                    slotCategoryId
+                                      ? "카테고리 내 구성 상품 선택..."
+                                      : "구성 상품 선택..."
+                                  }
                                 />
                                 <div className="flex items-center gap-2">
                                   <span className="text-jm-2xs text-[var(--jm-text-muted)]">

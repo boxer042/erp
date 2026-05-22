@@ -29,7 +29,6 @@ import {
   JmDialogHeader,
   JmDialogTitle,
   JmDrawer,
-  JmDrawerBody,
   JmDrawerContent,
   JmDrawerFooter,
   JmDrawerHeader,
@@ -51,6 +50,7 @@ import {
   JmTableToolbar,
   JmTableToolbarActions,
   JmTableToolbarSearch,
+  JmSelect,
   JmTextarea,
   JmTooltip,
   JmTooltipProvider,
@@ -60,7 +60,24 @@ import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-comb
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
-import type { SlotLabelRow, SlotRow, TemplateRow } from "./_types";
+import type { CategoryOption, SlotLabelRow, SlotRow, TemplateRow } from "./_types";
+
+// 카테고리 트리를 JmSelect options 로 평탄화. parent 만 있으면 그 자체, child 있으면 child 노출.
+function buildCategoryOptions(
+  categories: CategoryOption[],
+): Array<{ value: string; label: string }> {
+  return [
+    { value: "__none__", label: "전체 (필터 없음)" },
+    ...categories.flatMap((cat) =>
+      cat.children.length > 0
+        ? cat.children.map((child) => ({
+            value: child.id,
+            label: `${cat.name} > ${child.name}`,
+          }))
+        : [{ value: cat.id, label: cat.name }],
+    ),
+  ];
+}
 
 // ============================================================
 // 스켈레톤
@@ -426,8 +443,7 @@ export function TemplatesView() {
                   <JmTableRow className="hover:bg-transparent">
                     <JmTableCell
                       colSpan={7}
-                      className="py-10 text-center text-[13px]"
-                      style={{ color: "var(--jm-danger-fg)" }}
+                      className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
                     >
                       템플릿 목록을 불러오지 못했습니다
                     </JmTableCell>
@@ -454,34 +470,21 @@ export function TemplatesView() {
                       <JmTableCell>
                         <Link
                           href={`/products/assembly-templates/${r.id}`}
-                          className="font-medium hover:underline"
-                          style={{ color: "var(--jm-action)" }}
+                          className="font-medium text-[var(--jm-action)] hover:underline"
                         >
                           {r.name}
                         </Link>
                       </JmTableCell>
-                      <JmTableCell
-                        className="max-w-xs truncate"
-                        style={{ color: "var(--jm-text-muted)" }}
-                      >
+                      <JmTableCell className="max-w-xs truncate text-[var(--jm-text-muted)]">
                         {r.description ?? "—"}
                       </JmTableCell>
-                      <JmTableCell
-                        className="text-right tabular-nums"
-                        style={{ color: "var(--jm-text-muted)" }}
-                      >
+                      <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                         {r._count.slots}
                       </JmTableCell>
-                      <JmTableCell
-                        className="text-right tabular-nums"
-                        style={{ color: "var(--jm-text-muted)" }}
-                      >
+                      <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                         {r._count.presets}
                       </JmTableCell>
-                      <JmTableCell
-                        className="text-right tabular-nums"
-                        style={{ color: "var(--jm-text-muted)" }}
-                      >
+                      <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                         {r.defaultLaborCost
                           ? `₩${Number(r.defaultLaborCost).toLocaleString("ko-KR")}`
                           : "—"}
@@ -529,257 +532,216 @@ export function TemplatesView() {
         </div>
       </div>
 
-      {/* 등록/수정 Drawer */}
+      {/* 등록/수정 Drawer — 하단 시트 */}
       <JmDrawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <JmDrawerContent side="right" size="md">
-          <JmDrawerHeader>
+        <JmDrawerContent
+          side="bottom"
+          size="xl"
+          className="flex flex-col p-0"
+          dragHandle={false}
+        >
+          <JmDrawerHeader className="flex-shrink-0 border-b border-[var(--jm-border)] px-5 py-4">
             <JmDrawerTitle>
               {editingId ? "조립 템플릿 수정" : "조립 템플릿 등록"}
             </JmDrawerTitle>
           </JmDrawerHeader>
 
-          <JmDrawerBody className="flex flex-col gap-5">
-            <JmFormField label="템플릿명" required>
-              <JmInput
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="예: 고압분무기 조립"
-              />
-            </JmFormField>
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-5 py-5">
+              <div className="mx-auto flex max-w-5xl flex-col gap-5">
+                {/* 기본 정보 — 2열 그리드 */}
+                <div className="grid gap-5 md:grid-cols-2">
+                  <JmFormField label="템플릿명" required>
+                    <JmInput
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="예: 고압분무기 조립"
+                    />
+                  </JmFormField>
 
-            <JmFormField label="설명">
-              <JmTextarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-              />
-            </JmFormField>
+                  <JmFormField label="기본 조립비">
+                    <JmInput
+                      type="text"
+                      inputMode="numeric"
+                      value={formatComma(defaultLaborCost)}
+                      onChange={(e) => setDefaultLaborCost(parseComma(e.target.value))}
+                      onFocus={focusCaretEnd}
+                      placeholder="선택"
+                    />
+                  </JmFormField>
+                </div>
 
-            <JmFormField label="기본 조립비">
-              <JmInput
-                type="text"
-                inputMode="numeric"
-                value={formatComma(defaultLaborCost)}
-                onChange={(e) => setDefaultLaborCost(parseComma(e.target.value))}
-                onFocus={focusCaretEnd}
-                className="max-w-[200px]"
-                placeholder="선택"
-              />
-            </JmFormField>
+                <JmFormField label="설명">
+                  <JmTextarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={2}
+                  />
+                </JmFormField>
 
-            <JmFormField label="상태">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <JmCheckbox
-                  checked={isActive}
-                  onCheckedChange={(v) => setIsActive(!!v)}
-                />
-                <span style={{ color: "var(--jm-text)" }}>
-                  활성 (비활성이면 전용 등록 페이지에 표시되지 않습니다)
-                </span>
-              </label>
-            </JmFormField>
+                <JmFormField label="상태">
+                  <label className="flex cursor-pointer items-center gap-2 text-jm-sm">
+                    <JmCheckbox
+                      checked={isActive}
+                      onCheckedChange={(v) => setIsActive(!!v)}
+                    />
+                    <span className="text-[var(--jm-text)]">
+                      활성 (비활성이면 전용 등록 페이지에 표시되지 않습니다)
+                    </span>
+                  </label>
+                </JmFormField>
 
-            {/* 슬롯 편집 테이블 */}
-            <div>
-              <p
-                className="text-sm font-semibold mb-2"
-                style={{ color: "var(--jm-text)" }}
-              >
-                슬롯 (구성품 라벨)
-              </p>
-              <div
-                className="-mx-5"
-                style={{ borderTop: "1px solid var(--jm-border)", borderBottom: "1px solid var(--jm-border)" }}
-              >
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr
-                      className="text-xs"
-                      style={{
-                        background: "var(--jm-surface-muted)",
-                        color: "var(--jm-text-muted)",
-                        borderBottom: "1px solid var(--jm-border)",
-                      }}
-                    >
-                      <th
-                        className="w-[40px] py-2 text-center font-medium"
-                        style={{ borderRight: "1px solid var(--jm-border)" }}
-                      >
-                        번호
-                      </th>
-                      <th
-                        className="w-[64px] py-2 text-center font-medium"
-                        style={{ borderRight: "1px solid var(--jm-border)" }}
-                      >
-                        순서
-                      </th>
-                      <th
-                        className="py-2 px-2 text-left font-medium"
-                        style={{ width: "30%", borderRight: "1px solid var(--jm-border)" }}
-                      >
-                        라벨
-                      </th>
-                      <th
-                        className="w-[100px] py-2 text-center font-medium"
-                        style={{ borderRight: "1px solid var(--jm-border)" }}
-                      >
-                        수량
-                      </th>
-                      <th
-                        className="py-2 px-2 text-left font-medium"
-                        style={{ borderRight: "1px solid var(--jm-border)" }}
-                      >
-                        기본 상품
-                      </th>
-                      <th
-                        className="w-[60px] py-2 text-center font-medium"
-                        style={{ borderRight: "1px solid var(--jm-border)" }}
-                        title="조립실적에서 부품을 변경할 수 있는 슬롯"
-                      >
-                        가변
-                      </th>
-                      <th className="w-[40px]" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {slots.map((s, idx) => (
-                      <tr
-                        key={idx}
-                        className="group"
-                        style={{ borderBottom: "1px solid var(--jm-border)" }}
-                      >
-                        <td
-                          className="text-center py-1"
-                          style={{
-                            borderRight: "1px solid var(--jm-border)",
-                            color: "var(--jm-text-muted)",
-                          }}
-                        >
-                          {idx + 1}
-                        </td>
-                        <td
-                          className="p-0.5"
-                          style={{ borderRight: "1px solid var(--jm-border)" }}
-                        >
-                          <div className="flex items-center justify-center gap-0.5">
-                            <button
-                              type="button"
-                              onClick={() => moveSlot(idx, -1)}
-                              disabled={idx === 0}
-                              className="p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              style={{ color: "var(--jm-text-muted)" }}
-                              aria-label="위로 이동"
-                            >
-                              <ArrowUp className="size-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveSlot(idx, 1)}
-                              disabled={idx === slots.length - 1}
-                              className="p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              style={{ color: "var(--jm-text-muted)" }}
-                              aria-label="아래로 이동"
-                            >
-                              <ArrowDown className="size-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                        <td
-                          className="p-0.5 align-middle"
-                          style={{ borderRight: "1px solid var(--jm-border)" }}
-                        >
-                          <AssemblySlotLabelCombobox
-                            labels={activeLabels.map((l) => ({ id: l.id, name: l.name }))}
-                            value={s.slotLabelId ?? ""}
-                            onChange={(id, n) => updateSlot(idx, { slotLabelId: id || null, label: n })}
-                            onCreateNew={(n) => createLabelMutation.mutate({ name: n, slotIdx: idx })}
-                            placeholder={s.label && !s.slotLabelId ? `${s.label} (재선택 필요)` : "라벨 선택..."}
-                          />
-                        </td>
-                        <td
-                          className="p-0.5"
-                          style={{ borderRight: "1px solid var(--jm-border)" }}
-                        >
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={s.defaultQuantity}
-                            onChange={(e) => updateSlot(idx, { defaultQuantity: e.target.value })}
-                            onFocus={focusCaretEnd}
-                            className="w-full h-7 text-sm px-2 text-right outline-none rounded tabular-nums"
-                            style={{ background: "transparent", color: "var(--jm-text)" }}
-                          />
-                        </td>
-                        <td
-                          className="p-0.5"
-                          style={{ borderRight: "1px solid var(--jm-border)" }}
-                        >
-                          <ProductCombobox
-                            products={products}
-                            value={s.defaultProductId ?? ""}
-                            onChange={(p) => updateSlot(idx, { defaultProductId: p.id })}
-                            filterType="component"
-                            placeholder="기본 상품 (선택)"
-                          />
-                        </td>
-                        <td
-                          className="text-center"
-                          style={{ borderRight: "1px solid var(--jm-border)" }}
-                        >
-                          <JmCheckbox
-                            checked={s.isVariable}
-                            onCheckedChange={(c) => updateSlot(idx, { isVariable: c === true })}
-                            aria-label="가변 슬롯"
-                          />
-                        </td>
-                        <td className="text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeSlot(idx)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
-                            style={{ color: "var(--jm-text-muted)" }}
+                {/* 슬롯 편집 테이블 */}
+                <div>
+                  <p className="mb-2 text-jm-sm font-semibold text-[var(--jm-text)]">
+                    슬롯 (구성품 라벨)
+                  </p>
+                  <div className="overflow-hidden rounded-lg border border-[var(--jm-border)]">
+                    <table className="w-full text-jm-sm">
+                      <thead>
+                        <tr className="bg-[var(--jm-surface-muted)] text-jm-xs text-[var(--jm-text-muted)]">
+                          <th className="w-[40px] border-b border-r border-[var(--jm-border)] py-2 text-center font-medium">
+                            번호
+                          </th>
+                          <th className="w-[64px] border-b border-r border-[var(--jm-border)] py-2 text-center font-medium">
+                            순서
+                          </th>
+                          <th
+                            className="border-b border-r border-[var(--jm-border)] px-2 py-2 text-left font-medium"
+                            style={{ width: "30%" }}
                           >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    <tr>
-                      <td colSpan={7} className="py-1.5 px-2">
-                        <button
-                          type="button"
-                          onClick={addSlot}
-                          className="flex items-center gap-1.5 text-xs transition-colors px-1 py-0.5"
-                          style={{ color: "var(--jm-action)" }}
-                        >
-                          <Plus className="size-3.5" />
-                          슬롯 추가
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                            라벨
+                          </th>
+                          <th className="w-[100px] border-b border-r border-[var(--jm-border)] py-2 text-center font-medium">
+                            수량
+                          </th>
+                          <th className="border-b border-r border-[var(--jm-border)] px-2 py-2 text-left font-medium">
+                            기본 상품
+                          </th>
+                          <th
+                            className="w-[60px] border-b border-r border-[var(--jm-border)] py-2 text-center font-medium"
+                            title="조립실적에서 부품을 변경할 수 있는 슬롯"
+                          >
+                            가변
+                          </th>
+                          <th className="w-[40px] border-b border-[var(--jm-border)]" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {slots.map((s, idx) => (
+                          <tr
+                            key={idx}
+                            className="group border-b border-[var(--jm-border)] last:border-b-0"
+                          >
+                            <td className="border-r border-[var(--jm-border)] py-1 text-center text-[var(--jm-text-muted)]">
+                              {idx + 1}
+                            </td>
+                            <td className="border-r border-[var(--jm-border)] p-0.5">
+                              <div className="flex items-center justify-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => moveSlot(idx, -1)}
+                                  disabled={idx === 0}
+                                  className="rounded p-1 text-[var(--jm-text-muted)] transition-colors hover:text-[var(--jm-text)] disabled:cursor-not-allowed disabled:opacity-30"
+                                  aria-label="위로 이동"
+                                >
+                                  <ArrowUp className="size-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveSlot(idx, 1)}
+                                  disabled={idx === slots.length - 1}
+                                  className="rounded p-1 text-[var(--jm-text-muted)] transition-colors hover:text-[var(--jm-text)] disabled:cursor-not-allowed disabled:opacity-30"
+                                  aria-label="아래로 이동"
+                                >
+                                  <ArrowDown className="size-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                            <td className="border-r border-[var(--jm-border)] p-0.5 align-middle">
+                              <AssemblySlotLabelCombobox
+                                labels={activeLabels.map((l) => ({ id: l.id, name: l.name }))}
+                                value={s.slotLabelId ?? ""}
+                                onChange={(id, n) => updateSlot(idx, { slotLabelId: id || null, label: n })}
+                                onCreateNew={(n) => createLabelMutation.mutate({ name: n, slotIdx: idx })}
+                                placeholder={s.label && !s.slotLabelId ? `${s.label} (재선택 필요)` : "라벨 선택..."}
+                              />
+                            </td>
+                            <td className="border-r border-[var(--jm-border)] p-0.5">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={s.defaultQuantity}
+                                onChange={(e) => updateSlot(idx, { defaultQuantity: e.target.value })}
+                                onFocus={focusCaretEnd}
+                                className="h-7 w-full rounded bg-transparent px-2 text-right text-jm-sm tabular-nums text-[var(--jm-text)] outline-none focus:bg-[var(--jm-surface-muted)]"
+                              />
+                            </td>
+                            <td className="border-r border-[var(--jm-border)] p-0.5">
+                              <ProductCombobox
+                                products={products}
+                                value={s.defaultProductId ?? ""}
+                                onChange={(p) => updateSlot(idx, { defaultProductId: p.id })}
+                                filterType="component"
+                                placeholder="기본 상품 (선택)"
+                              />
+                            </td>
+                            <td className="border-r border-[var(--jm-border)] text-center">
+                              <JmCheckbox
+                                checked={s.isVariable}
+                                onCheckedChange={(c) => updateSlot(idx, { isVariable: c === true })}
+                                aria-label="가변 슬롯"
+                              />
+                            </td>
+                            <td className="text-center">
+                              <button
+                                type="button"
+                                onClick={() => removeSlot(idx)}
+                                className="rounded p-1 text-[var(--jm-text-muted)] opacity-0 transition-opacity hover:text-[var(--jm-danger-fg)] group-hover:opacity-100"
+                                aria-label="슬롯 삭제"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td colSpan={7} className="px-2 py-1.5">
+                            <button
+                              type="button"
+                              onClick={addSlot}
+                              className="flex items-center gap-1.5 px-1 py-0.5 text-jm-xs text-[var(--jm-action)] transition-colors hover:underline"
+                            >
+                              <Plus className="size-3.5" />
+                              슬롯 추가
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
-          </JmDrawerBody>
 
-          <JmDrawerFooter>
-            <JmButton
-              variant="ghost"
-              onClick={() => setDrawerOpen(false)}
-              disabled={submitting}
-            >
-              취소
-            </JmButton>
-            <JmButton
-              variant="cta"
-              onClick={submit}
-              disabled={submitting}
-            >
-              {submitting && <JmSpinner size="sm" tone="inverted" />}
-              {submitting ? "처리 중..." : editingId ? "수정" : "등록"}
-            </JmButton>
-          </JmDrawerFooter>
+            <JmDrawerFooter>
+              <JmButton
+                variant="ghost"
+                onClick={() => setDrawerOpen(false)}
+                disabled={submitting}
+              >
+                취소
+              </JmButton>
+              <JmButton
+                variant="cta"
+                onClick={submit}
+                disabled={submitting}
+              >
+                {submitting && <JmSpinner size="sm" tone="inverted" />}
+                {submitting ? "처리 중..." : editingId ? "수정" : "등록"}
+              </JmButton>
+            </JmDrawerFooter>
+          </div>
         </JmDrawerContent>
       </JmDrawer>
 
@@ -792,10 +754,10 @@ export function TemplatesView() {
           <JmDialogBody>
             {deleteTarget && (
               <>
-                <p className="text-jm-sm" style={{ color: "var(--jm-text)" }}>
+                <p className="text-jm-sm text-[var(--jm-text)]">
                   <span className="font-semibold">&quot;{deleteTarget.name}&quot;</span> 템플릿을 삭제하시겠습니까?
                 </p>
-                <p className="mt-2 text-jm-xs" style={{ color: "var(--jm-text-muted)" }}>
+                <p className="mt-2 text-jm-xs text-[var(--jm-text-muted)]">
                   템플릿에 연결된 슬롯과 프리셋({deleteTarget._count.presets}개)이 모두 함께 삭제됩니다.
                   이미 등록된 조립상품에는 영향이 없습니다.
                 </p>
@@ -834,6 +796,7 @@ export function LabelsView() {
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [newName, setNewName] = useState("");
+  const [newCategoryId, setNewCategoryId] = useState<string>("__none__");
 
   const labelsQuery = useQuery({
     queryKey: queryKeys.assemblySlotLabels.list({ search: appliedSearch }),
@@ -842,13 +805,20 @@ export function LabelsView() {
         `/api/assembly-slot-labels${appliedSearch ? `?search=${encodeURIComponent(appliedSearch)}` : ""}`,
       ),
   });
+  const categoriesQuery = useQuery({
+    queryKey: ["categories", "tree"],
+    queryFn: () => apiGet<CategoryOption[]>("/api/categories"),
+  });
+  const categories = categoriesQuery.data ?? [];
+  const categoryOptions = buildCategoryOptions(categories);
 
   const createMutation = useMutation({
-    mutationFn: (name: string) =>
-      apiMutate("/api/assembly-slot-labels", "POST", { name }),
+    mutationFn: ({ name, categoryId }: { name: string; categoryId: string | null }) =>
+      apiMutate("/api/assembly-slot-labels", "POST", { name, categoryId }),
     onSuccess: () => {
       toast.success("라벨이 등록되었습니다");
       setNewName("");
+      setNewCategoryId("__none__");
       queryClient.invalidateQueries({ queryKey: queryKeys.assemblySlotLabels.all });
     },
     onError: (err) =>
@@ -856,8 +826,22 @@ export function LabelsView() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, name, isActive }: { id: string; name: string; isActive: boolean }) =>
-      apiMutate(`/api/assembly-slot-labels/${id}`, "PUT", { name, isActive }),
+    mutationFn: ({
+      id,
+      name,
+      isActive,
+      categoryId,
+    }: {
+      id: string;
+      name: string;
+      isActive: boolean;
+      categoryId: string | null;
+    }) =>
+      apiMutate(`/api/assembly-slot-labels/${id}`, "PUT", {
+        name,
+        isActive,
+        categoryId,
+      }),
     onSuccess: () => {
       toast.success("라벨이 수정되었습니다");
       queryClient.invalidateQueries({ queryKey: queryKeys.assemblySlotLabels.all });
@@ -882,7 +866,10 @@ export function LabelsView() {
       toast.error("라벨명을 입력해주세요");
       return;
     }
-    createMutation.mutate(trimmed);
+    createMutation.mutate({
+      name: trimmed,
+      categoryId: newCategoryId === "__none__" ? null : newCategoryId,
+    });
   };
 
   const labels = labelsQuery.data ?? [];
@@ -968,10 +955,7 @@ export function LabelsView() {
             </JmTableToolbar>
 
             {/* 빠른 등록 바 */}
-            <div
-              className="px-4 py-2.5 flex items-center gap-2"
-              style={{ borderBottom: "1px solid var(--jm-border)" }}
-            >
+            <div className="flex flex-wrap items-center gap-2 border-b border-[var(--jm-border)] px-4 py-2.5">
               <JmInput
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -985,6 +969,13 @@ export function LabelsView() {
                 className="max-w-[280px]"
                 size="sm"
               />
+              <JmSelect
+                size="sm"
+                value={newCategoryId}
+                onChange={(v) => setNewCategoryId(v || "__none__")}
+                options={categoryOptions}
+                className="max-w-[240px]"
+              />
               <JmButton
                 size="sm"
                 onClick={handleCreate}
@@ -997,12 +988,16 @@ export function LabelsView() {
                 )}
                 라벨 추가
               </JmButton>
+              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                카테고리 지정 시 상품등록 콤보박스가 해당 카테고리 상품만 노출
+              </span>
             </div>
 
-            <JmTable className="min-w-[600px]">
+            <JmTable className="min-w-[720px]">
               <JmTableHeader>
                 <JmTableRow>
                   <JmTableHead>라벨명</JmTableHead>
+                  <JmTableHead>카테고리</JmTableHead>
                   <JmTableHead className="text-right">사용 중 슬롯</JmTableHead>
                   <JmTableHead>상태</JmTableHead>
                   <JmTableHead className="w-32 text-right">관리</JmTableHead>
@@ -1014,16 +1009,15 @@ export function LabelsView() {
                 ) : labelsQuery.isError ? (
                   <JmTableRow className="hover:bg-transparent">
                     <JmTableCell
-                      colSpan={4}
-                      className="py-10 text-center text-[13px]"
-                      style={{ color: "var(--jm-danger-fg)" }}
+                      colSpan={5}
+                      className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
                     >
                       라벨 목록을 불러오지 못했습니다
                     </JmTableCell>
                   </JmTableRow>
                 ) : labels.length === 0 ? (
                   <JmTableRow className="hover:bg-transparent">
-                    <JmTableCell colSpan={4} className="py-12">
+                    <JmTableCell colSpan={5} className="py-12">
                       <JmEmpty
                         icon={<Tag className="size-8" />}
                         title={appliedSearch ? "조건에 맞는 라벨이 없습니다" : "등록된 라벨이 없습니다"}
@@ -1036,8 +1030,9 @@ export function LabelsView() {
                     <LabelRow
                       key={l.id}
                       label={l}
-                      onUpdate={(name, isActive) =>
-                        updateMutation.mutate({ id: l.id, name, isActive })
+                      categoryOptions={categoryOptions}
+                      onUpdate={(name, isActive, categoryId) =>
+                        updateMutation.mutate({ id: l.id, name, isActive, categoryId })
                       }
                       onDelete={() => deleteMutation.mutate(l.id)}
                       updating={updateMutation.isPending && updateMutation.variables?.id === l.id}
@@ -1056,13 +1051,15 @@ export function LabelsView() {
 
 function LabelRow({
   label,
+  categoryOptions,
   onUpdate,
   onDelete,
   updating,
   deleting,
 }: {
   label: SlotLabelRow;
-  onUpdate: (name: string, isActive: boolean) => void;
+  categoryOptions: Array<{ value: string; label: string }>;
+  onUpdate: (name: string, isActive: boolean, categoryId: string | null) => void;
   onDelete: () => void;
   updating: boolean;
   deleting: boolean;
@@ -1078,7 +1075,7 @@ function LabelRow({
       toast.error("라벨명을 입력해주세요");
       return;
     }
-    onUpdate(trimmed, label.isActive);
+    onUpdate(trimmed, label.isActive, label.categoryId);
     setEditing(false);
   };
 
@@ -1103,23 +1100,32 @@ function LabelRow({
             className="max-w-[260px]"
           />
         ) : (
-          <span style={{ color: "var(--jm-text)" }}>{label.name}</span>
+          <span className="text-[var(--jm-text)]">{label.name}</span>
         )}
       </JmTableCell>
-      <JmTableCell
-        className="text-right tabular-nums"
-        style={{ color: "var(--jm-text-muted)" }}
-      >
+      <JmTableCell>
+        <JmSelect
+          size="sm"
+          value={label.categoryId ?? "__none__"}
+          onChange={(v) =>
+            onUpdate(label.name, label.isActive, !v || v === "__none__" ? null : v)
+          }
+          options={categoryOptions}
+          disabled={updating}
+          className="max-w-[220px]"
+        />
+      </JmTableCell>
+      <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
         {label._count.slots}
       </JmTableCell>
       <JmTableCell>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <label className="flex cursor-pointer items-center gap-2 text-jm-sm">
           <JmCheckbox
             checked={label.isActive}
-            onCheckedChange={(v) => onUpdate(label.name, !!v)}
+            onCheckedChange={(v) => onUpdate(label.name, !!v, label.categoryId)}
             disabled={updating}
           />
-          <span style={{ color: "var(--jm-text-muted)" }}>
+          <span className="text-[var(--jm-text-muted)]">
             {label.isActive ? "활성" : "비활성"}
           </span>
         </label>

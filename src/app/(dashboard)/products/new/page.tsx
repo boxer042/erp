@@ -219,6 +219,7 @@ export default async function NewProductPage() {
       isSet: p.isSet,
       isCanonical: p.isCanonical,
       canonicalProductId: p.canonicalProductId,
+      categoryId: p.categoryId ?? null,
     };
   });
 

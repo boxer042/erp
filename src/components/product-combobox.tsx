@@ -30,6 +30,8 @@ export interface ProductOption {
   isSet: boolean;
   isCanonical?: boolean;
   canonicalProductId?: string | null;
+  /** 카테고리 — 조립 슬롯라벨 카테고리 필터링 등에 사용 */
+  categoryId?: string | null;
   taxType?: string;
   zeroRateEligible?: boolean;
   /** 활성 ProductOption 슬롯 보유 여부 — POS 카트가 "옵션 선택" 트리거 노출용 */

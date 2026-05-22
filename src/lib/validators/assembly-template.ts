@@ -13,6 +13,8 @@ export const assemblyTemplateSlotSchema = z.object({
 export const assemblySlotLabelSchema = z.object({
   name: z.string().trim().min(1, "라벨명을 입력해주세요"),
   isActive: z.boolean().optional(),
+  // 이 슬롯이 받는 후보 상품 카테고리 — 설정 시 상품등록 콤보박스가 해당 카테고리 상품만 노출.
+  categoryId: z.string().nullable().optional(),
 });
 
 export type AssemblySlotLabelInput = z.infer<typeof assemblySlotLabelSchema>;

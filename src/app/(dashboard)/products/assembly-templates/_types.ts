@@ -22,7 +22,16 @@ export interface SlotLabelRow {
   id: string;
   name: string;
   isActive: boolean;
+  /** 후보 상품 카테고리 — 설정 시 구성품 콤보박스가 해당 카테고리 상품만 노출 */
+  categoryId: string | null;
+  category: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
   _count: { slots: number };
+}
+
+export interface CategoryOption {
+  id: string;
+  name: string;
+  children: Array<{ id: string; name: string }>;
 }

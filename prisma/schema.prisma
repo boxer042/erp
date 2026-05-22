@@ -822,6 +822,8 @@ model ProductCategory {
   // 카테고리별 증상·진단 템플릿
   symptomTemplates   RepairSymptomTemplate[]   @relation("SymptomCategory")
   diagnosisTemplates RepairDiagnosisTemplate[] @relation("DiagnosisCategory")
+  // 조립 슬롯라벨의 후보 상품 카테고리
+  slotLabels         AssemblySlotLabel[]       @relation("SlotLabelCategory")
 
   @@map("product_categories")
 }
@@ -2734,11 +2736,15 @@ model AssemblyTemplateSlot {
 }
 
 model AssemblySlotLabel {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String           @id @default(uuid())
+  name       String           @unique
+  isActive   Boolean          @default(true) @map("is_active")
+  // 이 라벨이 지정될 슬롯의 후보 상품을 좁히는 카테고리. 설정 시 상품등록·조립등록의
+  // 구성품 콤보박스가 해당 카테고리 상품만 노출. 미설정 시 전체 노출 (기존 동작).
+  categoryId String?          @map("category_id")
+  category   ProductCategory? @relation("SlotLabelCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
 
   slots         AssemblyTemplateSlot[]
   setComponents SetComponent[]

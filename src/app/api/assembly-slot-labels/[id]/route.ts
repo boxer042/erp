@@ -22,7 +22,13 @@ export async function PUT(
     const label = await prisma.$transaction(async (tx) => {
       const updated = await tx.assemblySlotLabel.update({
         where: { id },
-        data: { name: data.name, isActive: data.isActive ?? true },
+        data: {
+          name: data.name,
+          isActive: data.isActive ?? true,
+          // undefined 면 미변경, null 이면 해제, 값 있으면 변경
+          ...(data.categoryId !== undefined ? { categoryId: data.categoryId || null } : {}),
+        },
+        include: { category: { select: { id: true, name: true } } },
       });
       // 사용 중인 슬롯의 label 캐시도 일괄 동기화
       await tx.assemblyTemplateSlot.updateMany({

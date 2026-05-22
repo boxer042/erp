@@ -12,7 +12,10 @@ export async function GET(request: NextRequest) {
     where: search
       ? { name: { contains: search, mode: "insensitive" } }
       : undefined,
-    include: { _count: { select: { slots: true } } },
+    include: {
+      _count: { select: { slots: true } },
+      category: { select: { id: true, name: true } },
+    },
     orderBy: [{ isActive: "desc" }, { name: "asc" }],
   });
 
@@ -31,7 +34,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const label = await prisma.assemblySlotLabel.create({
-      data: { name: data.name, isActive: data.isActive ?? true },
+      data: {
+        name: data.name,
+        isActive: data.isActive ?? true,
+        categoryId: data.categoryId || null,
+      },
+      include: { category: { select: { id: true, name: true } } },
     });
     return NextResponse.json(label, { status: 201 });
   } catch (e) {
