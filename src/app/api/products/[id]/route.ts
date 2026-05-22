@@ -28,7 +28,11 @@ export async function GET(
         },
       },
       setComponents: {
-        include: { component: { select: { id: true, name: true, sku: true, isBulk: true } } },
+        include: {
+          component: { select: { id: true, name: true, sku: true, isBulk: true } },
+          slot: { select: { id: true, label: true, order: true } },
+          slotLabel: { select: { id: true, name: true } },
+        },
       },
       assemblyTemplate: {
         include: {
@@ -1040,6 +1044,7 @@ export async function PATCH(
     autoMapped?: boolean;
     trackable?: boolean;
     catalogHidden?: boolean;
+    assemblyTemplateId?: string | null;
   } = {};
   if (typeof body.sku === "string" && body.sku.trim().length > 0) {
     data.sku = body.sku.trim();
@@ -1058,6 +1063,9 @@ export async function PATCH(
   }
   if (typeof body.catalogHidden === "boolean") {
     data.catalogHidden = body.catalogHidden;
+  }
+  if (typeof body.assemblyTemplateId === "string" || body.assemblyTemplateId === null) {
+    data.assemblyTemplateId = body.assemblyTemplateId || null;
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "수정할 필드가 없습니다" }, { status: 400 });

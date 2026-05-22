@@ -20,6 +20,10 @@ export interface SetComponentInput {
   componentId: string;
   quantity: string;
   label?: string | null;
+  /** 슬롯 라벨 마스터 id (선택). 보존 시 카테고리 필터·라벨 연동 유지. */
+  slotLabelId?: string | null;
+  /** 조립 템플릿 슬롯 id (선택). 보존 시 프리셋 저장 가능. */
+  slotId?: string | null;
 }
 
 // ───────── 1. 상품 필드 PUT ─────────
@@ -362,6 +366,8 @@ export async function replaceSetComponents(
       componentId: c.componentId,
       quantity: c.quantity,
       label: c.label ?? null,
+      slotLabelId: c.slotLabelId ?? null,
+      slotId: c.slotId ?? null,
     })),
   });
 }

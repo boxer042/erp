@@ -27,6 +27,12 @@ export interface SetComponentItem {
   id: string;
   quantity: string;
   label?: string | null;
+  /** 연결된 조립 템플릿 슬롯 (있으면 프리셋 저장 가능) */
+  slotId?: string | null;
+  slot?: { id: string; label: string; order: number } | null;
+  /** 슬롯 라벨 마스터 (재선택용 식별자) */
+  slotLabelId?: string | null;
+  slotLabel?: { id: string; name: string } | null;
   component: { id: string; name: string; sku: string };
 }
 
@@ -246,6 +252,17 @@ export interface ProductDetail {
   imageUrl: string | null;
   memo: string | null;
   assemblyTemplateId?: string | null;
+  /** 연결된 조립 템플릿 정보 — 편집 시 "사용 템플릿: X" 안내 + 프리셋 저장 가능 */
+  assemblyTemplate?: {
+    id: string;
+    name: string;
+    slots: Array<{
+      id: string;
+      label: string;
+      order: number;
+      slotLabel?: { id: string; name: string } | null;
+    }>;
+  } | null;
   isActive?: boolean;
   autoMapped?: boolean;
   /** 카탈로그·POS 노출 숨김 여부 */
