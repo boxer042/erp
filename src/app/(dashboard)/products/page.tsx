@@ -77,6 +77,7 @@ interface Product {
   name: string;
   brand: string | null;
   sku: string;
+  spec: string | null;
   unitOfMeasure: string;
   productType: string;
   listPrice: string;
@@ -158,6 +159,9 @@ function ProductRowSkeleton() {
       </JmTableCell>
       <JmTableCell>
         <JmSkeleton className="h-4 w-20" />
+      </JmTableCell>
+      <JmTableCell>
+        <JmSkeleton className="h-4 w-24" />
       </JmTableCell>
       <JmTableCell>
         <JmSkeleton className="h-4 w-8" />
@@ -466,11 +470,12 @@ export default function ProductsPage() {
                 </JmTableToolbarActions>
               </JmTableToolbar>
 
-              <JmTable className="min-w-[1220px]">
+              <JmTable className="min-w-[1360px]">
                 <JmTableHeader>
                   <JmTableRow>
                     <JmTableHead>상품명</JmTableHead>
                     <JmTableHead className="w-[120px]">SKU</JmTableHead>
+                    <JmTableHead className="w-[140px]">규격</JmTableHead>
                     <JmTableHead className="w-[70px]">단위</JmTableHead>
                     <JmTableHead className="w-[110px] text-right">
                       공급가액
@@ -502,7 +507,7 @@ export default function ProductsPage() {
                   ) : isError ? (
                     <JmTableRow className="hover:bg-transparent">
                       <JmTableCell
-                        colSpan={11}
+                        colSpan={12}
                         className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
                       >
                         상품 목록을 불러오지 못했습니다
@@ -510,7 +515,7 @@ export default function ProductsPage() {
                     </JmTableRow>
                   ) : rows.length === 0 ? (
                     <JmTableRow className="hover:bg-transparent">
-                      <JmTableCell colSpan={11} className="py-12">
+                      <JmTableCell colSpan={12} className="py-12">
                         <JmEmpty
                           icon={<Package className="size-8" />}
                           title={
@@ -591,6 +596,9 @@ export default function ProductsPage() {
                             <span className="font-[family-name:var(--jm-font-mono)] text-[12px] text-[var(--jm-text-muted)]">
                               {product.sku}
                             </span>
+                          </JmTableCell>
+                          <JmTableCell className="truncate text-[13px] text-[var(--jm-text-muted)]">
+                            {product.spec || "—"}
                           </JmTableCell>
                           <JmTableCell className="text-[13px] text-[var(--jm-text-muted)]">
                             {product.unitOfMeasure}
