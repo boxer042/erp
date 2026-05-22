@@ -2267,7 +2267,7 @@ export function NewProductForm({
                               }}
                               disabled={
                                 !templateId ||
-                                (templates.find((t) => t.id === templateId)?.presets.length ?? 0) === 0
+                                (templates.find((t) => t.id === templateId)?.presets?.length ?? 0) === 0
                               }
                             />
                             <JmButton
@@ -3007,7 +3007,11 @@ export function NewProductForm({
                   );
                   toast.success("조립 템플릿이 등록되었습니다");
                   // 신규 템플릿을 목록에 추가하고 현재 행에 slotId 를 연결 — preset 저장 흐름과 정합.
-                  setTemplates((prev) => [created, ...prev]);
+                  // presets 는 비어있어도 [] 로 정규화 — UI 의 .length 접근 안전성.
+                  setTemplates((prev) => [
+                    { ...created, presets: created.presets ?? [] },
+                    ...prev,
+                  ]);
                   setTemplateId(created.id);
                   const slotByOrder = new Map(
                     created.slots.map((s) => [s.order, s.id]),

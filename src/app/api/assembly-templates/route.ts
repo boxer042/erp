@@ -41,7 +41,12 @@ export async function POST(request: NextRequest) {
         })),
       },
     },
-    include: { slots: { orderBy: { order: "asc" } } },
+    // GET 응답과 동일한 형태로 — 클라이언트는 templates 상태에 그대로 spread 하므로
+    // presets 가 누락되면 .length 접근에서 런타임 에러 발생.
+    include: {
+      slots: { orderBy: { order: "asc" } },
+      presets: { where: { isActive: true } },
+    },
   });
 
   return NextResponse.json(template, { status: 201 });
