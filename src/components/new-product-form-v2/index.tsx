@@ -3021,6 +3021,7 @@ export function NewProductForm({
             taxType={form.taxType as "TAXABLE" | "TAX_FREE"}
             isZeroRate={form.zeroRateEligible}
             originalPrice={spNet > 0 ? spNet : undefined}
+            z="elevated"
             onSubmit={(netInput) => {
               if (netInput <= 0) {
                 setForm((prev) => ({ ...prev, listPrice: "0" }));

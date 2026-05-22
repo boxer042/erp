@@ -556,7 +556,7 @@ function ProductChannelPricingEditSheetContent({
         }
       />
 
-      {/* 정가 입력 드로워 */}
+      {/* 정가 입력 드로워 — JmDrawer 위에 겹쳐 띄움 */}
       <PriceInputDialog
         open={listPriceDialogOpen}
         onOpenChange={setListPriceDialogOpen}
@@ -564,6 +564,7 @@ function ProductChannelPricingEditSheetContent({
         initialNet={lpNet}
         taxType={product.taxType as "TAXABLE" | "TAX_FREE"}
         originalPrice={spNet > 0 ? spNet : undefined}
+        z="elevated"
         onSubmit={(net) => {
           if (net <= 0) {
             setOfflineListVat("");
@@ -573,7 +574,7 @@ function ProductChannelPricingEditSheetContent({
         }}
       />
 
-      {/* 판매가 입력 드로워 */}
+      {/* 판매가 입력 드로워 — JmDrawer 위에 겹쳐 띄움 */}
       <PriceInputDialog
         open={sellingPriceDialogOpen}
         onOpenChange={setSellingPriceDialogOpen}
@@ -581,6 +582,7 @@ function ProductChannelPricingEditSheetContent({
         initialNet={spNet}
         taxType={product.taxType as "TAXABLE" | "TAX_FREE"}
         originalPrice={lpNet > 0 ? lpNet : undefined}
+        z="elevated"
         onSubmit={(net) => {
           if (net <= 0) {
             setOfflineSellingVat("");

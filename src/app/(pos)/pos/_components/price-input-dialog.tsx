@@ -25,6 +25,8 @@ interface Props {
   originalPrice?: number;
   /** 저장 시 호출 — 항상 공급가액(세전) 으로 반환 */
   onSubmit: (net: number) => void;
+  /** 다른 시트(JmDrawer 등) 위에 겹쳐 띄울 때 "elevated" (BottomSheet z-[60]/[70]) */
+  z?: "base" | "elevated";
 }
 
 /**
@@ -49,6 +51,7 @@ function Body({
   title = "가격 입력",
   originalPrice,
   onSubmit,
+  z,
 }: Props) {
   const taxApplies = taxType === "TAXABLE" && !isZeroRate;
 
@@ -100,6 +103,7 @@ function Body({
       open
       onOpenChange={onOpenChange}
       title={title}
+      z={z}
       footer={
         <button
           type="button"
