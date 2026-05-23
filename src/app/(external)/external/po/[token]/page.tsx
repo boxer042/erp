@@ -13,13 +13,13 @@ import {
   JmCardContent,
   JmCardHeader,
   JmCardTitle,
+  JmDatePicker,
   JmDialog,
   JmDialogBody,
   JmDialogContent,
   JmDialogFooter,
   JmDialogHeader,
   JmDialogTitle,
-  JmInput,
   JmNumberInput,
   JmTextarea,
 } from "@/jm";
@@ -101,7 +101,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
   // [수락] 모달 상태 — 출고 방법/납기일/메모 입력
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [acceptShipping, setAcceptShipping] = useState<ShippingMethodValue | null>(null);
-  const [acceptDate, setAcceptDate] = useState("");
+  const [acceptDate, setAcceptDate] = useState<Date | undefined>(undefined);
   const [acceptMemo, setAcceptMemo] = useState("");
 
   const detailQuery = useQuery<PoDetail>({
@@ -644,7 +644,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                     className="flex-1 min-w-0 px-2 sm:px-5"
                     onClick={() => {
                       setAcceptShipping(isPickupPreset ? "PICKUP" : null);
-                      setAcceptDate("");
+                      setAcceptDate(undefined);
                       setAcceptMemo("");
                       setAcceptOpen(true);
                     }}
@@ -722,10 +722,10 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
               <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
                 {isPickupPreset ? "출고 가능일" : "납기일"}
               </label>
-              <JmInput
-                type="date"
+              <JmDatePicker
                 value={acceptDate}
-                onChange={(e) => setAcceptDate(e.target.value)}
+                onChange={setAcceptDate}
+                placeholder={isPickupPreset ? "출고 가능일 선택" : "납기일 선택"}
               />
             </div>
 
@@ -736,7 +736,6 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
               <JmTextarea
                 value={acceptMemo}
                 onChange={(e) => setAcceptMemo(e.target.value)}
-                placeholder="예) 송장번호, 배달 시간대, 외부 업체명·연락처 등"
                 rows={2}
                 maxLength={500}
               />
@@ -761,9 +760,13 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   toast.error(isPickupPreset ? "출고 가능일을 선택해주세요" : "납기일을 선택해주세요");
                   return;
                 }
+                // Date → yyyy-MM-dd (로컬 타임존 기준) — API 는 new Date() 로 파싱
+                const y = acceptDate.getFullYear();
+                const m = String(acceptDate.getMonth() + 1).padStart(2, "0");
+                const d = String(acceptDate.getDate()).padStart(2, "0");
                 acceptMutation.mutate({
                   shippingMethod: method,
-                  promisedDate: acceptDate,
+                  promisedDate: `${y}-${m}-${d}`,
                   shippingMemo: acceptMemo.trim() || null,
                 });
               }}
