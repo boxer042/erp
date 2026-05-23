@@ -329,7 +329,8 @@ export function AssemblyRegisterSheet({
     components.forEach((c, idx) => {
       const hasComponent = c.componentId.trim().length > 0;
       const qty = parseFloat(c.quantity);
-      const hasQuantity = !Number.isNaN(qty) && qty > 0;
+      // 음수 qty = 회수 (부속을 분해해서 재고로 돌려놓는 케이스). qty === 0 만 무효.
+      const hasQuantity = !Number.isNaN(qty) && qty !== 0;
       if (hasComponent && hasQuantity) {
         filledComponents.push(c);
       } else {
@@ -494,11 +495,24 @@ export function AssemblyRegisterSheet({
                         </JmTableCell>
                       </JmTableRow>
                     ) : (
-                      components.map((c, idx) => (
+                      components.map((c, idx) => {
+                        const qtyNum = parseFloat(c.quantity);
+                        const isRecovery = !Number.isNaN(qtyNum) && qtyNum < 0;
+                        return (
                         <JmTableRow key={idx}>
                           <JmTableCell className="text-[var(--jm-text-muted)] text-jm-xs px-3 py-2">
                             <div className="flex items-center gap-1.5">
                               <span>{c.slotLabel || "-"}</span>
+                              {isRecovery && (
+                                <JmBadge
+                                  variant="warning"
+                                  size="sm"
+                                  shape="square"
+                                  className="text-jm-2xs px-1 py-0"
+                                >
+                                  회수
+                                </JmBadge>
+                              )}
                               {c.slotLabelId &&
                                 (c.isVariable ? (
                                   <JmBadge
@@ -559,7 +573,8 @@ export function AssemblyRegisterSheet({
                             )}
                           </JmTableCell>
                         </JmTableRow>
-                      ))
+                        );
+                      })
                     )}
                   </JmTableBody>
                 </JmTable>
