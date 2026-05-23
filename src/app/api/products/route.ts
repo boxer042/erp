@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { productSchema } from "@/lib/validators/product";
 import { computeUnitCost, computeSupplierProductAvgShipping } from "@/lib/cost-utils";
+import {
+  computeBaseUnitCost,
+  computeAssemblyUnitCost,
+  deriveCostAlert,
+  isAssemblyLike,
+} from "@/lib/product-cost";
 import { guardUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
@@ -220,6 +226,79 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  // 조립/세트 상품의 unitCost — 자체 매핑이 없을 때만 구성품들의 unitCost 합으로 산출.
+  // 메인 query 에 없는 구성품은 2차 batch 로 그 매핑 데이터를 로드.
+  const assemblyProducts = productsWithUnitCost.filter(
+    (p) => isAssemblyLike(p) && (p.setComponents?.length ?? 0) > 0 && p.unitCost === null,
+  );
+  if (assemblyProducts.length > 0) {
+    const knownById = new Map<string, number | null>();
+    for (const p of productsWithUnitCost) {
+      knownById.set(p.id, p.unitCost);
+    }
+    const neededIds = new Set<string>();
+    for (const p of assemblyProducts) {
+      for (const sc of p.setComponents ?? []) {
+        if (!knownById.has(sc.componentId)) neededIds.add(sc.componentId);
+      }
+    }
+    if (neededIds.size > 0) {
+      const extraComponents = await prisma.product.findMany({
+        where: { id: { in: Array.from(neededIds) } },
+        select: {
+          id: true,
+          isBulk: true,
+          productMappings: {
+            include: {
+              supplierProduct: {
+                select: {
+                  unitPrice: true,
+                  incomingCosts: {
+                    where: { isActive: true },
+                    select: { costType: true, value: true, isTaxable: true },
+                  },
+                },
+              },
+            },
+          },
+          salesContainers: {
+            where: { isActive: true },
+            take: 1,
+            select: {
+              containerSize: true,
+              productMappings: {
+                include: {
+                  supplierProduct: {
+                    select: {
+                      unitPrice: true,
+                      incomingCosts: {
+                        where: { isActive: true },
+                        select: { costType: true, value: true, isTaxable: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      for (const c of extraComponents) {
+        knownById.set(
+          c.id,
+          computeBaseUnitCost({
+            productMappings: c.productMappings,
+            salesContainers: c.salesContainers,
+            isBulk: c.isBulk,
+          }),
+        );
+      }
+    }
+    for (const p of assemblyProducts) {
+      p.unitCost = computeAssemblyUnitCost(p.setComponents ?? [], knownById);
+    }
+  }
+
   // OPTION_PARENT 상품의 최저 SWAP 가격 derive — 카탈로그 노출 시 "₩50,000~" 표시용.
   // OPTION_PARENT 자체 sellingPrice 는 0 placeholder 라 옵션값이 매핑한 SKU 들의 sellingPrice 중 최소.
   const optionParentIds = productsWithUnitCost
@@ -255,6 +334,11 @@ export async function GET(request: NextRequest) {
   const enrichedProducts = productsWithUnitCost.map((p) => ({
     ...p,
     minOptionPrice: minOptionPriceById.get(p.id) ?? null,
+    // 원가 변동 알림 — 현재 unitCost vs Product.acknowledgedUnitCost 비교
+    costAlert: deriveCostAlert({
+      currentUnitCost: p.unitCost,
+      acknowledgedUnitCost: p.acknowledgedUnitCost,
+    }),
   }));
 
   return NextResponse.json(enrichedProducts);

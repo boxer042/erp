@@ -3,6 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { computeShippingPerUnitDisplay } from "@/lib/incoming-shipping";
 import { computeSupplierProductAvgShipping } from "@/lib/cost-utils";
+import {
+  computeBaseUnitCost,
+  computeAssemblyUnitCost,
+  computeCurrentUnitCostForId,
+  deriveCostAlert,
+  isAssemblyLike,
+} from "@/lib/product-cost";
 import { productSchema } from "@/lib/validators/product";
 
 export async function GET(
@@ -878,6 +885,82 @@ export async function GET(
     customerName: r.repairTicket.customer?.name ?? null,
   }));
 
+  // 현재 supplier-base unitCost (list API 와 동일 공식) + costAlert.
+  // estimatedUnitCost (lot 가중평균 + 배송비 포함) 와는 별개 —
+  // 알림은 "최신 공급가 변동" 추적이 목적이므로 lot 평균보다 supplier 단가가 적절.
+  const baseUnitCost = computeBaseUnitCost({
+    productMappings: product.productMappings,
+    salesContainers: [], // 상세 API 는 salesContainers 미로드 — 벌크 SKU 상세는 null
+    isBulk: product.isBulk,
+  });
+  let currentUnitCost: number | null = baseUnitCost;
+
+  // 자체 매핑이 없는 조립/세트만 구성품 합으로 산출
+  if (
+    baseUnitCost === null &&
+    isAssemblyLike(product) &&
+    product.setComponents.length > 0
+  ) {
+    const componentIds = product.setComponents.map((c) => c.componentId);
+    const components = await prisma.product.findMany({
+      where: { id: { in: componentIds } },
+      select: {
+        id: true,
+        isBulk: true,
+        productMappings: {
+          include: {
+            supplierProduct: {
+              select: {
+                unitPrice: true,
+                incomingCosts: {
+                  where: { isActive: true },
+                  select: { costType: true, value: true, isTaxable: true },
+                },
+              },
+            },
+          },
+        },
+        salesContainers: {
+          where: { isActive: true },
+          take: 1,
+          select: {
+            containerSize: true,
+            productMappings: {
+              include: {
+                supplierProduct: {
+                  select: {
+                    unitPrice: true,
+                    incomingCosts: {
+                      where: { isActive: true },
+                      select: { costType: true, value: true, isTaxable: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const costById = new Map<string, number | null>();
+    for (const c of components) {
+      costById.set(
+        c.id,
+        computeBaseUnitCost({
+          productMappings: c.productMappings,
+          salesContainers: c.salesContainers,
+          isBulk: c.isBulk,
+        }),
+      );
+    }
+    currentUnitCost = computeAssemblyUnitCost(product.setComponents, costById);
+  }
+
+  const costAlert = deriveCostAlert({
+    currentUnitCost,
+    acknowledgedUnitCost: product.acknowledgedUnitCost,
+  });
+
   return NextResponse.json({
     ...product,
     variants: enrichedVariants,
@@ -892,6 +975,8 @@ export async function GET(
     canonicalAggregatedQty,
     parentProducts,
     repairUsages,
+    currentUnitCost,
+    costAlert,
   });
 }
 
@@ -946,6 +1031,14 @@ export async function PUT(
       ? body.priceChangeReason.trim()
       : null;
 
+  // 판매가·정가 변경 = 원가 변동을 "조치 완료"로 본다 → acknowledgedUnitCost 동기화.
+  // 인라인 [판매가 조정] 진입과 사이드시트 편집 양쪽 모두 이 경로를 거치므로 한 곳에서 처리.
+  const priceChanged =
+    oldSellingPrice !== newSellingPrice || oldListPrice !== newListPrice;
+  const ackUnitCost = priceChanged
+    ? await computeCurrentUnitCostForId(prisma, id)
+    : null;
+
   const product = await prisma.$transaction(async (tx) => {
     const updated = await tx.product.update({
       where: { id },
@@ -983,6 +1076,13 @@ export async function PUT(
         warrantyPolicy: data.warrantyPolicy ?? null,
         asResponsible: data.asResponsible ?? null,
         ...(shouldClearAutoMapped ? { autoMapped: false } : {}),
+        ...(priceChanged
+          ? {
+              acknowledgedUnitCost: ackUnitCost,
+              acknowledgedAt: new Date(),
+              acknowledgedById: user?.id ?? null,
+            }
+          : {}),
       },
     });
 

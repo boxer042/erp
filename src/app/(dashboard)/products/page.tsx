@@ -72,6 +72,14 @@ interface ProductMapping {
   };
 }
 
+interface CostAlert {
+  direction: "up" | "down";
+  oldCost: number;
+  newCost: number;
+  changeAmount: number;
+  changePercent: number;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -101,6 +109,28 @@ interface Product {
   unitCost: number | null;
   inventory: { quantity: string; safetyStock: string } | null;
   productMappings: ProductMapping[];
+  costAlert: CostAlert | null;
+}
+
+function CostAlertBadge({ alert }: { alert: CostAlert }) {
+  const isUp = alert.direction === "up";
+  const label = isUp ? "원가↑" : "원가↓";
+  const sign = isUp ? "+" : "";
+  const tooltip = `₩${Math.round(alert.oldCost).toLocaleString("ko-KR")} → ₩${Math.round(alert.newCost).toLocaleString("ko-KR")} (${sign}${alert.changePercent.toFixed(1)}%)`;
+  return (
+    <JmTooltip content={tooltip}>
+      <span
+        className="inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
+        style={{
+          backgroundColor: isUp ? "var(--jm-danger-bg)" : "var(--jm-info-bg)",
+          color: isUp ? "var(--jm-danger-fg)" : "var(--jm-info-fg)",
+        }}
+        aria-label={tooltip}
+      >
+        {label}
+      </span>
+    </JmTooltip>
+  );
 }
 
 function ProductTypeBadge({ type }: { type: string }) {
@@ -575,22 +605,27 @@ export default function ProductsPage() {
                       return (
                         <JmTableRow key={product.id}>
                           <JmTableCell>
-                            <Link
-                              href={`/products/${product.id}`}
-                              className="inline-flex flex-wrap items-center gap-1.5 font-medium text-[var(--jm-text)] hover:text-[var(--jm-action)] hover:underline"
-                            >
-                              {product.name}
-                              {isCanonical && (
-                                <JmBadge variant="info" size="sm">
-                                  그룹
-                                </JmBadge>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {product.costAlert && (
+                                <CostAlertBadge alert={product.costAlert} />
                               )}
-                              {product.autoMapped && (
-                                <JmBadge variant="success" size="sm">
-                                  자동
-                                </JmBadge>
-                              )}
-                            </Link>
+                              <Link
+                                href={`/products/${product.id}`}
+                                className="inline-flex flex-wrap items-center gap-1.5 font-medium text-[var(--jm-text)] hover:text-[var(--jm-action)] hover:underline"
+                              >
+                                {product.name}
+                                {isCanonical && (
+                                  <JmBadge variant="info" size="sm">
+                                    그룹
+                                  </JmBadge>
+                                )}
+                                {product.autoMapped && (
+                                  <JmBadge variant="success" size="sm">
+                                    자동
+                                  </JmBadge>
+                                )}
+                              </Link>
+                            </div>
                           </JmTableCell>
                           <JmTableCell>
                             <span className="font-[family-name:var(--jm-font-mono)] text-[12px] text-[var(--jm-text-muted)]">

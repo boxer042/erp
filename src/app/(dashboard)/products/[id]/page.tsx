@@ -181,6 +181,18 @@ export default function ProductDetailPage() {
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
+  const acknowledgeCostMutation = useMutation({
+    mutationFn: () =>
+      apiMutate(`/api/products/${id}/acknowledge-cost`, "POST"),
+    onSuccess: () => {
+      toast.success("원가 변동을 확인 처리했습니다");
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "처리 실패"),
+  });
+
   const toggleCatalogMutation = useMutation({
     mutationFn: (hidden: boolean) =>
       apiMutate(`/api/products/${id}`, "PATCH", { catalogHidden: hidden }),
@@ -355,6 +367,44 @@ export default function ProductDetailPage() {
               >
                 SKU/이름/판매가를 검토한 뒤 [검토 완료]를 눌러주세요. 다른 상품과
                 같은 품목이라면 [합치기]로 통합할 수 있습니다.
+              </JmAlert>
+            )}
+
+            {product.costAlert && (
+              <JmAlert
+                variant={product.costAlert.direction === "up" ? "danger" : "info"}
+                title={
+                  product.costAlert.direction === "up"
+                    ? "원가가 상승했습니다"
+                    : "원가가 하락했습니다"
+                }
+                action={
+                  <div className="flex shrink-0 gap-2">
+                    <JmButton
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setInfoEditOpen(true)}
+                    >
+                      판매가 조정
+                    </JmButton>
+                    <JmButton
+                      size="sm"
+                      onClick={() => acknowledgeCostMutation.mutate()}
+                      disabled={acknowledgeCostMutation.isPending}
+                    >
+                      {acknowledgeCostMutation.isPending && (
+                        <JmSpinner size="sm" tone="inverted" />
+                      )}
+                      확인
+                    </JmButton>
+                  </div>
+                }
+              >
+                이전 ₩{Math.round(product.costAlert.oldCost).toLocaleString("ko-KR")} →
+                현재 ₩{Math.round(product.costAlert.newCost).toLocaleString("ko-KR")} (
+                {product.costAlert.direction === "up" ? "+" : ""}
+                {product.costAlert.changePercent.toFixed(1)}%).
+                {" "}판매가를 조정하거나 [확인]으로 알림을 닫을 수 있습니다.
               </JmAlert>
             )}
 

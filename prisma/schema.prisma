@@ -534,6 +534,11 @@ model Product {
   asResponsible      String?            @map("as_responsible")
   assemblyTemplateId String?            @map("assembly_template_id")
   assemblyTemplate   AssemblyTemplate?  @relation("ProductDefaultTemplate", fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
+  // 원가 변동 안내 — 마지막으로 "확인" 또는 "판매가 조정" 된 시점의 단위 원가(세전).
+  // 현재 계산된 unitCost 와 다르면 리스트에 원가↑/↓ 배지 노출. 확인/판매가 수정 시 currentUnitCost 로 갱신.
+  acknowledgedUnitCost Decimal?         @map("acknowledged_unit_cost") @db.Decimal(15, 4)
+  acknowledgedAt       DateTime?        @map("acknowledged_at")
+  acknowledgedById     String?          @map("acknowledged_by_id")
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 

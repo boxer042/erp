@@ -315,6 +315,16 @@ export interface ProductDetail {
   parentProducts?: ParentProductItem[];
   /** 역방향 — 이 상품이 부속으로 소진된 수리 이력 */
   repairUsages?: RepairUsageItem[];
+  /** 원가 변동 안내용 — supplier-base 현재 단위 원가 (list API 와 동일 공식). 없으면 null */
+  currentUnitCost?: number | null;
+  /** 원가 변동 알림 — acknowledgedUnitCost 와 currentUnitCost 차이가 ₩1 이상일 때만 non-null */
+  costAlert?: {
+    direction: "up" | "down";
+    oldCost: number;
+    newCost: number;
+    changeAmount: number;
+    changePercent: number;
+  } | null;
 }
 
 export interface ProductSpecSlotItem {
