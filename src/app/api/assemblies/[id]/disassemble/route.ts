@@ -111,7 +111,23 @@ export async function POST(
         },
       });
 
-      // 4. 원본 구성품 로트 remainingQty 복원 + 구성품 Inventory 증가
+      // 4. 원본 구성품 로트 remainingQty 복원 + 구성품 Inventory 변동
+      // 회수(consumption.quantity < 0) 라인 역조립 가드: 회수 lot 이 이미 소진됐으면 차단
+      for (const c of original.consumptions) {
+        if (Number(c.quantity) < 0) {
+          const recoveredLot = await tx.inventoryLot.findUnique({
+            where: { id: c.lotId },
+            select: { remainingQty: true },
+          });
+          const need = -Number(c.quantity);
+          if (!recoveredLot || Number(recoveredLot.remainingQty) < need) {
+            throw new Error(
+              `회수 로트가 이미 소진되어 역조립할 수 없습니다 (component=${c.component.name})`,
+            );
+          }
+        }
+      }
+
       const perComponent = new Map<string, number>();
       for (const c of original.consumptions) {
         perComponent.set(
@@ -135,15 +151,20 @@ export async function POST(
             where: { productId: componentId },
             data: { quantity: { increment: qty } },
           });
+          // qty > 0 → 구성품 복원 (소비 역방향), qty < 0 → 회수 취소 (회수 역방향)
+          const movementType = qty >= 0 ? "ADJUSTMENT_PLUS" : "ADJUSTMENT_MINUS";
+          const absQty = Math.abs(qty);
           await tx.inventoryMovement.create({
             data: {
               inventoryId: inv.id,
-              type: "ADJUSTMENT_PLUS",
-              quantity: qty,
+              type: movementType,
+              quantity: absQty,
               balanceAfter: inv.quantity,
               referenceId: reverse.id,
               referenceType: "ASSEMBLY_DISASSEMBLE",
-              memo: `역조립 ${assemblyNo} 구성품 복원`,
+              memo: qty >= 0
+                ? `역조립 ${assemblyNo} 구성품 복원`
+                : `역조립 ${assemblyNo} 회수 취소`,
             },
           });
         }),

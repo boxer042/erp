@@ -28,7 +28,7 @@ export async function isOversellAllowed(): Promise<boolean> {
  * 재고 부족분(소진할 로트가 없는 수량)의 추정 원가.
  * 1순위: 가장 최근 입고 로트 단가 → 2순위: 거래처 매입단가(매핑 환산) → 없으면 0.
  */
-async function estimateUnitCost(
+export async function estimateUnitCost(
   tx: Prisma.TransactionClient,
   productId: string,
 ): Promise<number> {

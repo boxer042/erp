@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assemblySchema } from "@/lib/validators/assembly";
-import { fifoConsume, ensureBulkStock } from "@/lib/inventory/fifo";
+import { fifoConsume, ensureBulkStock, estimateUnitCost } from "@/lib/inventory/fifo";
 import { getCurrentUser } from "@/lib/auth";
 
 function generateAssemblyNo() {
@@ -402,51 +402,101 @@ export async function POST(request: NextRequest) {
       let totalComponentCost = 0;
       for (const comp of data.components) {
         const compQty = parseFloat(comp.quantity);
-        if (!Number.isFinite(compQty) || compQty <= 0) continue;
-        const totalNeed = compQty * quantity;
+        if (!Number.isFinite(compQty) || compQty === 0) continue;
+        const totalQty = compQty * quantity;
 
         const compProduct = compById.get(comp.componentId);
         const displayName = compProduct?.name ?? comp.componentId;
 
-        if (compProduct?.isBulk) {
-          await ensureBulkStock(tx, comp.componentId, totalNeed, displayName);
-        }
+        if (totalQty > 0) {
+          // 차감 (CONSUME) — 정상 부속 소비
+          if (compProduct?.isBulk) {
+            await ensureBulkStock(tx, comp.componentId, totalQty, displayName);
+          }
 
-        const { consumptions, unitCostAvg } = await fifoConsume(
-          tx,
-          comp.componentId,
-          totalNeed,
-          displayName,
-        );
-        totalComponentCost += unitCostAvg * totalNeed;
+          const { consumptions, unitCostAvg } = await fifoConsume(
+            tx,
+            comp.componentId,
+            totalQty,
+            displayName,
+          );
+          totalComponentCost += unitCostAvg * totalQty;
 
-        for (const c of consumptions) {
+          for (const c of consumptions) {
+            await tx.assemblyComponentConsumption.create({
+              data: {
+                assemblyId: assembly.id,
+                componentId: comp.componentId,
+                lotId: c.lotId,
+                quantity: c.quantity,
+                unitCost: c.unitCost,
+              },
+            });
+          }
+
+          const compInv = await tx.inventory.update({
+            where: { productId: comp.componentId },
+            data: { quantity: { decrement: totalQty } },
+          });
+          await tx.inventoryMovement.create({
+            data: {
+              inventoryId: compInv.id,
+              type: "SET_CONSUME",
+              quantity: totalQty,
+              balanceAfter: compInv.quantity,
+              referenceId: assembly.id,
+              referenceType: "ASSEMBLY",
+              memo: `조립 ${assemblyNo} 구성품 ${displayName} 차감`,
+            },
+          });
+        } else {
+          // 회수 (RECOVER) — totalQty < 0. 부속을 빼서 재고로 돌려놓는 케이스.
+          // 예: 본품에서 수동조압변 빼고 자동조압변 끼울 때 수동조압변 회수.
+          const absQty = -totalQty;
+          const recoverUnitCost = await estimateUnitCost(tx, comp.componentId);
+
+          const recoveredLot = await tx.inventoryLot.create({
+            data: {
+              product: { connect: { id: comp.componentId } },
+              receivedQty: absQty,
+              remainingQty: absQty,
+              unitCost: recoverUnitCost,
+              receivedAt: new Date(data.assembledAt),
+              source: "ADJUSTMENT",
+              memo: `조립 ${assemblyNo} 회수`,
+            },
+          });
+
           await tx.assemblyComponentConsumption.create({
             data: {
               assemblyId: assembly.id,
               componentId: comp.componentId,
-              lotId: c.lotId,
-              quantity: c.quantity,
-              unitCost: c.unitCost,
+              lotId: recoveredLot.id,
+              quantity: totalQty,
+              unitCost: recoverUnitCost,
+            },
+          });
+
+          // 회수분 원가는 완성품에서 공제 (음수 totalQty * unitCost = 자동으로 마이너스)
+          totalComponentCost += recoverUnitCost * totalQty;
+
+          const compInv = await tx.inventory.upsert({
+            where: { productId: comp.componentId },
+            update: { quantity: { increment: absQty } },
+            create: { productId: comp.componentId, quantity: absQty },
+          });
+          await tx.inventoryMovement.create({
+            data: {
+              inventoryId: compInv.id,
+              type: "ADJUSTMENT_PLUS",
+              quantity: absQty,
+              balanceAfter: compInv.quantity,
+              referenceId: assembly.id,
+              referenceType: "ASSEMBLY",
+              memo: `조립 ${assemblyNo} 부속 ${displayName} 회수`,
             },
           });
         }
-
-        const compInv = await tx.inventory.update({
-          where: { productId: comp.componentId },
-          data: { quantity: { decrement: totalNeed } },
-        });
-        await tx.inventoryMovement.create({
-          data: {
-            inventoryId: compInv.id,
-            type: "SET_CONSUME",
-            quantity: totalNeed,
-            balanceAfter: compInv.quantity,
-            referenceId: assembly.id,
-            referenceType: "ASSEMBLY",
-            memo: `조립 ${assemblyNo} 구성품 ${displayName} 차감`,
-          },
-        });
       }
 
       const finishedUnitCost = (totalComponentCost + laborCost) / quantity;

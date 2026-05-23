@@ -343,12 +343,18 @@ function ProductSetComponentsEditSheetContent({
                     value={row.quantity}
                     onChange={(e) => {
                       const v = e.target.value;
-                      if (v === "" || /^[0-9]*\.?[0-9]*$/.test(v)) {
+                      // 음수 허용 — "-1" 같은 회수 부속 표현
+                      if (v === "" || v === "-" || /^-?[0-9]*\.?[0-9]*$/.test(v)) {
                         update(row.rowId, { quantity: v });
                       }
                     }}
                     className="h-9 w-20 text-right"
                   />
+                  {parseFloat(row.quantity) < 0 && (
+                    <JmBadge variant="warning" size="sm" shape="square">
+                      회수
+                    </JmBadge>
+                  )}
                   {showSlotWarning ? (
                     <JmBadge variant="default" size="sm" shape="square" className="ml-auto">
                       슬롯 미연결
