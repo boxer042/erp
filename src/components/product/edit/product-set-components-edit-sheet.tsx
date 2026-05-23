@@ -137,7 +137,23 @@ function ProductSetComponentsEditSheetContent({
       slotId: sc.slotId ?? null,
       slotLabelId: sc.slotLabelId ?? null,
     }));
-    return existing.length > 0 ? existing : [newRow()];
+    if (existing.length > 0) return existing;
+    // 구성품 비어있고 템플릿 연결돼 있으면 슬롯 골격으로 자동 prefill — 사용자는 부속만 채우면 됨.
+    // 등록 실패로 구성품이 0 개인 상품을 빠르게 복구하는 경로.
+    const slots = product.assemblyTemplate?.slots ?? [];
+    if (slots.length > 0) {
+      return [...slots]
+        .sort((a, b) => a.order - b.order)
+        .map((s) => ({
+          rowId: Math.random().toString(36).slice(2),
+          product: null,
+          quantity: "1",
+          label: s.slotLabel?.name ?? s.label,
+          slotId: s.id,
+          slotLabelId: s.slotLabel?.id ?? null,
+        }));
+    }
+    return [newRow()];
   });
 
   // 템플릿/프리셋 저장 다이얼로그 상태
