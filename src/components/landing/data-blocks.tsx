@@ -817,6 +817,7 @@ interface ProductHeroOptionValue {
   addPrice: string;
   mappedProductId: string | null;
   mappedVariantId: string | null;
+  mappedMode: "SWAP" | "ADDON";
   mappedProduct: {
     id: string;
     name: string;
@@ -1161,6 +1162,14 @@ export function ProductHeroBlockView({
                   {opt.values.map((val) => {
                     const isSelected = selectedValueId === val.id;
                     const addPrice = parseFloat(val.addPrice) || 0;
+                    // 가격 표시 우선순위 (POS 시트와 동일):
+                    //  - addPrice ≠ 0 → "+₩addPrice" (운영자 표시용 차액)
+                    //  - SWAP + mappedProduct.sellingPrice > 0 → "₩sellingPrice" (폴백)
+                    const isSwap =
+                      val.mappedMode === "SWAP" && !!val.mappedProduct;
+                    const swapPrice = isSwap
+                      ? Number(val.mappedProduct?.sellingPrice ?? 0)
+                      : 0;
                     return (
                       <button
                         key={val.id}
@@ -1179,7 +1188,7 @@ export function ProductHeroBlockView({
                         )}
                       >
                         <span>{val.label}</span>
-                        {addPrice !== 0 && (
+                        {addPrice !== 0 ? (
                           <span
                             className={cn(
                               "text-jm-xs tabular-nums",
@@ -1191,7 +1200,18 @@ export function ProductHeroBlockView({
                             {addPrice > 0 ? "+" : ""}
                             ₩{Math.abs(addPrice).toLocaleString("ko-KR")}
                           </span>
-                        )}
+                        ) : isSwap && swapPrice > 0 ? (
+                          <span
+                            className={cn(
+                              "text-jm-xs tabular-nums",
+                              isSelected
+                                ? "opacity-80"
+                                : "text-[var(--jm-text-muted)]",
+                            )}
+                          >
+                            ₩{swapPrice.toLocaleString("ko-KR")}
+                          </span>
+                        ) : null}
                       </button>
                     );
                   })}
