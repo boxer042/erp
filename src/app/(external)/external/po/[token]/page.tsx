@@ -2,7 +2,7 @@
 
 import { use, useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { CheckCircle2, XCircle, Loader2, AlertCircle, FileText, Pencil } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, AlertCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -197,11 +197,13 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      {/* 헤더 */}
+    <div className="mx-auto max-w-3xl px-4 pb-32 pt-8">
+      {/* 헤더 — 발주자 상호 + "발주서" */}
       <header className="mb-6 flex items-center gap-2">
         <FileText className="size-5 text-[var(--jm-text-muted)]" />
-        <h1 className="text-jm-xl font-bold text-[var(--jm-text)]">발주서 확인</h1>
+        <h1 className="text-jm-xl font-bold text-[var(--jm-text)]">
+          {data.issuer?.name ? `${data.issuer.name} 발주서` : "발주서"}
+        </h1>
       </header>
 
       {/* 결과 메시지 */}
@@ -480,19 +482,52 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
         </JmCard>
       )}
 
-      {/* 액션 버튼 — COUNTER_OFFER 면 수락/거절/단가변경 모두 비활성 */}
-      {!isProcessed && !isCounterOffer && (
+      {/* 모드별 인라인 UI (priceMode 안내 / 거절 사유 textarea) */}
+      {!isProcessed && !isCounterOffer && priceMode && (
         <JmCard className="p-4">
-          {priceMode ? (
-            <div className="space-y-3">
-              <p className="text-jm-sm font-medium text-[var(--jm-text)]">
-                변경할 단가를 입력하세요. 변경된 항목만 발주처에 전송됩니다.
-              </p>
-              <div className="flex flex-col gap-2 md:flex-row">
+          <p className="text-jm-sm font-medium text-[var(--jm-text)]">
+            위 표에서 변경할 단가를 입력하세요. 변경된 항목만 발주처에 전송됩니다.
+          </p>
+        </JmCard>
+      )}
+      {!isProcessed && !isCounterOffer && showRejectForm && (
+        <JmCard className="space-y-3 p-4">
+          <p className="text-jm-sm font-medium text-[var(--jm-text)]">거절 사유 (선택)</p>
+          <JmTextarea
+            value={rejectNote}
+            onChange={(e) => setRejectNote(e.target.value)}
+            placeholder="예) 재고 부족, 가격 재협상 필요 등"
+            rows={3}
+            maxLength={500}
+          />
+        </JmCard>
+      )}
+
+      <p className="mt-6 text-center text-jm-2xs text-[var(--jm-text-subtle)]">
+        링크 만료: {new Date(data.expiresAt).toLocaleString("ko-KR")}
+      </p>
+
+      {/* 하단 고정 액션 바 — 발주번호·발주일 + 버튼 한 줄 */}
+      {!isProcessed && !isCounterOffer && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--jm-border)] bg-[var(--jm-bg)] shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="mx-auto max-w-3xl px-3 pb-3 pt-2 sm:px-4">
+            <div className="mb-2 flex items-baseline justify-between gap-2 text-jm-2xs">
+              <span className="truncate font-[family-name:var(--jm-font-mono)] font-semibold text-[var(--jm-text)]">
+                {data.poNo}
+              </span>
+              <span className="shrink-0 text-[var(--jm-text-muted)]">
+                발주일 {new Date(data.orderDate).toLocaleDateString("ko-KR")}
+              </span>
+            </div>
+            {priceMode ? (
+              <div className="flex gap-1.5 sm:gap-2">
                 <JmButton
-                  size="lg"
+                  size="md"
                   variant="ghost"
-                  className="flex-1"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
                   onClick={() => {
                     setPriceMode(false);
                     setEditingPrices({});
@@ -502,8 +537,8 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   취소
                 </JmButton>
                 <JmButton
-                  size="lg"
-                  className="flex-1"
+                  size="md"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
                   onClick={submitProposal}
                   disabled={proposeMutation.isPending}
                 >
@@ -511,63 +546,12 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   변경 요청 전송
                 </JmButton>
               </div>
-            </div>
-          ) : !showRejectForm ? (
-            <div className="space-y-3">
-              <p className="text-jm-sm text-[var(--jm-text-muted)]">
-                발주 내용을 확인하고 수락 / 단가 변경 요청 / 거절을 선택해주세요.
-              </p>
-              <div className="flex flex-col gap-2 md:flex-row">
+            ) : showRejectForm ? (
+              <div className="flex gap-1.5 sm:gap-2">
                 <JmButton
-                  size="lg"
-                  className="flex-1"
-                  onClick={() => acceptMutation.mutate()}
-                  disabled={acceptMutation.isPending}
-                >
-                  {acceptMutation.isPending ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <CheckCircle2 />
-                  )}
-                  수락
-                </JmButton>
-                <JmButton
-                  size="lg"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={startPriceEdit}
-                  disabled={acceptMutation.isPending}
-                >
-                  <Pencil />
-                  단가 변경 요청
-                </JmButton>
-                <JmButton
-                  size="lg"
+                  size="md"
                   variant="ghost"
-                  className="flex-1"
-                  onClick={() => setShowRejectForm(true)}
-                  disabled={acceptMutation.isPending}
-                >
-                  <XCircle />
-                  거절
-                </JmButton>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-jm-sm font-medium text-[var(--jm-text)]">거절 사유 (선택)</p>
-              <JmTextarea
-                value={rejectNote}
-                onChange={(e) => setRejectNote(e.target.value)}
-                placeholder="예) 재고 부족, 가격 재협상 필요 등"
-                rows={3}
-                maxLength={500}
-              />
-              <div className="flex flex-col gap-2 md:flex-row">
-                <JmButton
-                  size="lg"
-                  variant="ghost"
-                  className="flex-1"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
                   onClick={() => {
                     setShowRejectForm(false);
                     setRejectNote("");
@@ -577,9 +561,9 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   취소
                 </JmButton>
                 <JmButton
-                  size="lg"
+                  size="md"
                   variant="danger"
-                  className="flex-1"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
                   onClick={() => rejectMutation.mutate()}
                   disabled={rejectMutation.isPending}
                 >
@@ -587,14 +571,40 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   거절 확정
                 </JmButton>
               </div>
-            </div>
-          )}
-        </JmCard>
+            ) : (
+              <div className="flex gap-1.5 sm:gap-2">
+                <JmButton
+                  size="md"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
+                  onClick={() => acceptMutation.mutate()}
+                  disabled={acceptMutation.isPending}
+                >
+                  {acceptMutation.isPending && <Loader2 className="animate-spin" />}
+                  수락
+                </JmButton>
+                <JmButton
+                  size="md"
+                  variant="outline"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
+                  onClick={startPriceEdit}
+                  disabled={acceptMutation.isPending}
+                >
+                  단가 변경
+                </JmButton>
+                <JmButton
+                  size="md"
+                  variant="ghost"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
+                  onClick={() => setShowRejectForm(true)}
+                  disabled={acceptMutation.isPending}
+                >
+                  거절
+                </JmButton>
+              </div>
+            )}
+          </div>
+        </div>
       )}
-
-      <p className="mt-6 text-center text-jm-2xs text-[var(--jm-text-subtle)]">
-        링크 만료: {new Date(data.expiresAt).toLocaleString("ko-KR")}
-      </p>
     </div>
   );
 }
