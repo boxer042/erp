@@ -25,6 +25,8 @@ interface ProductHeaderBarProps {
   actions?: React.ReactNode;
   /** 상품명 인라인 편집 — 제공 시 hover Pencil 아이콘 노출 */
   onSaveName?: (next: string) => Promise<void>;
+  /** SKU 인라인 편집 — 제공 시 hover Pencil 아이콘 노출 */
+  onSaveSku?: (next: string) => Promise<void>;
 }
 
 export function ProductHeaderBar({
@@ -33,6 +35,7 @@ export function ProductHeaderBar({
   backLabel = "목록",
   actions,
   onSaveName,
+  onSaveSku,
 }: ProductHeaderBarProps) {
   const router = useRouter();
 
@@ -83,9 +86,22 @@ export function ProductHeaderBar({
           {product.name}
         </h2>
       )}
-      <JmBadge variant="outline" size="sm" shape="square">
-        {product.sku}
-      </JmBadge>
+      {onSaveSku ? (
+        <InlineTextEdit
+          value={product.sku}
+          productId={product.id}
+          onSave={onSaveSku}
+          display={
+            <JmBadge variant="outline" size="sm" shape="square">
+              {product.sku}
+            </JmBadge>
+          }
+        />
+      ) : (
+        <JmBadge variant="outline" size="sm" shape="square">
+          {product.sku}
+        </JmBadge>
+      )}
       {product.isSet && (
         <JmBadge variant="info" size="sm" shape="square">
           세트

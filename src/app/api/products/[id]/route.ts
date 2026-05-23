@@ -917,17 +917,28 @@ export async function PUT(
 
   // 가격 변경 이력 — 현재 DB 값 미리 조회 (업데이트 후 diff 비교용)
   // name/isCanonical 도 같이 가져와서 대표 상품 이름 변경 시 자식 변형들에 cascade.
+  // autoMapped + sku 는 자동 검토완료 트리거용 (SKU/이름/가격 편집 시 자동 해제).
   const before = await prisma.product.findUnique({
     where: { id },
     select: {
       listPrice: true,
       sellingPrice: true,
       name: true,
+      sku: true,
       isCanonical: true,
+      autoMapped: true,
     },
   });
   const oldListPrice = before ? Number(before.listPrice) : 0;
   const oldSellingPrice = before ? Number(before.sellingPrice) : 0;
+  // 자동매핑(autoMapped) 상품의 SKU/이름/판매가/정가 가 바뀌면 사용자가 사실상 검토한 것 →
+  // 자동매핑 표시 해제. 별도 [검토 완료] 버튼 안 눌러도 자동 처리.
+  const shouldClearAutoMapped =
+    !!before?.autoMapped &&
+    (before.sku !== data.sku ||
+      before.name !== data.name ||
+      oldSellingPrice !== newSellingPrice ||
+      oldListPrice !== newListPrice);
   const reason =
     typeof body.priceChangeReason === "string" && body.priceChangeReason.trim().length > 0
       ? body.priceChangeReason.trim()
@@ -969,6 +980,7 @@ export async function PUT(
         manufactureDate: data.manufactureDate ?? null,
         warrantyPolicy: data.warrantyPolicy ?? null,
         asResponsible: data.asResponsible ?? null,
+        ...(shouldClearAutoMapped ? { autoMapped: false } : {}),
       },
     });
 

@@ -294,6 +294,7 @@ export default function ProductDetailPage() {
             <ProductHeaderBar
               product={product}
               onSaveName={(name) => saveSingleField({ name })}
+              onSaveSku={(sku) => saveSingleField({ sku })}
               actions={
                 <>
                   <JmButton
