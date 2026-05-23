@@ -467,9 +467,9 @@ function OptionSlot({
           const active = selectedId === v.id;
           const addPrice = Number(v.addPrice) || 0;
           const mapped = v.mappedProduct ?? v.mappedVariant;
-          // 가격 표시 우선순위:
-          //  - SWAP + mappedProduct.sellingPrice > 0 → "₩sellingPrice" (선택 시 메인 라인 가격)
-          //  - addPrice > 0 → "+₩addPrice" (메인 라인 가산)
+          // 가격 표시 우선순위 (결제 처리와는 별개 — 결제는 항상 SWAP 의 mappedProduct.sellingPrice 우선):
+          //  - addPrice > 0 → "+₩addPrice" (운영자가 직접 입력한 표시용 차액)
+          //  - SWAP + mappedProduct.sellingPrice > 0 → "₩sellingPrice" (절대값, addPrice 0 일 때 폴백)
           //  - 그 외 → 표시 없음
           const isSwap = v.mappedMode === "SWAP" && !!v.mappedProduct;
           const swapPrice = isSwap
@@ -496,13 +496,13 @@ function OptionSlot({
                   </span>
                 )}
               </div>
-              {isSwap && swapPrice > 0 ? (
-                <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--jm-text)]">
-                  ₩{swapPrice.toLocaleString("ko-KR")}
-                </span>
-              ) : addPrice > 0 ? (
+              {addPrice > 0 ? (
                 <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--jm-text)]">
                   +₩{addPrice.toLocaleString("ko-KR")}
+                </span>
+              ) : isSwap && swapPrice > 0 ? (
+                <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--jm-text)]">
+                  ₩{swapPrice.toLocaleString("ko-KR")}
                 </span>
               ) : null}
             </button>
