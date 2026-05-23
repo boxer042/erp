@@ -198,12 +198,23 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-32 pt-8">
-      {/* 헤더 — 발주자 상호 + "발주서" */}
-      <header className="mb-6 flex items-center gap-2">
-        <FileText className="size-5 text-[var(--jm-text-muted)]" />
-        <h1 className="text-jm-xl font-bold text-[var(--jm-text)]">
-          {data.issuer?.name ? `${data.issuer.name} 발주서` : "발주서"}
-        </h1>
+      {/* 헤더 — 발주자 상호 + "발주서" + 한 줄 메타 (발주번호·발주일·입고희망일) */}
+      <header className="mb-6">
+        <div className="flex items-center gap-2">
+          <FileText className="size-5 text-[var(--jm-text-muted)]" />
+          <h1 className="text-jm-xl font-bold text-[var(--jm-text)]">
+            {data.issuer?.name ? `${data.issuer.name} 발주서` : "발주서"}
+          </h1>
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 pl-7 text-jm-xs text-[var(--jm-text-muted)]">
+          <span className="font-[family-name:var(--jm-font-mono)] font-semibold text-[var(--jm-text)]">
+            {data.poNo}
+          </span>
+          <span>발주일 {new Date(data.orderDate).toLocaleDateString("ko-KR")}</span>
+          {data.expectedDate && (
+            <span>입고 희망일 {new Date(data.expectedDate).toLocaleDateString("ko-KR")}</span>
+          )}
+        </div>
       </header>
 
       {/* 결과 메시지 */}
@@ -234,24 +245,6 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
           </div>
         </div>
       )}
-
-      {/* 발주번호 / 일자 */}
-      <JmCard className="mb-4">
-        <JmCardHeader>
-          <div className="flex items-baseline justify-between gap-2">
-            <JmCardTitle>발주번호</JmCardTitle>
-            <span className="font-[family-name:var(--jm-font-mono)] text-jm-base text-[var(--jm-text)]">
-              {data.poNo}
-            </span>
-          </div>
-        </JmCardHeader>
-        <JmCardContent className="space-y-1.5 text-jm-sm">
-          <Row label="발주일" value={new Date(data.orderDate).toLocaleDateString("ko-KR")} />
-          {data.expectedDate && (
-            <Row label="입고 희망일" value={new Date(data.expectedDate).toLocaleDateString("ko-KR")} />
-          )}
-        </JmCardContent>
-      </JmCard>
 
       {/* 발주자 (우리) */}
       {data.issuer && (
@@ -513,15 +506,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
           className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--jm-border)] bg-[var(--jm-bg)] shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
-          <div className="mx-auto max-w-3xl px-3 pb-3 pt-2 sm:px-4">
-            <div className="mb-2 flex items-baseline justify-between gap-2 text-jm-2xs">
-              <span className="truncate font-[family-name:var(--jm-font-mono)] font-semibold text-[var(--jm-text)]">
-                {data.poNo}
-              </span>
-              <span className="shrink-0 text-[var(--jm-text-muted)]">
-                발주일 {new Date(data.orderDate).toLocaleDateString("ko-KR")}
-              </span>
-            </div>
+          <div className="mx-auto max-w-3xl px-3 py-3 sm:px-4">
             {priceMode ? (
               <div className="flex gap-1.5 sm:gap-2">
                 <JmButton
