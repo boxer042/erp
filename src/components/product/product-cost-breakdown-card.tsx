@@ -36,10 +36,10 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
   const breakdown = product.estimatedCostBreakdown ?? [];
   const isComposite = product.productType === "ASSEMBLED" || product.isSet;
   if (!isComposite) return null;
-  if (breakdown.length === 0) return null;
 
   const sorted = [...breakdown].sort((a, b) => b.subtotal - a.subtotal);
   const total = sorted.reduce((s, b) => s + b.subtotal, 0);
+  const isEmpty = breakdown.length === 0;
 
   return (
     <ProductSection
@@ -49,26 +49,36 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
           ? "조립상품 구성 부품 · 단가 · 소계 (비용 큰 항목부터)"
           : "세트 상품 구성품 · 단가 · 소계"
       }
-      noPadding
+      noPadding={!isEmpty}
       actions={
         onEdit || onAddAssembly ? (
           <div className="flex gap-1.5">
-            {onAddAssembly && (
+            {onAddAssembly && !isEmpty && (
               <JmButton size="sm" variant="cta" onClick={onAddAssembly}>
                 <Plus />
                 <span>조립실적 추가</span>
               </JmButton>
             )}
             {onEdit && (
-              <JmButton size="sm" variant="outline" onClick={onEdit}>
+              <JmButton size="sm" variant={isEmpty ? "cta" : "outline"} onClick={onEdit}>
                 <Pencil />
-                <span>편집</span>
+                <span>{isEmpty ? "구성품 추가" : "편집"}</span>
               </JmButton>
             )}
           </div>
         ) : undefined
       }
     >
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] py-8 text-center">
+          <span className="text-jm-sm font-medium text-[var(--jm-text)]">
+            등록된 구성품이 없습니다
+          </span>
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">
+            우측 상단 [구성품 추가] 버튼으로 슬롯·부속을 등록하세요
+          </span>
+        </div>
+      ) : (
       <JmTable className="min-w-[920px]">
         <JmTableHeader>
           <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
@@ -201,6 +211,7 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
           })()}
         </JmTableBody>
       </JmTable>
+      )}
     </ProductSection>
   );
 }
