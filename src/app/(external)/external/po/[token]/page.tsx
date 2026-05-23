@@ -488,8 +488,9 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
               <p className="text-jm-sm font-medium text-[var(--jm-text)]">
                 변경할 단가를 입력하세요. 변경된 항목만 발주처에 전송됩니다.
               </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 md:flex-row">
                 <JmButton
+                  size="lg"
                   variant="ghost"
                   className="flex-1"
                   onClick={() => {
@@ -501,11 +502,12 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   취소
                 </JmButton>
                 <JmButton
+                  size="lg"
                   className="flex-1"
                   onClick={submitProposal}
                   disabled={proposeMutation.isPending}
                 >
-                  {proposeMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+                  {proposeMutation.isPending && <Loader2 className="animate-spin" />}
                   변경 요청 전송
                 </JmButton>
               </div>
@@ -515,7 +517,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
               <p className="text-jm-sm text-[var(--jm-text-muted)]">
                 발주 내용을 확인하고 수락 / 단가 변경 요청 / 거절을 선택해주세요.
               </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 md:flex-row">
                 <JmButton
                   size="lg"
                   className="flex-1"
@@ -523,9 +525,9 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   disabled={acceptMutation.isPending}
                 >
                   {acceptMutation.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="animate-spin" />
                   ) : (
-                    <CheckCircle2 className="size-4" />
+                    <CheckCircle2 />
                   )}
                   수락
                 </JmButton>
@@ -536,7 +538,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   onClick={startPriceEdit}
                   disabled={acceptMutation.isPending}
                 >
-                  <Pencil className="size-4" />
+                  <Pencil />
                   단가 변경 요청
                 </JmButton>
                 <JmButton
@@ -546,7 +548,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   onClick={() => setShowRejectForm(true)}
                   disabled={acceptMutation.isPending}
                 >
-                  <XCircle className="size-4" />
+                  <XCircle />
                   거절
                 </JmButton>
               </div>
@@ -561,8 +563,9 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                 rows={3}
                 maxLength={500}
               />
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 md:flex-row">
                 <JmButton
+                  size="lg"
                   variant="ghost"
                   className="flex-1"
                   onClick={() => {
@@ -574,12 +577,13 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   취소
                 </JmButton>
                 <JmButton
+                  size="lg"
                   variant="danger"
                   className="flex-1"
                   onClick={() => rejectMutation.mutate()}
                   disabled={rejectMutation.isPending}
                 >
-                  {rejectMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+                  {rejectMutation.isPending && <Loader2 className="animate-spin" />}
                   거절 확정
                 </JmButton>
               </div>
