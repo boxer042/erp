@@ -29,7 +29,7 @@ export async function GET(
       },
       setComponents: {
         include: {
-          component: { select: { id: true, name: true, sku: true, isBulk: true } },
+          component: { select: { id: true, name: true, sku: true, spec: true, isBulk: true } },
           slot: { select: { id: true, label: true, order: true } },
           slotLabel: { select: { id: true, name: true } },
         },
@@ -321,6 +321,7 @@ export async function GET(
     componentId: string;
     componentName: string;
     componentSku: string;
+    componentSpec: string | null;
     label: string | null;
     quantity: number;
     unitCost: number;
@@ -647,6 +648,7 @@ export async function GET(
         componentId: c.componentId,
         componentName: c.component.name,
         componentSku: c.component.sku,
+        componentSpec: c.component.spec ?? null,
         label: c.label ?? null,
         quantity: qty,
         unitCost,
