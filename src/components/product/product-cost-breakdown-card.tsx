@@ -79,7 +79,7 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
           </span>
         </div>
       ) : (
-      <JmTable className="min-w-[920px]">
+      <JmTable className="min-w-[1040px]">
         <JmTableHeader>
           <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
             <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-28">
@@ -87,6 +87,9 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
             </JmTableHead>
             <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
               구성품
+            </JmTableHead>
+            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-40">
+              규격
             </JmTableHead>
             <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium w-16">
               수량
@@ -139,6 +142,9 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
                           </span>
                         </div>
                       </JmTableCell>
+                      <JmTableCell className="px-3 py-2 text-jm-xs text-[var(--jm-text-muted)]">
+                        {b.componentSpec?.trim() ? b.componentSpec : "-"}
+                      </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                         {b.quantity.toLocaleString("ko-KR")}
                       </JmTableCell>
@@ -187,7 +193,7 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
                 <JmTableRow className="bg-[var(--jm-surface-muted)]/30">
                   <JmTableCell
                     className="px-3 py-2 font-semibold text-[var(--jm-text)]"
-                    colSpan={3}
+                    colSpan={4}
                   >
                     구성품 합계
                   </JmTableCell>

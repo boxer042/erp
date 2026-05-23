@@ -286,6 +286,7 @@ export interface ProductDetail {
     componentId: string;
     componentName: string;
     componentSku: string;
+    componentSpec?: string | null;
     label?: string | null;
     quantity: number;
     unitCost: number;
