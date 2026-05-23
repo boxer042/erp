@@ -28,11 +28,27 @@ interface SupplierInfo {
   businessNumber?: string | null;
 }
 
+export type ShippingMethodPdf =
+  | "COURIER"
+  | "DIRECT_DELIVERY"
+  | "QUICK_OR_CARGO"
+  | "OTHER_SUPPLIER"
+  | "PICKUP";
+
+const SHIPPING_LABELS_PDF: Record<ShippingMethodPdf, string> = {
+  COURIER: "택배 출고",
+  DIRECT_DELIVERY: "직접 배달",
+  QUICK_OR_CARGO: "퀵 · 용달",
+  OTHER_SUPPLIER: "다른 거래처 출고",
+  PICKUP: "직접 수령 (매장 픽업)",
+};
+
 export interface PurchaseOrderPdfItem {
   name: string;
   spec?: string | null;
   supplierCode?: string | null;
   unitOfMeasure: string;
+  priceUndetermined?: boolean;
   quantity: string | number;
   unitPrice: string | number;
   totalPrice: string | number;
@@ -42,6 +58,9 @@ export interface PurchaseOrderPdfProps {
   documentNo: string;
   orderDate: string;
   expectedDate?: string | null;
+  shippingMethod?: ShippingMethodPdf | null;
+  promisedDate?: string | null;
+  shippingMemo?: string | null;
   issuer: Issuer | null;
   supplier: SupplierInfo;
   items: PurchaseOrderPdfItem[];
@@ -239,6 +258,24 @@ function PdfDoc(props: PurchaseOrderPdfProps) {
                 <Text style={s.rowValue}>{fmtDate(props.expectedDate)}</Text>
               </View>
             )}
+            {props.shippingMethod && (
+              <View style={s.row}>
+                <Text style={s.rowLabel}>출고 방법</Text>
+                <Text style={s.rowValue}>{SHIPPING_LABELS_PDF[props.shippingMethod]}</Text>
+              </View>
+            )}
+            {props.promisedDate && (
+              <View style={s.row}>
+                <Text style={s.rowLabel}>납기일</Text>
+                <Text style={s.rowValue}>{fmtDate(props.promisedDate)}</Text>
+              </View>
+            )}
+            {props.shippingMemo && (
+              <View style={s.row}>
+                <Text style={s.rowLabel}>출고 메모</Text>
+                <Text style={s.rowValue}>{props.shippingMemo}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -330,8 +367,12 @@ function PdfDoc(props: PurchaseOrderPdfProps) {
               <Text style={s.cellQty}>
                 {fmt(it.quantity)} {it.unitOfMeasure}
               </Text>
-              <Text style={s.cellUnitPrice}>₩{fmt(it.unitPrice)}</Text>
-              <Text style={s.cellTotal}>₩{fmt(it.totalPrice)}</Text>
+              <Text style={s.cellUnitPrice}>
+                {it.priceUndetermined ? "가격 미정" : `₩${fmt(it.unitPrice)}`}
+              </Text>
+              <Text style={s.cellTotal}>
+                {it.priceUndetermined ? "미정" : `₩${fmt(it.totalPrice)}`}
+              </Text>
             </View>
           ))}
 

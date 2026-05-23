@@ -59,12 +59,30 @@ interface AccessToken {
   rejectionNote: string | null;
 }
 
+type ShippingMethod =
+  | "COURIER"
+  | "DIRECT_DELIVERY"
+  | "QUICK_OR_CARGO"
+  | "OTHER_SUPPLIER"
+  | "PICKUP";
+
+const SHIPPING_LABELS_DETAIL: Record<ShippingMethod, string> = {
+  COURIER: "택배 출고",
+  DIRECT_DELIVERY: "직접 배달",
+  QUICK_OR_CARGO: "퀵 · 용달",
+  OTHER_SUPPLIER: "다른 거래처 출고",
+  PICKUP: "직접 수령 (매장 픽업)",
+};
+
 interface PurchaseOrderDetail {
   id: string;
   poNo: string;
   status: PurchaseOrderStatus;
   orderDate: string;
   expectedDate: string | null;
+  shippingMethod: ShippingMethod | null;
+  promisedDate: string | null;
+  shippingMemo: string | null;
   totalAmount: string;
   memo: string | null;
   supplier: { id: string; name: string; phone: string | null; representative: string | null };
@@ -74,6 +92,7 @@ interface PurchaseOrderDetail {
   items: Array<{
     id: string;
     name: string | null;        // 자유입력 라인일 때만 값
+    priceUndetermined: boolean;
     quantity: string;
     receivedQty: string;
     pendingQty: number;
@@ -292,7 +311,18 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
               <InfoField label="총 발주금액" value={`₩${parseFloat(data.totalAmount).toLocaleString("ko-KR")}`} />
               {data.quotation && <InfoField label="견적서" value={data.quotation.quotationNo} mono />}
               <InfoField label="작성자" value={data.createdBy.name} />
+              <InfoField
+                label="출고 방법"
+                value={data.shippingMethod ? SHIPPING_LABELS_DETAIL[data.shippingMethod] : "—"}
+              />
+              <InfoField label="납기일" value={isoToKr(data.promisedDate)} />
             </div>
+            {data.shippingMemo && (
+              <div className="mt-4 border-t border-[var(--jm-border)] pt-4">
+                <div className="mb-1 text-jm-xs text-[var(--jm-text-muted)]">출고 메모</div>
+                <div className="whitespace-pre-wrap text-jm-sm">{data.shippingMemo}</div>
+              </div>
+            )}
             {data.memo && (
               <div className="mt-4 border-t border-[var(--jm-border)] pt-4">
                 <div className="mb-1 text-jm-xs text-[var(--jm-text-muted)]">메모</div>
@@ -372,6 +402,11 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                           )}
                           {!it.supplierProduct && (
                             <span className="text-jm-2xs text-[var(--jm-warning-fg)]">자유 품명 — 입고 시 공급상품 매핑 필요</span>
+                          )}
+                          {it.priceUndetermined && (
+                            <span className="mt-0.5 inline-flex w-fit items-center rounded-md bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-2xs font-medium text-[var(--jm-warning-fg)]">
+                              가격 미정
+                            </span>
                           )}
                         </div>
                       </JmTableCell>

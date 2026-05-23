@@ -48,6 +48,9 @@ export default async function PurchaseOrderPrintPage({
       documentNo={po.poNo}
       orderDate={po.orderDate.toISOString()}
       expectedDate={po.expectedDate?.toISOString() ?? null}
+      shippingMethod={po.shippingMethod ?? null}
+      promisedDate={po.promisedDate?.toISOString() ?? null}
+      shippingMemo={po.shippingMemo ?? null}
       issuer={
         company
           ? {
@@ -69,6 +72,7 @@ export default async function PurchaseOrderPrintPage({
         spec: it.supplierProduct?.spec ?? null,
         supplierCode: it.supplierProduct?.supplierCode ?? null,
         unitOfMeasure: it.supplierProduct?.unitOfMeasure ?? "EA",
+        priceUndetermined: it.priceUndetermined,
         quantity: it.quantity.toString(),
         unitPrice: it.unitPrice.toString(),
         totalPrice: it.totalPrice.toString(),

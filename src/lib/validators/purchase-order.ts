@@ -1,10 +1,21 @@
 import { z } from "zod";
 
+export const SHIPPING_METHODS = [
+  "COURIER",
+  "DIRECT_DELIVERY",
+  "QUICK_OR_CARGO",
+  "OTHER_SUPPLIER",
+  "PICKUP",
+] as const;
+export type ShippingMethodValue = (typeof SHIPPING_METHODS)[number];
+
 export const purchaseOrderItemSchema = z
   .object({
     // 자유입력 라인 도입: supplierProductId 또는 name 둘 중 하나는 필수.
     supplierProductId: z.string().optional().nullable(),
     name: z.string().optional().nullable(),
+    // 가격 미정 플래그. true 면 단가는 0 으로 저장되고 외부 페이지에서 "가격 미정" 표시.
+    priceUndetermined: z.boolean().optional(),
     quantity: z.string().min(1, "수량을 입력해주세요"),
     unitPrice: z.string().min(1, "단가를 입력해주세요"),
     totalPrice: z.string().optional(),
@@ -21,8 +32,24 @@ export const purchaseOrderSchema = z.object({
   expectedDate: z.string().optional(),
   memo: z.string().optional(),
   quotationId: z.string().optional(),
+  // 발송 시 우리가 사전 선택하는 출고 방법 (보통 PICKUP 또는 null). 거래처가 [수락] 모달에서 덮어쓸 수 있음.
+  shippingMethod: z.enum(SHIPPING_METHODS).optional().nullable(),
   items: z.array(purchaseOrderItemSchema).min(1, "발주 항목을 추가해주세요"),
 });
+
+// 외부 발주서 [수락] 모달 payload
+export const purchaseOrderAcceptSchema = z
+  .object({
+    shippingMethod: z.enum(SHIPPING_METHODS).optional().nullable(),
+    promisedDate: z.string().min(1, "납기일(또는 출고 가능일)을 선택해주세요"),
+    shippingMemo: z.string().optional().nullable(),
+  })
+  .refine(
+    // PICKUP 이 아닌 경우(=거래처 출고) shippingMethod 필수.
+    // PICKUP 이면 우리가 사전 선택해둔 값이 그대로 유지되며 payload 의 shippingMethod 는 무시 가능.
+    (v) => v.shippingMethod === "PICKUP" || (v.shippingMethod && v.shippingMethod.length > 0),
+    { message: "출고 방법을 선택해주세요", path: ["shippingMethod"] },
+  );
 
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
 

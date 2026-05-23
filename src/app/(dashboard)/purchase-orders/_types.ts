@@ -43,6 +43,21 @@ export interface PurchaseOrderListRow {
 //   "free":    supplierProductId 비어있음, name 필수, unit/단가/수량 모두 직접 입력
 export type PurchaseOrderRowType = "product" | "free";
 
+export type ShippingMethodOption =
+  | "COURIER"
+  | "DIRECT_DELIVERY"
+  | "QUICK_OR_CARGO"
+  | "OTHER_SUPPLIER"
+  | "PICKUP";
+
+export const SHIPPING_METHOD_LABELS: Record<ShippingMethodOption, string> = {
+  COURIER: "택배 출고",
+  DIRECT_DELIVERY: "직접 배달",
+  QUICK_OR_CARGO: "퀵 · 용달",
+  OTHER_SUPPLIER: "다른 거래처 출고",
+  PICKUP: "직접 수령 (매장 픽업)",
+};
+
 export interface PurchaseOrderItemForm {
   rowType: PurchaseOrderRowType;
   supplierProductId: string;
@@ -55,6 +70,8 @@ export interface PurchaseOrderItemForm {
   memo: string;
   // 자유입력 라인의 품명 (rowType="free")
   name: string;
+  // 가격 미정 토글 — true 면 단가는 0 으로 저장되고 외부 페이지에서 "가격 미정" 표시
+  priceUndetermined: boolean;
 }
 
 export interface PurchaseOrderFormState {
@@ -63,6 +80,9 @@ export interface PurchaseOrderFormState {
   orderDate: string;       // yyyy-MM-dd
   expectedDate: string;    // yyyy-MM-dd
   memo: string;
+  // 우리가 PO 발송 시 사전 선택하는 출고 방법. 비워두면 거래처가 [수락] 모달에서 선택.
+  // "PICKUP" 으로 보내면 거래처 모달은 출고 방법 버튼 숨기고 출고 가능일만 받음.
+  shippingMethod: ShippingMethodOption | "";
   items: PurchaseOrderItemForm[];
 }
 
@@ -77,6 +97,7 @@ export const emptyItem = (rowType: PurchaseOrderRowType = "product"): PurchaseOr
   totalPrice: "",
   memo: "",
   name: "",
+  priceUndetermined: false,
 });
 
 export const statusLabels: Record<PurchaseOrderStatus, string> = {

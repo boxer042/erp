@@ -125,13 +125,15 @@ export async function PUT(
 
   const items = data.items.map((it, idx) => {
     const qty = parseFloat(it.quantity);
-    const price = parseFloat(it.unitPrice);
+    const undetermined = it.priceUndetermined === true;
+    const price = undetermined ? 0 : parseFloat(it.unitPrice);
     const sentTotal = it.totalPrice ? parseFloat(it.totalPrice) : NaN;
-    const totalPrice = Number.isFinite(sentTotal) && sentTotal >= 0 ? sentTotal : qty * price;
+    const totalPrice = undetermined ? 0 : Number.isFinite(sentTotal) && sentTotal >= 0 ? sentTotal : qty * price;
     const hasSp = it.supplierProductId && it.supplierProductId.length > 0;
     return {
       supplierProductId: hasSp ? it.supplierProductId! : null,
       name: !hasSp && it.name ? it.name.trim() : null,
+      priceUndetermined: undetermined,
       quantity: qty,
       unitPrice: price,
       totalPrice,
@@ -152,11 +154,13 @@ export async function PUT(
         expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
         totalAmount,
         memo: data.memo || null,
+        shippingMethod: data.shippingMethod ?? null,
         quotationId: data.quotationId || null,
         items: {
           create: items.map((i) => ({
             supplierProductId: i.supplierProductId,
             name: i.name,
+            priceUndetermined: i.priceUndetermined,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
             totalPrice: i.totalPrice,

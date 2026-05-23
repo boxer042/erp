@@ -29,6 +29,7 @@ export async function GET(
             select: {
               id: true,
               name: true,
+              priceUndetermined: true,
               quantity: true,
               unitPrice: true,
               totalPrice: true,
@@ -108,6 +109,11 @@ export async function GET(
     poNo: po.poNo,
     orderDate: po.orderDate.toISOString(),
     expectedDate: po.expectedDate?.toISOString() ?? null,
+    // 우리가 PO 발송 시 사전 선택한 출고 방법 (보통 PICKUP 또는 null).
+    // PICKUP 이면 거래처 모달에서 출고 방법 선택을 숨기고 출고 가능일만 입력.
+    shippingMethod: po.shippingMethod ?? null,
+    promisedDate: po.promisedDate?.toISOString() ?? null,
+    shippingMemo: po.shippingMemo ?? null,
     totalAmount: po.totalAmount.toString(),
     // 발주자 (우리)
     issuer: company
@@ -135,6 +141,8 @@ export async function GET(
       spec: it.supplierProduct?.spec ?? null,
       supplierCode: it.supplierProduct?.supplierCode ?? null,
       unitOfMeasure: it.supplierProduct?.unitOfMeasure ?? "EA",
+      // 가격 미정 — true 면 외부 페이지에서 ₩0 대신 "가격 미정" 표시 + 수락 버튼 차단
+      priceUndetermined: it.priceUndetermined,
       quantity: it.quantity.toString(),
       unitPrice: it.unitPrice.toString(),
       totalPrice: it.totalPrice.toString(),

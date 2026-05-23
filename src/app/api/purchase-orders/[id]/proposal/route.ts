@@ -13,9 +13,11 @@ const schema = z.object({
  * 거래처가 제안한 단가 변경에 대한 우리(발주자) 측 응답.
  *
  * - accept: proposedUnitPrice → unitPrice 갱신, totalPrice 재계산, 발주 totalAmount 갱신,
- *           status → CONFIRMED, proposedUnitPrice 모두 null.
- * - reject: proposedUnitPrice 모두 null, status → SENT (거래처에 다시 발송 가능 상태).
- *           실제 재발송은 별도로 issue-token 호출 필요.
+ *           **status → SENT** (거래처가 출고 방법/납기일을 입력하는 [수락] 모달을 거치도록 회귀).
+ *           가격이 정해진 라인은 priceUndetermined=false 로 해제.
+ *           proposalStatus 는 ACCEPTED 로 마킹 (이력 표시 유지).
+ *           기존 토큰은 그대로 유효 — 거래처가 같은 링크로 [수락] 다시 진행.
+ * - reject: proposedUnitPrice 모두 null, status → SENT.
  *
  * 가드: 발주 status === COUNTER_OFFER 일 때만 허용.
  */
@@ -76,14 +78,16 @@ export async function POST(
         if (proposed != null && proposed !== original) {
           auditChanges.push({ itemId: it.id, oldUnitPrice: original, newUnitPrice: proposed });
         }
-        // PENDING 항목만 ACCEPTED 로 마킹. 그 외는 그대로.
         const isPending = it.proposalStatus === "PENDING";
+        // 가격이 0 보다 크게 정해지면 priceUndetermined 해제.
+        const clearedUndetermined = it.priceUndetermined && finalUnit > 0;
         updates.push(
           tx.purchaseOrderItem.update({
             where: { id: it.id },
             data: {
               unitPrice: finalUnit,
               totalPrice: lineTotal,
+              ...(clearedUndetermined ? { priceUndetermined: false } : {}),
               ...(isPending
                 ? { proposalStatus: "ACCEPTED", proposalRespondedAt: respondedAt }
                 : {}),
@@ -93,9 +97,10 @@ export async function POST(
       }
       await Promise.all(updates);
 
+      // status → SENT (거래처가 [수락] 모달에서 출고 방법/납기일 입력하도록 회귀).
       await tx.purchaseOrder.update({
         where: { id },
-        data: { status: "CONFIRMED", totalAmount: newTotal },
+        data: { status: "SENT", totalAmount: newTotal },
       });
 
       await recordAudit(tx, {
@@ -105,7 +110,7 @@ export async function POST(
         action: "STATUS_CHANGE",
         meta: {
           from: "COUNTER_OFFER",
-          to: "CONFIRMED",
+          to: "SENT",
           action: "ACCEPT_PROPOSAL",
           poNo: po.poNo,
           newTotalAmount: newTotal,

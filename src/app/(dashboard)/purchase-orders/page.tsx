@@ -49,6 +49,7 @@ function emptyForm(): PurchaseOrderFormState {
     orderDate: todayIso(),
     expectedDate: "",
     memo: "",
+    shippingMethod: "",
     items: [emptyItem()],
   };
 }
@@ -92,6 +93,7 @@ function PurchaseOrdersPageInner() {
       orderDate: todayIso(),
       expectedDate: "",
       memo: "",
+      shippingMethod: "",
       items: [
         {
           ...emptyItem(),
@@ -119,10 +121,12 @@ function PurchaseOrdersPageInner() {
           orderDate: string;
           expectedDate: string | null;
           memo: string | null;
+          shippingMethod: string | null;
           supplier: { id: string; name: string };
           items: Array<{
             id: string;
             name: string | null;
+            priceUndetermined: boolean;
             quantity: string;
             unitPrice: string;
             totalPrice: string;
@@ -149,6 +153,7 @@ function PurchaseOrdersPageInner() {
           orderDate: po.orderDate.split("T")[0],
           expectedDate: po.expectedDate ? po.expectedDate.split("T")[0] : "",
           memo: po.memo ?? "",
+          shippingMethod: (po.shippingMethod ?? "") as PurchaseOrderFormState["shippingMethod"],
           items: po.items.map((it) => ({
             rowType: (it.supplierProduct ? "product" : "free") as "product" | "free",
             supplierProductId: it.supplierProduct?.id ?? "",
@@ -160,6 +165,7 @@ function PurchaseOrdersPageInner() {
             totalPrice: String(Math.round(parseFloat(it.totalPrice))),
             memo: it.memo ?? "",
             name: it.name ?? "",
+            priceUndetermined: it.priceUndetermined,
           })),
         });
         setSheetOpen(true);

@@ -13,9 +13,39 @@ import {
   JmCardContent,
   JmCardHeader,
   JmCardTitle,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmInput,
   JmNumberInput,
   JmTextarea,
 } from "@/jm";
+
+type ShippingMethodValue =
+  | "COURIER"
+  | "DIRECT_DELIVERY"
+  | "QUICK_OR_CARGO"
+  | "OTHER_SUPPLIER"
+  | "PICKUP";
+
+const SHIPPING_LABELS: Record<ShippingMethodValue, string> = {
+  COURIER: "택배 출고",
+  DIRECT_DELIVERY: "직접 배달",
+  QUICK_OR_CARGO: "퀵 · 용달",
+  OTHER_SUPPLIER: "다른 거래처 출고",
+  PICKUP: "직접 수령 (매장 픽업)",
+};
+
+// 거래처가 선택 가능한 4종 (PICKUP 제외 — 매장이 PO 발송 시 사전 지정)
+const SUPPLIER_SHIPPING_OPTIONS: ShippingMethodValue[] = [
+  "COURIER",
+  "DIRECT_DELIVERY",
+  "QUICK_OR_CARGO",
+  "OTHER_SUPPLIER",
+];
 
 interface PoItem {
   id: string;
@@ -23,6 +53,7 @@ interface PoItem {
   spec: string | null;
   supplierCode: string | null;
   unitOfMeasure: string;
+  priceUndetermined: boolean;
   quantity: string;
   unitPrice: string;
   totalPrice: string;
@@ -36,6 +67,9 @@ interface PoDetail {
   poNo: string;
   orderDate: string;
   expectedDate: string | null;
+  shippingMethod: ShippingMethodValue | null;
+  promisedDate: string | null;
+  shippingMemo: string | null;
   totalAmount: string;
   issuer: {
     name: string;
@@ -64,6 +98,11 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
   // 단가 협상 모드 — itemId → 입력 중인 새 단가 (string)
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
   const [priceMode, setPriceMode] = useState(false);
+  // [수락] 모달 상태 — 출고 방법/납기일/메모 입력
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [acceptShipping, setAcceptShipping] = useState<ShippingMethodValue | null>(null);
+  const [acceptDate, setAcceptDate] = useState("");
+  const [acceptMemo, setAcceptMemo] = useState("");
 
   const detailQuery = useQuery<PoDetail>({
     queryKey: ["public-po", token],
@@ -72,10 +111,15 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
   });
 
   const acceptMutation = useMutation({
-    mutationFn: () => apiMutate(`/api/public/po/${token}/accept`, "POST"),
+    mutationFn: (payload: {
+      shippingMethod: ShippingMethodValue;
+      promisedDate: string;
+      shippingMemo?: string | null;
+    }) => apiMutate(`/api/public/po/${token}/accept`, "POST", payload),
     onSuccess: () => {
       toast.success("발주를 수락했습니다");
       setResultMessage({ type: "success", text: "발주를 수락했습니다. 감사합니다." });
+      setAcceptOpen(false);
       detailQuery.refetch();
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "처리 실패"),
@@ -151,6 +195,10 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
 
   const isProcessed = data.alreadyAccepted || data.tokenStatus === "REJECTED";
   const isCounterOffer = data.poStatus === "COUNTER_OFFER";
+  // 가격 미정 라인이 하나라도 있으면 [수락] 차단 — 거래처가 [단가 변경 요청] 거쳐야 함
+  const hasUndetermined = data.items.some((it) => it.priceUndetermined);
+  // 매장이 PICKUP 으로 사전 설정했으면 모달에서 출고 방법 선택 숨김
+  const isPickupPreset = data.shippingMethod === "PICKUP";
   const tax = Math.round(subtotal * 0.1);
   const grandTotal = subtotal + tax;
   // 협상 결과 — 가장 최근 응답 (PENDING 외 ACCEPTED/REJECTED 가 모두 같은 응답시각이므로 한 번만 추출)
@@ -213,6 +261,11 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
           <span>발주일 {new Date(data.orderDate).toLocaleDateString("ko-KR")}</span>
           {data.expectedDate && (
             <span>입고 희망일 {new Date(data.expectedDate).toLocaleDateString("ko-KR")}</span>
+          )}
+          {isPickupPreset && (
+            <span className="rounded-md bg-[var(--jm-info-bg)] px-1.5 py-0.5 font-medium text-[var(--jm-info-fg)]">
+              매장 직접 수령 (픽업)
+            </span>
           )}
         </div>
       </header>
@@ -316,12 +369,17 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
             };
             return (
               <div key={it.id} className="space-y-2.5 px-4 py-3">
-                {/* 품명 + 품번 */}
+                {/* 품명 + 품번 + 가격 미정 배지 */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-[var(--jm-text)]">{it.name}</div>
                     {it.spec && (
                       <div className="text-jm-xs text-[var(--jm-text-muted)]">{it.spec}</div>
+                    )}
+                    {it.priceUndetermined && (
+                      <div className="mt-1 inline-flex items-center rounded-md bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-2xs font-medium text-[var(--jm-warning-fg)]">
+                        가격 미정 — 단가 제안 필요
+                      </div>
                     )}
                   </div>
                   {it.supplierCode && (
@@ -354,6 +412,11 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                     />
                     {changed && renderDelta(parseFloat(editingPrices[it.id]))}
                   </div>
+                ) : it.priceUndetermined ? (
+                  <div className="flex items-baseline justify-between text-jm-sm">
+                    <span className="text-[var(--jm-text-muted)]">단가</span>
+                    <span className="font-semibold text-[var(--jm-warning-fg)]">가격 미정</span>
+                  </div>
                 ) : proposed ? (
                   <div className="space-y-1">
                     <div className="flex items-baseline justify-between text-jm-sm">
@@ -377,7 +440,11 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                 <div className="flex items-baseline justify-between border-t border-[var(--jm-border)] pt-2 text-jm-sm">
                   <span className="text-[var(--jm-text-muted)]">금액</span>
                   <span className="font-bold tabular-nums text-[var(--jm-text)]">
-                    ₩{Math.round(lineTotal).toLocaleString("ko-KR")}
+                    {it.priceUndetermined ? (
+                      <span className="text-[var(--jm-warning-fg)]">미정</span>
+                    ) : (
+                      `₩${Math.round(lineTotal).toLocaleString("ko-KR")}`
+                    )}
                   </span>
                 </div>
               </div>
@@ -493,6 +560,22 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
         </JmCard>
       )}
 
+      {/* 가격 미정 안내 — 수락 차단 사유 명시 */}
+      {!isProcessed && !isCounterOffer && hasUndetermined && !priceMode && !showRejectForm && (
+        <JmCard className="border-[color-mix(in_oklch,var(--jm-warning-fg)_30%,transparent)] bg-[var(--jm-warning-bg)] p-4">
+          <div className="flex items-start gap-2 text-jm-sm text-[var(--jm-warning-fg)]">
+            <AlertCircle className="mt-0.5 size-5 shrink-0" />
+            <div>
+              <div className="font-semibold">가격 미정 라인이 있어 수락할 수 없습니다</div>
+              <div className="mt-0.5 opacity-90">
+                [단가 변경 요청] 으로 정확한 단가를 제안해주세요. 발주처가 단가를 수락하면 다시
+                보내드릴 발주서에서 [수락] 으로 진행하실 수 있습니다.
+              </div>
+            </div>
+          </div>
+        </JmCard>
+      )}
+
       <p className="mt-6 text-center text-jm-2xs text-[var(--jm-text-subtle)]">
         링크 만료: {new Date(data.expiresAt).toLocaleString("ko-KR")}
       </p>
@@ -555,15 +638,21 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
               </div>
             ) : (
               <div className="flex gap-1.5 sm:gap-2">
-                <JmButton
-                  size="md"
-                  className="flex-1 min-w-0 px-2 sm:px-5"
-                  onClick={() => acceptMutation.mutate()}
-                  disabled={acceptMutation.isPending}
-                >
-                  {acceptMutation.isPending && <Loader2 className="animate-spin" />}
-                  수락
-                </JmButton>
+                {!hasUndetermined && (
+                  <JmButton
+                    size="md"
+                    className="flex-1 min-w-0 px-2 sm:px-5"
+                    onClick={() => {
+                      setAcceptShipping(isPickupPreset ? "PICKUP" : null);
+                      setAcceptDate("");
+                      setAcceptMemo("");
+                      setAcceptOpen(true);
+                    }}
+                    disabled={acceptMutation.isPending}
+                  >
+                    수락
+                  </JmButton>
+                )}
                 <JmButton
                   size="md"
                   variant="outline"
@@ -587,6 +676,105 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
           </div>
         </div>
       )}
+
+      {/* 수락 모달 — 출고 방법 + 납기일 + 메모 */}
+      <JmDialog open={acceptOpen} onOpenChange={setAcceptOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>발주 수락</JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody className="space-y-4">
+            {isPickupPreset ? (
+              <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-info-bg)] p-3 text-jm-sm text-[var(--jm-info-fg)]">
+                <div className="font-semibold">매장이 직접 수령 (픽업) 으로 요청했습니다</div>
+                <div className="mt-1 opacity-90">
+                  출고 가능일만 알려주세요. 메모에 시간대·연락처 등을 자유롭게 적으셔도 됩니다.
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
+                  출고 방법
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SUPPLIER_SHIPPING_OPTIONS.map((m) => {
+                    const selected = acceptShipping === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setAcceptShipping(m)}
+                        className={`rounded-lg border px-3 py-2.5 text-jm-sm font-medium transition-colors ${
+                          selected
+                            ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
+                            : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
+                        }`}
+                      >
+                        {SHIPPING_LABELS[m]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
+                {isPickupPreset ? "출고 가능일" : "납기일"}
+              </label>
+              <JmInput
+                type="date"
+                value={acceptDate}
+                onChange={(e) => setAcceptDate(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
+                메모 (선택)
+              </label>
+              <JmTextarea
+                value={acceptMemo}
+                onChange={(e) => setAcceptMemo(e.target.value)}
+                placeholder="예) 송장번호, 배달 시간대, 외부 업체명·연락처 등"
+                rows={2}
+                maxLength={500}
+              />
+            </div>
+          </JmDialogBody>
+          <JmDialogFooter>
+            <JmButton
+              variant="ghost"
+              onClick={() => setAcceptOpen(false)}
+              disabled={acceptMutation.isPending}
+            >
+              취소
+            </JmButton>
+            <JmButton
+              onClick={() => {
+                const method = isPickupPreset ? "PICKUP" : acceptShipping;
+                if (!method) {
+                  toast.error("출고 방법을 선택해주세요");
+                  return;
+                }
+                if (!acceptDate) {
+                  toast.error(isPickupPreset ? "출고 가능일을 선택해주세요" : "납기일을 선택해주세요");
+                  return;
+                }
+                acceptMutation.mutate({
+                  shippingMethod: method,
+                  promisedDate: acceptDate,
+                  shippingMemo: acceptMemo.trim() || null,
+                });
+              }}
+              disabled={acceptMutation.isPending}
+            >
+              {acceptMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              수락 확정
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
   JmIconButton,
   JmInput,
   JmNumberInput,
+  JmSelect,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -33,8 +34,10 @@ import { QuickSupplierSheet, QuickSupplierProductSheet } from "@/components/quic
 
 import {
   emptyItem,
+  SHIPPING_METHOD_LABELS,
   type PurchaseOrderFormState,
   type PurchaseOrderItemForm,
+  type ShippingMethodOption,
 } from "./_types";
 
 interface SupplierLite { id: string; name: string; businessNumber: string | null }
@@ -100,9 +103,11 @@ export function PurchaseOrderCreateSheet({
       orderDate: string;
       expectedDate?: string;
       memo?: string;
+      shippingMethod?: ShippingMethodOption | null;
       items: Array<{
         supplierProductId?: string | null;
         name?: string | null;
+        priceUndetermined?: boolean;
         quantity: string;
         unitPrice: string;
         totalPrice: string;
@@ -125,9 +130,15 @@ export function PurchaseOrderCreateSheet({
     setForm((prev) => {
       const items = prev.items.slice();
       items[idx] = { ...items[idx], ...patch };
-      const qty = parseFloat(items[idx].quantity || "0");
-      const price = parseFloat(items[idx].unitPrice || "0");
-      items[idx].totalPrice = qty > 0 && price >= 0 ? String(Math.round(qty * price)) : "";
+      // 가격 미정 토글이 켜지면 단가·소계 0 으로 강제, 끄면 그대로 유지
+      if (patch.priceUndetermined === true) {
+        items[idx].unitPrice = "0";
+        items[idx].totalPrice = "0";
+      } else {
+        const qty = parseFloat(items[idx].quantity || "0");
+        const price = parseFloat(items[idx].unitPrice || "0");
+        items[idx].totalPrice = qty > 0 && price >= 0 ? String(Math.round(qty * price)) : "";
+      }
       return { ...prev, items };
     });
   };
@@ -151,14 +162,15 @@ export function PurchaseOrderCreateSheet({
       toast.error("거래처를 선택해주세요");
       return;
     }
-    // 라인 유효성 — product 는 supplierProductId 필수, free 는 name 필수. 둘 다 수량·단가 필수 (0원 허용).
+    // 라인 유효성 — product 는 supplierProductId 필수, free 는 name 필수. 가격 미정 토글이면 단가 검사 skip.
     const validItems = form.items.filter((it) => {
-      if (!it.quantity || it.unitPrice === "") return false;
+      if (!it.quantity) return false;
+      if (!it.priceUndetermined && it.unitPrice === "") return false;
       if (it.rowType === "free") return it.name.trim().length > 0;
       return Boolean(it.supplierProductId);
     });
     if (validItems.length === 0) {
-      toast.error("발주 항목을 1개 이상 추가해주세요 (수량·단가 필수, 0원 허용)");
+      toast.error("발주 항목을 1개 이상 추가해주세요 (수량·단가 필수, 가격 미정 토글 가능)");
       return;
     }
     saveMutation.mutate({
@@ -166,12 +178,14 @@ export function PurchaseOrderCreateSheet({
       orderDate: form.orderDate,
       expectedDate: form.expectedDate || undefined,
       memo: form.memo || undefined,
+      shippingMethod: form.shippingMethod || null,
       items: validItems.map((it) => ({
         supplierProductId: it.rowType === "free" ? null : it.supplierProductId,
         name: it.rowType === "free" ? it.name.trim() : null,
+        priceUndetermined: it.priceUndetermined,
         quantity: it.quantity,
-        unitPrice: it.unitPrice,
-        totalPrice: it.totalPrice,
+        unitPrice: it.priceUndetermined ? "0" : it.unitPrice,
+        totalPrice: it.priceUndetermined ? "0" : it.totalPrice,
         memo: it.memo || undefined,
       })),
     });
@@ -188,7 +202,7 @@ export function PurchaseOrderCreateSheet({
           <JmDrawerBody>
             <div className="space-y-5">
               {/* 헤더 정보 */}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                 <JmFormField label="거래처" required>
                   <JmCombobox<JmComboboxItem>
                     items={(suppliersQuery.data ?? []).map((s) => ({
@@ -230,6 +244,24 @@ export function PurchaseOrderCreateSheet({
                     type="date"
                     value={form.expectedDate}
                     onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))}
+                  />
+                </JmFormField>
+                <JmFormField
+                  label="출고 방법 (사전 선택)"
+                  hint="비워두면 거래처가 [수락] 시 선택. PICKUP 선택 시 거래처는 출고 가능일만 입력."
+                >
+                  <JmSelect
+                    value={form.shippingMethod}
+                    onChange={(v) =>
+                      setForm((p) => ({ ...p, shippingMethod: v as PurchaseOrderFormState["shippingMethod"] }))
+                    }
+                    options={[
+                      { value: "", label: "거래처가 선택" },
+                      ...Object.entries(SHIPPING_METHOD_LABELS).map(([value, label]) => ({
+                        value,
+                        label,
+                      })),
+                    ]}
                   />
                 </JmFormField>
               </div>
@@ -332,16 +364,41 @@ export function PurchaseOrderCreateSheet({
                             />
                           </JmTableCell>
                           <JmTableCell className="align-top">
-                            <JmNumberInput
-                              size="sm"
-                              prefix="₩"
-                              clearable={false}
-                              value={it.unitPrice}
-                              onValueChange={(v) => updateItem(idx, { unitPrice: v })}
-                            />
+                            <div className="space-y-1">
+                              {it.priceUndetermined ? (
+                                <div className="flex h-9 items-center rounded-md border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] px-2 text-jm-xs font-medium text-[var(--jm-warning-fg)]">
+                                  가격 미정
+                                </div>
+                              ) : (
+                                <JmNumberInput
+                                  size="sm"
+                                  prefix="₩"
+                                  clearable={false}
+                                  value={it.unitPrice}
+                                  onValueChange={(v) => updateItem(idx, { unitPrice: v })}
+                                />
+                              )}
+                              <label className="flex cursor-pointer items-center gap-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
+                                <input
+                                  type="checkbox"
+                                  className="size-3.5"
+                                  checked={it.priceUndetermined}
+                                  onChange={(e) =>
+                                    updateItem(idx, { priceUndetermined: e.target.checked })
+                                  }
+                                />
+                                가격 미정
+                              </label>
+                            </div>
                           </JmTableCell>
                           <JmTableCell className="text-right tabular-nums align-middle">
-                            {it.totalPrice ? `₩${parseFloat(it.totalPrice).toLocaleString("ko-KR")}` : "-"}
+                            {it.priceUndetermined ? (
+                              <span className="text-[var(--jm-warning-fg)]">미정</span>
+                            ) : it.totalPrice ? (
+                              `₩${parseFloat(it.totalPrice).toLocaleString("ko-KR")}`
+                            ) : (
+                              "-"
+                            )}
                           </JmTableCell>
                           <JmTableCell className="align-top">
                             <JmInput
