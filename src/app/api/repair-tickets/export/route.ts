@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
     [
       "수리번호",
       "유형",
+      "작업성격",
       "상태",
       "카테고리",
       "고객",
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest) {
       [
         t.ticketNo,
         t.type === "ON_SITE" ? "즉시" : "맡김",
+        t.workKind === "CUSTOM_BUILD" ? "리빌드" : "일반 수리",
         STATUS_LABEL[t.status] ?? t.status,
         t.repairCategory?.name ?? "기타",
         t.customer?.name ?? "(미등록)",

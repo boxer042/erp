@@ -97,9 +97,22 @@ export function ClaimBadge({
   );
 }
 
-/** 타입 배지 — 판매/수리/임대 시각 구분. */
-export function TypeBadge({ type }: { type: SalesHistoryRow["type"] }) {
+/** 타입 배지 — 판매/수리/임대 시각 구분. 수리는 workKind 가 CUSTOM_BUILD 면 "리빌드" 로 분기. */
+export function TypeBadge({
+  type,
+  repairWorkKind,
+}: {
+  type: SalesHistoryRow["type"];
+  repairWorkKind?: SalesHistoryRow["repairWorkKind"];
+}) {
   if (type === "repair") {
+    if (repairWorkKind === "CUSTOM_BUILD") {
+      return (
+        <JmBadge variant="accent" size="sm" shape="square">
+          리빌드
+        </JmBadge>
+      );
+    }
     return (
       <JmBadge variant="info" size="sm" shape="square">
         수리

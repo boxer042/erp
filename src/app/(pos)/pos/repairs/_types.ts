@@ -13,12 +13,16 @@ export type RepairStatus =
 
 export type RepairType = "ON_SITE" | "DROP_OFF";
 
+// 작업 성격 — RepairType(시간) 과 직교. REPAIR(기본) / CUSTOM_BUILD(리빌드)
+export type RepairWorkKind = "REPAIR" | "CUSTOM_BUILD";
+
 export type RepairPartStatus = "USED" | "LOST";
 
 export interface RepairTicketRow {
   id: string;
   ticketNo: string;
   type: RepairType;
+  workKind: RepairWorkKind;
   status: RepairStatus;
   receivedAt: string;
   pickedUpAt: string | null;
@@ -85,6 +89,7 @@ export interface RepairTicketDetail {
   id: string;
   ticketNo: string;
   type: RepairType;
+  workKind: RepairWorkKind;
   status: RepairStatus;
   receivedAt: string;
   pickedUpAt: string | null;

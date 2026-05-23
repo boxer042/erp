@@ -92,6 +92,7 @@ interface RepairTicketDetail {
   id: string;
   ticketNo: string;
   type: "ON_SITE" | "DROP_OFF";
+  workKind: "REPAIR" | "CUSTOM_BUILD";
   status: RepairStatus;
   receivedAt: string;
   pickedUpAt: string | null;
@@ -275,6 +276,11 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               <><Wrench className="size-3" /> 맡김</>
             )}
           </Badge>
+          {t.workKind === "CUSTOM_BUILD" && (
+            <Badge variant="default" className="text-[10px]">
+              리빌드
+            </Badge>
+          )}
           <Badge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
           {t.parentRepairTicket && (
             <Badge variant="secondary" className="text-[10px]">

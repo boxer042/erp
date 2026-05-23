@@ -179,6 +179,14 @@ function RepairCard({
               즉시
             </span>
           )}
+          {ticket.workKind === "CUSTOM_BUILD" && (
+            <span
+              className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[var(--jm-accent-fg)]"
+              title="리빌드 — 손님 부품 + 부속 조합"
+            >
+              리빌드
+            </span>
+          )}
         </div>
         <span className="text-[11px] text-[var(--jm-text-subtle)]">
           {formatDistanceToNow(new Date(ticket.receivedAt), {
@@ -343,6 +351,8 @@ function NewRepairBody({
   const qc = useQueryClient();
   // 즉시수리가 더 흔해서 디폴트
   const [type, setType] = useState<"ON_SITE" | "DROP_OFF">("ON_SITE");
+  // 작업 성격 — 일반 수리(기본) / 리빌드. RepairType 과 직교
+  const [workKind, setWorkKind] = useState<"REPAIR" | "CUSTOM_BUILD">("REPAIR");
   // 카테고리 — "기타" 가 default
   const [categoryId, setCategoryId] = useState<string>(OTHER_CATEGORY_ID);
 
@@ -368,6 +378,7 @@ function NewRepairBody({
         "POST",
         {
           type,
+          workKind,
           customerId: session.customerId ?? null,
           // "기타" 는 null 로 저장
           repairCategoryId:
@@ -424,7 +435,13 @@ function NewRepairBody({
               />
             </svg>
           )}
-          {type === "ON_SITE" ? "즉시 수리 시작" : "맡김 접수"}
+          {workKind === "CUSTOM_BUILD"
+            ? type === "ON_SITE"
+              ? "즉시 리빌드 시작"
+              : "리빌드 접수"
+            : type === "ON_SITE"
+              ? "즉시 수리 시작"
+              : "맡김 접수"}
         </button>
       }
     >
@@ -443,6 +460,24 @@ function NewRepairBody({
               onClick={() => setType("DROP_OFF")}
               title="맡김"
               desc="며칠 보관 후 픽업"
+            />
+          </div>
+        </FieldGroup>
+
+        {/* 작업 성격 — 일반 수리 / 리빌드 */}
+        <FieldGroup label="작업 성격">
+          <div className="grid grid-cols-2 gap-2">
+            <TypeButton
+              active={workKind === "REPAIR"}
+              onClick={() => setWorkKind("REPAIR")}
+              title="일반 수리"
+              desc="고장 부품 교체·수리"
+            />
+            <TypeButton
+              active={workKind === "CUSTOM_BUILD"}
+              onClick={() => setWorkKind("CUSTOM_BUILD")}
+              title="리빌드"
+              desc="손님 부품 + 부속 조합"
             />
           </div>
         </FieldGroup>

@@ -627,7 +627,10 @@ export default function SalesHistoryPage() {
                           {format(new Date(row.date), "MM-dd HH:mm")}
                         </JmTableCell>
                         <JmTableCell>
-                          <TypeBadge type={row.type} />
+                          <TypeBadge
+                            type={row.type}
+                            repairWorkKind={row.repairWorkKind}
+                          />
                         </JmTableCell>
                         <JmTableCell>
                           {row.fulfillmentType ? (
@@ -655,6 +658,17 @@ export default function SalesHistoryPage() {
                                 title={row.channelOrderNo}
                               >
                                 {row.channelOrderNo}
+                              </span>
+                            )}
+                            {row.extraSalesCount > 0 && (
+                              <span
+                                className="block truncate text-[11px] text-[var(--jm-text-subtle)] tabular-nums"
+                                title={`추가구매 ${row.extraSalesCount}건 ₩${Math.round(row.extraSalesAmount).toLocaleString("ko-KR")} 포함`}
+                              >
+                                + 추가구매 {row.extraSalesCount}건 ₩
+                                {Math.round(
+                                  row.extraSalesAmount,
+                                ).toLocaleString("ko-KR")}
                               </span>
                             )}
                           </div>

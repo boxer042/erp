@@ -41,11 +41,13 @@ type RepairStatus =
   | "CANCELLED";
 
 type RepairType = "ON_SITE" | "DROP_OFF";
+type RepairWorkKind = "REPAIR" | "CUSTOM_BUILD";
 
 interface RepairTicketRow {
   id: string;
   ticketNo: string;
   type: RepairType;
+  workKind: RepairWorkKind;
   status: RepairStatus;
   receivedAt: string;
   pickedUpAt: string | null;
@@ -384,13 +386,20 @@ export default function RepairsPage() {
                         </span>
                       </JmTableCell>
                       <JmTableCell>
-                        <JmBadge variant="outline" size="sm">
-                          {t.type === "ON_SITE" ? (
-                            <><MapPin className="size-3" /> 즉시</>
-                          ) : (
-                            <><Wrench className="size-3" /> 맡김</>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <JmBadge variant="outline" size="sm">
+                            {t.type === "ON_SITE" ? (
+                              <><MapPin className="size-3" /> 즉시</>
+                            ) : (
+                              <><Wrench className="size-3" /> 맡김</>
+                            )}
+                          </JmBadge>
+                          {t.workKind === "CUSTOM_BUILD" && (
+                            <JmBadge variant="accent" size="sm">
+                              리빌드
+                            </JmBadge>
                           )}
-                        </JmBadge>
+                        </div>
                       </JmTableCell>
                       <JmTableCell>
                         {t.repairCategory ? (
