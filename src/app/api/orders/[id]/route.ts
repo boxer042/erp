@@ -622,7 +622,8 @@ export async function PUT(
 
       const allowOversell = await isOversellAllowed();
 
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(
+        async (tx) => {
         await tx.order.update({ where: { id }, data: { status: "PREPARING" } });
 
         // FIFO 로트 소진 + orderItemId로 LotConsumption 생성
@@ -780,7 +781,9 @@ export async function PUT(
             },
           });
         }
-      });
+        },
+        { timeout: 30000, maxWait: 10000 },
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "주문 확정 실패";
       return NextResponse.json({ error: msg }, { status: 400 });
