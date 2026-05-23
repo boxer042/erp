@@ -548,26 +548,30 @@ function OptionValueEditor({
         </div>
       )}
 
-      {/* 추가 금액 — 교체(SWAP)는 단품 가격을 그대로 쓰므로 제외 */}
-      {linkType !== "swap" && (
-        <div className="flex items-center gap-2">
-          <label className="shrink-0 text-jm-2xs text-[var(--jm-text-muted)]">
-            추가 금액
-          </label>
-          <JmInput
-            size="sm"
-            type="text"
-            inputMode="numeric"
-            value={value.addPrice}
-            onChange={(e) =>
-              onChange({ addPrice: e.target.value.replace(/[^0-9]/g, "") })
-            }
-            onFocus={focusCaretEnd}
-            placeholder="0"
-            className="w-32 tabular-nums"
-          />
-        </div>
-      )}
+      {/* 추가 금액 — SWAP 은 표시용 차액 (실 결제는 매핑 상품의 sellingPrice 사용),
+                       ADDON / 텍스트 / 변형은 실제 가산금액 */}
+      <div className="flex items-center gap-2">
+        <label className="shrink-0 text-jm-2xs text-[var(--jm-text-muted)]">
+          추가 금액
+        </label>
+        <JmInput
+          size="sm"
+          type="text"
+          inputMode="numeric"
+          value={value.addPrice}
+          onChange={(e) =>
+            onChange({ addPrice: e.target.value.replace(/[^0-9]/g, "") })
+          }
+          onFocus={focusCaretEnd}
+          placeholder="0"
+          className="w-32 tabular-nums"
+        />
+        {linkType === "swap" && (
+          <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+            표시용 — 실제 결제는 교체 상품의 판매가
+          </span>
+        )}
+      </div>
     </div>
   );
 }
