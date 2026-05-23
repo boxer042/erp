@@ -618,6 +618,8 @@ function IncomingPageInner() {
           supplier: { id: string; name: string };
           items: Array<{
             id: string;
+            // 자유입력 라인의 품명 (supplierProduct 없을 때 사용)
+            name: string | null;
             quantity: string;
             receivedQty: string;
             // PENDING 입고로 이미 등록된 양 — 잔량 계산 시 차감해 이중 입고 방지
@@ -629,7 +631,7 @@ function IncomingPageInner() {
               spec: string | null;
               supplierCode: string | null;
               unitOfMeasure: string;
-            };
+            } | null;
           }>;
         }>(`/api/purchase-orders/${purchaseOrderIdParam}`);
         if (cancelled) return;
@@ -660,19 +662,23 @@ function IncomingPageInner() {
         setShippingSupply("");
         setShippingIsTaxable(true);
         setShippingDeducted(false);
+        // 자유입력 라인이 섞여있는지 확인 — 사용자에게 매핑 필요 안내
+        const hasFreeLines = remainingItems.some(({ it }) => !it.supplierProduct);
         setItems(
           remainingItems.map(({ it, remain }) => ({
-            supplierProductId: it.supplierProduct.id,
-            supplierProductName: it.supplierProduct.name,
-            supplierCode: it.supplierProduct.supplierCode ?? "",
-            spec: it.supplierProduct.spec ?? "",
-            unitOfMeasure: it.supplierProduct.unitOfMeasure,
+            // 자유입력 라인: supplierProductId 빈 상태로 prefill → 사용자가 입고 시 선택
+            supplierProductId: it.supplierProduct?.id ?? "",
+            // 자유입력일 땐 발주 시점의 품명을 memo 에도 남겨 매핑 hint 로 노출
+            supplierProductName: it.supplierProduct?.name ?? "",
+            supplierCode: it.supplierProduct?.supplierCode ?? "",
+            spec: it.supplierProduct?.spec ?? "",
+            unitOfMeasure: it.supplierProduct?.unitOfMeasure ?? "EA",
             quantity: String(remain),
             unitPrice: String(parseFloat(it.unitPrice)),
             supplyAmount: String(remain * parseFloat(it.unitPrice)),
             discount: "",
             originalPrice: String(parseFloat(it.unitPrice)),
-            memo: "",
+            memo: !it.supplierProduct && it.name ? `발주: ${it.name}` : "",
             itemShippingCost: "",
             itemShippingIsTaxable: true,
             purchaseOrderItemId: it.id,
@@ -681,6 +687,9 @@ function IncomingPageInner() {
         setLinkedPurchaseOrderId(po.id);
         setEditingId(null);
         setCreateOpen(true);
+        if (hasFreeLines) {
+          toast.info("자유 품명 라인이 있습니다. 실제 입고 시 공급상품을 선택해주세요 (메모에 발주 품명 표시)");
+        }
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "발주서를 불러오지 못했습니다");
       }

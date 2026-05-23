@@ -28,6 +28,7 @@ export async function GET(
             orderBy: { sortOrder: "asc" },
             select: {
               id: true,
+              name: true,
               quantity: true,
               unitPrice: true,
               totalPrice: true,
@@ -129,10 +130,11 @@ export async function GET(
     },
     items: po.items.map((it) => ({
       id: it.id,
-      name: it.supplierProduct.name,
-      spec: it.supplierProduct.spec,
-      supplierCode: it.supplierProduct.supplierCode,
-      unitOfMeasure: it.supplierProduct.unitOfMeasure,
+      // 자유입력 라인이면 it.name, 아니면 supplierProduct.name 폴백
+      name: it.supplierProduct?.name ?? it.name ?? "",
+      spec: it.supplierProduct?.spec ?? null,
+      supplierCode: it.supplierProduct?.supplierCode ?? null,
+      unitOfMeasure: it.supplierProduct?.unitOfMeasure ?? "EA",
       quantity: it.quantity.toString(),
       unitPrice: it.unitPrice.toString(),
       totalPrice: it.totalPrice.toString(),

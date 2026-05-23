@@ -122,6 +122,7 @@ function PurchaseOrdersPageInner() {
           supplier: { id: string; name: string };
           items: Array<{
             id: string;
+            name: string | null;
             quantity: string;
             unitPrice: string;
             totalPrice: string;
@@ -132,7 +133,7 @@ function PurchaseOrdersPageInner() {
               spec: string | null;
               supplierCode: string | null;
               unitOfMeasure: string;
-            };
+            } | null;
           }>;
         }>(`/api/purchase-orders/${editId}`);
         if (cancelled) return;
@@ -149,14 +150,16 @@ function PurchaseOrdersPageInner() {
           expectedDate: po.expectedDate ? po.expectedDate.split("T")[0] : "",
           memo: po.memo ?? "",
           items: po.items.map((it) => ({
-            supplierProductId: it.supplierProduct.id,
-            supplierProductName: it.supplierProduct.name,
-            supplierCode: it.supplierProduct.supplierCode ?? null,
-            unitOfMeasure: it.supplierProduct.unitOfMeasure,
+            rowType: (it.supplierProduct ? "product" : "free") as "product" | "free",
+            supplierProductId: it.supplierProduct?.id ?? "",
+            supplierProductName: it.supplierProduct?.name ?? "",
+            supplierCode: it.supplierProduct?.supplierCode ?? null,
+            unitOfMeasure: it.supplierProduct?.unitOfMeasure ?? "EA",
             quantity: String(parseFloat(it.quantity)),
             unitPrice: String(Math.round(parseFloat(it.unitPrice))),
             totalPrice: String(Math.round(parseFloat(it.totalPrice))),
             memo: it.memo ?? "",
+            name: it.name ?? "",
           })),
         });
         setSheetOpen(true);

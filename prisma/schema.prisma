@@ -1226,12 +1226,17 @@ model PurchaseOrderAccessToken {
 }
 
 model PurchaseOrderItem {
-  id                    String          @id @default(uuid())
-  purchaseOrderId       String          @map("purchase_order_id")
-  purchaseOrder         PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  supplierProductId     String          @map("supplier_product_id")
-  supplierProduct       SupplierProduct @relation(fields: [supplierProductId], references: [id])
-  quantity              Decimal         @db.Decimal(15, 4)
+  id                    String           @id @default(uuid())
+  purchaseOrderId       String           @map("purchase_order_id")
+  purchaseOrder         PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  // 자유입력 라인 도입(2026-05-23) — 입고 전까지 거래처 공급상품을 특정할 수 없을 때
+  // supplierProductId 없이 name 만으로 발주 가능. 입고 시 SupplierProductCombobox 로 매핑.
+  // 둘 중 하나는 반드시 존재해야 함 (API 검증).
+  supplierProductId     String?          @map("supplier_product_id")
+  supplierProduct       SupplierProduct? @relation(fields: [supplierProductId], references: [id])
+  // 자유입력 라인의 품명. supplierProductId 있으면 supplierProduct.name 우선 (override 용 보조 필드는 아님).
+  name                  String?
+  quantity              Decimal          @db.Decimal(15, 4)
   // 분할 입고 누적 수량. quantity 도달 시 PurchaseOrder.status 가 RECEIVED 로 자동 전환.
   // 사용자가 "발주 종료" 누르면 잔량 무시하고 CLOSED.
   receivedQty           Decimal         @default(0) @map("received_qty") @db.Decimal(15, 4)

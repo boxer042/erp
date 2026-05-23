@@ -24,20 +24,27 @@ export interface PurchaseOrderListRow {
   _count: { items: number; incomings: number };
   items: Array<{
     id: string;
+    name: string | null;       // 자유입력 라인일 때만 값. supplierProduct 없으면 이 값 사용
     quantity: string;
     receivedQty: string;
-    pendingQty?: number;     // PENDING 입고 누적 (목록 응답에서 계산해서 추가)
+    pendingQty?: number;       // PENDING 입고 누적 (목록 응답에서 계산해서 추가)
     unitPrice: string;
     supplierProduct: {
       id: string;
       name: string;
       supplierCode: string | null;
       unitOfMeasure: string;
-    };
+    } | null;
   }>;
 }
 
+// rowType 으로 자유입력 / 공급상품 라인 구분.
+//   "product": supplierProductId 필수, name 은 supplierProductName 동기화 (편의용)
+//   "free":    supplierProductId 비어있음, name 필수, unit/단가/수량 모두 직접 입력
+export type PurchaseOrderRowType = "product" | "free";
+
 export interface PurchaseOrderItemForm {
+  rowType: PurchaseOrderRowType;
   supplierProductId: string;
   supplierProductName: string;
   supplierCode: string | null;
@@ -46,6 +53,8 @@ export interface PurchaseOrderItemForm {
   unitPrice: string;
   totalPrice: string;
   memo: string;
+  // 자유입력 라인의 품명 (rowType="free")
+  name: string;
 }
 
 export interface PurchaseOrderFormState {
@@ -57,7 +66,8 @@ export interface PurchaseOrderFormState {
   items: PurchaseOrderItemForm[];
 }
 
-export const emptyItem = (): PurchaseOrderItemForm => ({
+export const emptyItem = (rowType: PurchaseOrderRowType = "product"): PurchaseOrderItemForm => ({
+  rowType,
   supplierProductId: "",
   supplierProductName: "",
   supplierCode: null,
@@ -66,6 +76,7 @@ export const emptyItem = (): PurchaseOrderItemForm => ({
   unitPrice: "",
   totalPrice: "",
   memo: "",
+  name: "",
 });
 
 export const statusLabels: Record<PurchaseOrderStatus, string> = {

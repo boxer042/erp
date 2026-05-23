@@ -73,6 +73,7 @@ interface PurchaseOrderDetail {
   accessTokens: AccessToken[];
   items: Array<{
     id: string;
+    name: string | null;        // 자유입력 라인일 때만 값
     quantity: string;
     receivedQty: string;
     pendingQty: number;
@@ -87,7 +88,7 @@ interface PurchaseOrderDetail {
       spec: string | null;
       supplierCode: string | null;
       unitOfMeasure: string;
-    };
+    } | null;
   }>;
   incomings: Array<{
     id: string;
@@ -363,17 +364,22 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                     <JmTableRow key={it.id}>
                       <JmTableCell>
                         <div className="flex flex-col">
-                          <span className="font-medium">{it.supplierProduct.name}</span>
-                          {it.supplierProduct.spec && (
+                          <span className="font-medium">
+                            {it.supplierProduct?.name ?? it.name ?? "-"}
+                          </span>
+                          {it.supplierProduct?.spec && (
                             <span className="text-jm-2xs text-[var(--jm-text-muted)]">{it.supplierProduct.spec}</span>
+                          )}
+                          {!it.supplierProduct && (
+                            <span className="text-jm-2xs text-[var(--jm-warning-fg)]">자유 품명 — 입고 시 공급상품 매핑 필요</span>
                           )}
                         </div>
                       </JmTableCell>
                       <JmTableCell className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
-                        {it.supplierProduct.supplierCode ?? "-"}
+                        {it.supplierProduct?.supplierCode ?? "-"}
                       </JmTableCell>
                       <JmTableCell className="text-right tabular-nums">
-                        {ordered.toLocaleString("ko-KR")} {it.supplierProduct.unitOfMeasure}
+                        {ordered.toLocaleString("ko-KR")} {it.supplierProduct?.unitOfMeasure ?? "EA"}
                       </JmTableCell>
                       <JmTableCell className="text-right tabular-nums text-[var(--jm-success-fg)]">
                         {received.toLocaleString("ko-KR")}
@@ -612,8 +618,10 @@ function CounterOfferCard({
                   <JmTableRow key={it.id}>
                     <JmTableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">{it.supplierProduct.name}</span>
-                        {it.supplierProduct.spec && (
+                        <span className="font-medium">
+                          {it.supplierProduct?.name ?? it.name ?? "-"}
+                        </span>
+                        {it.supplierProduct?.spec && (
                           <span className="text-jm-2xs text-[var(--jm-text-muted)]">{it.supplierProduct.spec}</span>
                         )}
                       </div>

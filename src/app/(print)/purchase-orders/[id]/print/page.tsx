@@ -65,10 +65,10 @@ export default async function PurchaseOrderPrintPage({
         businessNumber: po.supplier.businessNumber,
       }}
       items={po.items.map((it) => ({
-        name: it.supplierProduct.name,
-        spec: it.supplierProduct.spec,
-        supplierCode: it.supplierProduct.supplierCode,
-        unitOfMeasure: it.supplierProduct.unitOfMeasure,
+        name: it.supplierProduct?.name ?? it.name ?? "",
+        spec: it.supplierProduct?.spec ?? null,
+        supplierCode: it.supplierProduct?.supplierCode ?? null,
+        unitOfMeasure: it.supplierProduct?.unitOfMeasure ?? "EA",
         quantity: it.quantity.toString(),
         unitPrice: it.unitPrice.toString(),
         totalPrice: it.totalPrice.toString(),

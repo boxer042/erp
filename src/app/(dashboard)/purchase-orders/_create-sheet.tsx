@@ -100,7 +100,14 @@ export function PurchaseOrderCreateSheet({
       orderDate: string;
       expectedDate?: string;
       memo?: string;
-      items: Array<{ supplierProductId: string; quantity: string; unitPrice: string; totalPrice: string; memo?: string }>;
+      items: Array<{
+        supplierProductId?: string | null;
+        name?: string | null;
+        quantity: string;
+        unitPrice: string;
+        totalPrice: string;
+        memo?: string;
+      }>;
     }) =>
       editingId
         ? apiMutate(`/api/purchase-orders/${editingId}`, "PUT", payload)
@@ -125,7 +132,8 @@ export function PurchaseOrderCreateSheet({
     });
   };
 
-  const addRow = () => setForm((prev) => ({ ...prev, items: [...prev.items, emptyItem()] }));
+  const addRow = (rowType: "product" | "free" = "product") =>
+    setForm((prev) => ({ ...prev, items: [...prev.items, emptyItem(rowType)] }));
   const removeRow = (idx: number) =>
     setForm((prev) =>
       prev.items.length === 1
@@ -143,9 +151,14 @@ export function PurchaseOrderCreateSheet({
       toast.error("거래처를 선택해주세요");
       return;
     }
-    const validItems = form.items.filter((it) => it.supplierProductId && it.quantity && it.unitPrice);
+    // 라인 유효성 — product 는 supplierProductId 필수, free 는 name 필수. 둘 다 수량·단가 필수 (0원 허용).
+    const validItems = form.items.filter((it) => {
+      if (!it.quantity || it.unitPrice === "") return false;
+      if (it.rowType === "free") return it.name.trim().length > 0;
+      return Boolean(it.supplierProductId);
+    });
     if (validItems.length === 0) {
-      toast.error("발주 항목을 1개 이상 추가해주세요");
+      toast.error("발주 항목을 1개 이상 추가해주세요 (수량·단가 필수, 0원 허용)");
       return;
     }
     saveMutation.mutate({
@@ -154,7 +167,8 @@ export function PurchaseOrderCreateSheet({
       expectedDate: form.expectedDate || undefined,
       memo: form.memo || undefined,
       items: validItems.map((it) => ({
-        supplierProductId: it.supplierProductId,
+        supplierProductId: it.rowType === "free" ? null : it.supplierProductId,
+        name: it.rowType === "free" ? it.name.trim() : null,
         quantity: it.quantity,
         unitPrice: it.unitPrice,
         totalPrice: it.totalPrice,
@@ -222,18 +236,33 @@ export function PurchaseOrderCreateSheet({
 
               {/* 항목 */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">발주 항목 *</span>
-                  <JmButton
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={addRow}
-                    disabled={!form.supplierId}
-                  >
-                    <Plus />
-                    행 추가
-                  </JmButton>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
+                    발주 항목 *{" "}
+                    <span className="text-[var(--jm-text-subtle)]">— 자유 품명 라인은 입고 시 공급상품 매핑</span>
+                  </span>
+                  <div className="flex gap-1.5">
+                    <JmButton
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => addRow("product")}
+                      disabled={!form.supplierId}
+                    >
+                      <Plus />
+                      상품 추가
+                    </JmButton>
+                    <JmButton
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => addRow("free")}
+                      disabled={!form.supplierId}
+                    >
+                      <Plus />
+                      자유 품명 추가
+                    </JmButton>
+                  </div>
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-[var(--jm-border)]">
@@ -254,6 +283,13 @@ export function PurchaseOrderCreateSheet({
                           <JmTableCell className="align-top">
                             {!form.supplierId ? (
                               <span className="text-jm-xs text-[var(--jm-text-muted)]">먼저 거래처를 선택하세요</span>
+                            ) : it.rowType === "free" ? (
+                              <JmInput
+                                size="sm"
+                                value={it.name}
+                                onChange={(e) => updateItem(idx, { name: e.target.value })}
+                                placeholder="자유 품명 (입고 시 공급상품 매핑)"
+                              />
                             ) : (
                               <JmCombobox<JmComboboxItem>
                                 items={(supplierProductsQuery.data ?? []).map((sp) => ({

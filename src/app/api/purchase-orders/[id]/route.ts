@@ -127,9 +127,11 @@ export async function PUT(
     const qty = parseFloat(it.quantity);
     const price = parseFloat(it.unitPrice);
     const sentTotal = it.totalPrice ? parseFloat(it.totalPrice) : NaN;
-    const totalPrice = Number.isFinite(sentTotal) && sentTotal > 0 ? sentTotal : qty * price;
+    const totalPrice = Number.isFinite(sentTotal) && sentTotal >= 0 ? sentTotal : qty * price;
+    const hasSp = it.supplierProductId && it.supplierProductId.length > 0;
     return {
-      supplierProductId: it.supplierProductId,
+      supplierProductId: hasSp ? it.supplierProductId! : null,
+      name: !hasSp && it.name ? it.name.trim() : null,
       quantity: qty,
       unitPrice: price,
       totalPrice,
@@ -154,6 +156,7 @@ export async function PUT(
         items: {
           create: items.map((i) => ({
             supplierProductId: i.supplierProductId,
+            name: i.name,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
             totalPrice: i.totalPrice,
