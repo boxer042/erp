@@ -364,32 +364,36 @@ export function PurchaseOrderCreateSheet({
                             />
                           </JmTableCell>
                           <JmTableCell className="align-top">
-                            <div className="space-y-1">
-                              {it.priceUndetermined ? (
-                                <div className="flex h-9 items-center rounded-md border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] px-2 text-jm-xs font-medium text-[var(--jm-warning-fg)]">
-                                  가격 미정
-                                </div>
-                              ) : (
-                                <JmNumberInput
-                                  size="sm"
-                                  prefix="₩"
-                                  clearable={false}
-                                  value={it.unitPrice}
-                                  onValueChange={(v) => updateItem(idx, { unitPrice: v })}
-                                />
-                              )}
-                              <label className="flex cursor-pointer items-center gap-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
-                                <input
-                                  type="checkbox"
-                                  className="size-3.5"
-                                  checked={it.priceUndetermined}
-                                  onChange={(e) =>
-                                    updateItem(idx, { priceUndetermined: e.target.checked })
-                                  }
-                                />
+                            {it.priceUndetermined ? (
+                              <button
+                                type="button"
+                                onClick={() => updateItem(idx, { priceUndetermined: false })}
+                                title="클릭하여 단가 입력"
+                                className="flex h-9 w-full items-center justify-center rounded-md border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] text-jm-xs font-medium text-[var(--jm-warning-fg)] transition-opacity hover:opacity-80"
+                              >
                                 가격 미정
-                              </label>
-                            </div>
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <div className="min-w-0 flex-1">
+                                  <JmNumberInput
+                                    size="sm"
+                                    prefix="₩"
+                                    clearable={false}
+                                    value={it.unitPrice}
+                                    onValueChange={(v) => updateItem(idx, { unitPrice: v })}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => updateItem(idx, { priceUndetermined: true })}
+                                  title="가격 미정으로 표시"
+                                  className="shrink-0 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-1.5 py-1 text-jm-2xs text-[var(--jm-text-muted)] transition-colors hover:border-[var(--jm-warning-fg)] hover:bg-[var(--jm-warning-bg)] hover:text-[var(--jm-warning-fg)]"
+                                >
+                                  미정
+                                </button>
+                              </div>
+                            )}
                           </JmTableCell>
                           <JmTableCell className="text-right tabular-nums align-middle">
                             {it.priceUndetermined ? (
