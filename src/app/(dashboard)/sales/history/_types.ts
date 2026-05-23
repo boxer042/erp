@@ -65,6 +65,12 @@ export interface SalesHistoryRow {
   /** 매장 부담 배송 원가 (세전). orphan 은 0 */
   shippingCostBorne: number;
   isExchangeReplacement: boolean;
+  /** 수리·임대 결제에 섞여 들어온 추가구매 라인 수. 0 이면 순수 수리/임대. */
+  extraSalesCount: number;
+  /** 추가구매 라인 합계 (세전). */
+  extraSalesAmount: number;
+  /** 수리 작업 성격 — type=repair 일 때만 의미. CUSTOM_BUILD 면 "리빌드" 라벨. */
+  repairWorkKind: "REPAIR" | "CUSTOM_BUILD" | null;
   sourceId: string;
   isOrphan: boolean;
 }

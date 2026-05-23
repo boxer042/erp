@@ -52,6 +52,8 @@ interface Props {
 export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: Props) {
   // 즉시수리가 더 흔해서 디폴트
   const [type, setType] = useState<"ON_SITE" | "DROP_OFF">("ON_SITE");
+  // 작업 성격 — 일반 수리(기본) / 리빌드. RepairType 과 직교
+  const [workKind, setWorkKind] = useState<"REPAIR" | "CUSTOM_BUILD">("REPAIR");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [device, setDevice] = useState("");
@@ -97,6 +99,7 @@ export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: 
         "POST",
         {
           type,
+          workKind,
           customerId: selectedCustomer?.id ?? null,
           serialItemId: foundSerial?.id ?? null,
           repairProductText: device.trim() || null,
@@ -223,6 +226,24 @@ export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: 
               </div>
             </Section>
 
+            {/* 작업 성격 — 일반 수리 / 리빌드 */}
+            <Section label="작업 성격">
+              <div className="grid grid-cols-2 gap-2">
+                <TypeOption
+                  active={workKind === "REPAIR"}
+                  onClick={() => setWorkKind("REPAIR")}
+                  title="일반 수리"
+                  desc="고장 부품 교체·수리"
+                />
+                <TypeOption
+                  active={workKind === "CUSTOM_BUILD"}
+                  onClick={() => setWorkKind("CUSTOM_BUILD")}
+                  title="리빌드"
+                  desc="손님 부품 + 부속 조합"
+                />
+              </div>
+            </Section>
+
             {/* 고객 */}
             <Section label="고객" optional>
               {selectedCustomer ? (
@@ -321,7 +342,13 @@ export function NewRepairSheet({ open, onOpenChange, onCreated, posSessionId }: 
             className="w-full"
           >
             {createMutation.isPending && <Loader2 className="size-4 animate-spin" />}
-            {type === "ON_SITE" ? "즉시 수리 시작" : "맡김 접수"}
+            {workKind === "CUSTOM_BUILD"
+              ? type === "ON_SITE"
+                ? "즉시 리빌드 시작"
+                : "리빌드 접수"
+              : type === "ON_SITE"
+                ? "즉시 수리 시작"
+                : "맡김 접수"}
           </JmButton>
         </JmDrawerFooter>
       </JmDrawerContent>

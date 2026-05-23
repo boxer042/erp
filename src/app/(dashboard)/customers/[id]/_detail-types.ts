@@ -30,6 +30,7 @@ export type RentalStatus =
 
 export type SerialSource = "SALE" | "REPAIR";
 export type RepairType = "ON_SITE" | "DROP_OFF";
+export type RepairWorkKind = "REPAIR" | "CUSTOM_BUILD";
 
 export interface RecentOrder {
   id: string;
@@ -44,6 +45,7 @@ export interface RecentRepair {
   id: string;
   ticketNo: string;
   type: RepairType;
+  workKind: RepairWorkKind;
   status: RepairStatus;
   receivedAt: string;
   pickedUpAt: string | null;

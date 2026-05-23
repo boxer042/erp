@@ -25,6 +25,7 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatBusinessNumber, formatPhone } from "@/lib/utils";
 import {
+  JmBadge,
   JmButton,
   JmCard,
   JmCardContent,
@@ -465,6 +466,11 @@ export default function CustomerDetailPage({ params }: PageProps) {
                               {r.ticketNo}
                             </span>
                             <RepairTypeBadge type={r.type} />
+                            {r.workKind === "CUSTOM_BUILD" && (
+                              <JmBadge variant="accent" size="sm">
+                                리빌드
+                              </JmBadge>
+                            )}
                             <RepairStatusBadge status={r.status} />
                             <span className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
                               {formatDateShort(r.receivedAt)}

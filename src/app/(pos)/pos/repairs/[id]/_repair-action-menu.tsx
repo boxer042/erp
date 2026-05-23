@@ -6,6 +6,8 @@ import {
   ArrowRightLeft,
   ChevronDown,
   Clock,
+  Hammer,
+  Wrench,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -62,6 +64,19 @@ export function RepairTicketActionMenu({
     onSuccess: (_, nextType) => {
       toast.success(
         nextType === "ON_SITE" ? "즉시 수리로 변경됨" : "맡김 수리로 변경됨",
+      );
+      invalidate();
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "변경 실패"),
+  });
+
+  const workKindMutation = useMutation<unknown, Error, "REPAIR" | "CUSTOM_BUILD">({
+    mutationFn: (nextKind) =>
+      apiMutate(`/api/repair-tickets/${ticketId}`, "PUT", { workKind: nextKind }),
+    onSuccess: (_, nextKind) => {
+      toast.success(
+        nextKind === "CUSTOM_BUILD" ? "리빌드로 변경됨" : "일반 수리로 변경됨",
       );
       invalidate();
     },
@@ -157,6 +172,23 @@ export function RepairTicketActionMenu({
             >
               <ArrowRightLeft className="size-4" />
               즉시 수리로 변경
+            </JmDropdownMenuItem>
+          )}
+          {t.workKind === "CUSTOM_BUILD" ? (
+            <JmDropdownMenuItem
+              onClick={() => workKindMutation.mutate("REPAIR")}
+              disabled={workKindMutation.isPending}
+            >
+              <Wrench className="size-4" />
+              일반 수리로 변경
+            </JmDropdownMenuItem>
+          ) : (
+            <JmDropdownMenuItem
+              onClick={() => workKindMutation.mutate("CUSTOM_BUILD")}
+              disabled={workKindMutation.isPending}
+            >
+              <Hammer className="size-4" />
+              리빌드로 변경
             </JmDropdownMenuItem>
           )}
           <JmDropdownMenuSeparator />

@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     data: {
       ticketNo: generateRepairTicketNo(),
       type: data.type,
+      workKind: data.workKind,
       customerId: data.customerId || null,
       customerMachineId: data.customerMachineId || null,
       serialItemId: data.serialItemId || null,

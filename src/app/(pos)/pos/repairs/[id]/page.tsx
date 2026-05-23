@@ -246,6 +246,14 @@ export function RepairDetail({
                 <span className="font-mono text-jm-2xs text-[var(--jm-text-subtle)]">
                   {t.ticketNo}
                 </span>
+                {t.workKind === "CUSTOM_BUILD" && (
+                  <span
+                    className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[var(--jm-accent-fg)]"
+                    title="리빌드 — 손님 부품 + 부속 조합"
+                  >
+                    리빌드
+                  </span>
+                )}
               </div>
               {/* 손님 · 기기 — 한 줄에 정체성 즉시 표시 (스크롤 없이 누구의 무슨 작업인지) */}
               <HeaderIdentitySubtitle ticket={t} />

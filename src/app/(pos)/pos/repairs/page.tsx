@@ -449,6 +449,14 @@ function TicketRow({
               즉시
             </span>
           )}
+          {ticket.workKind === "CUSTOM_BUILD" && (
+            <span
+              className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-accent-fg)]"
+              title="리빌드 — 손님 부품 + 부속 조합"
+            >
+              리빌드
+            </span>
+          )}
           {ticket.quoteRejectedAt && (
             <span
               className="rounded bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-warning-fg)]"

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const repairTicketCreateSchema = z.object({
   type: z.enum(["ON_SITE", "DROP_OFF"]).default("ON_SITE"),
+  // 작업 성격 — 일반 수리(REPAIR, 기본) / 리빌드(CUSTOM_BUILD)
+  workKind: z.enum(["REPAIR", "CUSTOM_BUILD"]).default("REPAIR"),
   customerId: z.string().nullable().optional(),
   customerMachineId: z.string().nullable().optional(),
   serialItemId: z.string().nullable().optional(),
@@ -22,6 +24,7 @@ export type RepairTicketCreateInput = z.infer<typeof repairTicketCreateSchema>;
 
 export const repairTicketUpdateSchema = z.object({
   type: z.enum(["ON_SITE", "DROP_OFF"]).optional(),
+  workKind: z.enum(["REPAIR", "CUSTOM_BUILD"]).optional(),
   customerId: z.string().nullable().optional(),
   customerMachineId: z.string().nullable().optional(),
   serialItemId: z.string().nullable().optional(),

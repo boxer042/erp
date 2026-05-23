@@ -85,6 +85,15 @@ export type SalesHistoryRow = {
   shippingCostBorne: number;
   /** 교환 새 주문 (-EX) 인지 — 마진 리포트는 항상 제외, 이 페이지는 토글로만 노출 */
   isExchangeReplacement: boolean;
+  /**
+   * 수리·임대 결제에 섞여 들어온 추가구매 라인 수 (productId 있는 OrderItem 수).
+   * 0 이면 순수 수리/임대 결제. type=product 행은 항상 0.
+   */
+  extraSalesCount: number;
+  /** 추가구매 라인 합계 (세전 totalPrice 합). 표시용 배지. */
+  extraSalesAmount: number;
+  /** 수리 작업 성격 — REPAIR(일반) / CUSTOM_BUILD(리빌드). type=repair 일 때만 의미. */
+  repairWorkKind: "REPAIR" | "CUSTOM_BUILD" | null;
   /** 연결된 원천 — 판매:Order id, 수리:ticket id (orphan), 임대:rental id (orphan) */
   sourceId: string;
   /** orphan 인지 — 클릭 시 라우팅 분기용 */
@@ -226,12 +235,15 @@ export async function GET(request: NextRequest) {
       rentalId: true,
       channelId: true,
       channel: { select: { id: true, name: true } },
-      repairTicket: { select: { ticketNo: true } },
+      repairTicket: { select: { ticketNo: true, workKind: true } },
       rental: { select: { rentalNo: true } },
       exchangedFromOrders: { select: { id: true } },
       // PARTIAL_REFUND 매출 보정용 — 항목별 누적 환불 금액 (세전).
       // refundedAmount 합계가 totalAmount 와 같으면 사실상 전액 환불 → REFUNDED 와 동일 처리.
-      items: { select: { refundedAmount: true } },
+      // 수리/임대 결제에 추가구매 라인이 같이 들어간 경우 — productId 있는 라인 = 추가구매.
+      items: {
+        select: { refundedAmount: true, productId: true, totalPrice: true },
+      },
     },
     orderBy: { orderDate: "desc" },
     take: FETCH_CAP,
@@ -287,6 +299,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             ticketNo: true,
+            workKind: true,
             pickedUpAt: true,
             createdAt: true,
             customerId: true,
@@ -373,6 +386,17 @@ export async function GET(request: NextRequest) {
     const partialNet = isPartial
       ? Math.max(0, supplyAmount - partialRefundAmount)
       : supplyAmount;
+    // 수리·임대 결제에 섞여 들어온 추가구매 라인 — productId 있는 라인 = 추가구매 (수리 라인은 productId=null + serviceName).
+    // 메인 type=product 에는 의미 없음 (전체가 product 라인).
+    const extraItems =
+      t === "repair" || t === "rental"
+        ? (o.items ?? []).filter((it) => it.productId != null)
+        : [];
+    const extraSalesCount = extraItems.length;
+    const extraSalesAmount = extraItems.reduce(
+      (s, it) => s + Number(it.totalPrice ?? 0),
+      0,
+    );
     return {
       id: `order-${o.id}`,
       type: t,
@@ -401,6 +425,9 @@ export async function GET(request: NextRequest) {
       shippingFee: Number(o.shippingFee ?? 0),
       shippingCostBorne: Number(o.shippingCostBorne ?? 0),
       isExchangeReplacement: (o.exchangedFromOrders?.length ?? 0) > 0,
+      extraSalesCount,
+      extraSalesAmount,
+      repairWorkKind: o.repairTicket?.workKind ?? null,
       sourceId: o.id,
       isOrphan: false,
     };
@@ -433,6 +460,9 @@ export async function GET(request: NextRequest) {
       shippingFee: 0,
       shippingCostBorne: 0,
       isExchangeReplacement: false,
+      extraSalesCount: 0,
+      extraSalesAmount: 0,
+      repairWorkKind: t.workKind,
       sourceId: t.id,
       isOrphan: true,
     };
@@ -464,6 +494,9 @@ export async function GET(request: NextRequest) {
       shippingFee: 0,
       shippingCostBorne: 0,
       isExchangeReplacement: false,
+      extraSalesCount: 0,
+      extraSalesAmount: 0,
+      repairWorkKind: null,
       sourceId: r.id,
       isOrphan: true,
     };

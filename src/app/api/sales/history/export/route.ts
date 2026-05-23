@@ -14,6 +14,7 @@ import type {
 const TYPE_LABEL: Record<string, string> = {
   product: "판매",
   repair: "수리",
+  rebuild: "리빌드",
   rental: "임대",
 };
 
@@ -186,7 +187,7 @@ export async function GET(request: NextRequest) {
       repairTicketId: true,
       rentalId: true,
       channel: { select: { name: true } },
-      repairTicket: { select: { ticketNo: true } },
+      repairTicket: { select: { ticketNo: true, workKind: true } },
       rental: { select: { rentalNo: true } },
     },
     orderBy: { orderDate: "desc" },
@@ -240,6 +241,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             ticketNo: true,
+            workKind: true,
             pickedUpAt: true,
             createdAt: true,
             paymentMethod: true,
@@ -319,7 +321,13 @@ export async function GET(request: NextRequest) {
   };
 
   const orderRows: Row[] = orders.map((o) => ({
-    type: o.repairTicketId ? "repair" : o.rentalId ? "rental" : "product",
+    type: o.repairTicketId
+      ? o.repairTicket?.workKind === "CUSTOM_BUILD"
+        ? "rebuild"
+        : "repair"
+      : o.rentalId
+        ? "rental"
+        : "product",
     refNo: o.repairTicket?.ticketNo ?? o.rental?.rentalNo ?? o.orderNo,
     channelOrderNo: o.channelOrderNo,
     date: o.orderDate,
@@ -338,7 +346,7 @@ export async function GET(request: NextRequest) {
   }));
 
   const orphanRepairRows: Row[] = orphanTickets.map((t) => ({
-    type: "repair",
+    type: t.workKind === "CUSTOM_BUILD" ? "rebuild" : "repair",
     refNo: t.ticketNo,
     channelOrderNo: null,
     date: t.pickedUpAt ?? t.createdAt,

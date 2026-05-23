@@ -89,6 +89,7 @@ export async function GET(
         id: true,
         ticketNo: true,
         type: true,
+        workKind: true,
         status: true,
         receivedAt: true,
         pickedUpAt: true,
