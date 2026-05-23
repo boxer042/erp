@@ -281,111 +281,108 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
         <JmCardHeader>
           <JmCardTitle>발주 항목 ({data.items.length}건)</JmCardTitle>
         </JmCardHeader>
-        <div className="overflow-x-auto border-t border-[var(--jm-border)]">
-          <table className="w-full text-jm-sm">
-            <thead className="bg-[var(--jm-surface-muted)] text-jm-xs text-[var(--jm-text-muted)]">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">품명</th>
-                <th className="px-3 py-2 text-left font-medium">품번</th>
-                <th className="px-3 py-2 text-right font-medium">수량</th>
-                <th className="px-3 py-2 text-right font-medium">단가</th>
-                <th className="px-3 py-2 text-right font-medium">금액</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((it) => {
-                const original = parseFloat(it.unitPrice);
-                const eff = effectiveUnitPrice(it);
-                const lineTotal = eff * parseFloat(it.quantity);
-                const changed = priceMode && editingPrices[it.id] !== undefined && parseFloat(editingPrices[it.id]) !== original;
-                const proposed = !priceMode && it.proposedUnitPrice && parseFloat(it.proposedUnitPrice) !== original;
-                return (
-                  <tr key={it.id} className="border-t border-[var(--jm-border)]">
-                    <td className="px-3 py-2.5">
-                      <div className="font-semibold text-[var(--jm-text)]">{it.name}</div>
-                      {it.spec && (
-                        <div className="text-jm-2xs text-[var(--jm-text-muted)]">{it.spec}</div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-jm-xs text-[var(--jm-text-muted)]">
-                      {it.supplierCode ? (
-                        <JmBadge variant="outline" shape="square" size="sm">
-                          {it.supplierCode}
-                        </JmBadge>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--jm-text)]">
-                      {parseFloat(it.quantity).toLocaleString("ko-KR")} {it.unitOfMeasure}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--jm-text)]">
-                      {priceMode ? (
-                        <div className="flex flex-col items-end gap-0.5">
-                          <JmNumberInput
-                            size="sm"
-                            prefix="₩"
-                            className="w-36"
-                            value={editingPrices[it.id] ?? ""}
-                            onValueChange={(v) =>
-                              setEditingPrices((prev) => ({ ...prev, [it.id]: v }))
-                            }
-                          />
-                          {changed && (() => {
-                            const newVal = parseFloat(editingPrices[it.id]);
-                            const d = newVal - original;
-                            const pct = original !== 0 ? (d / original) * 100 : 0;
-                            const cls = d > 0
-                              ? "text-[var(--jm-danger-fg)]"
-                              : d < 0
-                                ? "text-[var(--jm-success-fg)]"
-                                : "text-[var(--jm-text-muted)]";
-                            return (
-                              <>
-                                <span className="text-jm-3xs text-[var(--jm-text-muted)] line-through">
-                                  ₩{original.toLocaleString("ko-KR")}
-                                </span>
-                                <span className={`text-jm-3xs ${cls}`}>
-                                  {d > 0 ? "+" : d < 0 ? "−" : ""}₩{Math.abs(d).toLocaleString("ko-KR")} ({pct > 0 ? "+" : pct < 0 ? "−" : ""}{Math.abs(pct).toFixed(1)}%)
-                                </span>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      ) : proposed ? (() => {
-                        const newVal = parseFloat(it.proposedUnitPrice!);
-                        const d = newVal - original;
-                        const pct = original !== 0 ? (d / original) * 100 : 0;
-                        const cls = d > 0
-                          ? "text-[var(--jm-danger-fg)]"
-                          : d < 0
-                            ? "text-[var(--jm-success-fg)]"
-                            : "text-[var(--jm-text-muted)]";
-                        return (
-                          <div className="flex flex-col items-end gap-0.5">
-                            <span className="font-bold text-[var(--jm-info-fg)]">
-                              ₩{newVal.toLocaleString("ko-KR")}
-                            </span>
-                            <span className="text-jm-3xs text-[var(--jm-text-muted)] line-through">
-                              ₩{original.toLocaleString("ko-KR")}
-                            </span>
-                            <span className={`text-jm-3xs ${cls}`}>
-                              {d > 0 ? "+" : d < 0 ? "−" : ""}₩{Math.abs(d).toLocaleString("ko-KR")} ({pct > 0 ? "+" : pct < 0 ? "−" : ""}{Math.abs(pct).toFixed(1)}%)
-                            </span>
-                          </div>
-                        );
-                      })() : (
-                        <>₩{original.toLocaleString("ko-KR")}</>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-[var(--jm-text)]">
-                      ₩{Math.round(lineTotal).toLocaleString("ko-KR")}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="divide-y divide-[var(--jm-border)] border-t border-[var(--jm-border)]">
+          {data.items.map((it) => {
+            const original = parseFloat(it.unitPrice);
+            const eff = effectiveUnitPrice(it);
+            const lineTotal = eff * parseFloat(it.quantity);
+            const changed =
+              priceMode &&
+              editingPrices[it.id] !== undefined &&
+              parseFloat(editingPrices[it.id]) !== original;
+            const proposed =
+              !priceMode && it.proposedUnitPrice && parseFloat(it.proposedUnitPrice) !== original;
+            const renderDelta = (newVal: number, size: "xs" | "2xs" = "2xs") => {
+              const d = newVal - original;
+              const pct = original !== 0 ? (d / original) * 100 : 0;
+              const cls =
+                d > 0
+                  ? "text-[var(--jm-danger-fg)]"
+                  : d < 0
+                    ? "text-[var(--jm-success-fg)]"
+                    : "text-[var(--jm-text-muted)]";
+              return (
+                <div className={`flex items-baseline justify-end gap-2 text-jm-${size}`}>
+                  <span className="text-[var(--jm-text-muted)] line-through">
+                    ₩{original.toLocaleString("ko-KR")}
+                  </span>
+                  <span className={cls}>
+                    {d > 0 ? "+" : d < 0 ? "−" : ""}₩{Math.abs(d).toLocaleString("ko-KR")} (
+                    {pct > 0 ? "+" : pct < 0 ? "−" : ""}
+                    {Math.abs(pct).toFixed(1)}%)
+                  </span>
+                </div>
+              );
+            };
+            return (
+              <div key={it.id} className="space-y-2.5 px-4 py-3">
+                {/* 품명 + 품번 */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-[var(--jm-text)]">{it.name}</div>
+                    {it.spec && (
+                      <div className="text-jm-xs text-[var(--jm-text-muted)]">{it.spec}</div>
+                    )}
+                  </div>
+                  {it.supplierCode && (
+                    <JmBadge variant="outline" shape="square" size="sm" className="shrink-0">
+                      {it.supplierCode}
+                    </JmBadge>
+                  )}
+                </div>
+
+                {/* 수량 */}
+                <div className="flex items-baseline justify-between text-jm-sm">
+                  <span className="text-[var(--jm-text-muted)]">수량</span>
+                  <span className="tabular-nums text-[var(--jm-text)]">
+                    {parseFloat(it.quantity).toLocaleString("ko-KR")} {it.unitOfMeasure}
+                  </span>
+                </div>
+
+                {/* 단가 */}
+                {priceMode ? (
+                  <div className="space-y-1.5">
+                    <div className="text-jm-sm text-[var(--jm-text-muted)]">단가</div>
+                    <JmNumberInput
+                      size="sm"
+                      prefix="₩"
+                      className="w-full"
+                      value={editingPrices[it.id] ?? ""}
+                      onValueChange={(v) =>
+                        setEditingPrices((prev) => ({ ...prev, [it.id]: v }))
+                      }
+                    />
+                    {changed && renderDelta(parseFloat(editingPrices[it.id]))}
+                  </div>
+                ) : proposed ? (
+                  <div className="space-y-1">
+                    <div className="flex items-baseline justify-between text-jm-sm">
+                      <span className="text-[var(--jm-text-muted)]">단가</span>
+                      <span className="font-bold tabular-nums text-[var(--jm-info-fg)]">
+                        ₩{parseFloat(it.proposedUnitPrice!).toLocaleString("ko-KR")}
+                      </span>
+                    </div>
+                    {renderDelta(parseFloat(it.proposedUnitPrice!))}
+                  </div>
+                ) : (
+                  <div className="flex items-baseline justify-between text-jm-sm">
+                    <span className="text-[var(--jm-text-muted)]">단가</span>
+                    <span className="tabular-nums text-[var(--jm-text)]">
+                      ₩{original.toLocaleString("ko-KR")}
+                    </span>
+                  </div>
+                )}
+
+                {/* 금액 (강조) */}
+                <div className="flex items-baseline justify-between border-t border-[var(--jm-border)] pt-2 text-jm-sm">
+                  <span className="text-[var(--jm-text-muted)]">금액</span>
+                  <span className="font-bold tabular-nums text-[var(--jm-text)]">
+                    ₩{Math.round(lineTotal).toLocaleString("ko-KR")}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
         <div className="space-y-1 border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-3 text-jm-sm">
           <Row label="공급가액" value={`₩${Math.round(subtotal).toLocaleString("ko-KR")}`} tabular />
