@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
 import { calcCartTotals } from "@/components/pos/cart-helpers";
+import { CartEmptyState } from "@/components/pos/cart-empty-state";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { CartLineRow } from "./_cart-line-row";
 import { issueQuotation, openPrintTab, calcCartFingerprint } from "./_issue-document";
@@ -43,7 +44,7 @@ interface Props {
  */
 export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabels }: Props) {
   const router = useRouter();
-  const { setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, forceSync } =
+  const { add, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, forceSync } =
     useSessions();
   const items = session.items;
   // 메인-자식 트리 — 메인 라인 후 그 자식 ADDON 라인들 순서로 평탄화 (orphan ADDON 은 마지막에)
@@ -201,20 +202,10 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
       >
         <div className="-mx-5 flex flex-col">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-5 py-12 text-center">
-              <span className="text-[13px] text-[var(--jm-text-subtle)]">
-                카트가 비어 있습니다
-              </span>
-              {session.customerId && (
-                <button
-                  type="button"
-                  onClick={() => setQuotationLoadOpen(true)}
-                  className="rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[12px] font-semibold text-[var(--jm-text)] border border-[var(--jm-border)] active:bg-[var(--jm-bg)]"
-                >
-                  이전 견적서에서 불러오기
-                </button>
-              )}
-            </div>
+            <CartEmptyState
+              customerId={session.customerId}
+              onLoadQuotation={() => setQuotationLoadOpen(true)}
+            />
           ) : (
             orderedItems.map((it) => (
               <CartLineRow key={it.cartItemId} item={it} sessionId={session.id} />
@@ -369,11 +360,21 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
         onSubmit={(net) => setSessionShipping(String(net), session.id)}
       />
 
-      {/* 기술료/공임 추가 — 프리셋 + 직접 입력 */}
+      {/* 기술료/공임 추가 — 프리셋 + 직접 입력. onAdd 콜백으로 POS·ERP 양쪽 카트에 적용 가능 */}
       <ServiceFeeSheet
         open={serviceFeeOpen}
         onOpenChange={setServiceFeeOpen}
-        sessionId={session.id}
+        onAdd={(line) =>
+          add(
+            {
+              itemType: "service",
+              name: line.name,
+              imageUrl: null,
+              unitPrice: line.unitPrice,
+            },
+            { sessionId: session.id },
+          )
+        }
       />
 
       {/* 견적서 → 카트 로드 — 고객 연결됐을 때만 진입 가능 */}

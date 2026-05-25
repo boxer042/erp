@@ -470,9 +470,17 @@ export default function PosV2CustomerPage({
       <CustomerActionSheet
         open={customerActionOpen}
         onOpenChange={setCustomerActionOpen}
-        session={session}
+        data={{
+          customerId: session.customerId,
+          customerName: session.customerName,
+        }}
         onLinkCustomer={() => setLinkOpen(true)}
         onCreateCustomer={() => setQuickRegister({ defaultText: "" })}
+        onViewProfile={
+          session.customerId
+            ? () => router.push(`/pos/customer-profile/${session.customerId}`)
+            : undefined
+        }
         onReturnExchange={
           session.customerId
             ? () => setReturnSheetOpen(true)

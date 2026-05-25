@@ -1,25 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import type { CartSession } from "@/components/pos/sessions-context";
 import { BottomSheet } from "./_components/bottom-sheet";
+
+/** POS·ERP 공용 데이터 — 등록 여부 + 이름만 필요 */
+export interface CustomerActionData {
+  customerId?: string | null;
+  customerName?: string | null;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  session: CartSession;
+  data: CustomerActionData;
   /** "기존 고객 연결" / "다른 고객으로 변경" — 검색 시트를 연다 */
   onLinkCustomer: () => void;
   /** "새 고객 등록" — 검색 건너뛰고 등록 시트 바로. 미지정 시 onLinkCustomer 폴백. */
   onCreateCustomer?: () => void;
-  /** "반품·교환" — 등록 고객의 환불 가능 주문 시트 진입. 미지정 시 액션 비노출. */
+  /** "고객 페이지" — 등록 고객 한정. POS 는 /pos/customer-profile/[id], ERP 는 /customers/[id]. 미지정 시 액션 비노출. */
+  onViewProfile?: () => void;
+  /** "반품·교환" — 등록 고객 한정. 미지정 시 액션 비노출 (POS 전용). */
   onReturnExchange?: () => void;
 }
 
 /**
- * 고객 작업 페이지 헤더 썸네일 클릭 시 뜨는 액션 시트.
+ * 고객 썸네일 클릭 시 뜨는 액션 시트. POS·ERP 공용.
  * - 미등록: 기존 고객 연결 / 새 고객 등록
- * - 등록: 고객 페이지 / 다른 고객으로 변경
+ * - 등록: 고객 페이지(옵션) / 다른 고객으로 변경 / 반품·교환(옵션)
  *
  * 고객 연결 해제는 의도적으로 제거 — ticket/order/rental 의 customerId 추적 끊김 사고 위험.
  * 잘못 연결한 경우는 "다른 고객으로 변경" 으로 충분.
@@ -27,18 +33,20 @@ interface Props {
 export function CustomerActionSheet({
   open,
   onOpenChange,
-  session,
+  data,
   onLinkCustomer,
   onCreateCustomer,
+  onViewProfile,
   onReturnExchange,
 }: Props) {
   if (!open) return null;
   return (
     <Body
       onOpenChange={onOpenChange}
-      session={session}
+      data={data}
       onLinkCustomer={onLinkCustomer}
       onCreateCustomer={onCreateCustomer}
+      onViewProfile={onViewProfile}
       onReturnExchange={onReturnExchange}
     />
   );
@@ -46,13 +54,13 @@ export function CustomerActionSheet({
 
 function Body({
   onOpenChange,
-  session,
+  data,
   onLinkCustomer,
   onCreateCustomer,
+  onViewProfile,
   onReturnExchange,
 }: Omit<Props, "open">) {
-  const router = useRouter();
-  const isRegistered = !!session.customerId;
+  const isRegistered = !!data.customerId;
 
   const close = () => onOpenChange(false);
 
@@ -66,22 +74,22 @@ function Body({
       <div className="flex flex-col gap-1 pb-2 pt-2">
         {isRegistered ? (
           <>
-            <Action
-              icon={
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M4 17c1.5-3 3.5-4.5 6-4.5s4.5 1.5 6 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              }
-              label="고객 페이지"
-              desc={`${session.customerName} — 구매·수리·임대 이력`}
-              onClick={() => {
-                close();
-                if (session.customerId) {
-                  router.push(`/pos/customer-profile/${session.customerId}`);
+            {onViewProfile && (
+              <Action
+                icon={
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M4 17c1.5-3 3.5-4.5 6-4.5s4.5 1.5 6 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
                 }
-              }}
-            />
+                label="고객 페이지"
+                desc={`${data.customerName ?? ""} — 구매·수리·임대 이력`}
+                onClick={() => {
+                  close();
+                  onViewProfile();
+                }}
+              />
+            )}
             <Action
               icon={
                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none">

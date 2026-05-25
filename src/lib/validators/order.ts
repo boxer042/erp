@@ -7,7 +7,17 @@ export const orderItemSchema = z
     /** 기술료/공임 등 상품 없는 서비스 라인명 — productId 없을 때 사용 */
     serviceName: z.string().optional(),
     quantity: z.string().min(1, "수량을 입력해주세요"),
+    /** 라인 단가 (세전, 정수) — 할인 적용 전 단가 (POS 와 동일 정책). 실제 OrderItem.unitPrice 는 unitPrice - discountPerUnit */
     unitPrice: z.string().min(1, "단가를 입력해주세요"),
+    /**
+     * 개당 할인액 (세전, 정수). 미지정 시 0.
+     * - OrderItem.discountAmount 로 저장
+     * - OrderItem.unitPrice = (input.unitPrice - discountPerUnit) 로 저장
+     * - OrderItem.listPrice = input.listPrice ?? input.unitPrice 로 저장 (정가 보존)
+     */
+    discountPerUnit: z.string().optional(),
+    /** 정가 (세전, 정수) — 카탈로그 listPrice. 미지정 시 unitPrice 사용 */
+    listPrice: z.string().optional(),
     /**
      * 고객이 선택한 옵션값 ID 들 — 결제 시 OrderItem 의 optionSnapshot + OPTION_REF 자식 라인 자동 생성에 사용.
      * 주문 후 보존되는 건 optionSnapshot (옵션값 라벨 mapping). 이 ID 들은 transient 용.

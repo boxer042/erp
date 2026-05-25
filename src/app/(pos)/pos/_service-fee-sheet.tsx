@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { useSessions } from "@/components/pos/sessions-context";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { PriceInputDialog } from "./_components/price-input-dialog";
 
@@ -16,24 +15,36 @@ interface ServiceFeePreset {
   memo: string | null;
 }
 
+/** 기술료 라인 페이로드 — POS·ERP 양쪽이 각자 카트 모델로 변환 */
+export interface ServiceFeeLine {
+  name: string;
+  /** 공급가액 (세전, 정수). 항상 과세 (TAXABLE) */
+  unitPrice: number;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  sessionId: string;
+  /**
+   * 라인 추가 콜백 — POS 는 `useSessions().add` 호출, ERP /orders/new 는 로컬 setItems 호출.
+   * 호출자에게 카트 모델 변환을 위임해 컴포넌트 자체는 context-free.
+   */
+  onAdd: (line: ServiceFeeLine) => void;
 }
 
 /**
  * 기술료/공임 추가 시트 — 상품 판매에 장착·설치 기술료를 라인으로 추가.
  * 프리셋 탭 → 즉시 추가 / 직접 입력 → 가격 입력 드로워로 공급가액 입력.
  * 기술료는 항상 과세 — itemType="service" 라인으로 카트에 들어가 결제 시 OrderItem.serviceName 으로 저장.
+ *
+ * 공용 (POS 카트 시트 + ERP 신규 주문) — onAdd 콜백으로 카트 추가 위임.
  */
 export function ServiceFeeSheet(props: Props) {
   if (!props.open) return null;
   return <Body {...props} />;
 }
 
-function Body({ onOpenChange, sessionId }: Props) {
-  const { add } = useSessions();
+function Body({ onOpenChange, onAdd }: Props) {
   const [name, setName] = useState("");
   const [amount, setAmount] = useState(0);
   const [priceOpen, setPriceOpen] = useState(false);
@@ -45,15 +56,7 @@ function Body({ onOpenChange, sessionId }: Props) {
   const presets = presetsQuery.data ?? [];
 
   const addLine = (lineName: string, net: number) => {
-    add(
-      {
-        itemType: "service",
-        name: lineName,
-        imageUrl: null,
-        unitPrice: Math.max(0, Math.round(net)),
-      },
-      { sessionId },
-    );
+    onAdd({ name: lineName, unitPrice: Math.max(0, Math.round(net)) });
     toast.success(`${lineName} 추가`, { duration: 1500 });
     onOpenChange(false);
   };

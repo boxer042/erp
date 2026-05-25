@@ -42,7 +42,6 @@ import {
   JmTableToolbarSearch,
 } from "@/jm";
 
-import { OrderCreateSheet } from "./_create-sheet";
 import { OrderDetailSheet } from "./_detail-sheet";
 import { VariantResolveDialog } from "./_variant-resolve-dialog";
 import {
@@ -119,7 +118,6 @@ export default function OrdersBoardPage() {
   };
   const isGroupActive = (key: BoardGroupKey) =>
     groupFilters.size === 0 || groupFilters.has(key);
-  const [createOpen, setCreateOpen] = useState(false);
   const detailId = searchParams.get("id");
   const detailItemId = searchParams.get("itemId");
 
@@ -693,7 +691,7 @@ export default function OrdersBoardPage() {
                   <RefreshCw className="size-4" />
                 )}
               </JmIconButton>
-              <JmButton size="sm" onClick={() => setCreateOpen(true)}>
+              <JmButton size="sm" onClick={() => router.push("/orders/new")}>
                 <Plus className="size-4" />
                 신규 주문
               </JmButton>
@@ -1057,12 +1055,6 @@ export default function OrdersBoardPage() {
             </JmTable>
         </JmCard>
       </div>
-
-      <OrderCreateSheet
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onCreated={invalidate}
-      />
 
       <OrderDetailSheet
         orderId={detailId}

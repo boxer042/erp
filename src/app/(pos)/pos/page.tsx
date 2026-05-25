@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { apiMutate, ApiError } from "@/lib/api-client";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
-import { CustomerCard } from "./_components/customer-card";
+import { CustomerSummaryCard } from "@/components/pos/customer-summary-card";
 import { MenuSheet } from "./_components/menu-sheet";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { LinkCustomerSheet } from "./_link-customer-sheet";
@@ -267,9 +267,22 @@ export default function PosV2HomePage() {
                     const hasOpenRepair = (s.openRepairCount ?? 0) > 0;
                     const blocked = !hasItems && !isRegistered && hasOpenRepair;
                     return (
-                      <CustomerCard
+                      <CustomerSummaryCard
                         key={s.id}
-                        session={s}
+                        data={{
+                          id: s.id,
+                          customerId: s.customerId,
+                          customerName: s.customerName,
+                          customerPhone: s.customerPhone,
+                          customerType: s.customerType,
+                          customerBusinessNumber: s.customerBusinessNumber,
+                          activeCount: {
+                            product: s.items.filter((i) => i.itemType === "product").length,
+                            repair: s.openRepairCount ?? 0,
+                            rental: s.items.filter((i) => i.itemType === "rental").length,
+                          },
+                          updatedAt: s.updatedAt,
+                        }}
                         onClick={() => goToCustomer(s.id)}
                         onClose={
                           blocked

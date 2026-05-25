@@ -272,19 +272,34 @@ export async function POST(request: NextRequest) {
         where: { id: { in: allOptionValueIds } },
         include: {
           option: { select: { name: true } },
-          mappedProduct: { select: { id: true, taxType: true, sellingPrice: true, name: true } },
+          mappedProduct: {
+            select: {
+              id: true,
+              taxType: true,
+              sellingPrice: true,
+              listPrice: true,
+              name: true,
+            },
+          },
         },
       })
     : [];
   const optionValueMap = new Map(optionValues.map((v) => [v.id, v]));
 
   // 메인 라인 + OPTION_REF 자식 라인 모두 평탄화. parentItemIndex 로 부모 link 표시.
+  // listPrice / discountPerUnit 은 라인 단위 할인 보존용 — OrderItem 에 그대로 저장
+  // (cost report·통합 판매내역 상세에서 정가 대비 할인 표시).
   type StagedItem = {
     productId: string | null;
     serviceName: string | null;
     quantity: number;
+    /** 실제 결제 단가 (세전) = input.unitPrice - discountPerUnit */
     unitPrice: number;
     totalPrice: number;
+    /** 정가 (세전) — OrderItem.listPrice 저장용 */
+    listPrice: number | null;
+    /** 개당 할인액 (세전) — OrderItem.discountAmount 저장용 */
+    discountPerUnit: number;
     lineRole: "MAIN" | "OPTION_REF";
     parentItemIndex: number | null;
     optionSnapshot: Record<string, string> | null;
@@ -295,7 +310,12 @@ export async function POST(request: NextRequest) {
   const stagedItems: StagedItem[] = [];
   for (const item of data.items) {
     const qty = parseFloat(item.quantity);
-    const price = parseFloat(item.unitPrice);
+    const inputUnitPrice = parseFloat(item.unitPrice);
+    const inputDiscount = parseFloat(item.discountPerUnit || "0") || 0;
+    const inputListPrice =
+      parseFloat(item.listPrice || "") || inputUnitPrice;
+    // 실제 결제 단가 — 할인 적용 후
+    const price = Math.max(0, inputUnitPrice - inputDiscount);
 
     // 기술료/공임 등 서비스 라인 — productId 없음. 재고·옵션 무관, 항상 과세.
     if (!item.productId) {
@@ -305,6 +325,8 @@ export async function POST(request: NextRequest) {
         quantity: qty,
         unitPrice: price,
         totalPrice: qty * price,
+        listPrice: inputListPrice,
+        discountPerUnit: inputDiscount,
         lineRole: "MAIN",
         parentItemIndex: null,
         optionSnapshot: null,
@@ -346,6 +368,13 @@ export async function POST(request: NextRequest) {
       ? Number(swapTarget.mappedProduct!.sellingPrice ?? 0)
       : price;
     const finalUnitPrice = mainBasePrice + unitAddPrice;
+    // listPrice — SWAP 일 땐 매핑된 SKU 의 카탈로그 listPrice. 그 외엔 input.listPrice(또는 unitPrice).
+    // 할인은 단순 라인(SWAP 없을 때)에만 인정 — SWAP 결과 단가는 옵션 가산까지 끝난 최종가라
+    // 추가 할인을 더하지 않음 (정책 단순화). 향후 정책 변경 시 여기 확장.
+    const mainListPrice = swapTarget
+      ? Number(swapTarget.mappedProduct!.listPrice ?? finalUnitPrice)
+      : inputListPrice + unitAddPrice;
+    const mainDiscount = swapTarget ? 0 : inputDiscount;
     const mainIdx = stagedItems.length;
     stagedItems.push({
       productId: mainProductId,
@@ -353,6 +382,8 @@ export async function POST(request: NextRequest) {
       quantity: qty,
       unitPrice: finalUnitPrice,
       totalPrice: qty * finalUnitPrice,
+      listPrice: mainListPrice,
+      discountPerUnit: mainDiscount,
       lineRole: "MAIN",
       parentItemIndex: null,
       optionSnapshot: Object.keys(snapshot).length > 0 ? snapshot : null,
@@ -377,6 +408,8 @@ export async function POST(request: NextRequest) {
         quantity: qty, // 메인 수량과 동일 (1 PC 사면 1 메모리)
         unitPrice: refUnit,
         totalPrice: qty * refUnit,
+        listPrice: refUnit, // OPTION_REF 자식은 할인 무관 — listPrice = unitPrice
+        discountPerUnit: 0,
         lineRole: "OPTION_REF",
         parentItemIndex: mainIdx,
         optionSnapshot: null,
@@ -462,6 +495,8 @@ export async function POST(request: NextRequest) {
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           totalPrice: it.totalPrice,
+          listPrice: it.listPrice ?? it.unitPrice,
+          discountAmount: it.discountPerUnit,
           lineRole: it.lineRole as never,
           parentItemId: parentId,
           optionSnapshot: it.optionSnapshot ?? undefined,

@@ -1,16 +1,36 @@
 "use client";
 
-import type { CartSession } from "@/components/pos/sessions-context";
 import {
   deriveTempCode,
   deriveTempColor,
 } from "@/components/pos/temp-customer";
 
+/**
+ * POS·ERP 공용 고객 카드 데이터.
+ * `id` 는 미등록 임시 코드/컬러 시드용 — POS 세션 ID 또는 ERP 의 draft slot ID 사용.
+ * `activeCount`/`updatedAt` 은 POS 다중 세션 흐름 한정 (ERP 는 생략 가능).
+ */
+export interface CustomerCardData {
+  /** 임시 코드 시드 — POS 세션 ID 또는 ERP draft 식별자 */
+  id: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerType?: "INDIVIDUAL" | "BUSINESS";
+  customerBusinessNumber?: string | null;
+  /** 진행중 카운트 — POS 만 의미. ERP 에선 undefined (영역 자체 hidden) */
+  activeCount?: { product: number; repair: number; rental: number };
+  /** 마지막 활동 ISO — POS 다중 세션 한정 표시 */
+  updatedAt?: string;
+}
+
 interface Props {
-  session: CartSession;
+  data: CustomerCardData;
   onClick?: () => void;
-  /** 추가 모드 — 우측 상단에 X 버튼 표시 */
+  /** 추가 모드 — 우측 상단에 X 버튼 표시 (POS 다중 세션 닫기용) */
   onClose?: () => void;
+  /** activeCount/updatedAt/카운트 영역 숨기기 — ERP 단일 흐름에서 사용 */
+  hideMeta?: boolean;
 }
 
 /** 마지막 활동 시각을 상대 표현으로 ("방금"/"5분 전"/"2시간 전"/"3일 전") */
@@ -26,25 +46,28 @@ function relativeTime(iso?: string): string | null {
   if (diffHr < 24) return `${diffHr}시간 전`;
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 30) return `${diffDay}일 전`;
-  return null; // 30일 넘으면 노이즈만 됨
+  return null;
 }
 
 /**
- * 고객 카드. 등록·미등록 모두 처리.
- * - 등록: 이름 + 전화 + 진행 카운트
- * - 미등록: #A2K + 컬러 아바타 + 진행 카운트
+ * 고객 카드. 등록·미등록 모두 처리. POS·ERP 양쪽에서 사용 (공용).
+ *  - 등록: 아바타(기업 빌딩 / 개인 첫글자) + 이름 + 사업자번호/전화
+ *  - 미등록: 컬러 코드 아바타 + #코드 + "미등록"
+ *  - hideMeta=false (기본): 진행 카운트 + 활동 시각 노출 (POS)
+ *  - hideMeta=true        : 카운트·시각 영역 숨김 (ERP 단일 흐름)
+ *
+ * 한쪽 디자인 수정 시 양쪽에 자동 적용.
  */
-export function CustomerCard({ session, onClick, onClose }: Props) {
-  const isRegistered = !!session.customerId;
-  const code = deriveTempCode(session.id);
-  const palette = deriveTempColor(session.id);
+export function CustomerSummaryCard({ data, onClick, onClose, hideMeta }: Props) {
+  const isRegistered = !!data.customerId;
+  const code = deriveTempCode(data.id);
+  const palette = deriveTempColor(data.id);
 
-  // 진행 카운트
-  const productCount = session.items.filter((i) => i.itemType === "product").length;
-  const repairCount = session.openRepairCount ?? 0;
-  const rentalCount = session.items.filter((i) => i.itemType === "rental").length;
+  const productCount = data.activeCount?.product ?? 0;
+  const repairCount = data.activeCount?.repair ?? 0;
+  const rentalCount = data.activeCount?.rental ?? 0;
   const totalActive = productCount + repairCount + rentalCount;
-  const activityLabel = relativeTime(session.updatedAt);
+  const activityLabel = relativeTime(data.updatedAt);
 
   return (
     <div className="relative">
@@ -54,9 +77,9 @@ export function CustomerCard({ session, onClick, onClose }: Props) {
         className="group flex w-full flex-col gap-3 rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4 text-left transition-all active:scale-[0.99] sm:hover:border-[var(--jm-border-strong)] sm:hover:shadow-sm"
       >
         <div className="flex items-start gap-3">
-          {/* 아바타 — 기업이면 빌딩 아이콘, 개인이면 이름 첫글자, 미등록이면 컬러 코드 */}
+          {/* 아바타 */}
           {isRegistered ? (
-            session.customerType === "BUSINESS" ? (
+            data.customerType === "BUSINESS" ? (
               <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                   <path
@@ -70,7 +93,7 @@ export function CustomerCard({ session, onClick, onClose }: Props) {
               </div>
             ) : (
               <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[18px] font-bold text-[var(--jm-text)]">
-                {(session.customerName ?? "?").charAt(0)}
+                {(data.customerName ?? "?").charAt(0)}
               </div>
             )
           ) : (
@@ -83,28 +106,26 @@ export function CustomerCard({ session, onClick, onClose }: Props) {
             </div>
           )}
 
-          {/* 이름·전화 또는 임시 라벨 */}
           <div className="flex min-w-0 flex-1 flex-col">
             {isRegistered ? (
               <>
                 <div className="flex items-center gap-1.5">
-                  {session.customerType === "BUSINESS" && (
+                  {data.customerType === "BUSINESS" && (
                     <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--jm-warning-fg)]">
                       기업
                     </span>
                   )}
                   <span className="line-clamp-1 text-[16px] font-semibold text-[var(--jm-text)]">
-                    {session.customerName}
+                    {data.customerName}
                   </span>
                 </div>
-                {session.customerType === "BUSINESS" &&
-                session.customerBusinessNumber ? (
+                {data.customerType === "BUSINESS" && data.customerBusinessNumber ? (
                   <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
-                    {session.customerBusinessNumber}
+                    {data.customerBusinessNumber}
                   </span>
-                ) : session.customerPhone ? (
+                ) : data.customerPhone ? (
                   <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
-                    {session.customerPhone}
+                    {data.customerPhone}
                   </span>
                 ) : null}
               </>
@@ -121,26 +142,31 @@ export function CustomerCard({ session, onClick, onClose }: Props) {
           </div>
         </div>
 
-        {/* 카운트 라벨 — 빈/채워진 상태 모두 동일 높이 유지(카드 크기 일정) */}
-        <div className="flex min-h-7 items-center justify-between gap-2">
-          {totalActive > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {productCount > 0 && <Pill label="상품" count={productCount} />}
-              {repairCount > 0 && <Pill label="수리" count={repairCount} highlight />}
-              {rentalCount > 0 && <Pill label="임대" count={rentalCount} />}
-            </div>
-          ) : (
-            <span className="text-[12px] text-[var(--jm-text-subtle)]">진행중 없음</span>
-          )}
-          {activityLabel && (
-            <span className="shrink-0 text-[11px] text-[var(--jm-text-subtle)] tabular-nums">
-              {activityLabel}
-            </span>
-          )}
-        </div>
+        {/* 카운트 + 활동 시각 — POS 다중 세션 한정. hideMeta=true 시 숨김 */}
+        {!hideMeta && (
+          <div className="flex min-h-7 items-center justify-between gap-2">
+            {totalActive > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {productCount > 0 && <Pill label="상품" count={productCount} />}
+                {repairCount > 0 && (
+                  <Pill label="수리" count={repairCount} highlight />
+                )}
+                {rentalCount > 0 && <Pill label="임대" count={rentalCount} />}
+              </div>
+            ) : (
+              <span className="text-[12px] text-[var(--jm-text-subtle)]">
+                진행중 없음
+              </span>
+            )}
+            {activityLabel && (
+              <span className="shrink-0 text-[11px] text-[var(--jm-text-subtle)] tabular-nums">
+                {activityLabel}
+              </span>
+            )}
+          </div>
+        )}
       </button>
 
-      {/* X 버튼 — 카드 내 클릭 위로 */}
       {onClose && (
         <button
           type="button"
@@ -177,7 +203,9 @@ function Pill({
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
-        highlight ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]" : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
+        highlight
+          ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
+          : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
       }`}
     >
       {label}

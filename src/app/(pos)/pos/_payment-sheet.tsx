@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { JmDatePicker } from "@/jm";
 import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
 import { formatComma, parseComma } from "@/lib/utils";
@@ -11,20 +12,16 @@ import { useSessions, type CartSession } from "@/components/pos/sessions-context
 import { calcCartTotals } from "@/components/pos/cart-helpers";
 import { submitCheckout } from "@/components/pos/checkout-submit";
 import {
+  PaymentMethodSelector,
+  type PaymentMethod,
+} from "@/components/pos/payment-method-selector";
+import {
   deriveTempCode,
   deriveTempColor,
 } from "@/components/pos/temp-customer";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { PriceInputDialog } from "./_components/price-input-dialog";
 import { issueStatement } from "./_issue-document";
-
-type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
-const METHODS: { value: PaymentMethod; label: string; sub?: string }[] = [
-  { value: "CARD", label: "카드", sub: "POS 결제" },
-  { value: "CASH", label: "현금" },
-  { value: "TRANSFER", label: "계좌이체" },
-  { value: "UNPAID", label: "외상", sub: "고객 미수금" },
-];
 
 type FulfillmentType =
   | "IN_STORE"
@@ -285,6 +282,12 @@ function Body({
   // 마진에서만 차감. 입력값은 net(세전) — PriceInputDialog 가 net 반환.
   const [shippingCostBorne, setShippingCostBorne] = useState("");
   const [shipCostDialogOpen, setShipCostDialogOpen] = useState(false);
+  // 발송 예정일 — 기본 주문일+1 (서버 자동값과 동일). DELIVERY/QUICK/SHIPPING 만 사용.
+  const [expectedShipDate, setExpectedShipDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return format(d, "yyyy-MM-dd");
+  });
   // 착불(COD) 로 전환 시 매장 부담 금액 자동 리셋 — 착불은 매장 회계 무관
   useEffect(() => {
     if (shippingPaymentType === "COD") setShippingCostBorne("");
@@ -386,6 +389,7 @@ function Body({
               recipientName: shippingRecipientName.trim() || session.customerName,
               recipientPhone: shippingRecipientPhone.trim(),
               address: shippingAddress.trim(),
+              expectedShipDate: expectedShipDate || null,
             }
           : undefined,
       });
@@ -715,6 +719,29 @@ function Body({
                   rows={2}
                   className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
                 />
+                {/* 발송 예정일 — 출고 워크보드 지연/오늘/이번주 분류 기준 */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                    발송 예정일
+                  </span>
+                  <JmDatePicker
+                    size="sm"
+                    value={(() => {
+                      if (!expectedShipDate) return undefined;
+                      const [y, m, d] = expectedShipDate.split("-").map(Number);
+                      return y && m && d ? new Date(y, m - 1, d) : undefined;
+                    })()}
+                    onChange={(d) =>
+                      setExpectedShipDate(d ? format(d, "yyyy-MM-dd") : "")
+                    }
+                    fromDate={(() => {
+                      const t = new Date();
+                      t.setHours(0, 0, 0, 0);
+                      return t;
+                    })()}
+                    placeholder="발송일 선택"
+                  />
+                </div>
                 {/* 배송비 결제 방식 — 선불 / 착불 / 매장 부담 */}
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
@@ -786,39 +813,12 @@ function Body({
           </div>
         )}
 
-        {/* 결제수단 */}
+        {/* 결제수단 — 공용 컴포넌트 (ERP 신규주문과 공유, 한쪽 수정 시 양쪽 적용) */}
         <div className="flex flex-col gap-1.5">
           <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             결제수단
           </span>
-          <div className="grid grid-cols-2 gap-2">
-            {METHODS.map((m) => {
-              const active = method === m.value;
-              return (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setMethod(m.value)}
-                  className={`flex flex-col gap-0.5 rounded-2xl border-2 p-4 text-left transition-colors ${
-                    active
-                      ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
-                      : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
-                  }`}
-                >
-                  <span
-                    className={`text-[16px] font-semibold ${
-                      active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
-                    }`}
-                  >
-                    {m.label}
-                  </span>
-                  {m.sub && (
-                    <span className="text-[11px] text-[var(--jm-text-muted)]">{m.sub}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <PaymentMethodSelector value={method} onChange={setMethod} />
         </div>
 
       </div>
