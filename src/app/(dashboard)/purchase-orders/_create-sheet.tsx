@@ -63,6 +63,7 @@ export function PurchaseOrderCreateSheet({
   form,
   setForm,
   editingId,
+  editingStatus,
   onSaved,
 }: {
   open: boolean;
@@ -70,8 +71,10 @@ export function PurchaseOrderCreateSheet({
   form: PurchaseOrderFormState;
   setForm: React.Dispatch<React.SetStateAction<PurchaseOrderFormState>>;
   editingId: string | null;
+  editingStatus?: string | null;
   onSaved: () => void;
 }) {
+  const isEditingSentOrLater = !!editingId && editingStatus && editingStatus !== "DRAFT";
   const queryClient = useQueryClient();
 
   const [quickSupplierOpen, setQuickSupplierOpen] = useState(false);
@@ -203,6 +206,17 @@ export function PurchaseOrderCreateSheet({
 
           <JmDrawerBody>
             <div className="space-y-5">
+              {isEditingSentOrLater && (
+                <div className="rounded-lg border border-[color-mix(in_oklch,var(--jm-warning-fg)_30%,transparent)] bg-[var(--jm-warning-bg)] p-3 text-jm-sm text-[var(--jm-warning-fg)]">
+                  <div className="font-semibold">이미 거래처에 발송된 발주서를 수정 중입니다</div>
+                  <div className="mt-0.5 text-jm-xs opacity-90">
+                    수정 사항은 거래처가 보고 있는 외부 발주서 화면에 즉시 반영됩니다.
+                    필요 시 거래처에 별도로 안내해주세요.
+                    {editingStatus === "COUNTER_OFFER" && " 단가 협상 중인 발주는 수정 시 제안된 단가가 무효화될 수 있습니다."}
+                  </div>
+                </div>
+              )}
+
               {/* 헤더 정보 */}
               <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                 <JmFormField label="거래처" required>

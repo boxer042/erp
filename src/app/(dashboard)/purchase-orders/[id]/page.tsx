@@ -216,7 +216,10 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
 
   const hasNonCancelledIncoming = data.incomings.some((i) => i.status !== "CANCELLED");
   const isTerminal = ["RECEIVED", "PARTIAL_COMPLETED", "CLOSED", "CANCELLED"].includes(data.status);
-  const canEdit = data.status === "DRAFT" && !hasNonCancelledIncoming;
+  // 입고 시작 전인 모든 비종결 status 에서 수정 허용. 거래처가 이미 보고 있을 수 있으니
+  // _create-sheet 에서 안내 배너로 알림. PARTIAL/PARTIAL_COMPLETED 는 incoming 가드로 자동 차단.
+  const EDITABLE_STATUSES = ["DRAFT", "SENT", "CONFIRMED", "COUNTER_OFFER", "PARTIAL_RESENT", "PARTIAL_REACCEPTED"];
+  const canEdit = EDITABLE_STATUSES.includes(data.status) && !hasNonCancelledIncoming;
   const canIncoming = ["CONFIRMED", "PARTIAL", "PARTIAL_REACCEPTED"].includes(data.status) && progress.remaining > 0;
   const canSend = data.status === "DRAFT";
   const canConfirm = data.status === "SENT";

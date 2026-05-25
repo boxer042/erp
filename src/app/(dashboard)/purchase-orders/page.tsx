@@ -73,6 +73,7 @@ function PurchaseOrdersPageInner() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [form, setForm] = useState<PurchaseOrderFormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingStatus, setEditingStatus] = useState<PurchaseOrderStatus | null>(null);
 
   // 딥링크 prefill — low-stock 발주 버튼에서 보내는 query
   const prefillSupplierId = searchParams.get("prefillSupplierId");
@@ -88,6 +89,7 @@ function PurchaseOrdersPageInner() {
     const qty = prefillQty ? String(parseFloat(prefillQty) || 1) : "1";
     const price = prefillUnitPrice ? String(Math.round(parseFloat(prefillUnitPrice))) : "";
     setEditingId(null);
+    setEditingStatus(null);
     setForm({
       supplierId: prefillSupplierId,
       supplierName: prefillSupplierName ?? "",
@@ -144,12 +146,15 @@ function PurchaseOrdersPageInner() {
           }>;
         }>(`/api/purchase-orders/${editId}`);
         if (cancelled) return;
-        if (po.status !== "DRAFT") {
-          toast.error("DRAFT 상태의 발주만 수정할 수 있습니다");
+        // 입고 시작 전인 비종결 status 모두 수정 허용. 차단은 API 가 동시에 검증.
+        const EDITABLE_STATUSES = ["DRAFT", "SENT", "CONFIRMED", "COUNTER_OFFER", "PARTIAL_RESENT", "PARTIAL_REACCEPTED"];
+        if (!EDITABLE_STATUSES.includes(po.status)) {
+          toast.error("이 상태의 발주는 수정할 수 없습니다");
           router.replace("/purchase-orders");
           return;
         }
         setEditingId(po.id);
+        setEditingStatus(po.status);
         setForm({
           supplierId: po.supplier.id,
           supplierName: po.supplier.name,
@@ -241,6 +246,7 @@ function PurchaseOrdersPageInner() {
                 size="sm"
                 onClick={() => {
                   setEditingId(null);
+                  setEditingStatus(null);
                   setForm(emptyForm());
                   setSheetOpen(true);
                 }}
@@ -322,7 +328,10 @@ function PurchaseOrdersPageInner() {
         open={sheetOpen}
         onOpenChange={(v) => {
           setSheetOpen(v);
-          if (!v) setEditingId(null);
+          if (!v) {
+            setEditingId(null);
+            setEditingStatus(null);
+          }
         }}
         form={form}
         setForm={setForm}
@@ -334,8 +343,10 @@ function PurchaseOrdersPageInner() {
           }
           setSheetOpen(false);
           setEditingId(null);
+          setEditingStatus(null);
           setForm(emptyForm());
         }}
+        editingStatus={editingStatus}
       />
     </div>
   );
