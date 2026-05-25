@@ -68,6 +68,15 @@ export const orderSchema = z.object({
   fulfillmentType: fulfillmentTypeSchema.default("IN_STORE"),
   expectedShipDate: z.string().optional(),  // YYYY-MM-DD
   paymentMethod: orderPaymentMethodSchema.optional(),
+  /**
+   * 즉시 결제된 금액(VAT 포함) — 부분 결제 케이스용.
+   * 미지정 또는 totalAmount 와 같으면 전액 결제(PAID).
+   * 0 보다 크고 totalAmount 보다 작으면 PARTIAL_PAID + 잔액은 customerLedger SALE.
+   * UNPAID 결제 또는 미입력 결제일 땐 무시됨.
+   */
+  paidAmount: z.string().optional(),
+  /** 부분 결제 구분 — paidAmount<totalAmount 일 때 의미. DEPOSIT(계약금) / PARTIAL(부분결제) */
+  partialPaymentKind: z.enum(["DEPOSIT", "PARTIAL"]).optional(),
   /** 세금계산서 발행 요청 — true 면 발행 대기 목록에 노출 (사장이 추후 발행) */
   taxInvoiceRequested: z.boolean().optional(),
   discountAmount: z.string().default("0"),

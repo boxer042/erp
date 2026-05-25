@@ -21,6 +21,10 @@ export interface ShippingInfo {
 export interface CheckoutPayloadOptions {
   action: CheckoutAction;
   paymentMethod?: "CASH" | "CASH_RECEIPT" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
+  /** 즉시 결제 금액 — null/totalAmount 와 같으면 전액 결제. 그 외 PARTIAL_PAID + 잔금 ledger SALE */
+  paidAmount?: number | null;
+  /** 부분 결제 구분 — DEPOSIT(계약금) / PARTIAL(부분결제) */
+  partialPaymentKind?: "DEPOSIT" | "PARTIAL" | null;
   taxInvoiceRequested?: boolean;
   memo?: string | null;
   /** 출고 방식 — 미지정/IN_STORE 시 즉시 종결, PICKUP/DELIVERY/SHIPPING 은 ERP 워크보드 진입 */
@@ -93,6 +97,10 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
     customerName: session.customerName ?? null,
     customerPhone: session.customerPhone ?? null,
     paymentMethod: opts.action === "order" ? opts.paymentMethod ?? null : null,
+    // 부분 결제 — order action 일 때만 의미. 견적서/명세서엔 무관.
+    paidAmount: opts.action === "order" ? opts.paidAmount ?? null : null,
+    partialPaymentKind:
+      opts.action === "order" ? opts.partialPaymentKind ?? null : null,
     taxInvoiceRequested: opts.action === "order" ? !!opts.taxInvoiceRequested : false,
     memo: opts.memo ?? null,
     items: session.items.map((i) => {

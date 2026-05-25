@@ -30,6 +30,7 @@ const PAYMENT_LABEL: Record<string, string> = {
 const PAYMENT_STATUS_LABEL: Record<OrderPaymentStatus, string> = {
   UNPAID: "외상",
   PAID: "결제완료",
+  PARTIAL_PAID: "부분결제",
   REFUND_PENDING: "환불진행",
   PARTIAL_REFUND: "부분환불",
   REFUNDED: "환불완료",

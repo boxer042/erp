@@ -17,6 +17,7 @@ export type OrderStatus =
 export type OrderPaymentStatus =
   | "UNPAID"
   | "PAID"
+  | "PARTIAL_PAID" // 부분 결제 — 일부 즉시 결제 + 잔액 미수 (계약금/일부결제)
   | "REFUND_PENDING"
   | "PARTIAL_REFUND"
   | "REFUNDED"
@@ -356,6 +357,7 @@ export function statusLabel(
 export const PAYMENT_STATUS_LABELS: Record<OrderPaymentStatus, string> = {
   UNPAID: "외상",
   PAID: "결제완료",
+  PARTIAL_PAID: "부분결제",
   REFUND_PENDING: "환불진행",
   PARTIAL_REFUND: "부분환불",
   REFUNDED: "환불완료",

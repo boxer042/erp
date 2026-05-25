@@ -16,6 +16,10 @@ import {
   type PaymentMethod,
 } from "@/components/pos/payment-method-selector";
 import {
+  PartialPaymentTile,
+  type PartialPayment,
+} from "@/components/pos/partial-payment-tile";
+import {
   deriveTempCode,
   deriveTempColor,
 } from "@/components/pos/temp-customer";
@@ -261,6 +265,11 @@ function Body({
 }: Omit<Props, "open">) {
   const { setSessionLabels } = useSessions();
   const [method, setMethod] = useState<PaymentMethod>("CARD");
+  // 부분 결제 — 즉시 결제 금액 + 종류 (DEPOSIT/PARTIAL). null/totalAmount 와 같으면 전액 결제.
+  const [partial, setPartial] = useState<PartialPayment>({
+    paidAmount: null,
+    kind: null,
+  });
   // 고객 등록 우회 — "이 고객은 등록 없이 진행" 클릭 시 true. 통계 데이터 안 쌓이는 단점 있음.
   const [skipCustomerLink, setSkipCustomerLink] = useState(false);
   // 미등록 고객 결제 가로채기 — 결제 직전 회원등록 유도 다이얼로그
@@ -378,6 +387,9 @@ function Body({
       const result = await submitCheckout(sessionForCheckout, {
         action: "order",
         paymentMethod: method,
+        // 부분 결제 — paidAmount<totalAmount 면 PARTIAL_PAID + 잔금 ledger SALE (서버 분기)
+        paidAmount: partial.paidAmount,
+        partialPaymentKind: partial.kind,
         taxInvoiceRequested,
         fulfillmentType: effectiveFulfillment,
         shippingPaymentType: needsShippingInfo ? shippingPaymentType : undefined,
@@ -820,6 +832,14 @@ function Body({
           </span>
           <PaymentMethodSelector value={method} onChange={setMethod} />
         </div>
+
+        {/* 부분 결제 — UNPAID 결제일 땐 의미 없으므로 비활성. 계약금/일부결제 분기 포함 */}
+        <PartialPaymentTile
+          totalAmount={totals.total}
+          value={partial}
+          disabled={method === "UNPAID"}
+          onChange={setPartial}
+        />
 
       </div>
 

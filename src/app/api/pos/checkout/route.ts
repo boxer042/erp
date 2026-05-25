@@ -69,6 +69,14 @@ interface CheckoutBody {
   customerName?: string | null;
   customerPhone?: string | null;
   paymentMethod?: "CASH" | "CASH_RECEIPT" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
+  /**
+   * 부분 결제 — 즉시 결제 금액 (VAT 포함, 정수). null 또는 totalAmount 와 같으면 전액 결제.
+   * 0 < paidAmount < totalAmount 면 PARTIAL_PAID + 잔금 customerLedger SALE.
+   * UNPAID 결제 또는 미지정 결제일 땐 무시됨.
+   */
+  paidAmount?: number | null;
+  /** 부분 결제 구분 — DEPOSIT(계약금) / PARTIAL(부분결제). 영수증 라벨 분기용 */
+  partialPaymentKind?: "DEPOSIT" | "PARTIAL" | null;
   taxInvoiceRequested?: boolean;
   memo?: string | null;
   items: CheckoutItem[];
@@ -303,6 +311,28 @@ export async function POST(request: NextRequest) {
   const taxAmount = Math.round(taxableSubtotal * 0.1);
   const totalAmount = subtotal + taxAmount;
 
+  // 부분 결제 (PARTIAL_PAID) 판정 — paidAmount 입력 + 0 < paidAmount < totalAmount
+  //   UNPAID 결제는 전액 외상이라 paidAmount 무시
+  const isUnpaid = !body.paymentMethod || body.paymentMethod === "UNPAID";
+  const paidAmountInput =
+    typeof body.paidAmount === "number" && body.paidAmount > 0
+      ? Math.max(0, Math.round(body.paidAmount))
+      : null;
+  const isPartialPaid =
+    !isUnpaid &&
+    paidAmountInput !== null &&
+    paidAmountInput > 0 &&
+    paidAmountInput < totalAmount;
+  // 외상 잔금 = UNPAID(전액) 또는 PARTIAL_PAID(부분) — customerLedger SALE 등록 대상
+  const outstandingAmount = isUnpaid
+    ? totalAmount
+    : isPartialPaid
+      ? totalAmount - paidAmountInput!
+      : 0;
+  const partialPaymentKind: "DEPOSIT" | "PARTIAL" | null = isPartialPaid
+    ? body.partialPaymentKind ?? "PARTIAL"
+    : null;
+
   if (body.action === "quotation") {
     const q = await prisma.quotation.create({
       data: {
@@ -488,11 +518,15 @@ export async function POST(request: NextRequest) {
           totalAmount,
           commissionAmount: 0,
           paymentMethod: body.paymentMethod ?? null,
-          // 결제 축 — UNPAID(외상) 또는 미입력은 미수, 그 외는 결제 완료
-          paymentStatus:
-            !body.paymentMethod || body.paymentMethod === "UNPAID"
-              ? "UNPAID"
+          // 결제 축 — UNPAID(외상) / PARTIAL_PAID(일부결제+잔금미수) / PAID(전액)
+          paymentStatus: isUnpaid
+            ? "UNPAID"
+            : isPartialPaid
+              ? "PARTIAL_PAID"
               : "PAID",
+          // 부분 결제 메타 — 전액 결제 시 null (영수증 라벨 분기 안 함)
+          paidAmount: isPartialPaid ? paidAmountInput : null,
+          partialPaymentKind,
           taxInvoiceRequested: !!body.taxInvoiceRequested,
           memo: body.memo || null,
           repairTicketId: body.repairTicketId || null,
@@ -858,9 +892,16 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // CustomerLedger — 외상(UNPAID)이면 매출(debit) 기록
+      // CustomerLedger — 외상 발생 시 매출(debit) 기록
+      //   UNPAID: 전액 미수 → debit = totalAmount
+      //   PARTIAL_PAID: 잔금만 미수 → debit = outstandingAmount
       // date 는 order.orderDate 로 명시 — RECEIPT(자정) 와 정렬 일관성 보장
-      if (body.customerId && body.paymentMethod === "UNPAID") {
+      if (body.customerId && outstandingAmount > 0) {
+        const ledgerDesc = isPartialPaid
+          ? partialPaymentKind === "DEPOSIT"
+            ? `POS 주문 ${order.orderNo} 잔금 (계약금 외)`
+            : `POS 주문 ${order.orderNo} 잔금`
+          : `POS 주문 ${order.orderNo}`;
         const last = await tx.customerLedger.findFirst({
           where: { customerId: body.customerId },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -871,10 +912,10 @@ export async function POST(request: NextRequest) {
             customerId: body.customerId,
             date: order.orderDate,
             type: "SALE",
-            description: `POS 주문 ${order.orderNo}`,
-            debitAmount: totalAmount,
+            description: ledgerDesc,
+            debitAmount: outstandingAmount,
             creditAmount: 0,
-            balance: prevBalance + totalAmount,
+            balance: prevBalance + outstandingAmount,
             referenceId: order.id,
             referenceType: "ORDER",
           },

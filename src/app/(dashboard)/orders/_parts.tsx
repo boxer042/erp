@@ -389,6 +389,8 @@ export function ShippingPaymentBadge({
 const PAYMENT_DOT: Record<OrderPaymentStatus, string> = {
   UNPAID: "bg-[var(--jm-danger-fg)]",
   PAID: "bg-[var(--jm-success-fg)]",
+  // 부분결제 — 일부만 결제됐고 잔금 미수 (UNPAID 와 PAID 사이) → 경고 색
+  PARTIAL_PAID: "bg-[var(--jm-warning-fg)]",
   REFUND_PENDING: "bg-[var(--jm-warning-fg)]",
   PARTIAL_REFUND: "bg-[var(--jm-text-subtle)]",
   REFUNDED: "bg-[var(--jm-text-subtle)]",

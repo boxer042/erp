@@ -450,9 +450,36 @@ export async function POST(request: NextRequest) {
   //   - DELIVERY/QUICK/SHIPPING 도 PENDING — 출고대기 단계 거쳐야 함
   const isInStore = data.fulfillmentType === "IN_STORE";
   const initialStatus: "PENDING" | "COMPLETED" = isInStore ? "COMPLETED" : "PENDING";
-  // paymentStatus 산출 — paymentMethod=UNPAID 또는 미입력은 외상, 그 외는 결제 완료.
-  const paymentStatus =
-    !data.paymentMethod || data.paymentMethod === "UNPAID" ? "UNPAID" : "PAID";
+  // paymentStatus 산출
+  //   - paymentMethod=UNPAID 또는 미입력 → UNPAID (전액 외상)
+  //   - paidAmount > 0 + < totalAmount → PARTIAL_PAID (일부 결제, 잔금 ledger SALE 등록)
+  //   - 그 외 → PAID (전액 결제)
+  // 부분 결제 메타: paidAmount + partialPaymentKind (DEPOSIT/PARTIAL) 함께 저장
+  const isUnpaid = !data.paymentMethod || data.paymentMethod === "UNPAID";
+  const paidAmountInput = data.paidAmount
+    ? Math.max(0, parseFloat(data.paidAmount) || 0)
+    : null;
+  // PARTIAL_PAID 적용 가능 케이스: 결제수단 지정됨 + paidAmount 명시 + 0 < paidAmount < totalAmount
+  const isPartialPaid =
+    !isUnpaid &&
+    paidAmountInput !== null &&
+    paidAmountInput > 0 &&
+    paidAmountInput < totalAmount;
+  // 부분 결제 시 잔금 = totalAmount - paidAmount, 외상 등록 대상
+  const outstandingAmount = isPartialPaid
+    ? totalAmount - paidAmountInput!
+    : isUnpaid
+      ? totalAmount
+      : 0;
+  const paymentStatus: "UNPAID" | "PAID" | "PARTIAL_PAID" = isUnpaid
+    ? "UNPAID"
+    : isPartialPaid
+      ? "PARTIAL_PAID"
+      : "PAID";
+  // PARTIAL_PAID 일 때만 partialPaymentKind 의미 있음. 미지정 시 PARTIAL 폴백.
+  const partialPaymentKind: "DEPOSIT" | "PARTIAL" | null = isPartialPaid
+    ? data.partialPaymentKind ?? "PARTIAL"
+    : null;
 
   // IN_STORE 즉시 종결 흐름: helper 가 라인 스냅샷 + FIFO 소진 처리.
   // 옵션 일괄 사전 조회는 트랜잭션 외부에서 (channel commission/카드수수료/판매비 read-only).
@@ -491,6 +518,9 @@ export async function POST(request: NextRequest) {
               : new Date(data.expectedShipDate),
           paymentMethod: data.paymentMethod ?? null,
           paymentStatus,
+          // 부분 결제 메타 — 전액 결제 시 null (영수증 출력에서 라벨 분기 안 함)
+          paidAmount: isPartialPaid ? paidAmountInput : null,
+          partialPaymentKind,
           taxInvoiceRequested: data.taxInvoiceRequested ?? false,
           subtotalAmount,
           discountAmount,
@@ -584,10 +614,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "주문 생성 실패" }, { status: 500 });
   }
 
-  // UNPAID 면 customerLedger SALE 기록 (POS checkout 과 동일 정책)
+  // 외상 발생 시 customerLedger SALE 기록 — UNPAID(전액) 또는 PARTIAL_PAID(잔금만)
+  //   - UNPAID: outstandingAmount = totalAmount
+  //   - PARTIAL_PAID: outstandingAmount = totalAmount - paidAmount
   // date 는 order.orderDate 로 명시 — 기본값(now()) 쓰면 paymentDate(자정) 보다 늦어져
   // rebalance 시 RECEIPT 가 먼저 처리되어 잔액이 음수로 계산되는 버그 발생.
-  if (data.paymentMethod === "UNPAID" && data.customerId) {
+  if (outstandingAmount > 0 && data.customerId) {
+    const ledgerDesc =
+      paymentStatus === "PARTIAL_PAID"
+        ? partialPaymentKind === "DEPOSIT"
+          ? `주문 ${order.orderNo} 잔금 (계약금 외)`
+          : `주문 ${order.orderNo} 잔금`
+        : `주문 ${order.orderNo}`;
     await prisma.$transaction(async (tx) => {
       const last = await tx.customerLedger.findFirst({
         where: { customerId: data.customerId! },
@@ -599,10 +637,10 @@ export async function POST(request: NextRequest) {
           customerId: data.customerId!,
           date: order.orderDate,
           type: "SALE",
-          description: `주문 ${order.orderNo}`,
-          debitAmount: totalAmount,
+          description: ledgerDesc,
+          debitAmount: outstandingAmount,
           creditAmount: 0,
-          balance: prevBalance + totalAmount,
+          balance: prevBalance + outstandingAmount,
           referenceId: order.id,
           referenceType: "ORDER",
         },

@@ -41,6 +41,10 @@ import {
   PaymentMethodSelector,
   type PaymentMethod,
 } from "@/components/pos/payment-method-selector";
+import {
+  PartialPaymentTile,
+  type PartialPayment,
+} from "@/components/pos/partial-payment-tile";
 import type {
   CartItem,
   CartSession,
@@ -122,6 +126,11 @@ export default function NewOrderPage() {
   // 결제
   // 결제수단 — POS 와 동일 4종 (CARD/CASH/TRANSFER/UNPAID). 기본 CARD.
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
+  // 부분 결제 — 즉시 결제 금액 + 종류. null/total 과 같으면 전액 결제.
+  const [partial, setPartial] = useState<PartialPayment>({
+    paidAmount: null,
+    kind: null,
+  });
   const [taxInvoiceRequested, setTaxInvoiceRequested] = useState(false);
   const [shippingPaymentType, setShippingPaymentType] = useState<
     "PREPAID" | "COD" | "STORE_BURDEN"
@@ -370,6 +379,16 @@ export default function NewOrderPage() {
       if (paymentMethod === "UNPAID" && !customerId) {
         throw new Error("외상 결제는 등록 고객 선택이 필요합니다");
       }
+      // 부분 결제(잔금 미수) — customerLedger SALE 등록 필요해 등록 고객 필수
+      const isPartialPaidUI =
+        partial.paidAmount !== null &&
+        partial.paidAmount > 0 &&
+        partial.paidAmount < totals.total;
+      if (isPartialPaidUI && !customerId) {
+        throw new Error(
+          "부분 결제(잔금 미수)는 등록 고객 선택이 필요합니다",
+        );
+      }
 
       // /api/orders 페이로드 — 기존 _create-sheet 와 동일 contract
       return apiMutate<{ id: string; orderNo: string }>(
@@ -388,6 +407,10 @@ export default function NewOrderPage() {
           fulfillmentType,
           expectedShipDate: isDelivery ? expectedShipDate || undefined : undefined,
           paymentMethod: paymentMethod || undefined,
+          // 부분 결제 — paidAmount<totalAmount 면 PARTIAL_PAID + 잔금 ledger SALE (서버 분기)
+          paidAmount:
+            partial.paidAmount !== null ? String(partial.paidAmount) : undefined,
+          partialPaymentKind: partial.kind ?? undefined,
           taxInvoiceRequested,
           // sessionDiscount 는 "1000" 또는 "10%" — calcCartTotals 가 net 으로 환산
           discountAmount: String(totals.sessionDiscountAmount),
@@ -863,6 +886,21 @@ export default function NewOrderPage() {
                     외상은 등록 고객 선택이 필요합니다
                   </div>
                 )}
+                {/* 부분 결제 — 계약금/일부결제 분기 (잔금 미수 자동 customerLedger) */}
+                <PartialPaymentTile
+                  totalAmount={totals.total}
+                  value={partial}
+                  disabled={paymentMethod === "UNPAID"}
+                  onChange={setPartial}
+                />
+                {partial.paidAmount !== null &&
+                  partial.paidAmount > 0 &&
+                  partial.paidAmount < totals.total &&
+                  !customerId && (
+                    <div className="rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-[11px] text-[var(--jm-warning-fg)]">
+                      부분 결제(잔금 미수)는 등록 고객 선택이 필요합니다
+                    </div>
+                  )}
               </div>
 
 
