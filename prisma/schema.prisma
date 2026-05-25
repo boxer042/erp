@@ -1173,6 +1173,9 @@ model PurchaseOrder {
   promisedDate   DateTime?         @map("promised_date")
   // 송장번호 / 직접배달 시간대 / 외부 운송사명 등 자유 메모.
   shippingMemo   String?           @map("shipping_memo")
+  // 가격 미정 라인이 있을 때 거래처가 [수락] 모달에서 단가를 직접 입력 — 이때 우리쪽 확인 필요 여부.
+  // false (기본): 거래처 입력 즉시 CONFIRMED. true: 거래처 입력 → COUNTER_OFFER → 우리 검토 후 수락.
+  requirePriceReview Boolean       @default(false) @map("require_price_review")
   // 발주가 매입견적서를 기반으로 작성된 경우
   quotationId  String?             @map("quotation_id")
   quotation    Quotation?          @relation(fields: [quotationId], references: [id])
@@ -1308,10 +1311,21 @@ enum OrderStatus {
 enum OrderPaymentStatus {
   UNPAID
   PAID
+  PARTIAL_PAID    // 부분 결제 — 일부 즉시 결제 + 잔액 미수금 (계약금/일부결제 케이스)
   REFUND_PENDING
   PARTIAL_REFUND
   REFUNDED
   SALES_CANCELLED
+}
+
+/**
+ * 부분 결제 구분 — paymentStatus=PARTIAL_PAID 일 때만 의미.
+ *  - DEPOSIT: 계약금 (영수증·증명서에 "계약금" 라벨로 출력)
+ *  - PARTIAL: 일반 일부 결제 ("부분결제 영수증" 으로 출력)
+ */
+enum PartialPaymentKind {
+  DEPOSIT
+  PARTIAL
 }
 
 /**
@@ -1425,6 +1439,17 @@ model Order {
    * 결제 축 — 출고 상태와 별개. 외상/환불 표현용
    */
   paymentStatus       OrderPaymentStatus  @default(UNPAID) @map("payment_status")
+  /**
+   * 즉시 결제된 금액 — 부분 결제(PARTIAL_PAID) 케이스에 사용.
+   * null/totalAmount 와 같으면 전액 결제(PAID), 0 이면 외상(UNPAID), 그 외는 PARTIAL_PAID.
+   * 잔금 = totalAmount - paidAmount → customerLedger SALE 로 등록.
+   */
+  paidAmount          Decimal?            @map("paid_amount") @db.Decimal(15, 2)
+  /**
+   * 부분 결제 구분 — paymentStatus=PARTIAL_PAID 일 때만 의미.
+   * 영수증·증명서 출력 시 "계약금"/"부분결제" 라벨 분기에 사용.
+   */
+  partialPaymentKind  PartialPaymentKind? @map("partial_payment_kind")
   /**
    * 반품 흐름 timestamp — 운영 로그 + 단계 추적
    */

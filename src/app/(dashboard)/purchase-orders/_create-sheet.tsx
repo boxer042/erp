@@ -104,6 +104,7 @@ export function PurchaseOrderCreateSheet({
       expectedDate?: string;
       memo?: string;
       shippingMethod?: ShippingMethodOption | null;
+      requirePriceReview?: boolean;
       items: Array<{
         supplierProductId?: string | null;
         name?: string | null;
@@ -179,6 +180,7 @@ export function PurchaseOrderCreateSheet({
       expectedDate: form.expectedDate || undefined,
       memo: form.memo || undefined,
       shippingMethod: form.shippingMethod || null,
+      requirePriceReview: form.requirePriceReview,
       items: validItems.map((it) => ({
         supplierProductId: it.rowType === "free" ? null : it.supplierProductId,
         name: it.rowType === "free" ? it.name.trim() : null,
@@ -265,6 +267,26 @@ export function PurchaseOrderCreateSheet({
                   />
                 </JmFormField>
               </div>
+
+              {/* 가격 미정 라인 처리 정책 — 라인 존재 여부와 무관하게 항상 노출 */}
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3 text-jm-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4"
+                  checked={form.requirePriceReview}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, requirePriceReview: e.target.checked }))
+                  }
+                />
+                <span>
+                  <span className="font-medium text-[var(--jm-text)]">
+                    가격 미정 라인의 단가는 거래처 제안 후 우리쪽 확인 필요
+                  </span>
+                  <span className="ml-1 text-jm-xs text-[var(--jm-text-muted)]">
+                    (OFF: 거래처 입력 즉시 수락 · ON: 거래처 입력 → 매장에서 검토 후 수락)
+                  </span>
+                </span>
+              </label>
 
               {/* 항목 */}
               <div className="space-y-2">

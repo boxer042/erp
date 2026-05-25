@@ -114,6 +114,8 @@ export async function GET(
     shippingMethod: po.shippingMethod ?? null,
     promisedDate: po.promisedDate?.toISOString() ?? null,
     shippingMemo: po.shippingMemo ?? null,
+    // 가격 미정 단가를 거래처가 입력했을 때 우리쪽 확인이 필요한지 (UI 라벨에서 사용)
+    requirePriceReview: po.requirePriceReview,
     totalAmount: po.totalAmount.toString(),
     // 발주자 (우리)
     issuer: company

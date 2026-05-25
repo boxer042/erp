@@ -37,7 +37,7 @@ export async function POST(
 
   const po = await prisma.purchaseOrder.findUnique({
     where: { id },
-    include: { items: true },
+    include: { items: true, accessTokens: { select: { id: true, status: true } } },
   });
   if (!po) {
     return NextResponse.json({ error: "발주서를 찾을 수 없습니다" }, { status: 404 });
@@ -97,11 +97,29 @@ export async function POST(
       }
       await Promise.all(updates);
 
-      // status → SENT (거래처가 [수락] 모달에서 출고 방법/납기일 입력하도록 회귀).
+      // status 결정:
+      //  - 출고 정보(방법·납기일)가 이미 채워져 있으면 → 거래처 재확인 불필요, 즉시 CONFIRMED + 토큰 ACCEPTED
+      //  - 없으면 → SENT 로 회귀해 거래처가 [수락] 모달에서 출고 정보 입력하도록
+      const shippingAlreadySet = !!po.shippingMethod && !!po.promisedDate;
+      const nextStatus = shippingAlreadySet ? "CONFIRMED" : "SENT";
+
       await tx.purchaseOrder.update({
         where: { id },
-        data: { status: "SENT", totalAmount: newTotal },
+        data: { status: nextStatus, totalAmount: newTotal },
       });
+
+      // 출고 정보 완비 시 활성 토큰을 ACCEPTED 로 종결 (재진입 불필요)
+      if (shippingAlreadySet) {
+        const activeToken = po.accessTokens.find(
+          (t) => t.status === "ACTIVE" || t.status === "VIEWED",
+        );
+        if (activeToken) {
+          await tx.purchaseOrderAccessToken.update({
+            where: { id: activeToken.id },
+            data: { status: "ACCEPTED", acceptedAt: new Date() },
+          });
+        }
+      }
 
       await recordAudit(tx, {
         userId: user.id,
@@ -110,10 +128,11 @@ export async function POST(
         action: "STATUS_CHANGE",
         meta: {
           from: "COUNTER_OFFER",
-          to: "SENT",
+          to: nextStatus,
           action: "ACCEPT_PROPOSAL",
           poNo: po.poNo,
           newTotalAmount: newTotal,
+          shippingAlreadySet,
           changes: auditChanges,
         },
       });

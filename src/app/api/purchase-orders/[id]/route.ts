@@ -155,6 +155,7 @@ export async function PUT(
         totalAmount,
         memo: data.memo || null,
         shippingMethod: data.shippingMethod ?? null,
+        requirePriceReview: data.requirePriceReview ?? false,
         quotationId: data.quotationId || null,
         items: {
           create: items.map((i) => ({

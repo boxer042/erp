@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
         totalAmount,
         memo: data.memo || null,
         shippingMethod: data.shippingMethod ?? null,
+        requirePriceReview: data.requirePriceReview ?? false,
         quotationId: data.quotationId || null,
         createdById: user.id,
         items: {

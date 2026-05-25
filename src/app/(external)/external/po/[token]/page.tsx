@@ -70,6 +70,7 @@ interface PoDetail {
   shippingMethod: ShippingMethodValue | null;
   promisedDate: string | null;
   shippingMemo: string | null;
+  requirePriceReview: boolean;
   totalAmount: string;
   issuer: {
     name: string;
@@ -98,11 +99,12 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
   // 단가 협상 모드 — itemId → 입력 중인 새 단가 (string)
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
   const [priceMode, setPriceMode] = useState(false);
-  // [수락] 모달 상태 — 출고 방법/납기일/메모 입력
+  // [수락] 모달 상태 — 출고 방법/납기일/메모 + 가격 미정 라인 단가 입력
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [acceptShipping, setAcceptShipping] = useState<ShippingMethodValue | null>(null);
   const [acceptDate, setAcceptDate] = useState<Date | undefined>(undefined);
   const [acceptMemo, setAcceptMemo] = useState("");
+  const [acceptPrices, setAcceptPrices] = useState<Record<string, string>>({});
 
   const detailQuery = useQuery<PoDetail>({
     queryKey: ["public-po", token],
@@ -115,11 +117,24 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
       shippingMethod: ShippingMethodValue;
       promisedDate: string;
       shippingMemo?: string | null;
-    }) => apiMutate(`/api/public/po/${token}/accept`, "POST", payload),
-    onSuccess: () => {
-      toast.success("발주를 수락했습니다");
-      setResultMessage({ type: "success", text: "발주를 수락했습니다. 감사합니다." });
+      priceProposals?: Array<{ itemId: string; unitPrice: number }>;
+    }) => apiMutate<{ ok: boolean; poStatus: string; requireReview: boolean }>(
+      `/api/public/po/${token}/accept`,
+      "POST",
+      payload,
+    ),
+    onSuccess: (res) => {
       setAcceptOpen(false);
+      if (res?.requireReview) {
+        toast.success("입력하신 단가가 발주처에 전달되었습니다");
+        setResultMessage({
+          type: "info",
+          text: "입력하신 단가가 발주처에 전달되었습니다. 확인 후 최종 수락 결과를 알려드립니다.",
+        });
+      } else {
+        toast.success("발주를 수락했습니다");
+        setResultMessage({ type: "success", text: "발주를 수락했습니다. 감사합니다." });
+      }
       detailQuery.refetch();
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "처리 실패"),
@@ -560,16 +575,16 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
         </JmCard>
       )}
 
-      {/* 가격 미정 안내 — 수락 차단 사유 명시 */}
+      {/* 가격 미정 안내 — 수락 모달에서 단가 입력 안내 */}
       {!isProcessed && !isCounterOffer && hasUndetermined && !priceMode && !showRejectForm && (
         <JmCard className="border-[color-mix(in_oklch,var(--jm-warning-fg)_30%,transparent)] bg-[var(--jm-warning-bg)] p-4">
           <div className="flex items-start gap-2 text-jm-sm text-[var(--jm-warning-fg)]">
             <AlertCircle className="mt-0.5 size-5 shrink-0" />
             <div>
-              <div className="font-semibold">가격 미정 라인이 있어 수락할 수 없습니다</div>
+              <div className="font-semibold">가격 미정 라인이 있습니다</div>
               <div className="mt-0.5 opacity-90">
-                [단가 변경 요청] 으로 정확한 단가를 제안해주세요. 발주처가 단가를 수락하면 다시
-                보내드릴 발주서에서 [수락] 으로 진행하실 수 있습니다.
+                [수락] 버튼을 누르시면 단가도 같이 입력하실 수 있습니다.
+                {data.requirePriceReview && " 입력하신 단가는 발주처 확인 후 최종 수락됩니다."}
               </div>
             </div>
           </div>
@@ -638,21 +653,25 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
               </div>
             ) : (
               <div className="flex gap-1.5 sm:gap-2">
-                {!hasUndetermined && (
-                  <JmButton
-                    size="md"
-                    className="flex-1 min-w-0 px-2 sm:px-5"
-                    onClick={() => {
-                      setAcceptShipping(isPickupPreset ? "PICKUP" : null);
-                      setAcceptDate(undefined);
-                      setAcceptMemo("");
-                      setAcceptOpen(true);
-                    }}
-                    disabled={acceptMutation.isPending}
-                  >
-                    수락
-                  </JmButton>
-                )}
+                <JmButton
+                  size="md"
+                  className="flex-1 min-w-0 px-2 sm:px-5"
+                  onClick={() => {
+                    setAcceptShipping(isPickupPreset ? "PICKUP" : null);
+                    setAcceptDate(undefined);
+                    setAcceptMemo("");
+                    // 가격 미정 라인이 있으면 빈 단가 prefill
+                    const init: Record<string, string> = {};
+                    for (const it of data.items) {
+                      if (it.priceUndetermined) init[it.id] = "";
+                    }
+                    setAcceptPrices(init);
+                    setAcceptOpen(true);
+                  }}
+                  disabled={acceptMutation.isPending}
+                >
+                  수락
+                </JmButton>
                 <JmButton
                   size="md"
                   variant="outline"
@@ -684,6 +703,52 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
             <JmDialogTitle>발주 수락</JmDialogTitle>
           </JmDialogHeader>
           <JmDialogBody className="space-y-4">
+            {/* 가격 미정 라인이 있으면 단가 입력 섹션 — 모달 상단에 노출 */}
+            {hasUndetermined && (
+              <div className="rounded-lg border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] p-3">
+                <div className="mb-2 text-jm-sm font-semibold text-[var(--jm-warning-fg)]">
+                  가격 미정 라인 단가 입력
+                </div>
+                <div className="mb-3 text-jm-xs text-[var(--jm-warning-fg)] opacity-90">
+                  {data.requirePriceReview
+                    ? "입력하신 단가는 발주처 확인 후 최종 수락됩니다."
+                    : "입력하신 단가가 즉시 적용되어 수락됩니다."}
+                </div>
+                <div className="space-y-2.5">
+                  {data.items
+                    .filter((it) => it.priceUndetermined)
+                    .map((it) => (
+                      <div key={it.id} className="space-y-1.5 rounded-md bg-[var(--jm-surface)] p-2.5">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-jm-sm font-medium text-[var(--jm-text)]">
+                              {it.name}
+                            </div>
+                            {it.spec && (
+                              <div className="text-jm-xs text-[var(--jm-text-muted)]">
+                                {it.spec}
+                              </div>
+                            )}
+                          </div>
+                          <span className="shrink-0 text-jm-xs tabular-nums text-[var(--jm-text-muted)]">
+                            {parseFloat(it.quantity).toLocaleString("ko-KR")} {it.unitOfMeasure}
+                          </span>
+                        </div>
+                        <JmNumberInput
+                          size="sm"
+                          prefix="₩"
+                          className="w-full"
+                          value={acceptPrices[it.id] ?? ""}
+                          onValueChange={(v) =>
+                            setAcceptPrices((prev) => ({ ...prev, [it.id]: v }))
+                          }
+                        />
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
             {isPickupPreset ? (
               <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-info-bg)] p-3 text-jm-sm text-[var(--jm-info-fg)]">
                 <div className="font-semibold">매장이 직접 수령 (픽업) 으로 요청했습니다</div>
@@ -760,6 +825,19 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   toast.error(isPickupPreset ? "출고 가능일을 선택해주세요" : "납기일을 선택해주세요");
                   return;
                 }
+                // 가격 미정 라인 단가 검증
+                const priceProposals: Array<{ itemId: string; unitPrice: number }> = [];
+                if (hasUndetermined) {
+                  for (const it of data.items) {
+                    if (!it.priceUndetermined) continue;
+                    const v = parseFloat(acceptPrices[it.id] ?? "");
+                    if (!Number.isFinite(v) || v <= 0) {
+                      toast.error(`${it.name} 의 단가를 입력해주세요 (0원 초과)`);
+                      return;
+                    }
+                    priceProposals.push({ itemId: it.id, unitPrice: v });
+                  }
+                }
                 // Date → yyyy-MM-dd (로컬 타임존 기준) — API 는 new Date() 로 파싱
                 const y = acceptDate.getFullYear();
                 const m = String(acceptDate.getMonth() + 1).padStart(2, "0");
@@ -768,6 +846,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   shippingMethod: method,
                   promisedDate: `${y}-${m}-${d}`,
                   shippingMemo: acceptMemo.trim() || null,
+                  ...(priceProposals.length > 0 ? { priceProposals } : {}),
                 });
               }}
               disabled={acceptMutation.isPending}

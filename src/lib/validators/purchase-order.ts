@@ -34,19 +34,30 @@ export const purchaseOrderSchema = z.object({
   quotationId: z.string().optional(),
   // 발송 시 우리가 사전 선택하는 출고 방법 (보통 PICKUP 또는 null). 거래처가 [수락] 모달에서 덮어쓸 수 있음.
   shippingMethod: z.enum(SHIPPING_METHODS).optional().nullable(),
+  // 가격 미정 라인이 있을 때 거래처가 [수락] 모달에서 단가 입력 → 우리쪽 확인 후 수락 여부.
+  requirePriceReview: z.boolean().optional(),
   items: z.array(purchaseOrderItemSchema).min(1, "발주 항목을 추가해주세요"),
 });
 
 // 외부 발주서 [수락] 모달 payload
+//  - shippingMethod / promisedDate / shippingMemo: 출고 정보
+//  - priceProposals: 가격 미정 라인이 있을 때 거래처가 제안한 단가 (itemId → 단가)
 export const purchaseOrderAcceptSchema = z
   .object({
     shippingMethod: z.enum(SHIPPING_METHODS).optional().nullable(),
     promisedDate: z.string().min(1, "납기일(또는 출고 가능일)을 선택해주세요"),
     shippingMemo: z.string().optional().nullable(),
+    priceProposals: z
+      .array(
+        z.object({
+          itemId: z.string().min(1),
+          unitPrice: z.number().nonnegative(),
+        }),
+      )
+      .optional(),
   })
   .refine(
     // PICKUP 이 아닌 경우(=거래처 출고) shippingMethod 필수.
-    // PICKUP 이면 우리가 사전 선택해둔 값이 그대로 유지되며 payload 의 shippingMethod 는 무시 가능.
     (v) => v.shippingMethod === "PICKUP" || (v.shippingMethod && v.shippingMethod.length > 0),
     { message: "출고 방법을 선택해주세요", path: ["shippingMethod"] },
   );

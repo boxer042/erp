@@ -83,6 +83,9 @@ export interface PurchaseOrderFormState {
   // 우리가 PO 발송 시 사전 선택하는 출고 방법. 비워두면 거래처가 [수락] 모달에서 선택.
   // "PICKUP" 으로 보내면 거래처 모달은 출고 방법 버튼 숨기고 출고 가능일만 받음.
   shippingMethod: ShippingMethodOption | "";
+  // 가격 미정 라인이 있을 때 거래처가 입력한 단가를 우리가 검토 후 수락할지 여부.
+  // false (기본): 거래처 입력 즉시 CONFIRMED. true: 거래처 입력 → COUNTER_OFFER → 우리 검토.
+  requirePriceReview: boolean;
   items: PurchaseOrderItemForm[];
 }
 

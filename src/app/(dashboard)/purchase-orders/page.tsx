@@ -50,6 +50,7 @@ function emptyForm(): PurchaseOrderFormState {
     expectedDate: "",
     memo: "",
     shippingMethod: "",
+    requirePriceReview: false,
     items: [emptyItem()],
   };
 }
@@ -94,6 +95,7 @@ function PurchaseOrdersPageInner() {
       expectedDate: "",
       memo: "",
       shippingMethod: "",
+      requirePriceReview: false,
       items: [
         {
           ...emptyItem(),
@@ -122,6 +124,7 @@ function PurchaseOrdersPageInner() {
           expectedDate: string | null;
           memo: string | null;
           shippingMethod: string | null;
+          requirePriceReview: boolean;
           supplier: { id: string; name: string };
           items: Array<{
             id: string;
@@ -154,6 +157,7 @@ function PurchaseOrdersPageInner() {
           expectedDate: po.expectedDate ? po.expectedDate.split("T")[0] : "",
           memo: po.memo ?? "",
           shippingMethod: (po.shippingMethod ?? "") as PurchaseOrderFormState["shippingMethod"],
+          requirePriceReview: po.requirePriceReview,
           items: po.items.map((it) => ({
             rowType: (it.supplierProduct ? "product" : "free") as "product" | "free",
             supplierProductId: it.supplierProduct?.id ?? "",
