@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { useIsCompactDevice } from "@/hooks/use-mobile";
 import {
   jmToast as toast,
   JmButton,
   JmCombobox,
   type JmComboboxItem,
+  JmComboboxDrawer,
   JmDrawer,
   JmDrawerBody,
   JmDrawerContent,
@@ -22,12 +24,6 @@ import {
   JmInput,
   JmNumberInput,
   JmSelect,
-  JmTable,
-  JmTableBody,
-  JmTableCell,
-  JmTableHead,
-  JmTableHeader,
-  JmTableRow,
 } from "@/jm";
 
 import { QuickSupplierSheet, QuickSupplierProductSheet } from "@/components/quick-register-sheets";
@@ -82,6 +78,10 @@ export function PurchaseOrderCreateSheet({
   const [quickSpOpen, setQuickSpOpen] = useState(false);
   const [quickSpName, setQuickSpName] = useState("");
   const [quickSpRowIndex, setQuickSpRowIndex] = useState<number | null>(null);
+
+  // 모바일/태블릿 — 공급상품 콤보박스를 JmComboboxDrawer (바텀 시트) 로 전환
+  const isCompactDevice = useIsCompactDevice();
+  const [drawerOpenIdx, setDrawerOpenIdx] = useState<number | null>(null);
 
   const suppliersQuery = useQuery<SupplierLite[]>({
     queryKey: queryKeys.suppliers.list(),
@@ -333,31 +333,49 @@ export function PurchaseOrderCreateSheet({
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-[var(--jm-border)]">
-                  <JmTable>
-                    <JmTableHeader>
-                      <JmTableRow>
-                        <JmTableHead>공급상품</JmTableHead>
-                        <JmTableHead className="w-[110px] text-right">수량</JmTableHead>
-                        <JmTableHead className="w-[140px] text-right">단가</JmTableHead>
-                        <JmTableHead className="w-[140px] text-right">소계</JmTableHead>
-                        <JmTableHead className="w-[200px]">메모</JmTableHead>
-                        <JmTableHead className="w-[40px]"></JmTableHead>
-                      </JmTableRow>
-                    </JmTableHeader>
-                    <JmTableBody>
-                      {form.items.map((it, idx) => (
-                        <JmTableRow key={idx} className="hover:bg-transparent">
-                          <JmTableCell className="align-top">
-                            {!form.supplierId ? (
-                              <span className="text-jm-xs text-[var(--jm-text-muted)]">먼저 거래처를 선택하세요</span>
-                            ) : it.rowType === "free" ? (
+                {!form.supplierId ? (
+                  <div className="rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+                    먼저 거래처를 선택하세요
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {form.items.map((it, idx) => (
+                      <div
+                        key={idx}
+                        className="space-y-3 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3"
+                      >
+                        {/* 헤더: 라인 번호 + 공급상품/자유품명 + 삭제 */}
+                        <div className="flex items-start gap-2">
+                          <span className="mt-2 shrink-0 text-jm-2xs font-medium text-[var(--jm-text-muted)]">
+                            #{idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            {it.rowType === "free" ? (
                               <JmInput
                                 size="sm"
                                 value={it.name}
                                 onChange={(e) => updateItem(idx, { name: e.target.value })}
                                 placeholder="자유 품명 (입고 시 공급상품 매핑)"
                               />
+                            ) : isCompactDevice ? (
+                              <button
+                                type="button"
+                                onClick={() => setDrawerOpenIdx(idx)}
+                                className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
+                              >
+                                <span
+                                  className={`truncate text-left ${
+                                    it.supplierProductId ? "text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"
+                                  }`}
+                                >
+                                  {it.supplierProductId
+                                    ? it.supplierProductName ||
+                                      (supplierProductsQuery.data ?? []).find((sp) => sp.id === it.supplierProductId)?.name ||
+                                      "공급상품"
+                                    : "공급상품 선택..."}
+                                </span>
+                                <ChevronsUpDown className="size-3.5 shrink-0 text-[var(--jm-text-muted)]" />
+                              </button>
                             ) : (
                               <JmCombobox<JmComboboxItem>
                                 items={(supplierProductsQuery.data ?? []).map((sp) => ({
@@ -390,82 +408,107 @@ export function PurchaseOrderCreateSheet({
                                 }}
                               />
                             )}
-                          </JmTableCell>
-                          <JmTableCell className="align-top">
-                            <JmNumberInput
-                              size="sm"
-                              clearable={false}
-                              value={it.quantity}
-                              onValueChange={(v) => updateItem(idx, { quantity: v })}
-                            />
-                          </JmTableCell>
-                          <JmTableCell className="align-top">
-                            {it.priceUndetermined ? (
-                              <button
-                                type="button"
-                                onClick={() => updateItem(idx, { priceUndetermined: false })}
-                                title="클릭하여 단가 입력"
-                                className="flex h-9 w-full items-center justify-center rounded-md border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] text-jm-xs font-medium text-[var(--jm-warning-fg)] transition-opacity hover:opacity-80"
-                              >
-                                가격 미정
-                              </button>
-                            ) : (
-                              <div className="flex items-center gap-1">
-                                <div className="min-w-0 flex-1">
-                                  <JmNumberInput
-                                    size="sm"
-                                    prefix="₩"
-                                    clearable={false}
-                                    value={it.unitPrice}
-                                    onValueChange={(v) => updateItem(idx, { unitPrice: v })}
-                                  />
-                                </div>
+                          </div>
+                          <JmIconButton
+                            size="sm"
+                            aria-label="행 삭제"
+                            onClick={() => removeRow(idx)}
+                          >
+                            <Trash2 />
+                          </JmIconButton>
+                        </div>
+
+                        {/* 수량 · 단가 — 모바일 1열, sm+ 2열 */}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-12 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">수량</span>
+                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                              <JmNumberInput
+                                size="sm"
+                                clearable={false}
+                                className="flex-1"
+                                value={it.quantity}
+                                onValueChange={(v) => updateItem(idx, { quantity: v })}
+                              />
+                              <span className="shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
+                                {it.unitOfMeasure || "EA"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-12 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">단가</span>
+                            <div className="min-w-0 flex-1">
+                              {it.priceUndetermined ? (
                                 <button
                                   type="button"
-                                  onClick={() => updateItem(idx, { priceUndetermined: true })}
-                                  title="가격 미정으로 표시"
-                                  className="shrink-0 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-1.5 py-1 text-jm-2xs text-[var(--jm-text-muted)] transition-colors hover:border-[var(--jm-warning-fg)] hover:bg-[var(--jm-warning-bg)] hover:text-[var(--jm-warning-fg)]"
+                                  onClick={() => updateItem(idx, { priceUndetermined: false })}
+                                  title="클릭하여 단가 입력"
+                                  className="flex h-9 w-full items-center justify-center rounded-md border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] text-jm-xs font-medium text-[var(--jm-warning-fg)] transition-opacity hover:opacity-80"
                                 >
-                                  미정
+                                  가격 미정
                                 </button>
-                              </div>
-                            )}
-                          </JmTableCell>
-                          <JmTableCell className="text-right tabular-nums align-middle">
-                            {it.priceUndetermined ? (
-                              <span className="text-[var(--jm-warning-fg)]">미정</span>
-                            ) : it.totalPrice ? (
-                              `₩${parseFloat(it.totalPrice).toLocaleString("ko-KR")}`
-                            ) : (
-                              "-"
-                            )}
-                          </JmTableCell>
-                          <JmTableCell className="align-top">
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <div className="min-w-0 flex-1">
+                                    <JmNumberInput
+                                      size="sm"
+                                      prefix="₩"
+                                      clearable={false}
+                                      value={it.unitPrice}
+                                      onValueChange={(v) => updateItem(idx, { unitPrice: v })}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(idx, { priceUndetermined: true })}
+                                    title="가격 미정으로 표시"
+                                    className="shrink-0 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-1.5 py-1 text-jm-2xs text-[var(--jm-text-muted)] transition-colors hover:border-[var(--jm-warning-fg)] hover:bg-[var(--jm-warning-bg)] hover:text-[var(--jm-warning-fg)]"
+                                  >
+                                    미정
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 메모 + 소계 — 모바일 세로, sm+ 가로 */}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <span className="w-12 shrink-0 text-jm-xs text-[var(--jm-text-muted)]">메모</span>
                             <JmInput
                               size="sm"
                               value={it.memo}
                               onChange={(e) => updateItem(idx, { memo: e.target.value })}
                               placeholder="(선택)"
+                              className="flex-1"
                             />
-                          </JmTableCell>
-                          <JmTableCell className="text-center align-middle">
-                            <JmIconButton
-                              size="sm"
-                              aria-label="행 삭제"
-                              onClick={() => removeRow(idx)}
-                            >
-                              <Trash2 />
-                            </JmIconButton>
-                          </JmTableCell>
-                        </JmTableRow>
-                      ))}
-                    </JmTableBody>
-                  </JmTable>
-                  <div className="flex items-center justify-between border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-2.5 text-jm-sm">
-                    <span className="text-jm-xs text-[var(--jm-text-muted)]">총 발주금액</span>
-                    <span className="font-bold tabular-nums">₩{totalAmount.toLocaleString("ko-KR")}</span>
+                          </div>
+                          <div className="flex items-baseline justify-between gap-2 border-t border-[var(--jm-border)] pt-2 sm:border-t-0 sm:pt-0">
+                            <span className="text-jm-xs text-[var(--jm-text-muted)] sm:hidden">소계</span>
+                            <span className="text-jm-sm font-bold tabular-nums">
+                              {it.priceUndetermined ? (
+                                <span className="text-[var(--jm-warning-fg)]">미정</span>
+                              ) : it.totalPrice ? (
+                                `₩${parseFloat(it.totalPrice).toLocaleString("ko-KR")}`
+                              ) : (
+                                "—"
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* 총 발주금액 카드 */}
+                    <div className="flex items-baseline justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-3">
+                      <span className="text-jm-sm text-[var(--jm-text-muted)]">총 발주금액</span>
+                      <span className="text-jm-lg font-bold tabular-nums">
+                        ₩{totalAmount.toLocaleString("ko-KR")}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* 메모 */}
@@ -518,6 +561,69 @@ export function PurchaseOrderCreateSheet({
           }
           setQuickSpOpen(false);
         }}
+      />
+
+      {/* 모바일·태블릿용 공급상품 선택 드로워 — 모든 행이 공유 (drawerOpenIdx 로 어느 행이 열렸는지 식별) */}
+      <JmComboboxDrawer<SupplierProductLite>
+        open={drawerOpenIdx !== null}
+        onOpenChange={(o) => {
+          if (!o) setDrawerOpenIdx(null);
+        }}
+        items={supplierProductsQuery.data ?? []}
+        loading={supplierProductsQuery.isPending}
+        getKey={(sp) => sp.id}
+        renderItem={(sp) => (
+          <div className="space-y-0.5">
+            <div className="font-medium text-[var(--jm-text)]">
+              {sp.name}
+              {sp.spec && (
+                <span className="ml-1 text-jm-xs font-normal text-[var(--jm-text-muted)]">
+                  ({sp.spec})
+                </span>
+              )}
+            </div>
+            <div className="text-jm-xs text-[var(--jm-text-muted)]">
+              {[sp.supplierCode, sp.unitPrice ? `₩${parseFloat(sp.unitPrice).toLocaleString("ko-KR")}` : null]
+                .filter(Boolean)
+                .join(" · ") || "—"}
+            </div>
+          </div>
+        )}
+        filterFn={(sp, q) => {
+          const lower = q.toLowerCase();
+          return (
+            sp.name.toLowerCase().includes(lower) ||
+            (sp.supplierCode?.toLowerCase().includes(lower) ?? false) ||
+            (sp.spec?.toLowerCase().includes(lower) ?? false)
+          );
+        }}
+        onSelect={(sp) => {
+          if (drawerOpenIdx === null) return;
+          updateItem(drawerOpenIdx, {
+            supplierProductId: sp.id,
+            supplierProductName: sp.name,
+            supplierCode: sp.supplierCode ?? null,
+            unitOfMeasure: sp.unitOfMeasure,
+            unitPrice: sp.unitPrice ? String(Math.round(parseFloat(sp.unitPrice))) : "",
+          });
+          setDrawerOpenIdx(null);
+        }}
+        onCreate={(name) => {
+          if (drawerOpenIdx === null) return;
+          setQuickSpName(name);
+          setQuickSpRowIndex(drawerOpenIdx);
+          setQuickSpOpen(true);
+          setDrawerOpenIdx(null);
+        }}
+        createLabel={(q) => (
+          <span className="text-jm-sm">
+            <span className="font-semibold">&ldquo;{q}&rdquo;</span>{" "}
+            <span className="text-[var(--jm-text-muted)]">새 공급상품 등록</span>
+          </span>
+        )}
+        title="공급상품 선택"
+        placeholder="품명·품번·규격 검색"
+        emptyText="검색 결과가 없습니다"
       />
     </>
   );
