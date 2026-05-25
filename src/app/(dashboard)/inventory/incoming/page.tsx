@@ -620,6 +620,9 @@ function IncomingPageInner() {
             id: string;
             // 자유입력 라인의 품명 (supplierProduct 없을 때 사용)
             name: string | null;
+            // 거래처 라인별 출고 응답 (OUT_OF_STOCK 은 prefill 스킵, DELAYED 는 메모 hint)
+            lineStatus: "NORMAL" | "OUT_OF_STOCK" | "DELAYED";
+            lineDelayedDate: string | null;
             quantity: string;
             receivedQty: string;
             // PENDING 입고로 이미 등록된 양 — 잔량 계산 시 차감해 이중 입고 방지
@@ -635,8 +638,10 @@ function IncomingPageInner() {
           }>;
         }>(`/api/purchase-orders/${purchaseOrderIdParam}`);
         if (cancelled) return;
-        // 잔량 = 발주수량 - 확정입고 - 진행중 입고(PENDING)
+        // 잔량 = 발주수량 - 확정입고 - 진행중 입고(PENDING). 거래처가 OUT_OF_STOCK 마킹한 라인은 prefill 스킵.
+        const skippedOOS = po.items.filter((it) => it.lineStatus === "OUT_OF_STOCK").length;
         const remainingItems = po.items
+          .filter((it) => it.lineStatus !== "OUT_OF_STOCK")
           .map((it) => {
             const remain = Math.max(
               0,
@@ -649,6 +654,9 @@ function IncomingPageInner() {
         if (remainingItems.length === 0) {
           toast.info("이 발주서는 잔량이 없어 추가 입고할 수 없습니다 (진행 중인 입고 포함)");
           return;
+        }
+        if (skippedOOS > 0) {
+          toast.info(`거래처가 재고 없음으로 마킹한 ${skippedOOS}개 라인은 prefill 에서 제외됨`);
         }
 
         setSelectedSupplierId(po.supplier.id);
@@ -678,7 +686,15 @@ function IncomingPageInner() {
             supplyAmount: String(remain * parseFloat(it.unitPrice)),
             discount: "",
             originalPrice: String(parseFloat(it.unitPrice)),
-            memo: !it.supplierProduct && it.name ? `발주: ${it.name}` : "",
+            memo: (() => {
+              const parts: string[] = [];
+              if (!it.supplierProduct && it.name) parts.push(`발주: ${it.name}`);
+              if (it.lineStatus === "DELAYED" && it.lineDelayedDate) {
+                const dt = new Date(it.lineDelayedDate).toLocaleDateString("ko-KR");
+                parts.push(`거래처 지연 약속: ${dt}`);
+              }
+              return parts.join(" · ");
+            })(),
             itemShippingCost: "",
             itemShippingIsTaxable: true,
             purchaseOrderItemId: it.id,

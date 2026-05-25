@@ -106,6 +106,27 @@ export async function POST(
     }
   }
 
+  // 라인별 출고 응답 정리 — 모든 라인은 itemId 가 PO 에 속해야 함
+  const validItemIds = new Set(po.items.map((it) => it.id));
+  const fulfillmentMap = new Map<
+    string,
+    { lineStatus: "NORMAL" | "OUT_OF_STOCK" | "DELAYED"; lineDelayedDate: string | null }
+  >();
+  if (payload.lineFulfillments) {
+    for (const f of payload.lineFulfillments) {
+      if (!validItemIds.has(f.itemId)) {
+        return NextResponse.json(
+          { error: "발주에 속하지 않은 라인이 있습니다" },
+          { status: 400 }
+        );
+      }
+      fulfillmentMap.set(f.itemId, {
+        lineStatus: f.lineStatus,
+        lineDelayedDate: f.lineDelayedDate ?? null,
+      });
+    }
+  }
+
   // PICKUP 일 땐 우리가 사전 선택한 값 유지, 그 외엔 거래처가 보낸 값
   const finalShippingMethod = po.shippingMethod === "PICKUP" ? "PICKUP" : payload.shippingMethod!;
   const hasUndetermined = undeterminedItems.length > 0;
@@ -121,6 +142,26 @@ export async function POST(
       : "PARTIAL_REACCEPTED";
 
   await prisma.$transaction(async (tx) => {
+    // 0) 라인별 출고 응답 적용 (priceProposals 와 별개로 항상 처리)
+    if (fulfillmentMap.size > 0) {
+      const lineUpdates: Promise<unknown>[] = [];
+      for (const [itemId, f] of fulfillmentMap) {
+        lineUpdates.push(
+          tx.purchaseOrderItem.update({
+            where: { id: itemId },
+            data: {
+              lineStatus: f.lineStatus,
+              lineDelayedDate:
+                f.lineStatus === "DELAYED" && f.lineDelayedDate
+                  ? new Date(f.lineDelayedDate)
+                  : null,
+            },
+          })
+        );
+      }
+      await Promise.all(lineUpdates);
+    }
+
     // 1) 라인 단가 처리
     if (hasUndetermined) {
       const updates: Promise<unknown>[] = [];
@@ -206,6 +247,7 @@ export async function POST(
         promisedDate: payload.promisedDate,
         shippingMemo: payload.shippingMemo ?? null,
         priceProposals: payload.priceProposals ?? [],
+        lineFulfillments: payload.lineFulfillments ?? [],
         requireReview,
       },
     });

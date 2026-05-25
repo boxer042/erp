@@ -9,6 +9,9 @@ export const SHIPPING_METHODS = [
 ] as const;
 export type ShippingMethodValue = (typeof SHIPPING_METHODS)[number];
 
+export const PO_LINE_FULFILLMENT_STATUSES = ["NORMAL", "OUT_OF_STOCK", "DELAYED"] as const;
+export type POLineFulfillmentStatusValue = (typeof PO_LINE_FULFILLMENT_STATUSES)[number];
+
 export const purchaseOrderItemSchema = z
   .object({
     // 자유입력 라인 도입: supplierProductId 또는 name 둘 중 하나는 필수.
@@ -42,6 +45,7 @@ export const purchaseOrderSchema = z.object({
 // 외부 발주서 [수락] 모달 payload
 //  - shippingMethod / promisedDate / shippingMemo: 출고 정보
 //  - priceProposals: 가격 미정 라인이 있을 때 거래처가 제안한 단가 (itemId → 단가)
+//  - lineFulfillments: 라인별 거래처 출고 응답 (생략 가능, 생략 시 모든 라인 NORMAL)
 export const purchaseOrderAcceptSchema = z
   .object({
     shippingMethod: z.enum(SHIPPING_METHODS).optional().nullable(),
@@ -55,11 +59,29 @@ export const purchaseOrderAcceptSchema = z
         }),
       )
       .optional(),
+    lineFulfillments: z
+      .array(
+        z.object({
+          itemId: z.string().min(1),
+          lineStatus: z.enum(PO_LINE_FULFILLMENT_STATUSES),
+          lineDelayedDate: z.string().optional().nullable(),
+        }),
+      )
+      .optional(),
   })
   .refine(
     // PICKUP 이 아닌 경우(=거래처 출고) shippingMethod 필수.
     (v) => v.shippingMethod === "PICKUP" || (v.shippingMethod && v.shippingMethod.length > 0),
     { message: "출고 방법을 선택해주세요", path: ["shippingMethod"] },
+  )
+  .refine(
+    // DELAYED 라인은 반드시 lineDelayedDate 가 있어야 함
+    (v) =>
+      !v.lineFulfillments ||
+      v.lineFulfillments.every(
+        (f) => f.lineStatus !== "DELAYED" || (f.lineDelayedDate && f.lineDelayedDate.length > 0),
+      ),
+    { message: "지연 라인은 라인별 납기일을 선택해주세요", path: ["lineFulfillments"] },
   );
 
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;

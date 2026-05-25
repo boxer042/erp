@@ -30,6 +30,8 @@ export async function GET(
               id: true,
               name: true,
               priceUndetermined: true,
+              lineStatus: true,
+              lineDelayedDate: true,
               quantity: true,
               unitPrice: true,
               totalPrice: true,
@@ -145,6 +147,9 @@ export async function GET(
       unitOfMeasure: it.supplierProduct?.unitOfMeasure ?? "EA",
       // 가격 미정 — true 면 외부 페이지에서 ₩0 대신 "가격 미정" 표시 + 수락 버튼 차단
       priceUndetermined: it.priceUndetermined,
+      // 라인별 거래처 출고 응답 (기본 NORMAL, 거래처가 [수락] 모달에서 라인별로 설정)
+      lineStatus: it.lineStatus,
+      lineDelayedDate: it.lineDelayedDate?.toISOString() ?? null,
       quantity: it.quantity.toString(),
       unitPrice: it.unitPrice.toString(),
       totalPrice: it.totalPrice.toString(),

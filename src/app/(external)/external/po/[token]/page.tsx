@@ -47,6 +47,14 @@ const SUPPLIER_SHIPPING_OPTIONS: ShippingMethodValue[] = [
   "OTHER_SUPPLIER",
 ];
 
+type LineFulfillmentStatus = "NORMAL" | "OUT_OF_STOCK" | "DELAYED";
+
+const LINE_STATUS_LABEL: Record<LineFulfillmentStatus, string> = {
+  NORMAL: "정상 출고",
+  OUT_OF_STOCK: "재고 없음",
+  DELAYED: "지연",
+};
+
 interface PoItem {
   id: string;
   name: string;
@@ -54,6 +62,8 @@ interface PoItem {
   supplierCode: string | null;
   unitOfMeasure: string;
   priceUndetermined: boolean;
+  lineStatus: LineFulfillmentStatus;
+  lineDelayedDate: string | null;
   quantity: string;
   unitPrice: string;
   totalPrice: string;
@@ -105,6 +115,11 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
   const [acceptDate, setAcceptDate] = useState<Date | undefined>(undefined);
   const [acceptMemo, setAcceptMemo] = useState("");
   const [acceptPrices, setAcceptPrices] = useState<Record<string, string>>({});
+  // 라인별 출고 응답 — 기본은 모든 라인 NORMAL. "라인별로 다르게" 토글 시 펼침.
+  const [perLineMode, setPerLineMode] = useState(false);
+  const [lineFulfillments, setLineFulfillments] = useState<
+    Record<string, { lineStatus: LineFulfillmentStatus; lineDelayedDate: Date | undefined }>
+  >({});
 
   const detailQuery = useQuery<PoDetail>({
     queryKey: ["public-po", token],
@@ -118,6 +133,11 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
       promisedDate: string;
       shippingMemo?: string | null;
       priceProposals?: Array<{ itemId: string; unitPrice: number }>;
+      lineFulfillments?: Array<{
+        itemId: string;
+        lineStatus: LineFulfillmentStatus;
+        lineDelayedDate?: string | null;
+      }>;
     }) => apiMutate<{ ok: boolean; poStatus: string; requireReview: boolean }>(
       `/api/public/po/${token}/accept`,
       "POST",
@@ -666,6 +686,13 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                       if (it.priceUndetermined) init[it.id] = "";
                     }
                     setAcceptPrices(init);
+                    // 라인별 상태 초기화 — 모두 NORMAL
+                    const lf: Record<string, { lineStatus: LineFulfillmentStatus; lineDelayedDate: Date | undefined }> = {};
+                    for (const it of data.items) {
+                      lf[it.id] = { lineStatus: "NORMAL", lineDelayedDate: undefined };
+                    }
+                    setLineFulfillments(lf);
+                    setPerLineMode(false);
                     setAcceptOpen(true);
                   }}
                   disabled={acceptMutation.isPending}
@@ -805,6 +832,90 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                 maxLength={500}
               />
             </div>
+
+            {/* 라인별 출고 응답 — 토글 켜면 라인별 정상/재고없음/지연 설정 */}
+            <div className="rounded-lg border border-[var(--jm-border)] p-3">
+              <label className="flex cursor-pointer items-start gap-2 text-jm-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4"
+                  checked={perLineMode}
+                  onChange={(e) => setPerLineMode(e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium text-[var(--jm-text)]">
+                    라인별로 다르게 설정
+                  </span>
+                  <span className="ml-1 text-jm-xs text-[var(--jm-text-muted)]">
+                    (재고 없음 / 다른 납기 필요한 라인이 있을 때)
+                  </span>
+                </span>
+              </label>
+
+              {perLineMode && (
+                <div className="mt-3 space-y-2">
+                  {data.items.map((it) => {
+                    const f = lineFulfillments[it.id] ?? {
+                      lineStatus: "NORMAL" as LineFulfillmentStatus,
+                      lineDelayedDate: undefined,
+                    };
+                    const set = (patch: Partial<{ lineStatus: LineFulfillmentStatus; lineDelayedDate: Date | undefined }>) =>
+                      setLineFulfillments((prev) => ({
+                        ...prev,
+                        [it.id]: { ...f, ...patch },
+                      }));
+                    return (
+                      <div
+                        key={it.id}
+                        className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] p-2.5"
+                      >
+                        <div className="text-jm-sm font-medium text-[var(--jm-text)]">
+                          {it.name}
+                          <span className="ml-2 text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
+                            {parseFloat(it.quantity).toLocaleString("ko-KR")} {it.unitOfMeasure}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {(["NORMAL", "OUT_OF_STOCK", "DELAYED"] as LineFulfillmentStatus[]).map((s) => {
+                            const sel = f.lineStatus === s;
+                            return (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => set({ lineStatus: s })}
+                                className={`rounded-md border px-2 py-1.5 text-jm-xs font-medium transition-colors ${
+                                  sel
+                                    ? s === "OUT_OF_STOCK"
+                                      ? "border-[var(--jm-danger-fg)] bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]"
+                                      : s === "DELAYED"
+                                        ? "border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
+                                        : "border-[var(--jm-action)] bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
+                                    : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]"
+                                }`}
+                              >
+                                {LINE_STATUS_LABEL[s]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {f.lineStatus === "DELAYED" && (
+                          <div className="space-y-1">
+                            <label className="block text-jm-xs text-[var(--jm-text-muted)]">
+                              이 라인 약속 납기
+                            </label>
+                            <JmDatePicker
+                              value={f.lineDelayedDate}
+                              onChange={(d) => set({ lineDelayedDate: d })}
+                              placeholder="납기일 선택"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </JmDialogBody>
           <JmDialogFooter>
             <JmButton
@@ -838,15 +949,43 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                     priceProposals.push({ itemId: it.id, unitPrice: v });
                   }
                 }
+                // 라인별 출고 응답 — perLineMode 켜졌을 때만 처리
+                const fmtDate = (d: Date) => {
+                  const y = d.getFullYear();
+                  const mo = String(d.getMonth() + 1).padStart(2, "0");
+                  const da = String(d.getDate()).padStart(2, "0");
+                  return `${y}-${mo}-${da}`;
+                };
+                let lineFulfillmentsPayload:
+                  | Array<{ itemId: string; lineStatus: LineFulfillmentStatus; lineDelayedDate?: string | null }>
+                  | undefined;
+                if (perLineMode) {
+                  const list: Array<{ itemId: string; lineStatus: LineFulfillmentStatus; lineDelayedDate?: string | null }> = [];
+                  for (const it of data.items) {
+                    const f = lineFulfillments[it.id];
+                    if (!f) continue;
+                    if (f.lineStatus === "DELAYED" && !f.lineDelayedDate) {
+                      toast.error(`${it.name} — 지연 라인은 약속 납기일을 선택해주세요`);
+                      return;
+                    }
+                    list.push({
+                      itemId: it.id,
+                      lineStatus: f.lineStatus,
+                      lineDelayedDate:
+                        f.lineStatus === "DELAYED" && f.lineDelayedDate
+                          ? fmtDate(f.lineDelayedDate)
+                          : null,
+                    });
+                  }
+                  lineFulfillmentsPayload = list;
+                }
                 // Date → yyyy-MM-dd (로컬 타임존 기준) — API 는 new Date() 로 파싱
-                const y = acceptDate.getFullYear();
-                const m = String(acceptDate.getMonth() + 1).padStart(2, "0");
-                const d = String(acceptDate.getDate()).padStart(2, "0");
                 acceptMutation.mutate({
                   shippingMethod: method,
-                  promisedDate: `${y}-${m}-${d}`,
+                  promisedDate: fmtDate(acceptDate),
                   shippingMemo: acceptMemo.trim() || null,
                   ...(priceProposals.length > 0 ? { priceProposals } : {}),
+                  ...(lineFulfillmentsPayload ? { lineFulfillments: lineFulfillmentsPayload } : {}),
                 });
               }}
               disabled={acceptMutation.isPending}

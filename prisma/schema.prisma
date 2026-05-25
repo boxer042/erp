@@ -1201,6 +1201,14 @@ enum ShippingMethod {
   PICKUP           // 매장 직접 수령 (우리가 PO 발송 시 사전 선택)
 }
 
+// 거래처가 [수락] 시 라인별로 줄 수 있는 출고 응답.
+// 기본 NORMAL — 라인별 분기를 사용하지 않으면 모든 라인이 NORMAL.
+enum POLineFulfillmentStatus {
+  NORMAL          // 정상 (PO 납기일 기준)
+  OUT_OF_STOCK    // 재고 없음 (이번 발주에서 제외, 매장이 별도 결정)
+  DELAYED         // 지연 (lineDelayedDate 에 라인별 약속 납기)
+}
+
 enum ProposalStatus {
   NONE // 협상 없음 (기본)
   PENDING // 거래처 제안, 우리 응답 대기
@@ -1258,6 +1266,12 @@ model PurchaseOrderItem {
   // [수락] 버튼이 숨겨져 거래처가 반드시 [단가 변경 요청] 으로 가격 제안하게 강제.
   // 우리가 단가 수락하면 unitPrice 갱신 + priceUndetermined=false + PO 가 SENT 로 회귀.
   priceUndetermined     Boolean          @default(false) @map("price_undetermined")
+  // 거래처 라인별 출고 응답(2026-05-25 도입). [수락] 모달에서 "라인별로 다르게" 선택 시 설정.
+  // NORMAL: 정상 (PO 납기일 기준)
+  // OUT_OF_STOCK: 재고 없음 — 입고 prefill 에서 스킵, 매장이 별도 결정 ([발주 종료]/타 거래처 재발주)
+  // DELAYED: 지연 — lineDelayedDate 에 약속 납기 저장, 입고 워크보드에서 따로 노출
+  lineStatus            POLineFulfillmentStatus @default(NORMAL) @map("line_status")
+  lineDelayedDate       DateTime?               @map("line_delayed_date")
   quantity              Decimal          @db.Decimal(15, 4)
   // 분할 입고 누적 수량. quantity 도달 시 PurchaseOrder.status 가 RECEIVED 로 자동 전환.
   // 사용자가 "발주 종료" 누르면 잔량 무시하고 CLOSED.

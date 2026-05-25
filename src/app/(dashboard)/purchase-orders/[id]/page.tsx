@@ -93,6 +93,8 @@ interface PurchaseOrderDetail {
     id: string;
     name: string | null;        // 자유입력 라인일 때만 값
     priceUndetermined: boolean;
+    lineStatus: "NORMAL" | "OUT_OF_STOCK" | "DELAYED";
+    lineDelayedDate: string | null;
     quantity: string;
     receivedQty: string;
     pendingQty: number;
@@ -410,11 +412,23 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                           {!it.supplierProduct && (
                             <span className="text-jm-2xs text-[var(--jm-warning-fg)]">자유 품명 — 입고 시 공급상품 매핑 필요</span>
                           )}
-                          {it.priceUndetermined && (
-                            <span className="mt-0.5 inline-flex w-fit items-center rounded-md bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-2xs font-medium text-[var(--jm-warning-fg)]">
-                              가격 미정
-                            </span>
-                          )}
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {it.priceUndetermined && (
+                              <span className="inline-flex w-fit items-center rounded-md bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-2xs font-medium text-[var(--jm-warning-fg)]">
+                                가격 미정
+                              </span>
+                            )}
+                            {it.lineStatus === "OUT_OF_STOCK" && (
+                              <span className="inline-flex w-fit items-center rounded-md bg-[var(--jm-danger-bg)] px-1.5 py-0.5 text-jm-2xs font-medium text-[var(--jm-danger-fg)]">
+                                재고 없음
+                              </span>
+                            )}
+                            {it.lineStatus === "DELAYED" && (
+                              <span className="inline-flex w-fit items-center rounded-md bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-2xs font-medium text-[var(--jm-warning-fg)]">
+                                지연 {it.lineDelayedDate ? `· ${isoToKr(it.lineDelayedDate)}` : ""}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </JmTableCell>
                       <JmTableCell className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
