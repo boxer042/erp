@@ -730,110 +730,7 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
             <JmDialogTitle>발주 수락</JmDialogTitle>
           </JmDialogHeader>
           <JmDialogBody className="space-y-4">
-            {/* 가격 미정 라인이 있으면 단가 입력 섹션 — 모달 상단에 노출 */}
-            {hasUndetermined && (
-              <div className="rounded-lg border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] p-3">
-                <div className="mb-2 text-jm-sm font-semibold text-[var(--jm-warning-fg)]">
-                  가격 미정 라인 단가 입력
-                </div>
-                <div className="mb-3 text-jm-xs text-[var(--jm-warning-fg)] opacity-90">
-                  {data.requirePriceReview
-                    ? "입력하신 단가는 발주처 확인 후 최종 수락됩니다."
-                    : "입력하신 단가가 즉시 적용되어 수락됩니다."}
-                </div>
-                <div className="space-y-2.5">
-                  {data.items
-                    .filter((it) => it.priceUndetermined)
-                    .map((it) => (
-                      <div key={it.id} className="space-y-1.5 rounded-md bg-[var(--jm-surface)] p-2.5">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-jm-sm font-medium text-[var(--jm-text)]">
-                              {it.name}
-                            </div>
-                            {it.spec && (
-                              <div className="text-jm-xs text-[var(--jm-text-muted)]">
-                                {it.spec}
-                              </div>
-                            )}
-                          </div>
-                          <span className="shrink-0 text-jm-xs tabular-nums text-[var(--jm-text-muted)]">
-                            {parseFloat(it.quantity).toLocaleString("ko-KR")} {it.unitOfMeasure}
-                          </span>
-                        </div>
-                        <JmNumberInput
-                          size="sm"
-                          prefix="₩"
-                          className="w-full"
-                          value={acceptPrices[it.id] ?? ""}
-                          onValueChange={(v) =>
-                            setAcceptPrices((prev) => ({ ...prev, [it.id]: v }))
-                          }
-                        />
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {isPickupPreset ? (
-              <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-info-bg)] p-3 text-jm-sm text-[var(--jm-info-fg)]">
-                <div className="font-semibold">매장이 직접 수령 (픽업) 으로 요청했습니다</div>
-                <div className="mt-1 opacity-90">
-                  출고 가능일만 알려주세요. 메모에 시간대·연락처 등을 자유롭게 적으셔도 됩니다.
-                </div>
-              </div>
-            ) : (
-              <div>
-                <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
-                  출고 방법
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {SUPPLIER_SHIPPING_OPTIONS.map((m) => {
-                    const selected = acceptShipping === m;
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setAcceptShipping(m)}
-                        className={`rounded-lg border px-3 py-2.5 text-jm-sm font-medium transition-colors ${
-                          selected
-                            ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
-                            : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
-                        }`}
-                      >
-                        {SHIPPING_LABELS[m]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
-                {isPickupPreset ? "출고 가능일" : "납기일"}
-              </label>
-              <JmDatePicker
-                value={acceptDate}
-                onChange={setAcceptDate}
-                placeholder={isPickupPreset ? "출고 가능일 선택" : "납기일 선택"}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
-                메모 (선택)
-              </label>
-              <JmTextarea
-                value={acceptMemo}
-                onChange={(e) => setAcceptMemo(e.target.value)}
-                rows={2}
-                maxLength={500}
-              />
-            </div>
-
-            {/* 라인별 출고 응답 — 토글 켜면 라인별 정상/재고없음/지연 설정 */}
+            {/* 1. 라인별 출고 응답 — 최상단 (사용자가 먼저 라인 상태를 결정해야 가격 입력이 의미 있음) */}
             <div className="rounded-lg border border-[var(--jm-border)] p-3">
               <label className="flex cursor-pointer items-start gap-2 text-jm-sm">
                 <input
@@ -916,6 +813,134 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                 </div>
               )}
             </div>
+
+            {/* 2. 가격 미정 라인 단가 입력 — 모두 선택사항, 입력 유도 */}
+            {hasUndetermined && (
+              <div className="rounded-lg border border-[var(--jm-warning-fg)] bg-[var(--jm-warning-bg)] p-3">
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <div className="text-jm-sm font-semibold text-[var(--jm-warning-fg)]">
+                    가격 미정 라인 단가
+                  </div>
+                  <span className="text-jm-2xs font-medium text-[var(--jm-warning-fg)] opacity-80">
+                    선택사항
+                  </span>
+                </div>
+                <div className="mb-3 text-jm-xs text-[var(--jm-warning-fg)] opacity-90">
+                  단가를 알려주시면 발주처가 입고를 더 빠르게 처리할 수 있습니다.
+                  {data.requirePriceReview
+                    ? " 입력하신 단가는 발주처 확인 후 최종 적용됩니다."
+                    : " 입력하신 단가가 즉시 적용됩니다."}{" "}
+                  비워두시면 발주처가 입고 시 정합니다.
+                </div>
+                <div className="space-y-2.5">
+                  {data.items
+                    .filter((it) => it.priceUndetermined)
+                    .map((it) => {
+                      const lf = lineFulfillments[it.id];
+                      const isOOS = perLineMode && lf?.lineStatus === "OUT_OF_STOCK";
+                      return (
+                        <div
+                          key={it.id}
+                          className={`space-y-1.5 rounded-md p-2.5 ${
+                            isOOS
+                              ? "bg-[var(--jm-surface-muted)] opacity-50"
+                              : "bg-[var(--jm-surface)]"
+                          }`}
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-jm-sm font-medium text-[var(--jm-text)]">
+                                {it.name}
+                                {isOOS && (
+                                  <span className="ml-1.5 text-jm-2xs font-normal text-[var(--jm-danger-fg)]">
+                                    (재고 없음 — 입력 불필요)
+                                  </span>
+                                )}
+                              </div>
+                              {it.spec && (
+                                <div className="text-jm-xs text-[var(--jm-text-muted)]">
+                                  {it.spec}
+                                </div>
+                              )}
+                            </div>
+                            <span className="shrink-0 text-jm-xs tabular-nums text-[var(--jm-text-muted)]">
+                              {parseFloat(it.quantity).toLocaleString("ko-KR")} {it.unitOfMeasure}
+                            </span>
+                          </div>
+                          <JmNumberInput
+                            size="sm"
+                            prefix="₩"
+                            className="w-full"
+                            value={acceptPrices[it.id] ?? ""}
+                            disabled={isOOS}
+                            onValueChange={(v) =>
+                              setAcceptPrices((prev) => ({ ...prev, [it.id]: v }))
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* 3. 출고 방법 */}
+            {isPickupPreset ? (
+              <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-info-bg)] p-3 text-jm-sm text-[var(--jm-info-fg)]">
+                <div className="font-semibold">매장이 직접 수령 (픽업) 으로 요청했습니다</div>
+                <div className="mt-1 opacity-90">
+                  출고 가능일만 알려주세요. 메모에 시간대·연락처 등을 자유롭게 적으셔도 됩니다.
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
+                  출고 방법
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SUPPLIER_SHIPPING_OPTIONS.map((m) => {
+                    const selected = acceptShipping === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setAcceptShipping(m)}
+                        className={`rounded-lg border px-3 py-2.5 text-jm-sm font-medium transition-colors ${
+                          selected
+                            ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
+                            : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
+                        }`}
+                      >
+                        {SHIPPING_LABELS[m]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
+                {isPickupPreset ? "출고 가능일" : "납기일"}
+              </label>
+              <JmDatePicker
+                value={acceptDate}
+                onChange={setAcceptDate}
+                placeholder={isPickupPreset ? "출고 가능일 선택" : "납기일 선택"}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-jm-sm font-medium text-[var(--jm-text)]">
+                메모 (선택)
+              </label>
+              <JmTextarea
+                value={acceptMemo}
+                onChange={(e) => setAcceptMemo(e.target.value)}
+                rows={2}
+                maxLength={500}
+              />
+            </div>
           </JmDialogBody>
           <JmDialogFooter>
             <JmButton
@@ -936,16 +961,18 @@ export default function ExternalPoPage({ params }: { params: Promise<{ token: st
                   toast.error(isPickupPreset ? "출고 가능일을 선택해주세요" : "납기일을 선택해주세요");
                   return;
                 }
-                // 가격 미정 라인 단가 검증
+                // 가격 미정 라인 단가 — 모두 선택사항. 입력된 라인만 priceProposals 에 포함.
+                // OUT_OF_STOCK 라인은 입력값 무시.
                 const priceProposals: Array<{ itemId: string; unitPrice: number }> = [];
                 if (hasUndetermined) {
                   for (const it of data.items) {
                     if (!it.priceUndetermined) continue;
-                    const v = parseFloat(acceptPrices[it.id] ?? "");
-                    if (!Number.isFinite(v) || v <= 0) {
-                      toast.error(`${it.name} 의 단가를 입력해주세요 (0원 초과)`);
-                      return;
-                    }
+                    const lf = lineFulfillments[it.id];
+                    if (perLineMode && lf?.lineStatus === "OUT_OF_STOCK") continue;
+                    const raw = acceptPrices[it.id] ?? "";
+                    if (raw === "") continue;
+                    const v = parseFloat(raw);
+                    if (!Number.isFinite(v) || v <= 0) continue;
                     priceProposals.push({ itemId: it.id, unitPrice: v });
                   }
                 }
