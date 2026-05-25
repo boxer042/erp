@@ -98,33 +98,51 @@ export async function POST(request: NextRequest) {
 
     await rebalanceCustomerLedger(tx, data.customerId);
 
-    // FIFO 자동 매칭 — UNPAID 주문(외상)을 orderDate 오름차순으로 입금액만큼 PAID 처리.
-    // 단순화: 주문 단위 fully paid 만 (각 주문의 totalAmount 보다 입금액이 크거나 같아야 PAID).
-    // 부분 매칭은 customer 잔액에 반영되어 있으니 다음 입금에서 처리됨.
-    const unpaidOrders = await tx.order.findMany({
+    // FIFO 자동 매칭 — UNPAID(전액 외상) + PARTIAL_PAID(잔금 미수) 모두 처리.
+    //   - UNPAID:        outstandingDue = totalAmount
+    //   - PARTIAL_PAID:  outstandingDue = totalAmount - paidAmount  (잔금만)
+    // 단순화: 주문 단위 fully paid 만 (outstandingDue 보다 입금액 ≥ 면 PAID 전이).
+    // 부분 매칭(잔금의 일부만 수금)은 customer 잔액에 반영되어 있으니 다음 입금에서 처리됨.
+    const candidates = await tx.order.findMany({
       where: {
         customerId: data.customerId,
-        paymentStatus: "UNPAID",
+        paymentStatus: { in: ["UNPAID", "PARTIAL_PAID"] },
         // 종결되지 않은 활성 주문만 (취소·반품된 외상은 환불 대상 아님)
         status: {
           notIn: ["CANCELLED", "RETURNED", "EXCHANGED"],
         },
       },
-      select: { id: true, orderNo: true, totalAmount: true },
+      select: {
+        id: true,
+        orderNo: true,
+        totalAmount: true,
+        paymentStatus: true,
+        paidAmount: true,
+      },
       orderBy: { orderDate: "asc" },
     });
     let remaining = amount;
     const paidOrderIds: string[] = [];
-    for (const o of unpaidOrders) {
-      const orderAmount = Number(o.totalAmount);
-      if (remaining + 0.01 < orderAmount) break; // 잔액 부족 — 다음 주문 처리 안 함
-      remaining -= orderAmount;
+    for (const o of candidates) {
+      const outstandingDue =
+        o.paymentStatus === "PARTIAL_PAID" && o.paidAmount
+          ? Math.max(0, Number(o.totalAmount) - Number(o.paidAmount))
+          : Number(o.totalAmount);
+      if (remaining + 0.01 < outstandingDue) break; // 잔액 부족 — 다음 주문 처리 안 함
+      remaining -= outstandingDue;
       paidOrderIds.push(o.id);
     }
     if (paidOrderIds.length > 0) {
+      // PAID 전이 — PARTIAL_PAID 였던 주문은 partial 메타 (paidAmount/partialPaymentKind)
+      // 초기화. 이후 영수증 헤더가 "계약금 영수증" 으로 오라벨되지 않게 함.
+      // 원본 부분 결제 이력은 CustomerLedger description + AuditLog 에 보존.
       await tx.order.updateMany({
         where: { id: { in: paidOrderIds } },
-        data: { paymentStatus: "PAID" },
+        data: {
+          paymentStatus: "PAID",
+          paidAmount: null,
+          partialPaymentKind: null,
+        },
       });
     }
 

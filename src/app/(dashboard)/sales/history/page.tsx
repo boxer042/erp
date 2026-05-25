@@ -93,8 +93,10 @@ const STATUS_GROUP_FILTERS: Array<{ value: SalesStatusGroup; label: string }> =
 const PAYMENT_STATUS_OPTIONS = [
   { value: "ALL", label: "결제상태 전체" },
   { value: "PAID", label: "결제완료" },
+  { value: "PARTIAL_PAID", label: "부분결제" },
   { value: "UNPAID", label: "외상" },
   { value: "REFUND_PENDING", label: "환불진행" },
+  { value: "PARTIAL_REFUND", label: "부분환불" },
   { value: "REFUNDED", label: "환불완료" },
   { value: "SALES_CANCELLED", label: "매출취소" },
 ];
@@ -110,6 +112,7 @@ const FULFILLMENT_LABEL: Record<string, string> = {
 const PAYMENT_METHOD_OPTIONS = [
   { value: "ALL", label: "결제수단 전체" },
   { value: "CASH", label: "현금" },
+  { value: "CASH_RECEIPT", label: "현금영수증" },
   { value: "CARD", label: "카드" },
   { value: "TRANSFER", label: "계좌이체" },
   { value: "MIXED", label: "혼합" },

@@ -13,15 +13,13 @@ export type OrderStatus =
   | "RETURNED"
   | "EXCHANGED";
 
-/** 결제 축 — 출고(OrderStatus) 와 별개 */
-export type OrderPaymentStatus =
-  | "UNPAID"
-  | "PAID"
-  | "PARTIAL_PAID" // 부분 결제 — 일부 즉시 결제 + 잔액 미수 (계약금/일부결제)
-  | "REFUND_PENDING"
-  | "PARTIAL_REFUND"
-  | "REFUNDED"
-  | "SALES_CANCELLED";
+/**
+ * 결제 축 — 출고(OrderStatus) 와 별개.
+ * Prisma enum 그대로 import + re-export — sales/history 처럼 prisma 응답을 바로 받는
+ * 곳과 타입 호환 자동 (단순 string union 으로 다시 정의하면 Prisma 타입과 미호환).
+ */
+import type { OrderPaymentStatus as PrismaOrderPaymentStatus } from "@prisma/client";
+export type OrderPaymentStatus = PrismaOrderPaymentStatus;
 
 /** 클레임 분기 — 손님이 원하는 결과 */
 export type OrderClaimType =

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { format } from "date-fns";
+import { Printer } from "lucide-react";
 import {
   JmBadge,
   JmTable,
@@ -126,6 +127,26 @@ export function LedgerView({
                         <JmBadge variant="warning" size="sm" shape="square">
                           {PAYMENT_KIND_LABELS[e.paymentKind]}
                         </JmBadge>
+                      )}
+                      {/* 부분 결제 잔금 SALE — description 에 "잔금" 포함 + "(계약금 외)" 여부로 분기.
+                          (API 가 backend 에서 두 가지 description 패턴으로 저장: "잔금" / "잔금 (계약금 외)") */}
+                      {e.type === "SALE" && e.description.includes("잔금") && (
+                        <JmBadge variant="warning" size="sm" shape="square">
+                          {e.description.includes("계약금") ? "계약금" : "부분결제"}
+                        </JmBadge>
+                      )}
+                      {/* 수금 영수증 출력 — RECEIPT(CustomerPayment) 행 한정 */}
+                      {isReceipt && e.referenceId && (
+                        <a
+                          href={`/customer-payments/${e.referenceId}/print?auto=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(ev) => ev.stopPropagation()}
+                          title="수금 영수증 출력"
+                          className="ml-1 inline-flex size-5 items-center justify-center rounded text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)] hover:text-[var(--jm-text)]"
+                        >
+                          <Printer className="size-3.5" />
+                        </a>
                       )}
                     </span>
                   </JmTableCell>
