@@ -225,3 +225,96 @@ export async function ensureBulkStock(
   }
   // allowOversell 이면 남은 부족분은 막지 않음 — 이어지는 fifoConsume 이 적자 로트로 처리한다.
 }
+
+/**
+ * InventoryLot.unitCost 가 바뀌었을 때 그 lot 에서 이미 소진된 LotConsumption.unitCost 도
+ * 함께 갱신하고, 영향받은 OrderItem / RepairPart 의 unitCostSnapshot 을 가중평균으로 재계산.
+ *
+ * 호출 케이스: 입고 배송비 후기입(update-shipping) 처럼 사후에 lot 의 unitCost 가 바뀌어야 하는 상황.
+ * 마진 리포트는 LotConsumption.unitCost 를 우선 사용하고 폴백으로 unitCostSnapshot 을 쓰므로
+ * 둘 다 갱신해야 과거 마진까지 새 배송비로 재계산됨.
+ */
+export async function recomputeConsumptionUnitCostsForLots(
+  tx: Prisma.TransactionClient,
+  lotIdToNewUnitCost: Map<string, number>,
+): Promise<void> {
+  if (lotIdToNewUnitCost.size === 0) return;
+
+  const lotIds = Array.from(lotIdToNewUnitCost.keys());
+  const consumptions = await tx.lotConsumption.findMany({
+    where: { lotId: { in: lotIds } },
+    select: { id: true, lotId: true, orderItemId: true, repairPartId: true },
+  });
+  if (consumptions.length === 0) return;
+
+  await Promise.all(
+    consumptions.map((c) => {
+      const newCost = lotIdToNewUnitCost.get(c.lotId);
+      if (newCost === undefined) return Promise.resolve();
+      return tx.lotConsumption.update({
+        where: { id: c.id },
+        data: { unitCost: newCost },
+      });
+    }),
+  );
+
+  const orderItemIds = Array.from(
+    new Set(consumptions.map((c) => c.orderItemId).filter((v): v is string => !!v)),
+  );
+  const repairPartIds = Array.from(
+    new Set(consumptions.map((c) => c.repairPartId).filter((v): v is string => !!v)),
+  );
+
+  const recomputeSnapshot = async (
+    consumptionsFor: { quantity: Prisma.Decimal; unitCost: Prisma.Decimal }[],
+  ) => {
+    let totalQty = 0;
+    let totalCost = 0;
+    for (const c of consumptionsFor) {
+      const q = Number(c.quantity);
+      totalQty += q;
+      totalCost += q * Number(c.unitCost);
+    }
+    return totalQty > 0 ? totalCost / totalQty : null;
+  };
+
+  if (orderItemIds.length > 0) {
+    const orderItems = await tx.orderItem.findMany({
+      where: { id: { in: orderItemIds } },
+      select: {
+        id: true,
+        lotConsumptions: { select: { quantity: true, unitCost: true } },
+      },
+    });
+    await Promise.all(
+      orderItems.map(async (oi) => {
+        const snap = await recomputeSnapshot(oi.lotConsumptions);
+        if (snap === null) return;
+        return tx.orderItem.update({
+          where: { id: oi.id },
+          data: { unitCostSnapshot: snap },
+        });
+      }),
+    );
+  }
+
+  if (repairPartIds.length > 0) {
+    const repairParts = await tx.repairPart.findMany({
+      where: { id: { in: repairPartIds } },
+      select: {
+        id: true,
+        lotConsumptions: { select: { quantity: true, unitCost: true } },
+      },
+    });
+    await Promise.all(
+      repairParts.map(async (rp) => {
+        const snap = await recomputeSnapshot(rp.lotConsumptions);
+        if (snap === null) return;
+        return tx.repairPart.update({
+          where: { id: rp.id },
+          data: { unitCostSnapshot: snap },
+        });
+      }),
+    );
+  }
+}

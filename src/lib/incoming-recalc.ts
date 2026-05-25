@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { computeShippingNetPerUnit } from "@/lib/incoming-shipping";
+import { recomputeConsumptionUnitCostsForLots } from "@/lib/inventory/fifo";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -181,6 +182,7 @@ export async function recalcIncomingShippingSnapshots(tx: Tx, incomingId: string
   ]);
 
   const snapshotByItemId = new Map(itemSnapshots.map((s) => [s.item.id, s]));
+  const lotIdToNewUnitCost = new Map<string, number>();
   await Promise.all(
     allLots.map((lot) => {
       const snap = lot.incomingItemId ? snapshotByItemId.get(lot.incomingItemId) : undefined;
@@ -192,10 +194,16 @@ export async function recalcIncomingShippingSnapshots(tx: Tx, incomingId: string
           lotUnitCost = snap.newUnitCostSnapshot / Number(mapping.conversionRate);
         }
       }
+      lotIdToNewUnitCost.set(lot.id, lotUnitCost);
       return tx.inventoryLot.update({
         where: { id: lot.id },
         data: { unitCost: lotUnitCost as unknown as Prisma.Decimal },
       });
     })
+  );
+
+  await recomputeConsumptionUnitCostsForLots(
+    tx as unknown as Prisma.TransactionClient,
+    lotIdToNewUnitCost,
   );
 }

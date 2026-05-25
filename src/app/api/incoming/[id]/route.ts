@@ -4,6 +4,7 @@ import { computeMovingAverage } from "@/lib/cost";
 import { rebalanceSupplierLedger } from "@/lib/supplier-ledger";
 import { incomingSchema } from "@/lib/validators/incoming";
 import { computeShippingNetPerUnit } from "@/lib/incoming-shipping";
+import { recomputeConsumptionUnitCostsForLots } from "@/lib/inventory/fifo";
 import { recalcIncomingExpense } from "@/lib/incoming-recalc";
 import { recalcPurchaseOrderProgress } from "@/lib/purchase-order";
 import { recordAudit } from "@/lib/audit";
@@ -202,6 +203,7 @@ export async function PUT(
 
       // 메모리에서 lot별 새 unitCost 계산 후 병렬 update
       const snapshotByItemId = new Map(itemSnapshots.map((s) => [s.item.id, s]));
+      const lotIdToNewUnitCost = new Map<string, number>();
       await Promise.all(
         allLots.map((lot) => {
           const snap = lot.incomingItemId ? snapshotByItemId.get(lot.incomingItemId) : undefined;
@@ -215,12 +217,16 @@ export async function PUT(
               lotUnitCost = snap.newUnitCostSnapshot / Number(mapping.conversionRate);
             }
           }
+          lotIdToNewUnitCost.set(lot.id, lotUnitCost);
           return tx.inventoryLot.update({
             where: { id: lot.id },
             data: { unitCost: lotUnitCost },
           });
         })
       );
+
+      // 이미 소진된 LotConsumption 도 새 unitCost 로 갱신 → 과거 마진 자동 재계산
+      await recomputeConsumptionUnitCostsForLots(tx, lotIdToNewUnitCost);
 
       // 3. 배송비 차감 원장 처리 (paymentMethod 무관)
       {
