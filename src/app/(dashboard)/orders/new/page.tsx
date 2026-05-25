@@ -424,9 +424,15 @@ export default function NewOrderPage() {
       );
     },
     onSuccess: (data) => {
-      toast.success(`주문이 등록되었습니다 — ${data.orderNo}`);
+      // 매장판매(IN_STORE) — 즉시 종결되어 워크보드에 안 노출. 통합 판매내역으로 진입.
+      // 그 외(PICKUP/DELIVERY/QUICK/SHIPPING) — PENDING 으로 진입하므로 워크보드로.
+      const isInStoreSale = fulfillmentType === "IN_STORE";
+      toast.success(
+        `주문이 등록되었습니다 — ${data.orderNo}` +
+          (isInStoreSale ? " (매장판매 · 즉시 종결)" : ""),
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      router.push("/orders");
+      router.push(isInStoreSale ? "/sales/history" : "/orders");
     },
     onError: (err) =>
       toast.error(

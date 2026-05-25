@@ -4,6 +4,7 @@ import { orderSchema } from "@/lib/validators/order";
 import { getCurrentUser } from "@/lib/auth";
 import type { OrderStatus, FulfillmentType, Prisma } from "@prisma/client";
 import { classifyBoardGroup, getKrToday } from "@/lib/orders/board";
+import { consumeStockForOrder, prepareConsumeOptions } from "@/lib/orders/consume-stock";
 import { recordAudit } from "@/lib/audit";
 import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 
@@ -440,82 +441,144 @@ export async function POST(request: NextRequest) {
     ? Math.round(subtotalAmount * Number(channel.commissionRate))
     : 0;
 
-  // ERP 수동 등록은 PENDING 으로 시작 (재고 미차감 — prepare 액션에서 차감)
   // 매장 인도(IN_STORE/PICKUP) 는 배송정보 불필요 → recipient/address null
   const isPickup =
     data.fulfillmentType === "IN_STORE" || data.fulfillmentType === "PICKUP";
+  // 매장판매(IN_STORE) — POS 와 동일 정책으로 즉시 종결: status=COMPLETED + 재고 차감 + 라인 스냅샷.
+  //   - 결제수단 무관 (외상도 COMPLETED + UNPAID + customerLedger SALE 자동)
+  //   - PICKUP 은 손님 추후 방문이라 PENDING 유지 (워크보드 진입)
+  //   - DELIVERY/QUICK/SHIPPING 도 PENDING — 출고대기 단계 거쳐야 함
+  const isInStore = data.fulfillmentType === "IN_STORE";
+  const initialStatus: "PENDING" | "COMPLETED" = isInStore ? "COMPLETED" : "PENDING";
   // paymentStatus 산출 — paymentMethod=UNPAID 또는 미입력은 외상, 그 외는 결제 완료.
   const paymentStatus =
     !data.paymentMethod || data.paymentMethod === "UNPAID" ? "UNPAID" : "PAID";
 
-  // OrderItem 순차 생성 — parentItemIndex → parentItemId 매핑 보장
-  const order = await prisma.$transaction(async (tx) => {
-    const o = await tx.order.create({
-      data: {
-        orderNo: generateOrderNo(),
-        channelId: data.channelId || null,
-        channelOrderNo: data.channelOrderNo || null,
-        customerId: data.customerId || null,
-        customerName: data.customerName || null,
-        customerPhone: data.customerPhone || null,
-        recipientName: isPickup ? null : data.recipientName || null,
-        recipientPhone: isPickup ? null : data.recipientPhone || null,
-        shippingAddress: isPickup ? null : data.shippingAddress || null,
-        orderDate: new Date(data.orderDate),
-        fulfillmentType: data.fulfillmentType,
-        expectedShipDate:
-          isPickup || !data.expectedShipDate
-            ? null
-            : new Date(data.expectedShipDate),
-        paymentMethod: data.paymentMethod ?? null,
-        paymentStatus,
-        taxInvoiceRequested: data.taxInvoiceRequested ?? false,
-        subtotalAmount,
-        discountAmount,
-        shippingFee,
-        shippingPaymentType: data.shippingPaymentType,
-        shippingCostBorne,
-        taxAmount,
-        totalAmount,
-        commissionAmount,
-        memo: data.memo || null,
-        createdById: user.id,
-      },
-    });
+  // IN_STORE 즉시 종결 흐름: helper 가 라인 스냅샷 + FIFO 소진 처리.
+  // 옵션 일괄 사전 조회는 트랜잭션 외부에서 (channel commission/카드수수료/판매비 read-only).
+  const consumeOptions = isInStore
+    ? await prepareConsumeOptions(prisma, {
+        channelId: data.channelId ?? null,
+        channel: channel ? { commissionRate: channel.commissionRate } : null,
+        // helper 옵션 사전 조회는 productId 만 사용 — staged 라인에서 추출
+        items: stagedItems
+          .filter((s) => !!s.productId)
+          .map((s) => ({ product: { id: s.productId! } })),
+      })
+    : null;
 
-    const createdIds: string[] = [];
-    for (const it of stagedItems) {
-      const parentId =
-        it.parentItemIndex !== null ? createdIds[it.parentItemIndex] ?? null : null;
-      const created = await tx.orderItem.create({
+  // OrderItem 순차 생성 — parentItemIndex → parentItemId 매핑 보장
+  const order = await prisma.$transaction(
+    async (tx) => {
+      const o = await tx.order.create({
         data: {
-          orderId: o.id,
-          productId: it.productId,
-          serviceName: it.serviceName ?? undefined,
-          quantity: it.quantity,
-          unitPrice: it.unitPrice,
-          totalPrice: it.totalPrice,
-          listPrice: it.listPrice ?? it.unitPrice,
-          discountAmount: it.discountPerUnit,
-          lineRole: it.lineRole as never,
-          parentItemId: parentId,
-          optionSnapshot: it.optionSnapshot ?? undefined,
-          entryProductId: it.entryProductId,
+          orderNo: generateOrderNo(),
+          channelId: data.channelId || null,
+          channelOrderNo: data.channelOrderNo || null,
+          customerId: data.customerId || null,
+          customerName: data.customerName || null,
+          customerPhone: data.customerPhone || null,
+          recipientName: isPickup ? null : data.recipientName || null,
+          recipientPhone: isPickup ? null : data.recipientPhone || null,
+          shippingAddress: isPickup ? null : data.shippingAddress || null,
+          orderDate: new Date(data.orderDate),
+          fulfillmentType: data.fulfillmentType,
+          // 매장판매(IN_STORE) → COMPLETED, 그 외 → PENDING (워크보드 노출)
+          status: initialStatus,
+          expectedShipDate:
+            isPickup || !data.expectedShipDate
+              ? null
+              : new Date(data.expectedShipDate),
+          paymentMethod: data.paymentMethod ?? null,
+          paymentStatus,
+          taxInvoiceRequested: data.taxInvoiceRequested ?? false,
+          subtotalAmount,
+          discountAmount,
+          shippingFee,
+          shippingPaymentType: data.shippingPaymentType,
+          shippingCostBorne,
+          taxAmount,
+          totalAmount,
+          commissionAmount,
+          memo: data.memo || null,
+          createdById: user.id,
         },
       });
-      createdIds.push(created.id);
-    }
 
-    return tx.order.findUnique({
-      where: { id: o.id },
-      include: {
-        channel: { select: { name: true } },
-        items: {
-          include: { product: { select: { name: true, sku: true } } },
+      const createdIds: string[] = [];
+      for (const it of stagedItems) {
+        const parentId =
+          it.parentItemIndex !== null
+            ? createdIds[it.parentItemIndex] ?? null
+            : null;
+        const created = await tx.orderItem.create({
+          data: {
+            orderId: o.id,
+            productId: it.productId,
+            serviceName: it.serviceName ?? undefined,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            totalPrice: it.totalPrice,
+            listPrice: it.listPrice ?? it.unitPrice,
+            discountAmount: it.discountPerUnit,
+            lineRole: it.lineRole as never,
+            parentItemId: parentId,
+            optionSnapshot: it.optionSnapshot ?? undefined,
+            entryProductId: it.entryProductId,
+          },
+        });
+        createdIds.push(created.id);
+      }
+
+      // IN_STORE: 재고 즉시 차감 + 라인 스냅샷 — POS 매장판매 결제와 동일.
+      // 워크보드 prepare 단계를 건너뜀.
+      if (isInStore && consumeOptions) {
+        const fullOrder = await tx.order.findUnique({
+          where: { id: o.id },
+          select: {
+            id: true,
+            orderNo: true,
+            items: {
+              select: {
+                id: true,
+                quantity: true,
+                unitPrice: true,
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    isSet: true,
+                    setComponents: {
+                      select: {
+                        componentId: true,
+                        quantity: true,
+                        component: { select: { name: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        if (fullOrder) {
+          await consumeStockForOrder(tx, fullOrder, consumeOptions);
+        }
+      }
+
+      return tx.order.findUnique({
+        where: { id: o.id },
+        include: {
+          channel: { select: { name: true } },
+          items: {
+            include: { product: { select: { name: true, sku: true } } },
+          },
         },
-      },
-    });
-  });
+      });
+    },
+    // IN_STORE 는 prepare 와 동일하게 재고 차감까지 — 트랜잭션 타임아웃 확장
+    isInStore ? { timeout: 30000, maxWait: 10000 } : undefined,
+  );
 
   if (!order) {
     return NextResponse.json({ error: "주문 생성 실패" }, { status: 500 });

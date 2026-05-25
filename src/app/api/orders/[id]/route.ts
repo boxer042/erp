@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { computeSellingCostPerUnit } from "@/lib/selling-cost";
-import { fifoConsume, ensureBulkStock, isOversellAllowed } from "@/lib/inventory/fifo";
+import { consumeStockForOrder, prepareConsumeOptions } from "@/lib/orders/consume-stock";
 import { orderUpdateSchema } from "@/lib/validators/order";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
@@ -583,204 +582,19 @@ export async function PUT(
     );
   }
 
-  // === prepare 시 재고 차감 + cost snapshot (기존 confirm 로직과 동일) ===
+  // === prepare 시 재고 차감 + cost snapshot ===
+  //   - 채널/카드수수료/판매비 옵션 prepareConsumeOptions 로 일괄 사전 조회
+  //   - consumeStockForOrder 헬퍼가 트랜잭션 내부에서 FIFO 소진 + 라인 스냅샷 처리
+  //   - IN_STORE 즉시 종결 흐름(/api/orders POST)과 동일 헬퍼 공용
   if (action === "prepare") {
-    // 채널 수수료율 + 오프라인(channelId IS NULL) 이면 현재 카드수수료율 (트랜잭션 외에서 fetch)
-    const channelCommRate = order.channel ? Number(order.channel.commissionRate) : 0;
-    const isOffline = order.channelId == null;
-    const currentCardFee = isOffline
-      ? await prisma.cardFeeRate.findFirst({
-          where: { appliedFrom: { lte: new Date() } },
-          orderBy: { appliedFrom: "desc" },
-        })
-      : null;
-    const cardFeeRateSnapshot = currentCardFee ? Number(currentCardFee.rate) : null;
-
     try {
-      // 모든 OrderItem의 productId 모아 sellingCost를 일괄 조회 (N+1 방지)
-      const productIds = Array.from(
-        new Set(order.items.map((i) => i.product?.id).filter((p): p is string => !!p))
-      );
-      const allSellingCosts = productIds.length > 0
-        ? await prisma.sellingCost.findMany({
-            where: {
-              productId: { in: productIds },
-              isActive: true,
-              OR: [
-                { channelId: null },
-                ...(order.channelId ? [{ channelId: order.channelId }] : []),
-              ],
-            },
-          })
-        : [];
-      const sellingCostsByProduct = new Map<string, typeof allSellingCosts>();
-      for (const sc of allSellingCosts) {
-        const arr = sellingCostsByProduct.get(sc.productId) ?? [];
-        arr.push(sc);
-        sellingCostsByProduct.set(sc.productId, arr);
-      }
-
-      const allowOversell = await isOversellAllowed();
+      const consumeOptions = await prepareConsumeOptions(prisma, order);
 
       await prisma.$transaction(
         async (tx) => {
-        await tx.order.update({ where: { id }, data: { status: "PREPARING" } });
-
-        // FIFO 로트 소진 + orderItemId로 LotConsumption 생성
-        const fifoForOrderItem = async (
-          productId: string,
-          orderItemId: string,
-          qty: number,
-          displayName: string,
-        ) => {
-          await ensureBulkStock(tx, productId, qty, displayName, allowOversell);
-          const { consumptions, unitCostAvg } = await fifoConsume(
-            tx,
-            productId,
-            qty,
-            displayName,
-            allowOversell,
-          );
-          if (consumptions.length > 0) {
-            await tx.lotConsumption.createMany({
-              data: consumptions.map((c) => ({
-                orderItemId,
-                lotId: c.lotId,
-                quantity: c.quantity,
-                unitCost: c.unitCost,
-              })),
-            });
-          }
-          return unitCostAvg;
-        };
-
-        for (const item of order.items) {
-          if (!item.product) continue; // 서비스 항목(productId 없음)은 재고 소진 스킵
-          let unitCostSnapshot: number | null = null;
-
-          if (item.product.isSet && item.product.setComponents.length > 0) {
-            // 조립상품: 완제품 로트 우선 차감, 부족분만 구성품 즉시 소비
-            const orderQty = Number(item.quantity);
-            const finishedInv = await tx.inventory.findUnique({
-              where: { productId: item.product.id },
-            });
-            // 완제품 재고가 음수(이미 초과판매)일 수 있으므로 0 으로 clamp —
-            // 부족분(componentQty)이 orderQty 를 넘지 않게 한다.
-            const finishedAvailable = finishedInv
-              ? Math.max(0, Math.min(orderQty, Number(finishedInv.quantity)))
-              : 0;
-            const componentQty = orderQty - finishedAvailable;
-
-            let finishedCostTotal = 0;
-            if (finishedAvailable > 0) {
-              const finishedUnitCost = await fifoForOrderItem(
-                item.product.id,
-                item.id,
-                finishedAvailable,
-                `${item.product.name} (완제품 재고)`,
-              );
-              finishedCostTotal = finishedUnitCost * finishedAvailable;
-
-              const inv = await tx.inventory.update({
-                where: { productId: item.product.id },
-                data: { quantity: { decrement: finishedAvailable } },
-              });
-              await tx.inventoryMovement.create({
-                data: {
-                  inventoryId: inv.id,
-                  type: "OUTGOING",
-                  quantity: finishedAvailable,
-                  balanceAfter: inv.quantity,
-                  referenceId: order.id,
-                  referenceType: "ORDER",
-                  memo: `주문 ${order.orderNo} 완제품 출고`,
-                },
-              });
-            }
-
-            let componentCostTotal = 0;
-            if (componentQty > 0) {
-              // 부족분은 구성품에서 즉시 소비 (현 로직 유지)
-              for (const comp of item.product.setComponents) {
-                const deductQty = componentQty * Number(comp.quantity);
-                const compUnitCost = await fifoForOrderItem(
-                  comp.componentId,
-                  item.id,
-                  deductQty,
-                  `세트 구성품 ${comp.component.name}`,
-                );
-                componentCostTotal +=
-                  compUnitCost * Number(comp.quantity) * componentQty;
-
-                const inventory = await tx.inventory.update({
-                  where: { productId: comp.componentId },
-                  data: { quantity: { decrement: deductQty } },
-                });
-                await tx.inventoryMovement.create({
-                  data: {
-                    inventoryId: inventory.id,
-                    type: "SET_CONSUME",
-                    quantity: deductQty,
-                    balanceAfter: inventory.quantity,
-                    referenceId: order.id,
-                    referenceType: "ORDER",
-                    memo: `주문 ${order.orderNo} 세트 구성품 차감`,
-                  },
-                });
-              }
-            }
-
-            unitCostSnapshot = (finishedCostTotal + componentCostTotal) / orderQty;
-          } else {
-            // 단품: FIFO 차감
-            unitCostSnapshot = await fifoForOrderItem(
-              item.product.id,
-              item.id,
-              Number(item.quantity),
-              item.product.name,
-            );
-
-            const inventory = await tx.inventory.update({
-              where: { productId: item.product.id },
-              data: { quantity: { decrement: Number(item.quantity) } },
-            });
-            await tx.inventoryMovement.create({
-              data: {
-                inventoryId: inventory.id,
-                type: "OUTGOING",
-                quantity: Number(item.quantity),
-                balanceAfter: inventory.quantity,
-                referenceId: order.id,
-                referenceType: "ORDER",
-                memo: `주문 ${order.orderNo}`,
-              },
-            });
-          }
-
-          // 판매비용 스냅샷 — 트랜잭션 시작 전 일괄 조회한 결과를 사용 (N+1 방지)
-          const sellingCosts = sellingCostsByProduct.get(item.product.id) ?? [];
-          const sellingCostSnapshot = computeSellingCostPerUnit(
-            sellingCosts,
-            Number(item.unitPrice),
-          );
-
-          if (unitCostSnapshot == null) {
-            console.warn(
-              `[orders/confirm] unitCostSnapshot 누락: orderItemId=${item.id}, productId=${item.product?.id}. ` +
-                `LotConsumption 도 없을 가능성 → 마진 리포트 부정확.`
-            );
-          }
-
-          await tx.orderItem.update({
-            where: { id: item.id },
-            data: {
-              unitCostSnapshot,
-              channelCommissionRateSnapshot: channelCommRate,
-              cardFeeRateSnapshot,
-              sellingCostSnapshot,
-            },
-          });
-        }
+          await tx.order.update({ where: { id }, data: { status: "PREPARING" } });
+          // 공용 헬퍼 — FIFO 소진 + 라인 스냅샷 일괄 처리 (IN_STORE 즉시 종결 흐름과 공용)
+          await consumeStockForOrder(tx, order, consumeOptions);
         },
         { timeout: 30000, maxWait: 10000 },
       );
