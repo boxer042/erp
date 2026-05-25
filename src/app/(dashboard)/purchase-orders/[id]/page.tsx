@@ -465,7 +465,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
           <AccessTokenCard
             tokens={data.accessTokens}
             companyName={companyInfoQuery.data?.name ?? ""}
-            supplierRepresentative={data.supplier.representative}
+            supplierName={data.supplier.name}
             supplierPhone={data.supplier.phone}
             firstItemName={
               data.items[0]
@@ -811,14 +811,14 @@ const TOKEN_STATUS_VARIANT: Record<AccessToken["status"], "default" | "info" | "
 function AccessTokenCard({
   tokens,
   companyName,
-  supplierRepresentative,
+  supplierName,
   supplierPhone,
   firstItemName,
   totalItems,
 }: {
   tokens: AccessToken[];
   companyName: string;
-  supplierRepresentative: string | null;
+  supplierName: string;
   supplierPhone: string | null;
   firstItemName: string;
   totalItems: number;
@@ -830,29 +830,61 @@ function AccessTokenCard({
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const buildUrl = (token: string) => `${baseUrl}/external/po/${token}`;
 
-  // 메시지 기본 템플릿 — 활성 토큰 있을 때 자동 생성
-  const buildDefaultMessage = (url: string) => {
-    const rep = supplierRepresentative ? `${supplierRepresentative}님` : "사장님";
-    const company = companyName ? `${companyName}입니다.` : "";
+  // 메시지 톤 2종 — 거래처에 따라 골라 보낼 수 있게
+  type MessageTone = "formal" | "friendly";
+  const TONE_LABELS: Record<MessageTone, string> = {
+    formal: "정중",
+    friendly: "친근",
+  };
+  const buildMessage = (tone: MessageTone, url: string) => {
+    const supplier = supplierName || "거래처";
+    const company = companyName || "";
     const itemLabel =
-      totalItems > 1
-        ? `${firstItemName} 외 ${totalItems - 1}건`
-        : firstItemName;
+      totalItems > 1 ? `${firstItemName} 외 ${totalItems - 1}건` : firstItemName;
+    if (tone === "formal") {
+      return [
+        `${supplier} 담당자님께,`,
+        ``,
+        `안녕하세요. ${company}입니다.`,
+        `${itemLabel} 발주를 보내드리오니`,
+        `아래 링크를 통해 확인 부탁드립니다.`,
+        ``,
+        url,
+        ``,
+        `검토 후 수락 / 단가 변경 / 거절 중`,
+        `선택해주시면 됩니다.`,
+        `감사합니다.`,
+      ].join("\n");
+    }
+    // friendly
     return [
-      `${rep} 안녕하세요.${company ? " " + company : ""}`,
-      `${itemLabel} 발주서 확인 부탁드립니다.`,
+      `${supplier} 담당자님, 안녕하세요!`,
+      `${company}입니다 :)`,
+      ``,
+      `${itemLabel} 발주서 보내드려요.`,
+      `링크에서 확인 부탁드립니다.`,
+      ``,
       url,
+      ``,
+      `수락 / 단가 변경 / 거절 중에서 편하게 선택해주시면 됩니다.`,
+      `오늘도 감사합니다!`,
     ].join("\n");
   };
 
   const activeUrl = active ? buildUrl(active.token) : "";
-  const [message, setMessage] = useState(() => activeUrl ? buildDefaultMessage(activeUrl) : "");
+  const [tone, setTone] = useState<MessageTone>("friendly");
+  const [message, setMessage] = useState(() => (activeUrl ? buildMessage("friendly", activeUrl) : ""));
   const [lastTokenId, setLastTokenId] = useState(active?.id ?? null);
-  // 새 토큰 발급되면 메시지 재생성
+  // 새 토큰 발급되면 현재 톤으로 메시지 재생성
   if (active && active.id !== lastTokenId) {
     setLastTokenId(active.id);
-    setMessage(buildDefaultMessage(activeUrl));
+    setMessage(buildMessage(tone, activeUrl));
   }
+
+  const applyTone = (next: MessageTone) => {
+    setTone(next);
+    setMessage(buildMessage(next, activeUrl));
+  };
 
   const copy = async (text: string) => {
     try {
@@ -923,24 +955,36 @@ function AccessTokenCard({
               <Metric label="만료" value={new Date(active.expiresAt).toLocaleString("ko-KR")} />
             </div>
 
-            {/* 거래처 발송 메시지 — 복사/SMS/공유로 카톡·문자에 붙여넣기 */}
+            {/* 거래처 발송 메시지 — 톤 선택 + 복사/SMS/공유 */}
             <div className="mt-3 space-y-2 border-t border-[var(--jm-border)] pt-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="text-jm-xs font-medium text-[var(--jm-text)]">
                   거래처에 보낼 메시지
                 </label>
-                <button
-                  type="button"
-                  className="text-jm-2xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
-                  onClick={() => setMessage(buildDefaultMessage(activeUrl))}
-                >
-                  기본 메시지로 초기화
-                </button>
+                <div className="flex gap-1">
+                  {(Object.keys(TONE_LABELS) as MessageTone[]).map((t) => {
+                    const selected = tone === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => applyTone(t)}
+                        className={`rounded-md border px-2 py-1 text-jm-2xs font-medium transition-colors ${
+                          selected
+                            ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
+                            : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]"
+                        }`}
+                      >
+                        {TONE_LABELS[t]}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <JmTextarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                rows={5}
+                rows={9}
                 className="font-[family-name:var(--jm-font-sans)] text-jm-sm"
               />
               <div className="flex flex-wrap gap-2">
