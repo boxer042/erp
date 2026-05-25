@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -27,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { CustomerPaymentDialog } from "@/components/customer-payment-dialog";
 import { CustomerAdjustmentDialog } from "@/components/customer-adjustment-dialog";
+import { OrderDetailSheet } from "@/app/(dashboard)/orders/_detail-sheet";
 import { type PaymentMethod } from "@/lib/validators/supplier";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 
@@ -49,7 +49,6 @@ import {
 import { LedgerView } from "./_views";
 
 export default function CustomerLedgerPage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { resolvedTheme } = useTheme();
   // 모바일/좁은 화면에서 좌측 패널 접기 토글 (기본: 펼침)
@@ -83,6 +82,9 @@ export default function CustomerLedgerPage() {
     date: string;
     memo: string | null;
   } | null>(null);
+
+  // 주문 상세 모달 — SALE/REFUND 행 더블클릭 시 페이지 이탈 없이 OrderDetailSheet 열기
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
 
   const ledgerQuery = useQuery({
     queryKey: queryKeys.ledger.customers({
@@ -165,9 +167,9 @@ export default function CustomerLedgerPage() {
       setAdjDialogOpen(true);
       return;
     }
-    // 매출/환불 → 주문 상세 deeplink
+    // 매출/환불 → OrderDetailSheet 모달 (페이지 이탈 없이 인라인 확인)
     if ((e.type === "SALE" || e.type === "REFUND") && e.referenceType === "ORDER" && e.referenceId) {
-      router.push(`/orders?id=${e.referenceId}`);
+      setDetailOrderId(e.referenceId);
     }
   };
 
@@ -572,6 +574,16 @@ export default function CustomerLedgerPage() {
         }
         initialAdjustment={editingAdjustment ?? undefined}
         onSaved={fetchLedger}
+      />
+
+      {/* 주문 상세 모달 — SALE/REFUND 행 더블클릭 시 인라인 슬라이드 (페이지 이탈 없음).
+          OrderDetailSheet 가 거래명세표 미리보기·수금·반품 등 모든 액션 포함. */}
+      <OrderDetailSheet
+        orderId={detailOrderId}
+        open={!!detailOrderId}
+        onOpenChange={(o) => {
+          if (!o) setDetailOrderId(null);
+        }}
       />
     </JmScope>
   );

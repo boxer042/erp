@@ -33,6 +33,12 @@ interface Data {
   taxAmount: number;
   totalAmount: number;
   paymentMethod: string | null;
+  /** 결제 축 — UNPAID / PAID / PARTIAL_PAID / 환불 등 */
+  paymentStatus?: string | null;
+  /** 즉시 결제된 금액 — 부분 결제(PARTIAL_PAID) 시 < totalAmount. null 이면 전액 결제 */
+  paidAmount?: number | null;
+  /** 부분 결제 구분 — DEPOSIT(계약금) / PARTIAL(부분결제). 헤더 라벨 분기용 */
+  partialPaymentKind?: "DEPOSIT" | "PARTIAL" | null;
   memo: string | null;
 }
 
@@ -164,6 +170,25 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
             {data.company.address && <div>{data.company.address}</div>}
           </div>
 
+          {/* 영수증 종류 라벨 — 부분 결제(계약금/부분결제) 케이스에 헤더 분기 */}
+          {data.partialPaymentKind && (
+            <div
+              style={{
+                textAlign: "center",
+                marginTop: "2mm",
+                padding: "1mm 2mm",
+                border: "1.5px solid #000",
+                fontSize: "10pt",
+                fontWeight: 800,
+                letterSpacing: "0.5mm",
+              }}
+            >
+              {data.partialPaymentKind === "DEPOSIT"
+                ? "계약금 영수증"
+                : "부분 결제 영수증"}
+            </div>
+          )}
+
           <hr />
 
           <div className="row">
@@ -259,6 +284,44 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
             <span>합계</span>
             <span>{fmt(data.totalAmount)}</span>
           </div>
+
+          {/* 부분 결제 — 즉시 결제 / 잔금(미수) 분리 표시 */}
+          {data.partialPaymentKind &&
+            data.paidAmount !== null &&
+            data.paidAmount !== undefined && (
+              <>
+                <hr />
+                <div className="row">
+                  <span className="label">
+                    {data.partialPaymentKind === "DEPOSIT"
+                      ? "계약금 입금"
+                      : "즉시 결제"}
+                  </span>
+                  <span className="val">{fmt(data.paidAmount)}</span>
+                </div>
+                <div
+                  className="row"
+                  style={{ fontSize: "10pt", fontWeight: 700 }}
+                >
+                  <span className="label">잔금 (미수)</span>
+                  <span className="val">
+                    {fmt(Math.max(0, data.totalAmount - data.paidAmount))}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: "1mm",
+                    fontSize: "8pt",
+                    color: "#555",
+                    textAlign: "center",
+                  }}
+                >
+                  {data.partialPaymentKind === "DEPOSIT"
+                    ? "본 영수증은 계약금 수령 확인용입니다 — 잔금 결제 시 별도 영수증 발급"
+                    : "잔금은 차후 결제 시 별도 영수증 발급"}
+                </div>
+              </>
+            )}
 
           {data.memo && (
             <>

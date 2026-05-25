@@ -83,6 +83,10 @@ export default async function PosReceiptPrintPage({
         taxAmount: Number(order.taxAmount),
         totalAmount: Number(order.totalAmount),
         paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        // 부분 결제 메타 — 계약금/일부결제일 때 영수증 헤더·결제정보 분기
+        paidAmount: order.paidAmount ? Number(order.paidAmount) : null,
+        partialPaymentKind: order.partialPaymentKind,
         memo: order.memo,
       }}
     />

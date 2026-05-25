@@ -82,9 +82,30 @@ export default async function OrderStatementPrintPage({
     address: order.customer?.address || order.shippingAddress || null,
   };
 
+  // 부분 결제 (PARTIAL_PAID) — 영수증/명세표 헤더 라벨 분기 + 메모에 결제·잔금 명시
+  //   DEPOSIT  → "계약금 명세표"     (계약금 ₩X 입금 / 잔금 ₩Y 미수)
+  //   PARTIAL  → "부분 결제 명세표"   (즉시 결제 ₩X / 잔금 ₩Y 미수)
+  const isPartial =
+    order.paymentStatus === "PARTIAL_PAID" && order.paidAmount !== null;
+  const paid = isPartial ? Number(order.paidAmount) : 0;
+  const outstanding = isPartial
+    ? Math.max(0, Number(order.totalAmount) - paid)
+    : 0;
+  const partialNote = isPartial
+    ? order.partialPaymentKind === "DEPOSIT"
+      ? `[계약금] 입금 ₩${paid.toLocaleString("ko-KR")} · 잔금 ₩${outstanding.toLocaleString("ko-KR")} 미수`
+      : `[부분 결제] 즉시 결제 ₩${paid.toLocaleString("ko-KR")} · 잔금 ₩${outstanding.toLocaleString("ko-KR")} 미수`
+    : null;
+  const docTitle = isPartial
+    ? order.partialPaymentKind === "DEPOSIT"
+      ? "계약금 명세표"
+      : "부분 결제 명세표"
+    : "거래명세표";
+  const docMemo = [partialNote, order.memo].filter(Boolean).join(" · ");
+
   return (
     <DocumentPdf
-      title="거래명세표"
+      title={docTitle}
       docKind="statement"
       documentNo={order.orderNo}
       issueDate={order.orderDate.toISOString()}
@@ -106,7 +127,7 @@ export default async function OrderStatementPrintPage({
       subtotalAmount={order.subtotalAmount.toString()}
       taxAmount={order.taxAmount.toString()}
       totalAmount={order.totalAmount.toString()}
-      memo={order.memo}
+      memo={docMemo || null}
       autoPrint={auto === "1"}
       supplyOnly={supplyOnly === "1"}
       fillPage

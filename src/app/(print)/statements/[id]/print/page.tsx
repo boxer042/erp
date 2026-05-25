@@ -46,9 +46,37 @@ export default async function StatementPrintPage({
     include: {
       items: { orderBy: { sortOrder: "asc" } },
       customer: true,
+      // 연결된 Order 의 부분 결제 메타 — 명세표 헤더·메모 분기용
+      order: {
+        select: {
+          paymentStatus: true,
+          paidAmount: true,
+          partialPaymentKind: true,
+          totalAmount: true,
+        },
+      },
     },
   });
   if (!s) notFound();
+
+  // 부분 결제 (PARTIAL_PAID) — 연결 Order 가 있을 때만 의미. statement 단독은 미적용.
+  const isPartial =
+    s.order?.paymentStatus === "PARTIAL_PAID" && s.order?.paidAmount !== null;
+  const paid = isPartial ? Number(s.order!.paidAmount) : 0;
+  const outstanding = isPartial
+    ? Math.max(0, Number(s.order!.totalAmount) - paid)
+    : 0;
+  const partialNote = isPartial
+    ? s.order!.partialPaymentKind === "DEPOSIT"
+      ? `[계약금] 입금 ₩${paid.toLocaleString("ko-KR")} · 잔금 ₩${outstanding.toLocaleString("ko-KR")} 미수`
+      : `[부분 결제] 즉시 결제 ₩${paid.toLocaleString("ko-KR")} · 잔금 ₩${outstanding.toLocaleString("ko-KR")} 미수`
+    : null;
+  const docTitle = isPartial
+    ? s.order!.partialPaymentKind === "DEPOSIT"
+      ? "계약금 명세표"
+      : "부분 결제 명세표"
+    : "거래명세표";
+  const docMemo = [partialNote, s.memo].filter(Boolean).join(" · ");
 
   const buyer = {
     name: s.customer?.name || s.customerNameSnapshot || "",
@@ -61,7 +89,7 @@ export default async function StatementPrintPage({
 
   return (
     <DocumentPdf
-      title="거래명세표"
+      title={docTitle}
       docKind="statement"
       documentNo={s.statementNo}
       issueDate={s.issueDate.toISOString()}
@@ -82,7 +110,7 @@ export default async function StatementPrintPage({
       subtotalAmount={s.subtotalAmount.toString()}
       taxAmount={s.taxAmount.toString()}
       totalAmount={s.totalAmount.toString()}
-      memo={s.memo}
+      memo={docMemo || null}
       autoPrint={auto === "1"}
       supplyOnly={supplyOnly === "1"}
       fillPage

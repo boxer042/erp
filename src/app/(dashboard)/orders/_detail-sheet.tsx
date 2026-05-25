@@ -152,6 +152,10 @@ interface OrderDetail {
   memo: string | null;
   paymentMethod: string | null;
   paymentStatus: OrderPaymentStatus;
+  /** 부분 결제 — 즉시 결제된 금액 (PARTIAL_PAID 시). null 이면 전액 결제. */
+  paidAmount: string | null;
+  /** 부분 결제 구분 — DEPOSIT(계약금) / PARTIAL(부분결제). PARTIAL_PAID 시 의미. */
+  partialPaymentKind: "DEPOSIT" | "PARTIAL" | null;
   taxInvoiceRequested: boolean;
   returnRequestedAt: string | null;
   returnAcceptedAt: string | null;
@@ -868,17 +872,21 @@ export function OrderDetailSheet({
                     <Printer className="size-3.5" />
                     거래명세표
                   </JmButton>
-                  {/* 외상 주문 수금 등록 — UNPAID + 등록 고객일 때만 (비등록 외상은 ledger 없음) */}
-                  {data.paymentStatus === "UNPAID" && data.customerId && (
-                    <JmButton
-                      variant="cta"
-                      size="xs"
-                      onClick={() => setPaymentDialogOpen(true)}
-                    >
-                      <Banknote className="size-3.5" />
-                      수금 등록
-                    </JmButton>
-                  )}
+                  {/* 수금 등록 — UNPAID(전액 미수) 또는 PARTIAL_PAID(잔금 미수) + 등록 고객 */}
+                  {(data.paymentStatus === "UNPAID" ||
+                    data.paymentStatus === "PARTIAL_PAID") &&
+                    data.customerId && (
+                      <JmButton
+                        variant="cta"
+                        size="xs"
+                        onClick={() => setPaymentDialogOpen(true)}
+                      >
+                        <Banknote className="size-3.5" />
+                        {data.paymentStatus === "PARTIAL_PAID"
+                          ? "잔금 수금"
+                          : "수금 등록"}
+                      </JmButton>
+                    )}
                   {data.status !== "CANCELLED" && (
                     <JmButton
                       variant="ghost"
@@ -1932,6 +1940,38 @@ function ReadView({
             )}
             <JmSeparator className="my-2" />
             <SumRow label="합계" value={Number(order.totalAmount)} bold />
+            {/* 부분 결제 — 즉시 결제(또는 계약금) / 잔금(미수) 분리 표시 */}
+            {order.paymentStatus === "PARTIAL_PAID" && order.paidAmount && (
+              <div className="mt-2 space-y-1 rounded-md border border-[var(--jm-warning-fg)]/40 bg-[var(--jm-warning-bg)] px-3 py-2">
+                <div className="flex items-center justify-between text-jm-xs">
+                  <span className="text-[var(--jm-warning-fg)]">
+                    {order.partialPaymentKind === "DEPOSIT"
+                      ? "계약금 입금"
+                      : "즉시 결제"}
+                  </span>
+                  <span className="font-semibold tabular-nums text-[var(--jm-warning-fg)]">
+                    ₩{Number(order.paidAmount).toLocaleString("ko-KR")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-jm-sm">
+                  <span className="font-semibold text-[var(--jm-warning-fg)]">
+                    잔금 (미수)
+                  </span>
+                  <span className="font-bold tabular-nums text-[var(--jm-warning-fg)]">
+                    ₩
+                    {Math.max(
+                      0,
+                      Number(order.totalAmount) - Number(order.paidAmount),
+                    ).toLocaleString("ko-KR")}
+                  </span>
+                </div>
+                <p className="text-jm-2xs text-[var(--jm-warning-fg)]/80">
+                  {order.partialPaymentKind === "DEPOSIT"
+                    ? "계약금 수령 — 잔금은 고객 미수금으로 등록되어 차후 수금"
+                    : "잔금은 고객 미수금으로 등록됨 — 수금 시 [수금 등록] 사용"}
+                </p>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2 pt-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
               {order.paymentMethod && (
                 <span>결제수단 · {paymentLabel(order.paymentMethod)}</span>
