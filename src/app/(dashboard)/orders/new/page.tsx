@@ -3,7 +3,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Minus, PanelRightClose, PanelRightOpen, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -11,7 +11,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { calcDiscountPerUnit, formatPhone, genClientId } from "@/lib/utils";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import {
-  JmButton,
   JmDatePicker,
   JmIconButton,
   JmInput,
@@ -152,6 +151,8 @@ export default function NewOrderPage() {
   const [quickCustomerDefault, setQuickCustomerDefault] = useState("");
   // draft slot id — 미등록 고객 임시 코드/컬러 시드용 (CustomerSummaryCard 입력)
   const [draftId] = useState(() => genClientId());
+  // 우측 패널(카트+폼) 표시 여부 — 토글로 카탈로그 전체 화면 모드 가능
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const isDelivery =
     fulfillmentType !== "IN_STORE" && fulfillmentType !== "PICKUP";
@@ -469,24 +470,19 @@ export default function NewOrderPage() {
             className="pl-9"
           />
         </div>
-        <div className="ml-auto hidden items-center gap-2 lg:flex">
-          <JmButton
-            variant="outline"
-            onClick={() => router.push("/orders")}
-            disabled={createMutation.isPending}
-          >
-            취소
-          </JmButton>
-          <JmButton
-            onClick={() => createMutation.mutate()}
-            disabled={!canSubmit}
-          >
-            {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
-            {createMutation.isPending
-              ? "등록 중..."
-              : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
-          </JmButton>
-        </div>
+        {/* 우측 패널 토글 — 카트/폼 패널을 열고 닫아 카탈로그 전체화면 모드 */}
+        <JmIconButton
+          aria-label={panelOpen ? "우측 패널 닫기" : "우측 패널 열기"}
+          variant="ghost"
+          onClick={() => setPanelOpen((v) => !v)}
+          className="ml-auto"
+        >
+          {panelOpen ? (
+            <PanelRightClose className="size-4" />
+          ) : (
+            <PanelRightOpen className="size-4" />
+          )}
+        </JmIconButton>
       </header>
 
       {/* ─── 본문 ─── */}
@@ -533,7 +529,8 @@ export default function NewOrderPage() {
           </div>
         </section>
 
-        {/* ── 우측: 카트 + 폼 (POS 결제시트 스타일) ── */}
+        {/* ── 우측: 카트 + 폼 (POS 결제시트 스타일). panelOpen=false 면 비노출 → 카탈로그 전체화면 ── */}
+        {panelOpen && (
         <aside className="flex min-h-0 flex-col bg-[var(--jm-surface)] lg:w-[440px] lg:shrink-0 xl:w-[480px]">
           {/* 본문 — 스크롤 */}
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -899,21 +896,32 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 모바일 sticky 등록 버튼 (lg 미만에서만 노출 — 데스크탑은 헤더에 위치) */}
-          <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] p-3 lg:hidden">
-            <button
-              type="button"
-              onClick={() => createMutation.mutate()}
-              disabled={!canSubmit}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
-            >
-              {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
-              {createMutation.isPending
-                ? "등록 중..."
-                : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
-            </button>
+          {/* Sticky bottom bar — POS 결제시트 풋터 패턴. 항상 노출 (모바일·데스크탑 공통). */}
+          <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] p-3">
+            <div className="flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={() => router.push("/orders")}
+                disabled={createMutation.isPending}
+                className="flex h-14 shrink-0 items-center justify-center rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-[14px] font-semibold text-[var(--jm-text)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => createMutation.mutate()}
+                disabled={!canSubmit}
+                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+              >
+                {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
+                {createMutation.isPending
+                  ? "등록 중..."
+                  : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
+              </button>
+            </div>
           </div>
         </aside>
+        )}
       </div>
 
       {/* ─── Dialogs ─── */}
