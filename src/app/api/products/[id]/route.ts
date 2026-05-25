@@ -754,9 +754,13 @@ export async function GET(
   }
   // 부모(canonical/단일) 의 가변 슬롯 부품을 키별로 매핑 (= 비교 기준)
   const parentVariableByKey = new Map<string, { componentId: string; quantity: number }>();
+  // slotId 가 있으면 그 슬롯에 정확히 핀된 SC — LID/LBL 폴백 금지.
+  // (같은 label 의 가변/고정 슬롯이 공존할 때 고정 슬롯 SC 가 LID/LBL 키로 가변에 잘못 매칭되는 것을 막음)
   const matchSlotKeys = (sc: { slotId: string | null; slotLabelId: string | null; label: string | null }): string[] => {
+    if (sc.slotId) {
+      return variableSlotKeys.has(`SID:${sc.slotId}`) ? [`SID:${sc.slotId}`] : [];
+    }
     const keys: string[] = [];
-    if (sc.slotId && variableSlotKeys.has(`SID:${sc.slotId}`)) keys.push(`SID:${sc.slotId}`);
     if (sc.slotLabelId && variableSlotKeys.has(`LID:${sc.slotLabelId}`)) keys.push(`LID:${sc.slotLabelId}`);
     if (sc.label && sc.label.trim() && variableSlotKeys.has(`LBL:${sc.label.trim()}`)) keys.push(`LBL:${sc.label.trim()}`);
     return keys;
