@@ -68,7 +68,7 @@ interface CheckoutBody {
   customerId?: string | null;
   customerName?: string | null;
   customerPhone?: string | null;
-  paymentMethod?: "CASH" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
+  paymentMethod?: "CASH" | "CASH_RECEIPT" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
   taxInvoiceRequested?: boolean;
   memo?: string | null;
   items: CheckoutItem[];

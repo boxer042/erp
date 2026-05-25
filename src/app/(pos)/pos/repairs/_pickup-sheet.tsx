@@ -14,10 +14,11 @@ import {
 } from "@/jm";
 import { fmtKRWInc } from "./_helpers";
 
-type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
+type PaymentMethod = "CASH" | "CASH_RECEIPT" | "CARD" | "TRANSFER" | "UNPAID";
 const PAYMENTS: { value: PaymentMethod; label: string; sub?: string }[] = [
   { value: "CARD", label: "카드", sub: "POS 결제" },
   { value: "CASH", label: "현금" },
+  { value: "CASH_RECEIPT", label: "현금영수증", sub: "국세청 발급" },
   { value: "TRANSFER", label: "계좌이체" },
   { value: "UNPAID", label: "외상", sub: "고객 미수금" },
 ];

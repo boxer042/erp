@@ -48,6 +48,7 @@ export const shippingPaymentTypeSchema = z.enum([
 ]);
 export const orderPaymentMethodSchema = z.enum([
   "CASH",
+  "CASH_RECEIPT", // 현금영수증 발행 — 손님 휴대폰/사업자번호로 국세청 영수증 발급
   "CARD",
   "TRANSFER",
   "MIXED",

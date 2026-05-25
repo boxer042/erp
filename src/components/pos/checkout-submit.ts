@@ -20,7 +20,7 @@ export interface ShippingInfo {
 
 export interface CheckoutPayloadOptions {
   action: CheckoutAction;
-  paymentMethod?: "CASH" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
+  paymentMethod?: "CASH" | "CASH_RECEIPT" | "CARD" | "TRANSFER" | "MIXED" | "UNPAID" | null;
   taxInvoiceRequested?: boolean;
   memo?: string | null;
   /** 출고 방식 — 미지정/IN_STORE 시 즉시 종결, PICKUP/DELIVERY/SHIPPING 은 ERP 워크보드 진입 */

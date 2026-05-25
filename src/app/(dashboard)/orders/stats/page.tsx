@@ -59,6 +59,7 @@ const TableRow = JmTableRow;
 
 const PAYMENT_LABEL: Record<string, string> = {
   CASH: "현금",
+  CASH_RECEIPT: "현금영수증",
   CARD: "카드",
   TRANSFER: "계좌이체",
   UNPAID: "외상",

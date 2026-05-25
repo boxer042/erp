@@ -39,6 +39,7 @@ interface Data {
 const PAYMENT_LABEL: Record<string, string> = {
   CARD: "카드",
   CASH: "현금",
+  CASH_RECEIPT: "현금영수증",
   TRANSFER: "계좌이체",
   UNPAID: "외상 (미수금)",
   MIXED: "복합",

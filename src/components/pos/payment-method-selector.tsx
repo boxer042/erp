@@ -3,15 +3,24 @@
 /**
  * POS·ERP 공용 결제수단 선택 그리드.
  *
- * - 4종: 카드 / 현금 / 계좌이체 / 외상
- * - 2×2 grid · 카드 스타일 · jm 토큰
+ * - 5종: 카드 / 현금 / 현금영수증 / 계좌이체 / 외상
+ * - 2-col grid (가변 행) · 카드 스타일 · jm 토큰
  * - 한쪽 디자인을 바꾸면 양쪽에 자동 적용됨 (POS 결제시트 + ERP 신규주문)
+ *
+ * 현금영수증: 손님 휴대폰/사업자번호로 국세청 영수증 발급된 현금 결제.
+ * "현금" 과 구분 — 회계·매출 통계에서 별도 집계 가능.
  */
-export type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
+export type PaymentMethod =
+  | "CASH"
+  | "CASH_RECEIPT"
+  | "CARD"
+  | "TRANSFER"
+  | "UNPAID";
 
 const METHODS: { value: PaymentMethod; label: string; sub?: string }[] = [
   { value: "CARD", label: "카드", sub: "POS 결제" },
   { value: "CASH", label: "현금" },
+  { value: "CASH_RECEIPT", label: "현금영수증", sub: "국세청 발급" },
   { value: "TRANSFER", label: "계좌이체" },
   { value: "UNPAID", label: "외상", sub: "고객 미수금" },
 ];

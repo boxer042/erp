@@ -1165,9 +1165,10 @@ function Row({
 
 // ──────── 상태 진행 액션 ────────
 
-type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "UNPAID";
+type PaymentMethod = "CASH" | "CASH_RECEIPT" | "CARD" | "TRANSFER" | "UNPAID";
 const PAYMENT_LABEL: Record<PaymentMethod, string> = {
   CASH: "현금",
+  CASH_RECEIPT: "현금영수증",
   CARD: "카드",
   TRANSFER: "계좌",
   UNPAID: "외상",

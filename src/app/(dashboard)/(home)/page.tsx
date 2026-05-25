@@ -81,6 +81,7 @@ const REVERSED_PAYMENT_STATUSES = ["REFUNDED", "SALES_CANCELLED"] as const;
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   CASH: "현금",
+  CASH_RECEIPT: "현금영수증",
   CARD: "카드",
   TRANSFER: "계좌이체",
   MIXED: "복합결제",
