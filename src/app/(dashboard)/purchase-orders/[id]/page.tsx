@@ -132,6 +132,13 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     staleTime: 1000 * 30,
   });
 
+  // 거래처 발송 메시지 prefill 에 우리 회사명 사용
+  const companyInfoQuery = useQuery<{ name: string } | null>({
+    queryKey: queryKeys.companyInfo.all,
+    queryFn: () => apiGet<{ name: string } | null>(`/api/company-info`),
+    staleTime: 1000 * 60 * 10,
+  });
+
   const statusMutation = useMutation({
     mutationFn: (target: PurchaseOrderStatus) =>
       apiMutate(`/api/purchase-orders/${id}/status`, "PUT", { status: target }),
@@ -453,8 +460,21 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
           />
         )}
 
-        {/* 거래처 발송 링크 */}
-        {data.accessTokens.length > 0 && <AccessTokenCard tokens={data.accessTokens} />}
+        {/* 거래처 발송 링크 + 메시지 작성 */}
+        {data.accessTokens.length > 0 && (
+          <AccessTokenCard
+            tokens={data.accessTokens}
+            companyName={companyInfoQuery.data?.name ?? ""}
+            supplierRepresentative={data.supplier.representative}
+            supplierPhone={data.supplier.phone}
+            firstItemName={
+              data.items[0]
+                ? data.items[0].supplierProduct?.name ?? data.items[0].name ?? ""
+                : ""
+            }
+            totalItems={data.items.length}
+          />
+        )}
 
         {/* 입고 내역 */}
         {data.incomings.length > 0 && (
@@ -788,7 +808,21 @@ const TOKEN_STATUS_VARIANT: Record<AccessToken["status"], "default" | "info" | "
   REVOKED: "default",
 };
 
-function AccessTokenCard({ tokens }: { tokens: AccessToken[] }) {
+function AccessTokenCard({
+  tokens,
+  companyName,
+  supplierRepresentative,
+  supplierPhone,
+  firstItemName,
+  totalItems,
+}: {
+  tokens: AccessToken[];
+  companyName: string;
+  supplierRepresentative: string | null;
+  supplierPhone: string | null;
+  firstItemName: string;
+  totalItems: number;
+}) {
   const [showHistory, setShowHistory] = useState(false);
   const active = tokens.find((t) => t.status === "ACTIVE" || t.status === "VIEWED");
   const history = tokens.filter((t) => t !== active);
@@ -796,12 +830,64 @@ function AccessTokenCard({ tokens }: { tokens: AccessToken[] }) {
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const buildUrl = (token: string) => `${baseUrl}/external/po/${token}`;
 
+  // 메시지 기본 템플릿 — 활성 토큰 있을 때 자동 생성
+  const buildDefaultMessage = (url: string) => {
+    const rep = supplierRepresentative ? `${supplierRepresentative}님` : "사장님";
+    const company = companyName ? `${companyName}입니다.` : "";
+    const itemLabel =
+      totalItems > 1
+        ? `${firstItemName} 외 ${totalItems - 1}건`
+        : firstItemName;
+    return [
+      `${rep} 안녕하세요.${company ? " " + company : ""}`,
+      `${itemLabel} 발주서 확인 부탁드립니다.`,
+      url,
+    ].join("\n");
+  };
+
+  const activeUrl = active ? buildUrl(active.token) : "";
+  const [message, setMessage] = useState(() => activeUrl ? buildDefaultMessage(activeUrl) : "");
+  const [lastTokenId, setLastTokenId] = useState(active?.id ?? null);
+  // 새 토큰 발급되면 메시지 재생성
+  if (active && active.id !== lastTokenId) {
+    setLastTokenId(active.id);
+    setMessage(buildDefaultMessage(activeUrl));
+  }
+
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       toast.success("링크가 복사되었습니다");
     } catch {
       toast.error("클립보드 복사 실패");
+    }
+  };
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message);
+      toast.success("메시지 + 링크가 복사되었습니다");
+    } catch {
+      toast.error("클립보드 복사 실패");
+    }
+  };
+
+  const openSms = () => {
+    const phone = supplierPhone ? supplierPhone.replace(/[^0-9]/g, "") : "";
+    const url = `sms:${phone}?body=${encodeURIComponent(message)}`;
+    window.location.href = url;
+  };
+
+  const share = async () => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text: message });
+      } catch {
+        // 사용자가 취소하거나 미지원
+      }
+    } else {
+      // 데스크탑 폴백 — 복사로 처리
+      copyMessage();
     }
   };
 
@@ -835,6 +921,43 @@ function AccessTokenCard({ tokens }: { tokens: AccessToken[] }) {
               <Metric label="처음 열람" value={active.firstViewedAt ? new Date(active.firstViewedAt).toLocaleString("ko-KR") : "-"} />
               <Metric label="최근 열람" value={active.lastViewedAt ? new Date(active.lastViewedAt).toLocaleString("ko-KR") : "-"} />
               <Metric label="만료" value={new Date(active.expiresAt).toLocaleString("ko-KR")} />
+            </div>
+
+            {/* 거래처 발송 메시지 — 복사/SMS/공유로 카톡·문자에 붙여넣기 */}
+            <div className="mt-3 space-y-2 border-t border-[var(--jm-border)] pt-3">
+              <div className="flex items-center justify-between">
+                <label className="text-jm-xs font-medium text-[var(--jm-text)]">
+                  거래처에 보낼 메시지
+                </label>
+                <button
+                  type="button"
+                  className="text-jm-2xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                  onClick={() => setMessage(buildDefaultMessage(activeUrl))}
+                >
+                  기본 메시지로 초기화
+                </button>
+              </div>
+              <JmTextarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={5}
+                className="font-[family-name:var(--jm-font-sans)] text-jm-sm"
+              />
+              <div className="flex flex-wrap gap-2">
+                <JmButton size="sm" variant="outline" onClick={copyMessage}>
+                  <Copy className="size-3.5" />
+                  복사
+                </JmButton>
+                <JmButton size="sm" variant="outline" onClick={openSms}>
+                  SMS 앱 열기
+                </JmButton>
+                <JmButton size="sm" variant="outline" onClick={share}>
+                  공유…
+                </JmButton>
+              </div>
+              <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+                💡 카카오톡으로 보내려면: [복사] 누른 후 카톡 대화창에 붙여넣기, 또는 [공유…] 누른 후 시스템 공유 시트에서 카카오톡 선택 (모바일).
+              </p>
             </div>
           </div>
         ) : (
