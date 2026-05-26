@@ -170,8 +170,14 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
         },
       },
     }),
+    // 입고 운임(referenceType=INCOMING, category=SHIPPING)은 매출원가에 베이크되어
+    // 있으므로 영업비용에서 중복 차감되지 않도록 제외.
     prisma.expense.findMany({
-      where: { date: { gte: from, lt: to }, recoverable: false },
+      where: {
+        date: { gte: from, lt: to },
+        recoverable: false,
+        NOT: { category: "SHIPPING", referenceType: "INCOMING" },
+      },
       select: { category: true, amount: true, isTaxable: true },
     }),
   ]);

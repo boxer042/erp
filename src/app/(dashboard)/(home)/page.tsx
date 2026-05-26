@@ -294,7 +294,12 @@ export default async function DashboardPage({
     }),
     prisma.expense.aggregate({
       _sum: { amount: true },
-      where: { date: { gte: range.from } },
+      where: {
+        date: { gte: range.from },
+        recoverable: false,
+        // 입고 운임은 매출원가에 베이크되어 있어 영업비용에서 중복 차감 방지
+        NOT: { category: "SHIPPING", referenceType: "INCOMING" },
+      },
     }),
     prisma.order.findMany({
       where: { ...soldOrderWhere, orderDate: { gte: start7Days, lt: endOfToday } },
