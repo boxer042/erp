@@ -18,7 +18,7 @@ interface InlineTextEditProps {
   multiline?: boolean;
   /** 저장 동작 — 사용자가 입력한 새 값을 받아서 PUT 등 수행 */
   onSave: (next: string) => Promise<void>;
-  /** 저장 후 invalidate 할 productId (쿼리 캐시 갱신) */
+  /** 저장 후 invalidate 할 productId (쿼리 캐시 갱신) — products.all 로 invalidate 하므로 현재 unused. 호환 보존. */
   productId?: string;
   /** 표시 영역의 className (라벨처럼 보이게 등) */
   className?: string;
@@ -42,7 +42,6 @@ export function InlineTextEdit({
   placeholder = "-",
   multiline = false,
   onSave,
-  productId,
   className,
   allowEmpty = false,
   display,
@@ -78,9 +77,10 @@ export function InlineTextEdit({
     onSuccess: () => {
       toast.success("저장되었습니다");
       setEditing(false);
-      if (productId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) });
-      }
+      // 상세 + 목록 + costs/movements 등 모든 products 관련 쿼리 일괄 갱신.
+      // detail 만 invalidate 하면 목록 페이지에서 인라인 편집해도 다른 행/캐시가
+      // 옛 이름으로 남아 사용자가 새로고침해야 하는 문제 방지.
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
     },
     onError: (err) => {
       toast.error(err instanceof ApiError ? err.message : err.message || "저장 실패");

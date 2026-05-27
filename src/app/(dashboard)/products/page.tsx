@@ -51,6 +51,7 @@ import {
   JmTooltipProvider,
 } from "@/jm";
 import { MappingSheet } from "@/components/mapping-sheet";
+import { InlineTextEdit } from "@/components/product/edit/inline-text-edit";
 import { ProductsThemeScope } from "./_theme-scope";
 
 interface CategoryOption {
@@ -609,22 +610,34 @@ export default function ProductsPage() {
                               {product.costAlert && (
                                 <CostAlertBadge alert={product.costAlert} />
                               )}
-                              <Link
-                                href={`/products/${product.id}`}
-                                className="inline-flex flex-wrap items-center gap-1.5 font-medium text-[var(--jm-text)] hover:text-[var(--jm-action)] hover:underline"
-                              >
-                                {product.name}
-                                {isCanonical && (
-                                  <JmBadge variant="success" size="sm">
-                                    변형대표
-                                  </JmBadge>
-                                )}
-                                {product.autoMapped && (
-                                  <JmBadge variant="success" size="sm">
-                                    자동
-                                  </JmBadge>
-                                )}
-                              </Link>
+                              <InlineTextEdit
+                                value={product.name}
+                                onSave={async (next) => {
+                                  await apiMutate(
+                                    `/api/products/${product.id}`,
+                                    "PATCH",
+                                    { name: next },
+                                  );
+                                }}
+                                display={
+                                  <Link
+                                    href={`/products/${product.id}`}
+                                    className="font-medium text-[var(--jm-text)] hover:text-[var(--jm-action)] hover:underline"
+                                  >
+                                    {product.name}
+                                  </Link>
+                                }
+                              />
+                              {isCanonical && (
+                                <JmBadge variant="success" size="sm">
+                                  변형대표
+                                </JmBadge>
+                              )}
+                              {product.autoMapped && (
+                                <JmBadge variant="info" size="sm">
+                                  자동
+                                </JmBadge>
+                              )}
                             </div>
                           </JmTableCell>
                           <JmTableCell>
