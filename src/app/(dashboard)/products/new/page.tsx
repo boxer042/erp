@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { computeUnitCost, computeSupplierProductAvgShipping } from "@/lib/cost-utils";
+import { computeCurrentUnitCostForId, isAssemblyLike } from "@/lib/product-cost";
 import { NewProductForm } from "@/components/new-product-form-v2";
 import type { ProductOption } from "@/components/product-combobox";
 
@@ -220,8 +221,25 @@ export default async function NewProductPage() {
       isCanonical: p.isCanonical,
       canonicalProductId: p.canonicalProductId,
       categoryId: p.categoryId ?? null,
+      productType: p.productType,
     };
   });
+
+  // ASSEMBLED/SET 인데 자체 매핑·벌크부모 없는 상품은 위 map 에서 unitCost=null.
+  // 자체 setComponents 재귀 합산으로 채워 BOM 후보 카드 "소계" 표시 정상화.
+  // computeCurrentUnitCostForId 는 N단계 재귀 + 메모이제이션 (cycle guard 포함).
+  const needAssemblyCost = existingProducts.filter(
+    (p) => p.unitCost === null && isAssemblyLike({ productType: p.productType ?? "FINISHED", isSet: p.isSet }),
+  );
+  if (needAssemblyCost.length > 0) {
+    const memo = new Map<string, number | null>();
+    await Promise.all(
+      needAssemblyCost.map(async (p) => {
+        const cost = await computeCurrentUnitCostForId(prisma, p.id, { memo });
+        if (cost !== null && cost > 0) p.unitCost = String(cost);
+      }),
+    );
+  }
 
   return (
     <NewProductForm

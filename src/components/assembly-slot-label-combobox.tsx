@@ -16,6 +16,7 @@ interface Props {
   placeholder?: string;
   clearable?: boolean;
   size?: "sm" | "md" | "lg";
+  disabled?: boolean;
 }
 
 export function AssemblySlotLabelCombobox({
@@ -26,6 +27,7 @@ export function AssemblySlotLabelCombobox({
   placeholder = "라벨 선택...",
   clearable = true,
   size = "sm",
+  disabled = false,
 }: Props) {
   const items = useMemo<JmComboboxItem[]>(
     () => labels.map((l) => ({ id: l.id, label: l.name })),
@@ -45,6 +47,7 @@ export function AssemblySlotLabelCombobox({
       clearable={clearable}
       onClear={() => onChange("", "")}
       matches={(item, q) => item.label.toLowerCase().includes(q.toLowerCase())}
+      disabled={disabled}
     />
   );
 }
