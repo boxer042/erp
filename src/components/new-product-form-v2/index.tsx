@@ -149,8 +149,6 @@ export function NewProductForm({
     warrantyMonths: "",
     /** 카탈로그 비노출 — 옵션 swap 대상 SKU 단독 노출 차단 (P006 가습기-블랙 같은 케이스) */
     catalogHidden: false,
-    /** 가변 상품(canonical) — 부속 조합이 다른 변형들의 대표 상품 (조립상품 한정) */
-    isCanonical: false,
   });
 
   // 변형(variant) 연결 — URL `?canonicalProductId=<id>` 로 진입 시 자동 채움
@@ -345,7 +343,6 @@ export function NewProductForm({
       trackable: false,
       warrantyMonths: "",
       catalogHidden: false,
-      isCanonical: false,
     });
     setMapping({ supplierId: "", supplierProductId: "", conversionRate: "1", isProvisional: false, syncName: false });
     setSupplierProducts([]);
@@ -940,11 +937,8 @@ export function NewProductForm({
           listPrice: getSubmitListPrice(),
           sellingPrice: getSubmitPrice(),
           canonicalProductId: canonicalProductId || null,
-          // 가변(canonical) 은 조립상품 한정. 다른 타입 또는 변형 연결(canonicalProductId 있음) 이면 강제 false.
-          isCanonical:
-            productType === "ASSEMBLED" && !canonicalProductId
-              ? form.isCanonical
-              : false,
+          // isCanonical 은 명시적으로 보내지 않음 — 첫 조립실적 등록 시 시스템이 자동 격상.
+          // (api/assemblies/route.ts:219+ 의 `!selected.isCanonical` 분기로 처리)
           containerSize: bulkUsable ? containerSize || null : null,
           assemblyTemplateId: productType === "ASSEMBLED" && templateId ? templateId : null,
           warrantyMonths: form.warrantyMonths ? parseInt(form.warrantyMonths, 10) : null,
@@ -2322,26 +2316,8 @@ export function NewProductForm({
                             </JmButton>
                           </div>
                         </div>
-                        {/* 가변(canonical) 토글 — 부속 조합이 다른 변형들의 대표 상품으로 등록 */}
-                        {!canonicalProductId && (
-                          <div className="sm:col-span-2 flex items-start gap-3 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
-                            <JmCheckbox
-                              id="isCanonical"
-                              checked={form.isCanonical}
-                              onCheckedChange={(v) =>
-                                setForm((p) => ({ ...p, isCanonical: v === true }))
-                              }
-                            />
-                            <label htmlFor="isCanonical" className="flex-1 cursor-pointer">
-                              <span className="block text-jm-sm font-medium">
-                                가변 상품(대표)으로 등록
-                              </span>
-                              <span className="block text-jm-2xs text-[var(--jm-text-muted)]">
-                                부속 조합이 다른 변형들의 대표 상품 — 자기 재고는 없고, 변형 SKU 들의 재고를 그룹으로 모아 보여줍니다.
-                              </span>
-                            </label>
-                          </div>
-                        )}
+                        {/* 가변(canonical) 토글 제거 — 첫 조립실적 등록 시 시스템이 자동 격상하므로
+                            사용자 결정 부담만 됨. canonicalProductId 로 변형 연결 진입은 유지. */}
                       </JmCardContent></JmCard>
                     </section>
                   )}
