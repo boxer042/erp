@@ -615,8 +615,8 @@ export default function ProductsPage() {
                               >
                                 {product.name}
                                 {isCanonical && (
-                                  <JmBadge variant="info" size="sm">
-                                    그룹
+                                  <JmBadge variant="success" size="sm">
+                                    변형대표
                                   </JmBadge>
                                 )}
                                 {product.autoMapped && (

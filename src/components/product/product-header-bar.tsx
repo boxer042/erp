@@ -114,7 +114,7 @@ export function ProductHeaderBar({
       )}
       {product.isCanonical && (
         <JmBadge variant="success" size="sm" shape="square">
-          대표
+          변형대표
         </JmBadge>
       )}
       {product.canonicalProductId && (
