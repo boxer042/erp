@@ -260,6 +260,7 @@ export interface ProductDetail {
       id: string;
       label: string;
       order: number;
+      isVariable?: boolean;
       slotLabel?: { id: string; name: string } | null;
     }>;
   } | null;
