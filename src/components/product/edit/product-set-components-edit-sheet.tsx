@@ -75,7 +75,10 @@ function ProductSetComponentsEditSheetContent({
     queryKey: queryKeys.products.list({ scope: "components", excludeId: product.id }),
     // isBulk=all — 벌크 SKU(엔진오일 벌크 등)도 BOM 후보에 포함. 기본값은 벌크 제외라
     // 이 옵션 없으면 기존 구성에 벌크가 들어있어도 콤보박스에서 이름이 안 뜨고 재선택 불가.
-    queryFn: () => apiGet<ProductOption[]>("/api/products?isSet=false&isBulk=all"),
+    // isSet 필터 없음 — ASSEMBLED·SET 도 sub-assembly 로 BOM 구성품이 될 수 있음
+    // (예: "범양80A고압분무기" → "범양80A3HP 모터고압분무기" 의 "고압분무기" 슬롯).
+    // ProductCombobox 의 filterType="component" 도 OPTION_PARENT 만 제외하도록 정합.
+    queryFn: () => apiGet<ProductOption[]>("/api/products?isBulk=all"),
     select: (data) => data.filter((p) => p.id !== product.id),
   });
 

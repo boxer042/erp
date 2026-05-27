@@ -143,8 +143,14 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
   };
 
   // 기간 내 경비(Expense) 집계 — 공급가액 환산 후 카테고리별 합산
+  // 입고 운임(referenceType=INCOMING, category=SHIPPING)은 매출원가(unitCostSnapshot)
+  // 에 이미 베이크되어 있어 영업비용에서 중복 차감되지 않도록 제외.
   const expensesInPeriod = await prisma.expense.findMany({
-    where: { date: { gte: from, lt: to }, recoverable: false },
+    where: {
+      date: { gte: from, lt: to },
+      recoverable: false,
+      NOT: { category: "SHIPPING", referenceType: "INCOMING" },
+    },
     select: { category: true, amount: true, isTaxable: true },
   });
   const opexMap: Record<string, number> = {};

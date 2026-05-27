@@ -809,6 +809,9 @@ function IncomeStatementBody({
 
       <Section title="매출원가">
         <Line label="상품 매출원가 (FIFO 실제 원가)" amount={costOfGoodsSold} negative />
+        <p className="px-3 pt-1 text-jm-2xs text-[var(--jm-text-muted)]">
+          입고 운임·부대비용은 FIFO 원가에 포함되어 있어 판관비에서 중복 차감되지 않습니다.
+        </p>
       </Section>
 
       <BigLine label="매출총이익" amount={grossProfit} />

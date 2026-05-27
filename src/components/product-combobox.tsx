@@ -84,11 +84,13 @@ export function ProductCombobox({
 }: ProductComboboxProps) {
   const items = useMemo<ProductItem[]>(() => {
     // "set" 모드: 세트/조립상품 중 변형(canonicalProductId 가 있는) 은 가림. 대표 또는 단일만.
+    // "component" 모드: BOM 구성품 선택용 — ASSEMBLED·SET 도 sub-assembly 로 사용 가능하므로
+    //                   isSet 은 필터링하지 않고, OPTION_PARENT 만 제외 (가상 SKU, 소비 불가).
     const filtered =
       filterType === "set"
         ? products.filter((p) => p.isSet && !p.canonicalProductId)
         : filterType === "component"
-          ? products.filter((p) => !p.isSet)
+          ? products.filter((p) => p.productType !== "OPTION_PARENT")
           : products;
     return filtered.map((p) => ({
       id: p.id,
