@@ -237,6 +237,7 @@ export default function ProductsPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [showAutoMapped, setShowAutoMapped] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedProductType, setSelectedProductType] = useState("");
 
   const [safetyTarget, setSafetyTarget] = useState<Product | null>(null);
   const [safetyValue, setSafetyValue] = useState("");
@@ -341,10 +342,16 @@ export default function ProductsPage() {
     return opts;
   }, [categories]);
 
-  const rows = useMemo(
-    () => (showLowStock ? topLevel.filter(rowIsLowStock) : topLevel),
-    [topLevel, showLowStock, rowIsLowStock],
-  );
+  const rows = useMemo(() => {
+    let r = topLevel;
+    if (selectedProductType) {
+      r = r.filter((p) => p.productType === selectedProductType);
+    }
+    if (showLowStock) {
+      r = r.filter(rowIsLowStock);
+    }
+    return r;
+  }, [topLevel, selectedProductType, showLowStock, rowIsLowStock]);
 
   const serialMutation = useMutation({
     mutationFn: (vars: { id: string; trackable: boolean }) =>
@@ -377,6 +384,7 @@ export default function ProductsPage() {
   const filtersActive =
     !!appliedSearch ||
     !!selectedCategoryId ||
+    !!selectedProductType ||
     showLowStock ||
     showBulk ||
     showAutoMapped;
@@ -455,6 +463,21 @@ export default function ProductsPage() {
                       options={categoryOptions}
                     />
                   )}
+                  <JmSelect
+                    size="sm"
+                    variant="pill"
+                    label="유형"
+                    value={selectedProductType}
+                    onChange={(v) => setSelectedProductType(v)}
+                    options={[
+                      { value: "", label: "전체" },
+                      { value: "FINISHED", label: "완제품" },
+                      { value: "ASSEMBLED", label: "조립" },
+                      { value: "SET", label: "세트" },
+                      { value: "PARTS", label: "부속" },
+                      { value: "OPTION_PARENT", label: "옵션대표" },
+                    ]}
+                  />
                   <JmPill
                     size="sm"
                     active={showLowStock}
