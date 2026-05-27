@@ -32,9 +32,9 @@ import { formatComma, parseComma } from "@/lib/utils";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { SupplierProductCombobox } from "@/components/supplier-product-combobox";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
+import { BomComponentRow } from "@/components/product/bom-component-row";
 import { AssemblyTemplateCombobox } from "@/components/assembly-template-combobox";
 import { AssemblyPresetCombobox } from "@/components/assembly-preset-combobox";
-import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -276,6 +276,17 @@ export function NewProductForm({
   };
   const [templates, setTemplates] = useState<TemplateDetail[]>([]);
   const [templateId, setTemplateId] = useState<string>("");
+  // 선택된 템플릿의 slotLabel → slotId 매핑.
+  // BomComponentRow 에 전달돼 라벨 선택 시 자동으로 slotId 채워짐 ("슬롯 미연결" 방지).
+  const selectedTemplateSlotIdByLabelId = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!templateId) return map;
+    const tpl = templates.find((t) => t.id === templateId);
+    for (const s of tpl?.slots ?? []) {
+      if (s.slotLabelId && !map.has(s.slotLabelId)) map.set(s.slotLabelId, s.id);
+    }
+    return map;
+  }, [templateId, templates]);
   const [presetId, setPresetId] = useState<string>("");
   const [savePresetOpen, setSavePresetOpen] = useState(false);
   const [savePresetName, setSavePresetName] = useState("");
@@ -397,9 +408,13 @@ export function NewProductForm({
     router.push("/products");
   };
 
+  // 등록 성공 직후 router.push 가 beforeunload prompt 를 띄우지 않도록 우회 플래그.
+  // isDirty 는 form state 합성이라 즉시 false 로 바꾸기 어려움 → ref 로 1회성 차단.
+  const submittedRef = useRef(false);
   useEffect(() => {
     if (!isDirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (submittedRef.current) return; // 등록 성공 후 redirect 중 — prompt 차단
       e.preventDefault();
       e.returnValue = "";
     };
@@ -1099,6 +1114,7 @@ export function NewProductForm({
           { duration: 8000 }
         );
       }
+      submittedRef.current = true; // beforeunload prompt 차단 — 깔끔하게 detail 페이지로 redirect
       router.push(`/products/${productId}`);
       router.refresh();
     } catch {
@@ -2349,87 +2365,44 @@ export function NewProductForm({
                                 )
                               : existingProducts;
                             return (
-                              <div
+                              <BomComponentRow
                                 key={row.id}
-                                className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2.5"
-                              >
-                                {showLabel && (
-                                  <AssemblySlotLabelCombobox
-                                    labels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
-                                    value={row.slotLabelId ?? ""}
-                                    onChange={(id, name) =>
-                                      setSetComponents((prev) =>
-                                        prev.map((r, i) =>
-                                          i === idx ? { ...r, slotLabelId: id || null, label: name } : r,
-                                        ),
-                                      )
-                                    }
-                                    onCreateNew={(name) =>
-                                      createSlotLabelMutation.mutate({ name, rowIdx: idx })
-                                    }
-                                    placeholder={
-                                      row.label && !row.slotLabelId
-                                        ? `${row.label} (재선택 필요)`
-                                        : "라벨 선택..."
-                                    }
-                                  />
-                                )}
-                                <ProductCombobox
-                                  products={productsForRow}
-                                  value={row.product?.id ?? ""}
-                                  onChange={(p) =>
-                                    setSetComponents((prev) =>
-                                      prev.map((r, i) => (i === idx ? { ...r, product: p } : r)),
-                                    )
-                                  }
-                                  placeholder={
-                                    slotCategoryId
-                                      ? "카테고리 내 구성 상품 선택..."
-                                      : "구성 상품 선택..."
-                                  }
-                                />
-                                <div className="flex items-center gap-2">
-                                  <span className="text-jm-2xs text-[var(--jm-text-muted)]">
-                                    수량
-                                  </span>
-                                  <JmInput
-                                    type="number"
-                                    inputMode="decimal"
-                                    min="0.0001"
-                                    step="0.01"
-                                    value={row.quantity}
-                                    onChange={(e) =>
-                                      setSetComponents((prev) =>
-                                        prev.map((r, i) =>
-                                          i === idx ? { ...r, quantity: e.target.value } : r,
-                                        ),
-                                      )
-                                    }
-                                    className="h-9 w-20 text-right"
-                                  />
-                                  <span className="ml-auto text-jm-sm tabular-nums text-[var(--jm-text)]">
-                                    {hasCost
-                                      ? `소계 ₩${Math.round(lineTotal).toLocaleString("ko-KR")}`
-                                      : ""}
-                                  </span>
-                                  {setComponents.length > 1 && (
-                                    <JmIconButton
-                                      type="button"
-                                      size="sm"
-                                      variant="ghost"
-                                      aria-label="구성 상품 삭제"
-                                      className="text-[var(--jm-danger-fg)]"
-                                      onClick={() =>
+                                row={{
+                                  product: row.product,
+                                  quantity: row.quantity,
+                                  label: row.label ?? "",
+                                  slotLabelId: row.slotLabelId ?? null,
+                                  slotId: row.slotId ?? null,
+                                }}
+                                onChange={(patch) =>
+                                  setSetComponents((prev) =>
+                                    prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+                                  )
+                                }
+                                onRemove={
+                                  setComponents.length > 1
+                                    ? () =>
                                         setSetComponents((prev) =>
                                           prev.filter((_, i) => i !== idx),
                                         )
-                                      }
-                                    >
-                                      <X />
-                                    </JmIconButton>
-                                  )}
-                                </div>
-                              </div>
+                                    : undefined
+                                }
+                                products={productsForRow}
+                                slotCategoryId={slotCategoryId}
+                                slotLabels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
+                                onCreateSlotLabel={(name) =>
+                                  createSlotLabelMutation.mutate({ name, rowIdx: idx })
+                                }
+                                templateSlotIdByLabelId={selectedTemplateSlotIdByLabelId}
+                                isAssembled={showLabel}
+                                rightContent={
+                                  hasCost ? (
+                                    <span className="text-jm-sm tabular-nums text-[var(--jm-text)]">
+                                      소계 ₩{Math.round(lineTotal).toLocaleString("ko-KR")}
+                                    </span>
+                                  ) : null
+                                }
+                              />
                             );
                           })}
                           <JmButton

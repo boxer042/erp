@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Loader2, Plus, X, ExternalLink } from "lucide-react";
+import { Loader2, Plus, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
-import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
-import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
+import { type ProductOption } from "@/components/product-combobox";
+import { BomComponentRow } from "@/components/product/bom-component-row";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { replaceSetComponents } from "@/lib/product-mutations";
@@ -25,7 +25,6 @@ import {
   JmDrawerDescription,
   JmDrawerHeader,
   JmDrawerTitle,
-  JmIconButton,
   JmInput,
 } from "@/jm";
 import type { ProductDetail } from "../types";
@@ -103,6 +102,22 @@ function ProductSetComponentsEditSheetContent({
     for (const l of slotLabels) map.set(l.id, l.categoryId);
     return map;
   }, [slotLabels]);
+
+  // 템플릿 슬롯 lookup — slotLabelId 선택 시 자동으로 slotId 매칭. "슬롯 미연결" 방지.
+  // 같은 라벨이 한 템플릿에 여러 슬롯에 있으면 첫 번째를 채택 (드문 케이스).
+  const templateSlotIdByLabelId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of product.assemblyTemplate?.slots ?? []) {
+      if (s.slotLabel?.id && !map.has(s.slotLabel.id)) {
+        map.set(s.slotLabel.id, s.id);
+      }
+    }
+    return map;
+  }, [product.assemblyTemplate]);
+
+  // 핵심 데이터 로딩 — 다 안 끝났으면 폼 비활성 + 안내 표시 (사용자 실수 방지)
+  const isInitialLoading =
+    productsQuery.isPending || (isAssembled && slotLabelsQuery.isPending);
 
   // 신규 슬롯라벨 인라인 등록 — 등록 페이지와 동일 패턴
   const createSlotLabelMutation = useMutation({
@@ -289,100 +304,30 @@ function ProductSetComponentsEditSheetContent({
                     p.categoryId === slotCategoryId || p.id === row.product?.id,
                 )
               : products;
-            // 템플릿 슬롯과 미연결인 경우 안내 (프리셋 저장 대상 아님)
-            const showSlotWarning = row.slotLabelId && !row.slotId;
             return (
-              <div
+              <BomComponentRow
                 key={row.rowId}
-                className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2.5"
-              >
-                {isAssembled && (
-                  <AssemblySlotLabelCombobox
-                    labels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
-                    value={row.slotLabelId ?? ""}
-                    onChange={(id, name) =>
-                      update(row.rowId, {
-                        slotLabelId: id || null,
-                        label: name,
-                      })
-                    }
-                    onCreateNew={(name) =>
-                      createSlotLabelMutation.mutate({ name, rowId: row.rowId })
-                    }
-                    placeholder={
-                      row.label && !row.slotLabelId
-                        ? `${row.label} (재선택 필요)`
-                        : "라벨 선택..."
-                    }
-                  />
-                )}
-                <ProductCombobox
-                  products={productsForRow}
-                  value={row.product?.id ?? ""}
-                  onChange={(p) => update(row.rowId, { product: p })}
-                  filterType="component"
-                  placeholder={
-                    slotCategoryId
-                      ? "카테고리 내 구성 상품 선택..."
-                      : "구성 상품 선택..."
-                  }
-                />
-                {!isAssembled && (
-                  <JmInput
-                    size="sm"
-                    value={row.label}
-                    onChange={(e) => update(row.rowId, { label: e.target.value })}
-                    placeholder="라벨 (선택) — 메인, 보너스 등"
-                  />
-                )}
-                <div className="flex items-center gap-2">
-                  <span className="text-jm-2xs text-[var(--jm-text-muted)]">
-                    수량
-                  </span>
-                  <JmInput
-                    size="sm"
-                    type="text"
-                    inputMode="decimal"
-                    value={row.quantity}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      // 음수 허용 — "-1" 같은 회수 부속 표현
-                      if (v === "" || v === "-" || /^-?[0-9]*\.?[0-9]*$/.test(v)) {
-                        update(row.rowId, { quantity: v });
-                      }
-                    }}
-                    className="h-9 w-20 text-right"
-                  />
-                  {parseFloat(row.quantity) < 0 && (
-                    <JmBadge variant="warning" size="sm" shape="square">
-                      회수
-                    </JmBadge>
-                  )}
-                  {showSlotWarning ? (
-                    <JmBadge variant="default" size="sm" shape="square" className="ml-auto">
-                      슬롯 미연결
-                    </JmBadge>
-                  ) : row.slotId ? (
-                    <JmBadge variant="info" size="sm" shape="square" className="ml-auto">
-                      슬롯 연결됨
-                    </JmBadge>
-                  ) : (
-                    <span className="ml-auto" />
-                  )}
-                  {rows.length > 1 && (
-                    <JmIconButton
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      aria-label="구성품 삭제"
-                      className="text-[var(--jm-danger-fg)]"
-                      onClick={() => remove(row.rowId)}
-                    >
-                      <X />
-                    </JmIconButton>
-                  )}
-                </div>
-              </div>
+                row={{
+                  product: row.product,
+                  quantity: row.quantity,
+                  label: row.label,
+                  slotLabelId: row.slotLabelId,
+                  slotId: row.slotId,
+                }}
+                onChange={(patch) => update(row.rowId, patch)}
+                onRemove={rows.length > 1 ? () => remove(row.rowId) : undefined}
+                products={productsForRow}
+                slotCategoryId={slotCategoryId}
+                slotLabels={slotLabels.map((l) => ({ id: l.id, name: l.name }))}
+                onCreateSlotLabel={(name) =>
+                  createSlotLabelMutation.mutate({ name, rowId: row.rowId })
+                }
+                templateSlotIdByLabelId={templateSlotIdByLabelId}
+                isAssembled={isAssembled}
+                isLoading={isInitialLoading}
+                allowNegativeQty
+                showSlotBadge
+              />
             );
           })}
 
