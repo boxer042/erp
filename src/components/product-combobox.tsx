@@ -126,8 +126,8 @@ export function ProductCombobox({
         return (
           <span className="flex min-w-0 flex-1 items-center gap-2">
             {p.isCanonical && (
-              <span className="shrink-0 rounded bg-[var(--jm-info-bg)] px-1.5 py-0.5 text-jm-2xs font-semibold text-[var(--jm-info-fg)]">
-                그룹
+              <span className="shrink-0 rounded bg-[var(--jm-success-bg)] px-1.5 py-0.5 text-jm-2xs font-semibold text-[var(--jm-success-fg)]">
+                변형대표
               </span>
             )}
             <span className="flex-1 truncate text-[var(--jm-text)]">
