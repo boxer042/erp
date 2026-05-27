@@ -46,14 +46,25 @@ export const shippingPaymentTypeSchema = z.enum([
   "COD",           // 착불 (받는 사람이 택배기사에게)
   "STORE_BURDEN",  // 매장 부담 (배송비 무료 / 도매)
 ]);
-export const orderPaymentMethodSchema = z.enum([
-  "CASH",
-  "CASH_RECEIPT", // 현금영수증 발행 — 손님 휴대폰/사업자번호로 국세청 영수증 발급
-  "CARD",
-  "TRANSFER",
-  "MIXED",
-  "UNPAID",
-]);
+/**
+ * 결제수단 enum.
+ *  - MIXED 는 **deprecated** — 신규 입력 차단. 부분 결제(PARTIAL_PAID + paidAmount) 로 대체.
+ *    기존 데이터 호환을 위해 enum 값 자체는 유지 (DB 응답 처리 + 통계 라벨 노출).
+ *  - 신규 입력은 refine 으로 차단 — `orderSchema` 의 paymentMethod 필드에서 검증.
+ */
+export const orderPaymentMethodSchema = z
+  .enum([
+    "CASH",
+    "CASH_RECEIPT", // 현금영수증 발행 — 손님 휴대폰/사업자번호로 국세청 영수증 발급
+    "CARD",
+    "TRANSFER",
+    "MIXED",        // deprecated — 신규 입력 차단 (아래 refine)
+    "UNPAID",
+  ])
+  .refine((v) => v !== "MIXED", {
+    message:
+      "MIXED(혼합) 결제는 더 이상 신규 입력 불가 — 부분 결제(paidAmount + partialPaymentKind) 또는 결제수단을 단일로 선택해주세요",
+  });
 
 export const orderSchema = z.object({
   channelId: z.string().nullable().optional(),  // null/undefined = 오프라인 매출

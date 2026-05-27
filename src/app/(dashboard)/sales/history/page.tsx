@@ -109,13 +109,13 @@ const FULFILLMENT_LABEL: Record<string, string> = {
   SHIPPING: "택배",
 };
 
+// MIXED 는 deprecated (신규 입력 차단). 필터 옵션에서도 제거 — 기존 데이터 라벨은 PAYMENT_METHOD_LABEL 에 남아 표시.
 const PAYMENT_METHOD_OPTIONS = [
   { value: "ALL", label: "결제수단 전체" },
   { value: "CASH", label: "현금" },
   { value: "CASH_RECEIPT", label: "현금영수증" },
   { value: "CARD", label: "카드" },
   { value: "TRANSFER", label: "계좌이체" },
-  { value: "MIXED", label: "혼합" },
   { value: "UNPAID", label: "외상" },
 ];
 
