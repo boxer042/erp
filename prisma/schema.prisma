@@ -968,6 +968,7 @@ model IncomingCost {
   isTaxable         Boolean         @default(true) @map("is_taxable")
   isActive          Boolean         @default(true) @map("is_active")
   createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")
 
   @@map("incoming_costs")
 }

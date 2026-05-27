@@ -19,6 +19,7 @@ export const queryKeys = {
     manual: (id: string) => ["products", "manual", id] as const,
     priceHistory: (id: string) => ["products", "price-history", id] as const,
     salesStats: (id: string) => ["products", "sales-stats", id] as const,
+    costCause: (id: string) => ["products", "cost-cause", id] as const,
   },
   incoming: {
     all: ["incoming"] as const,

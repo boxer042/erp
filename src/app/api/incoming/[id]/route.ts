@@ -502,6 +502,22 @@ export async function PUT(
         await tx.productMapping.deleteMany({
           where: { id: { in: autoMappings.map((m) => m.id) } },
         });
+        // 각 product 입장의 cost-cause 단서로 audit 기록
+        for (const m of autoMappings) {
+          await recordAudit(tx, {
+            userId: auditUser?.id,
+            entity: "Product",
+            entityId: m.productId,
+            action: "MAPPING_DELETE",
+            meta: {
+              mappingId: m.id,
+              supplierProductId: m.supplierProductId,
+              productName: m.product.name,
+              source: "incoming-unconfirm",
+              incomingId: incoming.id,
+            },
+          });
+        }
       }
 
       // 8. SupplierLedger 삭제 (PURCHASE + 배송비차감 ADJUSTMENT) + rebalance

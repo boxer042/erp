@@ -27,3 +27,4 @@ export type { ComponentIncomingInfoRow } from "./component-incoming-info-section
 export { VariantHistorySheet } from "./variant-history-sheet";
 export { ProductPriceHistoryCard } from "./product-price-history-card";
 export { ProductSalesPriceHistoryCard } from "./product-sales-price-history-card";
+export { ProductCostCauseCard } from "./product-cost-cause-card";

@@ -49,7 +49,9 @@ export type AuditAction =
   | "UNCONFIRM"
   | "CANCEL"
   | "STATUS_CHANGE"
-  | "IMPORT";
+  | "IMPORT"
+  | "MAPPING_CREATE"
+  | "MAPPING_DELETE";
 
 export const AUDIT_ENTITIES = [
   "Order",
@@ -64,5 +66,6 @@ export const AUDIT_ENTITIES = [
   "SupplierReturn",
   "SupplierPayment",
   "CustomerPayment",
+  "Product",
 ] as const;
 export type AuditEntity = (typeof AUDIT_ENTITIES)[number];

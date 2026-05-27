@@ -42,6 +42,7 @@ import {
   ProductMovementsTable,
   ProductPriceHistoryCard,
   ProductSalesPriceHistoryCard,
+  ProductCostCauseCard,
   ProductSection,
   ProductSellingCostsTable,
   ProductVariantsCard,
@@ -405,6 +406,9 @@ export default function ProductDetailPage() {
                 {product.costAlert.direction === "up" ? "+" : ""}
                 {product.costAlert.changePercent.toFixed(1)}%).
                 {" "}판매가를 조정하거나 [확인]으로 알림을 닫을 수 있습니다.
+                <div className="mt-3">
+                  <ProductCostCauseCard productId={product.id} />
+                </div>
               </JmAlert>
             )}
 

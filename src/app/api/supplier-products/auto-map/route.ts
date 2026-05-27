@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 import {
   createAutoMappedProductForSupplierProduct,
   reconcileOrphanLotsForMapping,
@@ -23,6 +25,7 @@ export async function POST() {
   let success = 0;
   let failed = 0;
   const errors: { id: string; name: string; message: string }[] = [];
+  const user = await getCurrentUser();
 
   for (const sp of targets) {
     try {
@@ -38,6 +41,18 @@ export async function POST() {
             productId,
             conversionRate: 1,
             referenceId: mapping.id,
+          });
+          await recordAudit(tx, {
+            userId: user?.id,
+            entity: "Product",
+            entityId: productId,
+            action: "MAPPING_CREATE",
+            meta: {
+              mappingId: mapping.id,
+              supplierProductId: sp.id,
+              supplierProductName: sp.name,
+              source: "auto-map",
+            },
           });
         },
         { timeout: 30000, maxWait: 10000 },

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guardUser } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 
 // GET: 합치기 영향 미리보기
 // /api/products/[id]/merge?targetId=xxx
@@ -131,6 +133,7 @@ export async function POST(
         where: { productId: sourceId },
         select: { id: true, supplierProductId: true },
       });
+      const reassignedSpIds: string[] = [];
       for (const m of sourceMappings) {
         if (targetSpIds.has(m.supplierProductId)) {
           await tx.productMapping.delete({ where: { id: m.id } });
@@ -138,6 +141,31 @@ export async function POST(
           await tx.productMapping.update({
             where: { id: m.id },
             data: { productId: targetId },
+          });
+          reassignedSpIds.push(m.supplierProductId);
+        }
+      }
+
+      // target 입장에서는 source 의 매핑이 새로 들어온 것 — cost-cause 단서 기록
+      if (reassignedSpIds.length > 0) {
+        const sps = await tx.supplierProduct.findMany({
+          where: { id: { in: reassignedSpIds } },
+          select: { id: true, name: true, supplier: { select: { name: true } } },
+        });
+        const user = await getCurrentUser();
+        for (const sp of sps) {
+          await recordAudit(tx, {
+            userId: user?.id,
+            entity: "Product",
+            entityId: targetId,
+            action: "MAPPING_CREATE",
+            meta: {
+              supplierProductId: sp.id,
+              supplierProductName: sp.name,
+              supplierName: sp.supplier?.name ?? null,
+              source: "merge",
+              fromProductId: sourceId,
+            },
           });
         }
       }
