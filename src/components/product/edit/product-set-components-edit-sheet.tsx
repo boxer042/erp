@@ -139,7 +139,15 @@ function ProductSetComponentsEditSheetContent({
   });
 
   const [rows, setRows] = useState<RowState[]>(() => {
-    const existing = (product.setComponents ?? []).map((sc) => ({
+    // 템플릿 슬롯 order 로 정렬 — DB 가 setComponents 를 임의 순서로 반환해서
+    // 매 로드마다 순서가 흔들리던 문제 방지.
+    // 정렬 우선순위: slot.order (있으면) → 그 외는 원래 순서 그대로 뒤에.
+    const sortedComponents = [...(product.setComponents ?? [])].sort((a, b) => {
+      const aOrder = a.slot?.order ?? Number.POSITIVE_INFINITY;
+      const bOrder = b.slot?.order ?? Number.POSITIVE_INFINITY;
+      return aOrder - bOrder;
+    });
+    const existing = sortedComponents.map((sc) => ({
       rowId: Math.random().toString(36).slice(2),
       product: {
         id: sc.component.id,
