@@ -294,7 +294,7 @@ export interface ProductDetail {
     shippingPerUnit?: number;
     incomingCostPerUnit?: number;
     subtotal: number;
-    costSource: "LOT" | "SUPPLIER" | "BULK_PARENT" | "NONE";
+    costSource: "LOT" | "SUPPLIER" | "BULK_PARENT" | "ASSEMBLY" | "NONE";
     supplierName?: string | null;
     supplierProductName?: string | null;
     incomingCostList?: Array<{ name: string; costType: string; value: number; isTaxable: boolean }>;

@@ -17,11 +17,12 @@ import { fmtPrice } from "./helpers";
 
 const SOURCE_LABEL: Record<
   string,
-  { label: string; variant: "info" | "default" | "danger" }
+  { label: string; variant: "info" | "default" | "danger" | "accent" }
 > = {
   LOT: { label: "재고 평균", variant: "info" },
   SUPPLIER: { label: "매입 단가", variant: "default" },
   BULK_PARENT: { label: "벌크 부모", variant: "default" },
+  ASSEMBLY: { label: "조립 합산", variant: "accent" },
   NONE: { label: "미설정", variant: "danger" },
 };
 

@@ -323,7 +323,7 @@ export async function GET(
   let estimatedUnitCost: number | null = null;
   let estimatedMargin: number | null = null;
   let estimatedMarginRate: number | null = null;
-  type CostSource = "LOT" | "SUPPLIER" | "BULK_PARENT" | "NONE";
+  type CostSource = "LOT" | "SUPPLIER" | "BULK_PARENT" | "ASSEMBLY" | "NONE";
   const estimatedCostBreakdown: Array<{
     componentId: string;
     componentName: string;
@@ -612,6 +612,34 @@ export async function GET(
       }
     }
 
+    // batch 4: ASSEMBLED-as-component 재귀 — LOT/SUPPLIER/BULK_PARENT 다 없는 sub-assembly 의
+    // unitCost 를 그 자신의 setComponents 합으로 계산. computeCurrentUnitCostForId 는 N단계 재귀 지원.
+    const needAssemblyRecursion = product.setComponents
+      .filter((c) => {
+        const hasLot = (lotAggByProduct.get(c.componentId)?.qty ?? 0) > 0;
+        const hasSupplier = supplierBreakByProduct.has(c.componentId);
+        const hasBulkParent = bulkParentAvgCost.has(c.componentId);
+        return !hasLot && !hasSupplier && !hasBulkParent;
+      })
+      .map((c) => c.componentId);
+    const assemblyCostByProduct = new Map<string, number>();
+    if (needAssemblyRecursion.length > 0) {
+      const candidates = await prisma.product.findMany({
+        where: {
+          id: { in: needAssemblyRecursion },
+          OR: [{ productType: "ASSEMBLED" }, { isSet: true }],
+        },
+        select: { id: true },
+      });
+      const memo = new Map<string, number | null>();
+      await Promise.all(
+        candidates.map(async (c) => {
+          const cost = await computeCurrentUnitCostForId(prisma, c.id, { memo });
+          if (cost !== null && cost > 0) assemblyCostByProduct.set(c.id, cost);
+        }),
+      );
+    }
+
     let totalComponentCost = 0;
     for (const c of product.setComponents) {
       const qty = Number(c.quantity);
@@ -646,6 +674,11 @@ export async function GET(
         // 벌크 부모 폴백은 부모 lot 평균 / containerSize 로 분해 어려우므로 전체를 공급단가로
         supplierUnitPrice = unitCost;
         costSource = "BULK_PARENT";
+      } else if (assemblyCostByProduct.has(c.componentId)) {
+        unitCost = assemblyCostByProduct.get(c.componentId) ?? 0;
+        // sub-assembly 의 분해는 그 자신의 페이지에서 보는 게 자연스러워, 여기선 전체를 공급단가로 표시
+        supplierUnitPrice = unitCost;
+        costSource = "ASSEMBLY";
       } else {
         missingCostCount += 1;
       }

@@ -200,11 +200,23 @@ const productCostInclude = {
 /**
  * 한 판매상품의 현재 supplier-base unitCost 를 DB 에서 직접 계산.
  * 매핑 변동/PUT 등에서 acknowledgedUnitCost 동기화에 사용.
+ *
+ * 깊이 N 의 sub-assembly 도 재귀 처리 (조립 → 조립 → 조립 …) — 메모이제이션 + 순환 가드.
  */
 export async function computeCurrentUnitCostForId(
   db: PrismaLike,
   productId: string,
+  options?: { memo?: Map<string, number | null>; visiting?: Set<string> },
 ): Promise<number | null> {
+  const memo = options?.memo ?? new Map<string, number | null>();
+  const visiting = options?.visiting ?? new Set<string>();
+  if (memo.has(productId)) return memo.get(productId)!;
+  if (visiting.has(productId)) {
+    // 순환 — 0 으로 끊어 무한루프 방지 (실제로는 BOM 정의 오류)
+    return null;
+  }
+  visiting.add(productId);
+
   const product = await db.product.findUnique({
     where: { id: productId },
     select: {
@@ -216,7 +228,11 @@ export async function computeCurrentUnitCostForId(
       ...productCostInclude,
     },
   });
-  if (!product) return null;
+  if (!product) {
+    visiting.delete(productId);
+    memo.set(productId, null);
+    return null;
+  }
 
   const baseCost = computeBaseUnitCost({
     productMappings: product.productMappings,
@@ -228,27 +244,26 @@ export async function computeCurrentUnitCostForId(
     !isAssemblyLike({ productType: product.productType, isSet: product.isSet }) ||
     product.setComponents.length === 0
   ) {
+    visiting.delete(productId);
+    memo.set(productId, baseCost);
     return baseCost;
   }
 
-  const componentIds = product.setComponents.map((c) => c.componentId);
-  const components = await db.product.findMany({
-    where: { id: { in: componentIds } },
-    select: { id: true, isBulk: true, ...productCostInclude },
-  });
+  // 조립인데 자체 매핑이 있으면 baseCost 우선 (기존 list API 동작과 일치)
+  if (baseCost !== null) {
+    visiting.delete(productId);
+    memo.set(productId, baseCost);
+    return baseCost;
+  }
+
+  // 자식들 cost 재귀 계산 — 자식도 조립이면 그 자식의 setComponents 까지 들어감
   const costById = new Map<string, number | null>();
-  costById.set(product.id, baseCost);
-  for (const c of components) {
-    costById.set(
-      c.id,
-      computeBaseUnitCost({
-        productMappings: c.productMappings,
-        salesContainers: c.salesContainers,
-        isBulk: c.isBulk,
-      }),
-    );
+  for (const sc of product.setComponents) {
+    const childCost = await computeCurrentUnitCostForId(db, sc.componentId, { memo, visiting });
+    costById.set(sc.componentId, childCost);
   }
   const assemblyCost = computeAssemblyUnitCost(product.setComponents, costById);
-  // 조립인데 매핑이 따로 있으면 baseCost 우선 (기존 list API 동작과 일치)
-  return baseCost !== null ? baseCost : assemblyCost;
+  visiting.delete(productId);
+  memo.set(productId, assemblyCost);
+  return assemblyCost;
 }
