@@ -185,10 +185,17 @@ export default function ProductDetailPage() {
   const acknowledgeCostMutation = useMutation({
     mutationFn: () =>
       apiMutate(`/api/products/${id}/acknowledge-cost`, "POST"),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("원가 변동을 확인 처리했습니다");
-      queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(id) });
+      // detail 을 await 으로 refetch 완료 보장. 안 그러면 stale cache 가
+      // 잠시 더 costAlert 를 들고 있어 배너가 안 사라진 듯 보임.
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.products.detail(id),
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.products.costCause(id),
+      });
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),

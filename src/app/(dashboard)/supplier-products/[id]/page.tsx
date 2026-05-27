@@ -272,6 +272,33 @@ export default function SupplierProductDetailPage() {
 
   if (loading) return <Loading />;
 
+  // 404 ("진짜 못 찾음") 와 서버/네트워크 에러 (500 등) 를 분리. 합치면
+  // 운영 장애 시 사용자가 데이터 사라진 줄 알고 디버깅이 헛돌게 됨.
+  if (productQuery.isError) {
+    const err = productQuery.error;
+    const is404 = err instanceof ApiError && err.status === 404;
+    if (is404) {
+      return (
+        <div className="p-6 text-[var(--jm-text-muted)]">상품을 찾을 수 없습니다</div>
+      );
+    }
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-jm-sm font-medium text-[var(--jm-text)]">
+          데이터를 불러올 수 없습니다
+        </p>
+        <p className="text-jm-xs text-[var(--jm-text-muted)]">
+          {err instanceof ApiError
+            ? `${err.status} ${err.message}`
+            : "서버 응답이 없습니다. 잠시 후 다시 시도해주세요."}
+        </p>
+        <JmButton size="sm" variant="outline" onClick={() => productQuery.refetch()}>
+          다시 시도
+        </JmButton>
+      </div>
+    );
+  }
+
   if (!product) {
     return (
       <div className="p-6 text-[var(--jm-text-muted)]">상품을 찾을 수 없습니다</div>

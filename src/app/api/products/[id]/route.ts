@@ -4,11 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { computeShippingPerUnitDisplay } from "@/lib/incoming-shipping";
 import { computeSupplierProductAvgShipping } from "@/lib/cost-utils";
 import {
-  computeBaseUnitCost,
-  computeAssemblyUnitCost,
   computeCurrentUnitCostForId,
   deriveCostAlert,
-  isAssemblyLike,
 } from "@/lib/product-cost";
 import { productSchema } from "@/lib/validators/product";
 
@@ -922,76 +919,12 @@ export async function GET(
     customerName: r.repairTicket.customer?.name ?? null,
   }));
 
-  // 현재 supplier-base unitCost (list API 와 동일 공식) + costAlert.
-  // estimatedUnitCost (lot 가중평균 + 배송비 포함) 와는 별개 —
-  // 알림은 "최신 공급가 변동" 추적이 목적이므로 lot 평균보다 supplier 단가가 적절.
-  const baseUnitCost = computeBaseUnitCost({
-    productMappings: product.productMappings,
-    salesContainers: [], // 상세 API 는 salesContainers 미로드 — 벌크 SKU 상세는 null
-    isBulk: product.isBulk,
-  });
-  let currentUnitCost: number | null = baseUnitCost;
-
-  // 자체 매핑이 없는 조립/세트만 구성품 합으로 산출
-  if (
-    baseUnitCost === null &&
-    isAssemblyLike(product) &&
-    product.setComponents.length > 0
-  ) {
-    const componentIds = product.setComponents.map((c) => c.componentId);
-    const components = await prisma.product.findMany({
-      where: { id: { in: componentIds } },
-      select: {
-        id: true,
-        isBulk: true,
-        productMappings: {
-          include: {
-            supplierProduct: {
-              select: {
-                unitPrice: true,
-                incomingCosts: {
-                  where: { isActive: true },
-                  select: { costType: true, value: true, isTaxable: true },
-                },
-              },
-            },
-          },
-        },
-        salesContainers: {
-          where: { isActive: true },
-          take: 1,
-          select: {
-            containerSize: true,
-            productMappings: {
-              include: {
-                supplierProduct: {
-                  select: {
-                    unitPrice: true,
-                    incomingCosts: {
-                      where: { isActive: true },
-                      select: { costType: true, value: true, isTaxable: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    const costById = new Map<string, number | null>();
-    for (const c of components) {
-      costById.set(
-        c.id,
-        computeBaseUnitCost({
-          productMappings: c.productMappings,
-          salesContainers: c.salesContainers,
-          isBulk: c.isBulk,
-        }),
-      );
-    }
-    currentUnitCost = computeAssemblyUnitCost(product.setComponents, costById);
-  }
+  // 현재 supplier-base unitCost + costAlert.
+  // estimatedUnitCost (lot 가중평균 + 배송비 포함) 와는 별개 — 알림은
+  // "최신 공급가 변동" 추적이 목적이므로 lot 평균보다 supplier 단가가 적절.
+  // acknowledge-cost API 와 반드시 동일 함수 사용 — 두 path 가 다른 값을
+  // 내면 [확인] 눌러도 다음 fetch 에서 또 alert 가 떠 영구 stuck 됨.
+  const currentUnitCost = await computeCurrentUnitCostForId(prisma, id);
 
   const costAlert = deriveCostAlert({
     currentUnitCost,
