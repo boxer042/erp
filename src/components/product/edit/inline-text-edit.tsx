@@ -104,10 +104,10 @@ export function InlineTextEdit({
         <button
           type="button"
           onClick={startEdit}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+          className="opacity-40 group-hover:opacity-100 transition-opacity text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
           aria-label="편집"
         >
-          <Pencil className="size-3" />
+          <Pencil className="size-3.5" />
         </button>
       </span>
     );

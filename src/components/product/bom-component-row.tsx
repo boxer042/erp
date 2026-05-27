@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { JmBadge, JmIconButton, JmInput } from "@/jm";
+import { JmBadge, JmIconButton, JmInput, JmSkeleton } from "@/jm";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import { AssemblySlotLabelCombobox } from "@/components/assembly-slot-label-combobox";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
@@ -106,34 +106,38 @@ export function BomComponentRow({
   return (
     <div className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] p-2.5">
       {isAssembled && (
-        <AssemblySlotLabelCombobox
-          labels={slotLabels}
-          value={row.slotLabelId ?? ""}
-          onChange={handleSlotLabelChange}
-          onCreateNew={onCreateSlotLabel ?? (() => {})}
-          placeholder={
-            row.label && !row.slotLabelId
-              ? `${row.label} (재선택 필요)`
-              : "라벨 선택..."
-          }
-          disabled={isLoading}
-        />
+        isLoading ? (
+          <JmSkeleton className="h-9 w-full rounded-lg" />
+        ) : (
+          <AssemblySlotLabelCombobox
+            labels={slotLabels}
+            value={row.slotLabelId ?? ""}
+            onChange={handleSlotLabelChange}
+            onCreateNew={onCreateSlotLabel ?? (() => {})}
+            placeholder={
+              row.label && !row.slotLabelId
+                ? `${row.label} (재선택 필요)`
+                : "라벨 선택..."
+            }
+          />
+        )
       )}
 
-      <ProductCombobox
-        products={products}
-        value={row.product?.id ?? ""}
-        onChange={(p) => onChange({ product: p })}
-        filterType="component"
-        placeholder={
-          isLoading
-            ? "데이터 불러오는 중..."
-            : slotCategoryId
+      {isLoading ? (
+        <JmSkeleton className="h-9 w-full rounded-lg" />
+      ) : (
+        <ProductCombobox
+          products={products}
+          value={row.product?.id ?? ""}
+          onChange={(p) => onChange({ product: p })}
+          filterType="component"
+          placeholder={
+            slotCategoryId
               ? "카테고리 내 구성 상품 선택..."
               : "구성 상품 선택..."
-        }
-        disabled={isLoading}
-      />
+          }
+        />
+      )}
 
       {!isAssembled && (
         <JmInput
