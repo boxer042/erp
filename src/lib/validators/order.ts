@@ -96,6 +96,12 @@ export const orderSchema = z.object({
   /** 배송 원가 (매장 지불) — 우리가 낸 퀵비·택배비. 마진에서 차감, 손님 청구 무관 */
   shippingCostBorne: z.string().default("0"),
   memo: z.string().optional(),
+  /**
+   * 등록 직전 자동 발번된 SerialItem 코드들 — POS checkout 과 동일 정책.
+   * 서버가 OrderItem 과 매칭해 orderItemId/customerId 연결. trackable 상품만 발번됨.
+   * 미지정 시 라벨 매칭 스킵 (외부 채널 import 등 라벨 무관 흐름).
+   */
+  labelCodes: z.array(z.string()).optional(),
   items: z.array(orderItemSchema).min(1, "주문 항목을 추가해주세요"),
 });
 

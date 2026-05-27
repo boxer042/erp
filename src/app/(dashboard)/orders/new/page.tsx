@@ -365,8 +365,11 @@ export default function NewOrderPage() {
   });
 
   // ─── 등록 mutation ────────────────────────────────────────────────
-  const createMutation = useMutation({
-    mutationFn: () => {
+  const createMutation = useMutation<
+    { id: string; orderNo: string; labelCodes: string[] },
+    Error
+  >({
+    mutationFn: async () => {
       if (items.length === 0) {
         throw new Error("주문 항목을 1개 이상 추가해주세요");
       }
@@ -390,8 +393,34 @@ export default function NewOrderPage() {
         );
       }
 
-      // /api/orders 페이로드 — 기존 _create-sheet 와 동일 contract
-      return apiMutate<{ id: string; orderNo: string }>(
+      // 1) 라벨 자동 발번 (POS 결제 흐름과 동일 — trackable 상품만 서버가 필터).
+      //    best-effort: 실패해도 등록은 진행. /api/serial-items/issue 가 같은 productId 묶음으로 발번.
+      let labelCodes: string[] = [];
+      const trackableCandidates = items
+        .filter((i) => i.itemType === "product" && i.productId)
+        .map((i) => ({
+          productId: i.productId!,
+          quantity: Math.max(1, Math.round(i.quantity)),
+        }));
+      if (trackableCandidates.length > 0) {
+        try {
+          const res = await apiMutate<{ labels: { code: string }[] }>(
+            "/api/serial-items/issue",
+            "POST",
+            {
+              customerId: customerId || null,
+              productItems: trackableCandidates,
+              repairTicketIds: [],
+            },
+          );
+          labelCodes = res.labels.map((l) => l.code);
+        } catch {
+          // 라벨 발번 실패해도 주문 등록은 진행 (POS 와 동일 정책)
+        }
+      }
+
+      // 2) /api/orders 페이로드 — 기존 _create-sheet 와 동일 contract + labelCodes
+      const orderResult = await apiMutate<{ id: string; orderNo: string }>(
         "/api/orders",
         "POST",
         {
@@ -412,6 +441,7 @@ export default function NewOrderPage() {
             partial.paidAmount !== null ? String(partial.paidAmount) : undefined,
           partialPaymentKind: partial.kind ?? undefined,
           taxInvoiceRequested,
+          labelCodes: labelCodes.length > 0 ? labelCodes : undefined,
           // sessionDiscount 는 "1000" 또는 "10%" — calcCartTotals 가 net 으로 환산
           discountAmount: String(totals.sessionDiscountAmount),
           // 배송비는 API 가 gross 로 받음 → net × 1.1
@@ -445,14 +475,31 @@ export default function NewOrderPage() {
           }),
         },
       );
+
+      return { ...orderResult, labelCodes };
     },
     onSuccess: (data) => {
       // 매장판매(IN_STORE) — 즉시 종결되어 워크보드에 안 노출. 통합 판매내역으로 진입.
       // 그 외(PICKUP/DELIVERY/QUICK/SHIPPING) — PENDING 으로 진입하므로 워크보드로.
       const isInStoreSale = fulfillmentType === "IN_STORE";
+      const hasLabels = data.labelCodes.length > 0;
       toast.success(
         `주문이 등록되었습니다 — ${data.orderNo}` +
-          (isInStoreSale ? " (매장판매 · 즉시 종결)" : ""),
+          (isInStoreSale ? " (매장판매 · 즉시 종결)" : "") +
+          (hasLabels ? ` · 시리얼 라벨 ${data.labelCodes.length}개 자동 발번` : ""),
+        hasLabels
+          ? {
+              duration: 8000,
+              action: {
+                label: "라벨 인쇄",
+                onClick: () =>
+                  window.open(
+                    `/serial-items/print?codes=${encodeURIComponent(data.labelCodes.join(","))}`,
+                    "_blank",
+                  ),
+              },
+            }
+          : undefined,
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       router.push(isInStoreSale ? "/sales/history" : "/orders");

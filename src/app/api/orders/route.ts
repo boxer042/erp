@@ -596,6 +596,40 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // 발번된 SerialItem ↔ OrderItem 매칭 (POS checkout 과 동일 정책).
+      //   - body.labelCodes 는 등록 직전 자동 발번된 SerialItem 코드들
+      //   - 같은 productId 의 OrderItem 1개에 묶음 (단순화: 1 productId → 1 OrderItem)
+      //   - 외부 기기 라벨(productId=null, 수리) 은 매칭 대상 아님
+      if (data.labelCodes && data.labelCodes.length > 0) {
+        const serials = await tx.serialItem.findMany({
+          where: { code: { in: data.labelCodes }, orderItemId: null },
+          select: { id: true, productId: true },
+        });
+        const orderItemByProductId = new Map<string, string>();
+        for (let idx = 0; idx < createdIds.length; idx++) {
+          const staged = stagedItems[idx];
+          if (staged.productId && !orderItemByProductId.has(staged.productId)) {
+            orderItemByProductId.set(staged.productId, createdIds[idx]);
+          }
+        }
+        const updates: Promise<unknown>[] = [];
+        for (const s of serials) {
+          if (!s.productId) continue;
+          const orderItemId = orderItemByProductId.get(s.productId);
+          if (!orderItemId) continue;
+          updates.push(
+            tx.serialItem.update({
+              where: { id: s.id },
+              data: {
+                orderItemId,
+                customerId: data.customerId ?? undefined,
+              },
+            }),
+          );
+        }
+        if (updates.length > 0) await Promise.all(updates);
+      }
+
       return tx.order.findUnique({
         where: { id: o.id },
         include: {
