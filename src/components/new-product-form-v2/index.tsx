@@ -264,6 +264,7 @@ export function NewProductForm({
     order: number;
     defaultProductId: string | null;
     defaultQuantity: string;
+    isVariable?: boolean;
   };
   type TemplatePreset = {
     id: string;
@@ -299,6 +300,10 @@ export function NewProductForm({
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [saveTemplateName, setSaveTemplateName] = useState("");
   const [saveTemplateSubmitting, setSaveTemplateSubmitting] = useState(false);
+  // 기존 선택된 템플릿 수정 (PUT) — templateId 가 set 됐을 때만 노출
+  const [updateTemplateOpen, setUpdateTemplateOpen] = useState(false);
+  const [updateTemplateName, setUpdateTemplateName] = useState("");
+  const [updateTemplateSubmitting, setUpdateTemplateSubmitting] = useState(false);
   // 슬롯별 가변(isVariable) 마킹 — row.id 키
   const [variableSlotIds, setVariableSlotIds] = useState<Set<string>>(() => new Set());
 
@@ -2265,6 +2270,43 @@ export function NewProductForm({
                                 }}
                               />
                             </div>
+                            {templateId && (
+                              <JmButton
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const tpl = templates.find((t) => t.id === templateId);
+                                  setUpdateTemplateName(tpl?.name ?? "");
+                                  // 기존 가변 슬롯 prefill (slotId 매칭)
+                                  const variableSlotIdSet = new Set(
+                                    (tpl?.slots ?? [])
+                                      .filter((s) => s.isVariable)
+                                      .map((s) => s.id),
+                                  );
+                                  setVariableSlotIds(
+                                    new Set(
+                                      setComponents
+                                        .filter(
+                                          (r) =>
+                                            r.label?.trim() &&
+                                            r.slotId &&
+                                            variableSlotIdSet.has(r.slotId),
+                                        )
+                                        .map((r) => r.id),
+                                    ),
+                                  );
+                                  setUpdateTemplateOpen(true);
+                                }}
+                                disabled={
+                                  !setComponents.some((r) => r.label && r.label.trim())
+                                }
+                                className="shrink-0 h-9"
+                              >
+                                <Plus className="size-3.5" />
+                                기존 템플릿 수정
+                              </JmButton>
+                            )}
                             <JmButton
                               type="button"
                               variant="outline"
@@ -2281,7 +2323,7 @@ export function NewProductForm({
                               className="shrink-0 h-9"
                             >
                               <Plus className="size-3.5" />
-                              템플릿으로 저장
+                              {templateId ? "새 템플릿으로 저장" : "템플릿으로 저장"}
                             </JmButton>
                           </div>
                         </div>
@@ -3009,6 +3051,166 @@ export function NewProductForm({
             >
               {saveTemplateSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
               저장
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+
+      {/* 기존 선택된 템플릿을 현재 구성으로 수정 (PUT) — 다른 상품에도 영향 */}
+      <JmDialog open={updateTemplateOpen} onOpenChange={setUpdateTemplateOpen}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>
+              기존 템플릿 수정 — &ldquo;{templates.find((t) => t.id === templateId)?.name ?? ""}&rdquo;
+            </JmDialogTitle>
+          </JmDialogHeader>
+          <div className="flex flex-col gap-3 px-6 py-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-jm-xs text-[var(--jm-text-muted)]">템플릿명</label>
+              <JmInput
+                value={updateTemplateName}
+                onChange={(e) => setUpdateTemplateName(e.target.value)}
+                placeholder="템플릿명"
+              />
+            </div>
+            <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-2.5">
+              <div className="mb-1 text-jm-xs font-medium text-[var(--jm-text-muted)]">
+                저장될 슬롯 ({setComponents.filter((r) => r.label?.trim()).length}개)
+              </div>
+              <ul className="space-y-1 text-jm-xs text-[var(--jm-text)]">
+                {setComponents
+                  .filter((r) => r.label?.trim())
+                  .map((r, i) => (
+                    <li key={r.id} className="flex items-center gap-1.5">
+                      <span className="text-[var(--jm-text-muted)]">{i + 1}.</span>
+                      <span className="font-medium min-w-0 truncate">
+                        {r.label || "(이름 없음)"}
+                      </span>
+                      <span className="text-[var(--jm-text-muted)] shrink-0">×</span>
+                      <span className="shrink-0">{r.quantity || "1"}</span>
+                      {r.product && (
+                        <span className="ml-1 text-[var(--jm-text-muted)] truncate">
+                          ({r.product.name})
+                        </span>
+                      )}
+                      {!r.slotId && (
+                        <span className="ml-1 text-[var(--jm-warning-fg)] shrink-0">신규</span>
+                      )}
+                      <label className="ml-auto flex items-center gap-1 text-jm-2xs text-[var(--jm-text-muted)] cursor-pointer whitespace-nowrap shrink-0">
+                        <JmCheckbox
+                          checked={variableSlotIds.has(r.id)}
+                          onCheckedChange={(v) => {
+                            setVariableSlotIds((prev) => {
+                              const next = new Set(prev);
+                              if (v === true) next.add(r.id);
+                              else next.delete(r.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        가변
+                      </label>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            {(() => {
+              // 원본 템플릿에 있던 slotId 중 setComponents 에 더 이상 없는 것 = 삭제 대상
+              const tpl = templates.find((t) => t.id === templateId);
+              const liveSlotIds = new Set(
+                setComponents
+                  .filter((r) => r.label?.trim())
+                  .map((r) => r.slotId)
+                  .filter((s): s is string => !!s),
+              );
+              const deletedSlots = (tpl?.slots ?? []).filter(
+                (s) => !liveSlotIds.has(s.id),
+              );
+              if (deletedSlots.length === 0) return null;
+              return (
+                <p className="text-jm-2xs text-[var(--jm-danger-fg)]">
+                  삭제될 슬롯 {deletedSlots.length}개: {deletedSlots.map((s) => s.label).join(", ")}
+                </p>
+              );
+            })()}
+            <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+              이 템플릿을 사용하는 다른 상품에도 변경이 반영됩니다.
+            </p>
+          </div>
+          <JmDialogFooter>
+            <JmButton
+              variant="outline"
+              onClick={() => setUpdateTemplateOpen(false)}
+              disabled={updateTemplateSubmitting}
+            >
+              취소
+            </JmButton>
+            <JmButton
+              onClick={async () => {
+                if (!templateId) return;
+                const name = updateTemplateName.trim();
+                if (!name) {
+                  toast.error("템플릿명을 입력해주세요");
+                  return;
+                }
+                const validRows = setComponents.filter((r) => r.label?.trim());
+                if (validRows.length === 0) {
+                  toast.error("슬롯 라벨이 있는 구성품이 1개 이상 필요합니다");
+                  return;
+                }
+                setUpdateTemplateSubmitting(true);
+                try {
+                  const updated = await apiMutate<TemplateDetail>(
+                    `/api/assembly-templates/${templateId}`,
+                    "PUT",
+                    {
+                      name,
+                      defaultLaborCost:
+                        assemblyFixedCost > 0 ? String(assemblyFixedCost) : null,
+                      isActive: true,
+                      slots: validRows.map((r, idx) => ({
+                        ...(r.slotId ? { id: r.slotId } : {}),
+                        label: r.label!.trim(),
+                        slotLabelId: r.slotLabelId || null,
+                        order: idx,
+                        defaultProductId: r.product?.id ?? null,
+                        defaultQuantity: r.quantity || "1",
+                        isVariable: variableSlotIds.has(r.id),
+                      })),
+                    },
+                  );
+                  toast.success("템플릿이 수정되었습니다");
+                  // 메모리 templates 갱신
+                  setTemplates((prev) =>
+                    prev.map((t) =>
+                      t.id === templateId
+                        ? { ...updated, presets: updated.presets ?? [] }
+                        : t,
+                    ),
+                  );
+                  // setComponents 의 slotId 도 신규 슬롯에 대해 갱신
+                  const slotByOrder = new Map(
+                    updated.slots.map((s) => [s.order, s.id]),
+                  );
+                  setSetComponents((prev) =>
+                    prev.map((r, idx) => {
+                      const matchingSlotId = slotByOrder.get(idx);
+                      return matchingSlotId ? { ...r, slotId: matchingSlotId } : r;
+                    }),
+                  );
+                  setUpdateTemplateOpen(false);
+                } catch (err) {
+                  toast.error(
+                    err instanceof ApiError ? err.message : "템플릿 수정 실패",
+                  );
+                } finally {
+                  setUpdateTemplateSubmitting(false);
+                }
+              }}
+              disabled={updateTemplateSubmitting}
+            >
+              {updateTemplateSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              수정 저장
             </JmButton>
           </JmDialogFooter>
         </JmDialogContent>
