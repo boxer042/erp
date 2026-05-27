@@ -235,7 +235,13 @@ export function NewProductForm({
     return map;
   }, [slotLabels]);
   const productNameItems = useMemo(
-    () => existingProducts.map((p) => ({ id: p.id, name: p.name, badge: p.sku })),
+    () =>
+      existingProducts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        badge: p.sku,
+        categoryId: p.categoryId ?? null,
+      })),
     [existingProducts],
   );
   const createSlotLabelMutation = useMutation({
@@ -1893,6 +1899,7 @@ export function NewProductForm({
                               value={form.name}
                               onChange={(name) => setForm((prev) => ({ ...prev, name }))}
                               items={productNameItems}
+                              contextCategoryId={form.categoryId || null}
                             />
                           </Field>
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

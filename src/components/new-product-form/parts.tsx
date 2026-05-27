@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, isValidElement, cloneElement, type ReactElement } from "react";
+import { useId, useMemo, isValidElement, cloneElement, type ReactElement } from "react";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import { JmBadge, JmInput } from "@/jm";
 import { Plus, X, ChevronRight, Package, Wrench, Layers, Cpu, Palette } from "lucide-react";
@@ -11,92 +11,221 @@ function normalizeName(s: string): string {
   return s.toLowerCase().replace(/\s+/g, "");
 }
 
+/**
+ * "범양80A 3HP모터" → ["범양", "80A", "3HP", "모터"]
+ * 공백 + 한글/영문↔숫자 경계로 토큰화. 시리즈 비교용 부분 매칭에 사용.
+ */
+function tokenize(s: string): string[] {
+  const tokens: string[] = [];
+  for (const part of s.trim().split(/\s+/)) {
+    if (!part) continue;
+    let buf = "";
+    let mode: "digit" | "non-digit" | null = null;
+    for (const ch of part) {
+      const newMode = /[0-9.]/.test(ch) ? "digit" : "non-digit";
+      if (mode && mode !== newMode) {
+        if (buf) tokens.push(buf);
+        buf = ch;
+      } else {
+        buf += ch;
+      }
+      mode = newMode;
+    }
+    if (buf) tokens.push(buf);
+  }
+  return tokens.filter((t) => t.length > 0);
+}
+
+const VISIBLE_SPACE = "·";
+
 export interface NameAutocompleteItem {
   id: string;
   name: string;
   badge?: string | null;
+  /** 빈 입력일 때 같은 카테고리 후보를 먼저 노출하기 위한 컨텍스트 */
+  categoryId?: string | null;
 }
 
 export function NameAutocomplete({
   value,
   onChange,
   items,
+  contextCategoryId,
   placeholder = "상품명을 입력하세요",
   autoFocus,
   onKeyDown,
   warningLabel = "이미 등록된 상품",
   inputClassName = "h-9",
+  maxSuggestions = 8,
 }: {
   value: string;
   onChange: (name: string) => void;
   items: NameAutocompleteItem[];
+  /** 빈 입력 시 같은 카테고리 후보를 우선 노출 */
+  contextCategoryId?: string | null;
   placeholder?: string;
   autoFocus?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   warningLabel?: string;
   inputClassName?: string;
+  maxSuggestions?: number;
 }) {
-  const [open, setOpen] = useState(false);
-  const normalized = useMemo(() => normalizeName(value), [value]);
-
-  const suggestions = useMemo(() => {
-    if (normalized.length < 1) return [];
-    return items
-      .filter((it) => normalizeName(it.name).includes(normalized))
-      .slice(0, 8);
-  }, [items, normalized]);
+  const normalizedValue = useMemo(() => normalizeName(value), [value]);
+  const valueTokens = useMemo(() => tokenize(value), [value]);
 
   const exactMatch = useMemo(() => {
-    if (normalized.length < 1) return null;
-    return items.find((it) => normalizeName(it.name) === normalized) ?? null;
-  }, [items, normalized]);
+    if (normalizedValue.length < 1) return null;
+    return items.find((it) => normalizeName(it.name) === normalizedValue) ?? null;
+  }, [items, normalizedValue]);
+
+  const suggestions = useMemo(() => {
+    // 정확 매치 자기 자신은 후보에서 제외
+    const pool = items.filter((it) => normalizeName(it.name) !== normalizedValue);
+
+    // 빈 입력: 같은 카테고리 → 그 외 (최근 등록 순서)
+    if (valueTokens.length === 0) {
+      if (!contextCategoryId) return pool.slice(0, maxSuggestions);
+      const same = pool.filter((it) => it.categoryId === contextCategoryId);
+      const rest = pool.filter((it) => it.categoryId !== contextCategoryId);
+      return [...same, ...rest].slice(0, maxSuggestions);
+    }
+
+    // 입력 중: 토큰 매칭 score (몇 토큰이 일치하는지)
+    const scored = pool
+      .map((it) => {
+        const ni = normalizeName(it.name);
+        let hits = 0;
+        for (const t of valueTokens) {
+          if (ni.includes(normalizeName(t))) hits++;
+        }
+        return { it, hits };
+      })
+      .filter((s) => s.hits > 0)
+      .sort((a, b) => {
+        const aCat = contextCategoryId && a.it.categoryId === contextCategoryId ? 1 : 0;
+        const bCat = contextCategoryId && b.it.categoryId === contextCategoryId ? 1 : 0;
+        if (aCat !== bCat) return bCat - aCat;
+        return b.hits - a.hits;
+      });
+
+    return scored.slice(0, maxSuggestions).map((s) => s.it);
+  }, [items, valueTokens, normalizedValue, contextCategoryId, maxSuggestions]);
 
   return (
-    <div className="relative">
+    <div className="space-y-1.5">
       <JmInput
         autoFocus={autoFocus}
         placeholder={placeholder}
         value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => {
-          if (value.trim().length >= 1) setOpen(true);
-        }}
-        onBlur={() => setOpen(false)}
+        onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         className={inputClassName}
       />
-      {open && suggestions.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] shadow-md">
-          {suggestions.map((it) => (
-            <button
-              key={it.id}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange(it.name);
-                setOpen(false);
-              }}
-              className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-[var(--jm-surface-muted)] text-left"
-            >
-              <span className="truncate">{it.name}</span>
-              {it.badge && <JmBadge variant="outline" className="ml-2 shrink-0">{it.badge}</JmBadge>}
-            </button>
-          ))}
-        </div>
-      )}
       {exactMatch && (
-        <p className="mt-1 text-xs text-[var(--jm-warning-fg)]">
+        <p className="text-jm-2xs text-[var(--jm-warning-fg)]">
           {warningLabel}: <span className="font-medium">{exactMatch.name}</span>
           {exactMatch.badge && (
             <span className="ml-1 text-[var(--jm-text-muted)]">({exactMatch.badge})</span>
           )}
         </p>
       )}
+      {suggestions.length > 0 && (
+        <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] overflow-hidden">
+          <div className="flex items-center gap-1.5 bg-[var(--jm-surface-muted)] px-2.5 py-1 text-jm-2xs text-[var(--jm-text-muted)] border-b border-[var(--jm-border)]">
+            <Package className="size-3" />
+            {valueTokens.length === 0
+              ? "비슷한 상품 — 명명 규칙 참고용"
+              : `유사 상품 ${suggestions.length}건 — 띄어쓰기·단어 순서 참고`}
+          </div>
+          <ul className="max-h-64 overflow-y-auto">
+            {suggestions.map((it) => (
+              <li key={it.id}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onChange(it.name);
+                  }}
+                  className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 hover:bg-[var(--jm-surface-muted)] text-left"
+                >
+                  <HighlightedName name={it.name} tokens={valueTokens} />
+                  {it.badge && (
+                    <JmBadge variant="outline" size="sm" className="shrink-0 font-normal">
+                      {it.badge}
+                    </JmBadge>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
+}
+
+function HighlightedName({ name, tokens }: { name: string; tokens: string[] }) {
+  if (tokens.length === 0) {
+    return <span className="text-jm-sm text-[var(--jm-text)] truncate">{renderWithSpaces(name)}</span>;
+  }
+
+  const lower = name.toLowerCase();
+  const matches: Array<{ from: number; to: number }> = [];
+  for (const t of tokens) {
+    const tn = t.toLowerCase();
+    if (!tn) continue;
+    let idx = 0;
+    while ((idx = lower.indexOf(tn, idx)) !== -1) {
+      matches.push({ from: idx, to: idx + tn.length });
+      idx += Math.max(tn.length, 1);
+    }
+  }
+  matches.sort((a, b) => a.from - b.from);
+  const merged: Array<{ from: number; to: number }> = [];
+  for (const m of matches) {
+    const last = merged[merged.length - 1];
+    if (last && m.from <= last.to) {
+      last.to = Math.max(last.to, m.to);
+    } else {
+      merged.push({ ...m });
+    }
+  }
+
+  const spans: Array<{ from: number; to: number; match: boolean }> = [];
+  let cursor = 0;
+  for (const m of merged) {
+    if (m.from > cursor) spans.push({ from: cursor, to: m.from, match: false });
+    spans.push({ from: m.from, to: m.to, match: true });
+    cursor = m.to;
+  }
+  if (cursor < name.length) spans.push({ from: cursor, to: name.length, match: false });
+
+  return (
+    <span className="text-jm-sm text-[var(--jm-text)] truncate">
+      {spans.map((s, i) => {
+        const segment = name.slice(s.from, s.to);
+        return s.match ? (
+          <span key={i} className="font-semibold text-[var(--jm-action)]">
+            {renderWithSpaces(segment)}
+          </span>
+        ) : (
+          <span key={i}>{renderWithSpaces(segment)}</span>
+        );
+      })}
+    </span>
+  );
+}
+
+function renderWithSpaces(text: string): React.ReactNode {
+  const parts = text.split(" ");
+  return parts.map((p, i) => (
+    <span key={i}>
+      {p}
+      {i < parts.length - 1 && (
+        <span className="text-[var(--jm-text-subtle)]">{VISIBLE_SPACE}</span>
+      )}
+    </span>
+  ));
 }
 
 export function Field({
