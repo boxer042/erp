@@ -354,24 +354,32 @@ function Body({
         }
       }
 
-      // 1) 라벨 자동 발번 (trackable 상품에 한해)
+      // 1) 라벨 자동 발번 — 상품(trackable) + 수리(시리얼 미발번 ticket 만 자동 신규)
+      //    이미 시리얼 있는 수리는 API 가 newlyIssued: false 로 반환만 — 결제 시점에
+      //    자동 재출력 안 함. 재출력은 수리 상세 페이지에서 명시적으로 진행.
       let labelCodes: string[] = [];
       const trackableCandidates = productItems
         .filter((i) => i.productId)
         .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) }));
+      const repairTicketIds = repairItems
+        .map((i) => i.repairMeta?.repairTicketId)
+        .filter((v): v is string => !!v);
 
-      if (trackableCandidates.length > 0) {
+      if (trackableCandidates.length > 0 || repairTicketIds.length > 0) {
         try {
-          const res = await apiMutate<{ labels: { code: string }[] }>(
+          const res = await apiMutate<{
+            labels: { code: string; newlyIssued: boolean }[];
+          }>(
             "/api/serial-items/issue",
             "POST",
             {
               customerId: session.customerId ?? null,
               productItems: trackableCandidates,
-              repairTicketIds: [],
+              repairTicketIds,
             },
           );
-          labelCodes = res.labels.map((l) => l.code);
+          // 결제 시점 인쇄는 신규만 — 기존 라벨은 재출력 대상 아님
+          labelCodes = res.labels.filter((l) => l.newlyIssued).map((l) => l.code);
           if (labelCodes.length > 0) {
             setSessionLabels(labelCodes, session.id, session.id);
           }

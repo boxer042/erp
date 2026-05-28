@@ -112,7 +112,12 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   const trackableCandidates = items
     .filter((i) => i.itemType === "product" && i.productId)
     .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) }));
-  const hasTrackableCandidates = trackableCandidates.length > 0;
+  // 수리 라인의 ticket id — API 가 미발번 ticket 만 신규 발번, 기존 있으면 재출력 후보로 반환
+  const repairTicketIdsForLabels = items
+    .filter((i) => i.itemType === "repair" && i.repairMeta?.repairTicketId)
+    .map((i) => i.repairMeta!.repairTicketId!);
+  const hasTrackableCandidates =
+    trackableCandidates.length > 0 || repairTicketIdsForLabels.length > 0;
 
   const quotationMutation = useMutation({
     mutationFn: () => issueQuotation(session),
@@ -141,34 +146,54 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   };
 
   const serialIssueMutation = useMutation<{
-    labels: { code: string }[];
+    labels: { code: string; newlyIssued: boolean }[];
     consentMissing: boolean;
   }>({
     mutationFn: () =>
-      apiMutate<{ labels: { code: string }[]; consentMissing: boolean }>(
+      apiMutate<{
+        labels: { code: string; newlyIssued: boolean }[];
+        consentMissing: boolean;
+      }>(
         "/api/serial-items/issue",
         "POST",
         {
           customerId: session.customerId ?? null,
           productItems: trackableCandidates,
-          repairTicketIds: [],
+          // 수리 ticket 도 함께 — API 가 시리얼 미발번 ticket 만 신규 발번, 기존 있으면
+          // newlyIssued: false 로 반환 (재출력 안내 토스트만 띄움)
+          repairTicketIds: repairTicketIdsForLabels,
         },
       ),
     onMutate: () => setIssuingKind("serial"),
     onSuccess: (res) => {
-      const codes = res.labels.map((l) => l.code);
-      if (codes.length === 0) {
-        toast.info("발번 가능한 trackable 상품이 없습니다");
+      const newCodes = res.labels
+        .filter((l) => l.newlyIssued)
+        .map((l) => l.code);
+      const existingCount = res.labels.length - newCodes.length;
+
+      if (newCodes.length === 0 && existingCount === 0) {
+        toast.info("발번 가능한 항목이 없습니다");
         return;
       }
-      setSessionLabels(codes, session.id, session.id);
-      toast.success(`라벨 ${codes.length}장 발번 완료`);
+      if (newCodes.length === 0) {
+        toast.info(
+          `기존 라벨 ${existingCount}장 — 재출력은 수리 상세에서 진행하세요`,
+        );
+        return;
+      }
+
+      setSessionLabels(newCodes, session.id, session.id);
+      const breakdown =
+        existingCount > 0
+          ? `신규 ${newCodes.length}장 발번 · 기존 ${existingCount}장은 수리 상세에서 재출력`
+          : `라벨 ${newCodes.length}장 발번 완료`;
+      toast.success(breakdown);
       if (res.consentMissing) {
         toast.warning(
           "이 손님은 시리얼 조회 서비스 미동의 — QR 없이 발급되었습니다. 동의는 손님 정보에서 설정하세요.",
         );
       }
-      onPrintLabels?.(codes);
+      onPrintLabels?.(newCodes);
       onOpenChange(false);
     },
     onError: (err) =>
