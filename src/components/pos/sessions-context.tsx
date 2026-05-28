@@ -85,6 +85,12 @@ export interface CartItem {
   isAddon?: boolean;
   /** 추가구매 BundleProduct.id — 메인-자식 관계 추적용 (서버에 안 보내고 카트 내부 관리) */
   bundleId?: string;
+  /**
+   * 서비스로 지급 — unitPrice=0 + 매장 무상 제공.
+   * 영수증·명세표·통합판매내역에서 "서비스" 배지 + 정가(listPrice) strike-through 표시.
+   * 카트 PriceInputDialog 의 [서비스로 지급] 토글로 설정.
+   */
+  isService?: boolean;
   repairMeta?: RepairMeta;
   rentalMeta?: RentalMeta;
 }
@@ -138,7 +144,12 @@ interface SessionsContextValue {
   replaceItems: (items: CartItem[], sessionId?: string) => void;
   remove: (cartItemId: string, sessionId?: string) => void;
   updateQty: (cartItemId: string, qty: number, sessionId?: string) => void;
-  updateUnitPrice: (cartItemId: string, unitPrice: number, sessionId?: string) => void;
+  updateUnitPrice: (
+    cartItemId: string,
+    unitPrice: number,
+    sessionId?: string,
+    isService?: boolean,
+  ) => void;
   updateDiscount: (cartItemId: string, discount: string, sessionId?: string) => void;
   updateRentalDates: (cartItemId: string, startDate: string, endDate: string, newUnitPrice: number, sessionId?: string) => void;
   assignVariant: (cartItemId: string, variant: { productId: string; name: string; sku?: string; unitPrice: number }, sessionId?: string) => void;
@@ -590,14 +601,24 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateUnitPrice = useCallback(
-    (cartItemId: string, unitPrice: number, sessionId?: string) => {
+    (
+      cartItemId: string,
+      unitPrice: number,
+      sessionId?: string,
+      // 옵션 — PriceInputDialog 의 [서비스로 지급] 토글 결과. 명시되지 않으면 isService 미변경.
+      isService?: boolean,
+    ) => {
       const targetId = sessionId ?? activeId;
       mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => ({
           ...s,
           items: s.items.map((p) =>
             p.cartItemId === cartItemId
-              ? { ...p, unitPrice: Math.max(0, Math.round(unitPrice)) }
+              ? {
+                  ...p,
+                  unitPrice: Math.max(0, Math.round(unitPrice)),
+                  ...(isService !== undefined ? { isService } : {}),
+                }
               : p,
           ),
         }))

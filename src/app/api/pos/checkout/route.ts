@@ -44,6 +44,8 @@ interface CheckoutItem {
   parentCartItemId?: string;
   /** 수리 라인 — 라인별 매핑된 RepairTicket id. 라인별로 ticket finalize 분기. */
   repairTicketId?: string | null;
+  /** 서비스로 지급 — true 면 OrderItem.isService=true 저장. 영수증/명세표에서 배지 노출. */
+  isService?: boolean;
 }
 
 interface RepairTicketData {
@@ -170,6 +172,7 @@ export async function POST(request: NextRequest) {
     parentItemIndex: number | null;
     optionSnapshot: Record<string, string> | null;
     entryProductId: string | null;
+    isService: boolean;
   };
 
   const stagedItems: StagedItem[] = [];
@@ -198,6 +201,7 @@ export async function POST(request: NextRequest) {
         parentItemIndex: parentIdx ?? null,
         optionSnapshot: null,
         entryProductId: null, // ADDON 도 funnel 분석 대상 아님 (메인의 부산물)
+        isService: !!it.isService,
       });
       continue;
     }
@@ -285,6 +289,7 @@ export async function POST(request: NextRequest) {
       optionSnapshot: Object.keys(snapshot).length > 0 ? snapshot : null,
       // POS 결제는 직원 입력이라 entryProductId 항상 null. 자사몰/채널 import 시에만 채움.
       entryProductId: it.entryProductId ?? null,
+      isService: !!it.isService,
     });
     for (const ref of refs) {
       stagedItems.push({
@@ -303,6 +308,7 @@ export async function POST(request: NextRequest) {
         parentItemIndex: mainIdx,
         optionSnapshot: null,
         entryProductId: null, // OPTION_REF 자식 라인은 funnel 분석 대상 아님
+        isService: false, // OPTION_REF 는 메인의 옵션 추가구매 — 별도 서비스 분류 안 함
       });
     }
   }
@@ -585,6 +591,7 @@ export async function POST(request: NextRequest) {
             parentItemId: parentId,
             optionSnapshot: stage.optionSnapshot ?? undefined,
             entryProductId: stage.entryProductId,
+            isService: stage.isService,
           },
         });
         createdIds.push(oi.id);

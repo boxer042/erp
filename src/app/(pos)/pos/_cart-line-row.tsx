@@ -146,6 +146,12 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                   기술료
                 </span>
               )}
+              {/* 서비스로 지급 — 0원 무상 제공 (영수증/명세표에서도 동일 배지) */}
+              {item.isService && (
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-success-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-success-fg)]">
+                  서비스
+                </span>
+              )}
               {taxType === "TAX_FREE" && (
                 <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text-muted)]">
                   면세
@@ -330,7 +336,12 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
         taxType={taxType}
         isZeroRate={item.isZeroRate}
         originalPrice={item.listPrice}
-        onSubmit={(net) => updateUnitPrice(item.cartItemId, net, sessionId)}
+        initialIsService={item.isService}
+        // 수리/임대 라인은 자체 청구 흐름이 있어 서비스 토글 부적합
+        allowService={item.itemType === "product"}
+        onSubmit={(net, isService) =>
+          updateUnitPrice(item.cartItemId, net, sessionId, isService)
+        }
       />
 
       {/* 변형/옵션 선택 시트 — canonical 또는 옵션 보유 상품 */}

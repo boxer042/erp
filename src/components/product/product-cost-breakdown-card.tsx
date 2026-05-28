@@ -47,7 +47,7 @@ export function ProductCostBreakdownCard({ product, onEdit, onAddAssembly }: Pro
       title="구성품 · 예상 원가 분해"
       description={
         product.productType === "ASSEMBLED"
-          ? "조립상품 구성 부품 · 단가 · 소계 (비용 큰 항목부터)"
+          ? "각 부속의 현재 잔여 로트·매입 단가 기준 추정 — 과거 조립실적 lot 평균(KPI '평균 입고가')과 시점 차이로 다를 수 있음"
           : "세트 상품 구성품 · 단가 · 소계"
       }
       noPadding={!isEmpty}

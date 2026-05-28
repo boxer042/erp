@@ -106,6 +106,10 @@ export default async function StatementPrintPage({
         totalPrice: it.totalPrice.toString(),
         isTaxable: it.isTaxable,
         memo: it.memo,
+        // 서비스 라인 식별 — StatementItem 자체엔 isService 없음, unitPrice=0 + quantity>0 으로 추정.
+        // 정가(listPrice) 가 있으면 strike-through 표시 가능.
+        isService:
+          Number(it.unitPrice) === 0 && Number(it.quantity) > 0,
       }))}
       subtotalAmount={s.subtotalAmount.toString()}
       taxAmount={s.taxAmount.toString()}

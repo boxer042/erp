@@ -17,6 +17,7 @@ import type { ChannelPricingItem, SellingCostItem } from "./types";
 
 interface ProductChannelPricingTableProps {
   taxType: string;
+  productType: string;
   baseCost: number;
   globalCostTotal: number;
   pricings: ChannelPricingItem[];
@@ -34,6 +35,7 @@ interface ProductChannelPricingTableProps {
 
 export function ProductChannelPricingTable({
   taxType,
+  productType,
   baseCost,
   globalCostTotal,
   pricings,
@@ -49,11 +51,16 @@ export function ProductChannelPricingTable({
   cardFeeRate = 0,
 }: ProductChannelPricingTableProps) {
   const offlineCardFee = sellingPriceVat * cardFeeRate;
+  // 오프라인 마진은 "실제 입고/생산된 로트 가중평균(baseInboundCost)" 기준.
+  // 데이터가 없으면 0 으로 차감되어 100% 같은 오해를 부르므로 별도 표시.
+  const hasInboundData = baseInboundCost > 0;
   const offlineMargin = Math.round(
     baseSellingPrice - baseInboundCost - globalCostTotal - offlineCardFee,
   );
   const offlineMarginRate =
     baseSellingPrice > 0 ? (offlineMargin / baseSellingPrice) * 100 : null;
+  const offlineEmptyLabel =
+    productType === "ASSEMBLED" ? "조립실적 없음" : "입고 이력 없음";
 
   return (
     <div>
@@ -142,18 +149,28 @@ export function ProductChannelPricingTable({
                 : "—"}
             </JmTableCell>
             <JmTableCell className="px-3 py-2 text-right">
-              <div
-                className={`tabular-nums font-medium ${
-                  offlineMargin < 0
-                    ? "text-[var(--jm-danger-fg)]"
-                    : "text-[var(--jm-success-fg)]"
-                }`}
-              >
-                ₩{fmtPrice(offlineMargin)}
-              </div>
-              <div className="text-jm-2xs text-[var(--jm-text-muted)] tabular-nums">
-                {offlineMarginRate != null ? `${offlineMarginRate.toFixed(1)}%` : "—"}
-              </div>
+              {hasInboundData ? (
+                <>
+                  <div
+                    className={`tabular-nums font-medium ${
+                      offlineMargin < 0
+                        ? "text-[var(--jm-danger-fg)]"
+                        : "text-[var(--jm-success-fg)]"
+                    }`}
+                  >
+                    ₩{fmtPrice(offlineMargin)}
+                  </div>
+                  <div className="text-jm-2xs text-[var(--jm-text-muted)] tabular-nums">
+                    {offlineMarginRate != null
+                      ? `${offlineMarginRate.toFixed(1)}%`
+                      : "—"}
+                  </div>
+                </>
+              ) : (
+                <div className="text-jm-xs text-[var(--jm-text-muted)] font-normal">
+                  {offlineEmptyLabel}
+                </div>
+              )}
             </JmTableCell>
             <JmTableCell className="px-3 py-2"></JmTableCell>
           </JmTableRow>

@@ -1572,6 +1572,12 @@ model OrderItem {
    */
   entryProductId                String?           @map("entry_product_id")
   entryProduct                  Product?          @relation("OrderItemEntry", fields: [entryProductId], references: [id], onDelete: SetNull)
+  /**
+   * 서비스로 지급된 라인 — unitPrice=0 + 매장이 손님에게 무상 제공.
+   * 영수증·명세표·통합판매내역에서 "서비스" 배지로 명시. 마진 리포트는 listPrice 기준으로
+   * 서비스 부피 별도 집계 가능.
+   */
+  isService                     Boolean           @default(false) @map("is_service")
   memo                          String?
 
   lotConsumptions LotConsumption[]

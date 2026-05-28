@@ -74,10 +74,12 @@ interface ProductGroup {
   productId: string;
   productName: string;
   sku: string;
+  spec: string | null;
   quantity: number;
   revenue: number;
   supplyRevenue: number;
   costAmount: number;
+  shippingCostAmount: number;
   netProfit: number;
   marginRate: number;
 }
@@ -92,6 +94,7 @@ interface CategoryGroup {
   commissionAmount: number;
   cardFeeAmount: number;
   sellingCostAmount: number;
+  shippingCostAmount: number;
   netProfit: number;
   marginRate: number;
 }
@@ -113,7 +116,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
         include: {
           product: {
             select: {
-              id: true, name: true, sku: true, taxType: true, taxRate: true,
+              id: true, name: true, sku: true, spec: true, taxType: true, taxRate: true,
               categoryId: true,
               category: { select: { id: true, name: true, parentId: true, parent: { select: { id: true, name: true } } } },
             },
@@ -183,6 +186,13 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       oCard = 0,
       oSelling = 0;
 
+    // 배송원가는 주문 단위라 라인별 공급가매출 비례로 배분 (입고 배송비와 동일 정책).
+    // 상품/카테고리 그룹 netProfit 에 반영되어 주문별 합계와 일치.
+    const oShipCostBorne = Number(order.shippingCostBorne);
+    const orderSupplySum = order.items
+      .filter((it) => it.product)
+      .reduce((s, it) => s + Number(it.totalPrice), 0);
+
     const chId = order.channel?.id ?? "__offline__";
     const chName = order.channel?.name ?? "오프라인";
     if (!channelMap.has(chId)) {
@@ -241,6 +251,10 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       const sellingCost =
         item.sellingCostSnapshot != null ? Number(item.sellingCostSnapshot) * qty : 0;
 
+      // 주문 배송원가를 라인 공급가 비율로 배분
+      const shipAlloc =
+        orderSupplySum > 0 ? oShipCostBorne * (supplyRevenue / orderSupplySum) : 0;
+
       oRevenue += revenue;
       oSupply += supplyRevenue;
       oCost += cost;
@@ -263,10 +277,12 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
           productId: item.product.id,
           productName: item.product.name,
           sku: item.product.sku,
+          spec: item.product.spec ?? null,
           quantity: 0,
           revenue: 0,
           supplyRevenue: 0,
           costAmount: 0,
+          shippingCostAmount: 0,
           netProfit: 0,
           marginRate: 0,
         });
@@ -276,8 +292,10 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       pGroup.revenue += revenue;
       pGroup.supplyRevenue += supplyRevenue;
       pGroup.costAmount += cost;
-      // 상품의 net profit은 수수료/카드료/판매비용 차감 포함
-      pGroup.netProfit += supplyRevenue - cost - commission - cardFee - sellingCost;
+      pGroup.shippingCostAmount += shipAlloc;
+      // 상품 netProfit — 수수료/카드료/판매비용 + 배분 배송원가 차감
+      pGroup.netProfit +=
+        supplyRevenue - cost - commission - cardFee - sellingCost - shipAlloc;
 
       // 카테고리 누적 — 소분류가 있으면 소분류, 없으면 대분류, 둘 다 없으면 "미분류"
       const cat = item.product.category;
@@ -294,6 +312,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
           commissionAmount: 0,
           cardFeeAmount: 0,
           sellingCostAmount: 0,
+          shippingCostAmount: 0,
           netProfit: 0,
           marginRate: 0,
         });
@@ -306,14 +325,15 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       cGroup.commissionAmount += commission;
       cGroup.cardFeeAmount += cardFee;
       cGroup.sellingCostAmount += sellingCost;
-      cGroup.netProfit += supplyRevenue - cost - commission - cardFee - sellingCost;
+      cGroup.shippingCostAmount += shipAlloc;
+      cGroup.netProfit +=
+        supplyRevenue - cost - commission - cardFee - sellingCost - shipAlloc;
     }
 
     // 배송 원가(매장 지불) — 주문 단위. 마진에서 차감.
-    const oShipCost = Number(order.shippingCostBorne);
-    chGroup.shippingCostAmount += oShipCost;
+    chGroup.shippingCostAmount += oShipCostBorne;
     const oNetProfit =
-      oSupply - oCost - oComm - oCard - oSelling - oShipCost;
+      oSupply - oCost - oComm - oCard - oSelling - oShipCostBorne;
     const oMarginRate = oSupply > 0 ? (oNetProfit / oSupply) * 100 : 0;
 
     orderRows.push({
@@ -328,7 +348,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       commissionAmount: Math.round(oComm),
       cardFeeAmount: Math.round(oCard),
       sellingCostAmount: Math.round(oSelling),
-      shippingCostAmount: Math.round(oShipCost),
+      shippingCostAmount: Math.round(oShipCostBorne),
       netProfit: Math.round(oNetProfit),
       marginRate: Number(oMarginRate.toFixed(1)),
     });
@@ -341,7 +361,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
     summary.commissionAmount += oComm;
     summary.cardFeeAmount += oCard;
     summary.sellingCostAmount += oSelling;
-    summary.shippingCostAmount += oShipCost;
+    summary.shippingCostAmount += oShipCostBorne;
   }
 
   summary.netProfit =
@@ -398,6 +418,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       revenue: Math.round(g.revenue),
       supplyRevenue: Math.round(g.supplyRevenue),
       costAmount: Math.round(g.costAmount),
+      shippingCostAmount: Math.round(g.shippingCostAmount),
       netProfit: Math.round(g.netProfit),
       marginRate: Number(mr.toFixed(1)),
     };
@@ -414,6 +435,7 @@ async function aggregate(from: Date, to: Date, channelId: string | null) {
       commissionAmount: Math.round(g.commissionAmount),
       cardFeeAmount: Math.round(g.cardFeeAmount),
       sellingCostAmount: Math.round(g.sellingCostAmount),
+      shippingCostAmount: Math.round(g.shippingCostAmount),
       netProfit: Math.round(g.netProfit),
       marginRate: Number(mr.toFixed(1)),
     };

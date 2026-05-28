@@ -23,8 +23,12 @@ interface Props {
    * 미지정 시 비교 영역은 렌더링하지 않음. 0 이하도 무시.
    */
   originalPrice?: number;
-  /** 저장 시 호출 — 항상 공급가액(세전) 으로 반환 */
-  onSubmit: (net: number) => void;
+  /** 초기 서비스 지급 상태 — 미지정 시 false */
+  initialIsService?: boolean;
+  /** 서비스 토글 노출 여부 — false 면 토글 자체 숨김 (수리/임대 라인 등) */
+  allowService?: boolean;
+  /** 저장 시 호출 — 공급가액(세전) + 서비스 지급 여부. isService 가 미사용 호출자는 net 만 받아도 됨 (구 시그니처 호환) */
+  onSubmit: (net: number, isService?: boolean) => void;
   /** 다른 시트(JmDrawer 등) 위에 겹쳐 띄울 때 "elevated" (BottomSheet z-[60]/[70]) */
   z?: "base" | "elevated";
 }
@@ -50,6 +54,8 @@ function Body({
   isZeroRate,
   title = "가격 입력",
   originalPrice,
+  initialIsService,
+  allowService = true,
   onSubmit,
   z,
 }: Props) {
@@ -61,6 +67,22 @@ function Body({
   const [gross, setGross] = useState<string>(
     String(taxApplies ? Math.round(initial * (1 + TAX_RATE)) : initial),
   );
+  // 서비스로 지급 토글 — 켜지면 net/gross 모두 0 으로 고정, 비활성화.
+  const [isService, setIsService] = useState<boolean>(!!initialIsService);
+
+  const toggleService = (v: boolean) => {
+    setIsService(v);
+    if (v) {
+      // 서비스 켜면 자동으로 0 원
+      setNet("0");
+      setGross("0");
+    } else {
+      // 서비스 끄면 원래 정가(있으면) 또는 빈 상태로 복원
+      const restore = originalPrice && originalPrice > 0 ? originalPrice : initial;
+      setNet(String(restore));
+      setGross(String(taxApplies ? Math.round(restore * (1 + TAX_RATE)) : restore));
+    }
+  };
 
   const tax = taxApplies
     ? Math.max(0, Math.round((parseInt(net.replace(/,/g, ""), 10) || 0) * TAX_RATE))
@@ -108,7 +130,8 @@ function Body({
         <button
           type="button"
           onClick={() => {
-            onSubmit(finalNet);
+            // 서비스 켜진 상태는 항상 net=0 으로 강제 — 사용자가 직접 0 입력한 케이스도 동일하게 처리 안 함 (의도 명시)
+            onSubmit(isService ? 0 : finalNet, isService);
             onOpenChange(false);
           }}
           className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99]"
@@ -118,15 +141,59 @@ function Body({
       }
     >
       <div className="flex flex-col gap-4 pt-2">
+        {/* 서비스로 지급 토글 — 켜면 가격 입력 비활성, net/gross 모두 0. 정가는 보존 (영수증에서 strike). */}
+        {allowService && (
+          <button
+            type="button"
+            onClick={() => toggleService(!isService)}
+            className={`flex items-center justify-between rounded-2xl px-4 py-3 text-left transition-colors ${
+              isService
+                ? "bg-[var(--jm-success-bg)] ring-1 ring-[var(--jm-success-border)]"
+                : "bg-[var(--jm-bg)] hover:bg-[var(--jm-surface-muted)]"
+            }`}
+          >
+            <div className="flex flex-col">
+              <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+                서비스로 지급
+              </span>
+              <span className="text-[11px] text-[var(--jm-text-muted)]">
+                {isService
+                  ? "₩0 청구 · 영수증·명세표에 \"서비스\" 표기 + 정가 strike"
+                  : "무상 제공으로 표시 (정가는 보존됨)"}
+              </span>
+            </div>
+            <span
+              className={`flex size-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                isService
+                  ? "border-[var(--jm-success-fg)] bg-[var(--jm-success-fg)] text-white"
+                  : "border-[var(--jm-border-strong)] bg-[var(--jm-surface)]"
+              }`}
+            >
+              {isService && (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path
+                    d="M3 7.5l3 3 5-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </span>
+          </button>
+        )}
+
         {/* 세 필드 — 세액은 자동 (read-only) */}
-        <Field label="공급가액 (세전)" hint="원가·매입 기준">
+        <Field label="공급가액 (세전)" hint="원가·매입 기준" disabled={isService}>
           <input
             type="text"
             inputMode="numeric"
             value={formatComma(net)}
             onChange={(e) => setNetAndSync(e.target.value)}
             onFocus={focusCaretEnd}
-            className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
+            disabled={isService}
+            className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)] disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </Field>
 
@@ -141,14 +208,15 @@ function Body({
           )}
         </Field>
 
-        <Field label="판매가 (VAT 포함)" hint="고객 청구 금액">
+        <Field label="판매가 (VAT 포함)" hint="고객 청구 금액" disabled={isService}>
           <input
             type="text"
             inputMode="numeric"
             value={formatComma(gross)}
             onChange={(e) => setGrossAndSync(e.target.value)}
             onFocus={focusCaretEnd}
-            className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
+            disabled={isService}
+            className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)] disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </Field>
 

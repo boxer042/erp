@@ -9,6 +9,10 @@ interface Line {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  /** 서비스로 지급 — 0원 무상 제공. 영수증에 [서비스] 배지 + 정가 strike */
+  isService?: boolean;
+  /** 정가 (세전) — 서비스 라인일 때 strike-through 표시용 */
+  listPrice?: number | null;
 }
 
 interface Data {
@@ -304,12 +308,39 @@ export function ReceiptClient({
 
           {data.lines.map((l, i) => {
             const showDiscount = false; // OrderItem 에 discountAmount 없음
+            const isService = !!l.isService;
+            // 서비스 라인: 정가(listPrice) 가 있으면 strike-through 로 정가 표시 — "원래 ₩X 짜리 서비스" 명시.
+            const showServiceListPrice =
+              isService && l.listPrice && l.listPrice > 0;
             return (
               <div key={i} className="line">
-                <div className="line-name">{l.name}</div>
-                <div className="line-detail">{fmt(l.totalPrice)}</div>
+                <div className="line-name">
+                  {l.name}
+                  {isService && (
+                    <span
+                      style={{
+                        marginLeft: "1.5mm",
+                        padding: "0 1mm",
+                        border: "1px solid #000",
+                        fontSize: "8pt",
+                        fontWeight: 700,
+                      }}
+                    >
+                      서비스
+                    </span>
+                  )}
+                </div>
+                <div className="line-detail">
+                  {showServiceListPrice ? (
+                    <span style={{ textDecoration: "line-through", color: "#888" }}>
+                      {fmt(l.listPrice as number)}
+                    </span>
+                  ) : (
+                    fmt(l.totalPrice)
+                  )}
+                </div>
                 <div className="line-detail" style={{ gridColumn: "1 / -1" }}>
-                  {l.quantity} × {fmt(l.unitPrice)}
+                  {l.quantity} × {isService ? "₩0 (서비스)" : fmt(l.unitPrice)}
                   {showDiscount && " (할인 적용)"}
                 </div>
               </div>

@@ -124,6 +124,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
           cartItemId: i.cartItemId,
           parentCartItemId: i.parentCartItemId,
           isAddon: true,
+          isService: i.isService ?? false,
         };
       }
       // 옵션 addPrice 는 메인 단가 외 별도 라인(OPTION_REF) 또는 메인 라인 가산으로 서버에서 처리됨.
@@ -149,6 +150,8 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
         cartItemId: i.cartItemId,
         // 수리 라인 — 라인별 RepairTicket 매핑. 서버가 라인별로 ticket finalize.
         repairTicketId: i.repairMeta?.repairTicketId ?? null,
+        // 서비스로 지급 — OrderItem.isService 로 저장. 영수증/명세표/판매내역에서 배지 표시.
+        isService: i.isService ?? false,
       };
     }), session.totalDiscount),
     repairTicketData,

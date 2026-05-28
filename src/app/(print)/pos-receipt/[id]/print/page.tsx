@@ -39,6 +39,9 @@ export default async function PosReceiptPrintPage({
     quantity: Number(it.quantity),
     unitPrice: Number(it.unitPrice),
     totalPrice: Number(it.totalPrice),
+    // 서비스 지급 — 영수증에 "[서비스]" 표시 + 정가 strike. 0원 라인도 안전망으로 포함.
+    isService: it.isService || (Number(it.unitPrice) === 0 && Number(it.quantity) > 0),
+    listPrice: it.listPrice ? Number(it.listPrice) : null,
   }));
 
   return (

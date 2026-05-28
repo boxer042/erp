@@ -36,6 +36,8 @@ export interface DocumentPdfItem {
   totalPrice: string | number;
   isTaxable: boolean;
   memo?: string | null;
+  /** 서비스로 지급 — 명세표에 "[서비스]" 텍스트 + 정가 strike */
+  isService?: boolean;
 }
 
 interface DocumentPdfProps {
@@ -493,7 +495,10 @@ function PdfContent(props: DocumentPdfProps) {
                 ]}
               >
                 <ItemCell widthPct={cols[0]} align="center">{idx + 1}</ItemCell>
-                <ItemCell widthPct={cols[1]} align="left">{it.name}</ItemCell>
+                <ItemCell widthPct={cols[1]} align="left">
+                  {it.name}
+                  {it.isService ? "  [서비스]" : ""}
+                </ItemCell>
                 <ItemCell widthPct={cols[2]} align="left">{it.spec || ""}</ItemCell>
                 <ItemCell widthPct={cols[3]} align="center">{it.unitOfMeasure}</ItemCell>
                 <ItemCell widthPct={cols[4]} align="right">
@@ -503,9 +508,11 @@ function PdfContent(props: DocumentPdfProps) {
                 <ItemCell widthPct={cols[6]} align="right">
                   {disc > 0 ? fmt(disc) : ""}
                 </ItemCell>
-                <ItemCell widthPct={cols[7]} align="right">{fmt(actual)}</ItemCell>
+                <ItemCell widthPct={cols[7]} align="right">
+                  {it.isService ? "서비스" : fmt(actual)}
+                </ItemCell>
                 <ItemCell widthPct={cols[8]} align="right" last={supplyOnly}>
-                  {fmt(supply)}
+                  {it.isService ? "0" : fmt(supply)}
                 </ItemCell>
                 {!supplyOnly && (
                   <ItemCell widthPct={cols[9]} align="right" last>

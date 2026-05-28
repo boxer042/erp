@@ -506,6 +506,7 @@ export default function ProductDetailPage() {
                 >
                   <ProductChannelPricingTable
                     taxType={product.taxType}
+                    productType={product.productType}
                     baseCost={baseCost}
                     globalCostTotal={globalCostTotal}
                     pricings={product.channelPricings ?? []}

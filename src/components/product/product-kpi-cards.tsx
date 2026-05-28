@@ -82,7 +82,7 @@ export function ProductKpiCards({ product, cardFeeRate = 0 }: ProductKpiCardsPro
       {showInboundLegacy && (
         <KpiCard
           label="마진 (오프라인)"
-          description="판매가 − 입고가 − 판매비용 − 카드수수료"
+          description="공급가액 − 입고가 − 판매비용 − 카드수수료 (VAT 제외 마진)"
         >
           <Line
             label="마진금액"
@@ -101,7 +101,7 @@ export function ProductKpiCards({ product, cardFeeRate = 0 }: ProductKpiCardsPro
       {showAverageForComposite && (
         <KpiCard
           label="평균 입고가"
-          description="조립실적 lot 가중평균 (구성품의 공급단가+배송비+부대비용 누적)"
+          description="조립 시점에 굳어진 lot 단가의 가중평균 (부속 단가 + 배송비 + 부대비용). 이후 부속 단가가 바뀌어도 변동하지 않음"
         >
           <Line label="공급가액" value={`₩${fmtPrice(inboundNet)}`} />
           <Line label="세액" value={`₩${fmtPrice(inboundTax)}`} />
@@ -112,7 +112,7 @@ export function ProductKpiCards({ product, cardFeeRate = 0 }: ProductKpiCardsPro
       {showAverageForComposite && (
         <KpiCard
           label="평균 마진"
-          description="판매가 − 평균 입고가 − 판매비용 − 카드수수료"
+          description="공급가액 − 평균 입고가 − 판매비용 − 카드수수료 (VAT 제외 마진)"
         >
           <Line
             label="마진금액"
@@ -152,7 +152,10 @@ export function ProductKpiCards({ product, cardFeeRate = 0 }: ProductKpiCardsPro
       )}
 
       {showEstimateForComposite && (
-        <KpiCard label="예상 마진" description="판매가 − 예상 원가 − 판매비용">
+        <KpiCard
+          label="예상 마진"
+          description="공급가액 − 예상 원가 − 판매비용 (VAT 제외 마진)"
+        >
           <Line
             label="마진금액"
             value={`₩${fmtPrice(Math.round(estMargin ?? 0))}`}

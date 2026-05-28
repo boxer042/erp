@@ -67,10 +67,12 @@ interface ProductGroup {
   productId: string;
   productName: string;
   sku: string;
+  spec: string | null;
   quantity: number;
   revenue: number;
   supplyRevenue: number;
   costAmount: number;
+  shippingCostAmount: number;
   netProfit: number;
   marginRate: number;
 }
@@ -85,6 +87,7 @@ interface CategoryGroup {
   commissionAmount: number;
   cardFeeAmount: number;
   sellingCostAmount: number;
+  shippingCostAmount: number;
   netProfit: number;
   marginRate: number;
 }
@@ -231,6 +234,7 @@ export default function MarginReportPage() {
         { key: "supplyRevenue", label: "공급가매출" },
         { key: "costAmount", label: "원가" },
         { key: "commissionAmount", label: "수수료" },
+        { key: "shippingCostAmount", label: "배송원가" },
         { key: "netProfit", label: "실순이익" },
         { key: "marginRate", label: "마진율(%)" },
       ]);
@@ -242,10 +246,12 @@ export default function MarginReportPage() {
       csv = toCSV(sorted, [
         { key: "productName", label: "상품명" },
         { key: "sku", label: "SKU" },
+        { key: "spec", label: "규격" },
         { key: "quantity", label: "판매수량" },
         { key: "revenue", label: "매출(VAT포함)" },
         { key: "supplyRevenue", label: "공급가매출" },
         { key: "costAmount", label: "원가" },
+        { key: "shippingCostAmount", label: "배송원가" },
         { key: "netProfit", label: "실순이익" },
         { key: "marginRate", label: "마진율(%)" },
       ]);
@@ -402,7 +408,7 @@ export default function MarginReportPage() {
                     <TableRow>
                       <TableHead>채널</TableHead>
                       <TableHead className="text-right">주문수</TableHead>
-                      <TableHead className="text-right">매출</TableHead>
+                      <TableHead className="text-right">매출(공급가)</TableHead>
                       <TableHead className="text-right">원가</TableHead>
                       <TableHead className="text-right">수수료</TableHead>
                       <TableHead className="text-right">카드료</TableHead>
@@ -415,7 +421,7 @@ export default function MarginReportPage() {
                       <TableRow key={g.channelId ?? "__offline__"}>
                         <TableCell className="text-[12px] font-medium">{g.channelName}</TableCell>
                         <TableCell className="text-right tabular-nums text-[12px]">{g.orderCount}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.revenue)}</TableCell>
+                        <TableCell className="text-right tabular-nums">₩{fmt(g.supplyRevenue)}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(g.costAmount)}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(g.commissionAmount)}</TableCell>
                         <TableCell className="text-right tabular-nums">{g.cardFeeAmount > 0 ? `₩${fmt(g.cardFeeAmount)}` : "—"}</TableCell>
@@ -448,9 +454,10 @@ export default function MarginReportPage() {
                     <TableRow>
                       <TableHead>카테고리</TableHead>
                       <TableHead className="text-right">판매수량</TableHead>
-                      <TableHead className="text-right">매출</TableHead>
+                      <TableHead className="text-right">매출(공급가)</TableHead>
                       <TableHead className="text-right">원가</TableHead>
                       <TableHead className="text-right">수수료</TableHead>
+                      <TableHead className="text-right">배송원가</TableHead>
                       <TableHead className="text-right">실순이익</TableHead>
                       <TableHead className="text-right">마진율</TableHead>
                     </TableRow>
@@ -460,9 +467,10 @@ export default function MarginReportPage() {
                       <TableRow key={g.categoryId ?? "__none__"}>
                         <TableCell className="text-[12px] font-medium">{g.categoryName}</TableCell>
                         <TableCell className="text-right tabular-nums text-[12px]">{g.quantity}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.revenue)}</TableCell>
+                        <TableCell className="text-right tabular-nums">₩{fmt(g.supplyRevenue)}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(g.costAmount)}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(g.commissionAmount + g.cardFeeAmount)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{g.shippingCostAmount > 0 ? `₩${fmt(g.shippingCostAmount)}` : "—"}</TableCell>
                         <TableCell className={`text-right tabular-nums font-semibold ${g.netProfit >= 0 ? "text-primary" : "text-red-400"}`}>
                           ₩{fmt(g.netProfit)}
                         </TableCell>
@@ -504,25 +512,29 @@ export default function MarginReportPage() {
                       <TableHead>순위</TableHead>
                       <TableHead>상품</TableHead>
                       <TableHead>SKU</TableHead>
+                      <TableHead>규격</TableHead>
                       <TableHead className="text-right">판매수량</TableHead>
-                      <TableHead className="text-right">매출</TableHead>
+                      <TableHead className="text-right">매출(공급가)</TableHead>
                       <TableHead className="text-right">원가</TableHead>
+                      <TableHead className="text-right">배송원가</TableHead>
                       <TableHead className="text-right">실순이익</TableHead>
                       <TableHead className="text-right">마진율</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {[...data.productGroups]
-                      .sort((a, b) => topSort === "revenue" ? b.revenue - a.revenue : b.netProfit - a.netProfit)
+                      .sort((a, b) => topSort === "revenue" ? b.supplyRevenue - a.supplyRevenue : b.netProfit - a.netProfit)
                       .slice(0, 10)
                       .map((p, idx) => (
                         <TableRow key={p.productId}>
                           <TableCell className="text-[12px] text-muted-foreground tabular-nums">{idx + 1}</TableCell>
                           <TableCell className="text-[12px] font-medium">{p.productName}</TableCell>
                           <TableCell className="text-[12px] text-muted-foreground">{p.sku}</TableCell>
+                          <TableCell className="text-[12px] text-muted-foreground">{p.spec ?? "-"}</TableCell>
                           <TableCell className="text-right tabular-nums text-[12px]">{p.quantity}</TableCell>
-                          <TableCell className="text-right tabular-nums">₩{fmt(p.revenue)}</TableCell>
+                          <TableCell className="text-right tabular-nums">₩{fmt(p.supplyRevenue)}</TableCell>
                           <TableCell className="text-right tabular-nums">₩{fmt(p.costAmount)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{p.shippingCostAmount > 0 ? `₩${fmt(p.shippingCostAmount)}` : "—"}</TableCell>
                           <TableCell className={`text-right tabular-nums font-semibold ${p.netProfit >= 0 ? "text-primary" : "text-red-400"}`}>
                             ₩{fmt(p.netProfit)}
                           </TableCell>
@@ -555,7 +567,7 @@ export default function MarginReportPage() {
                       <TableHead>주문일</TableHead>
                       <TableHead>주문번호</TableHead>
                       <TableHead>채널</TableHead>
-                      <TableHead className="text-right">매출</TableHead>
+                      <TableHead className="text-right">매출(공급가)</TableHead>
                       <TableHead className="text-right">원가</TableHead>
                       <TableHead className="text-right">수수료</TableHead>
                       <TableHead className="text-right">카드료</TableHead>
@@ -570,7 +582,7 @@ export default function MarginReportPage() {
                         <TableCell className="text-[12px]">{format(new Date(o.orderDate), "yyyy-MM-dd")}</TableCell>
                         <TableCell className="text-[12px]">{o.orderNo}</TableCell>
                         <TableCell className="text-[12px]">{o.channelName}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(o.revenue)}</TableCell>
+                        <TableCell className="text-right tabular-nums">₩{fmt(o.supplyRevenue)}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(o.costAmount)}</TableCell>
                         <TableCell className="text-right tabular-nums">₩{fmt(o.commissionAmount)}</TableCell>
                         <TableCell className="text-right tabular-nums">{o.cardFeeAmount > 0 ? `₩${fmt(o.cardFeeAmount)}` : "—"}</TableCell>
