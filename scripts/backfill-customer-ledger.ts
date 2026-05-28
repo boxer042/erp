@@ -42,17 +42,45 @@ async function ensurePaidPair(
   changedCustomers: Set<string>,
 ) {
   if (amount <= 0) return false;
-  // 이미 SALE / RECEIPT 둘 다 있으면 skip
+  // 기존 ledger 상태 확인
   const existing = await prisma.customerLedger.findMany({
     where: { referenceId, referenceType },
-    select: { type: true },
+    select: { type: true, createdAt: true },
   });
-  const hasSale = existing.some((e) => e.type === "SALE");
-  const hasReceipt = existing.some((e) => e.type === "RECEIPT");
+  const existingSale = existing.find((e) => e.type === "SALE");
+  const existingReceipt = existing.find((e) => e.type === "RECEIPT");
 
+  // 이미 SALE+RECEIPT 둘 다 있으면 끝
+  if (existingSale && existingReceipt) return false;
+
+  // SALE 만 있는 케이스 — 원래 UNPAID 였다가 다른 경로(customer-payment) 로
+  // 정산된 주문일 수 있음. 외부 결제 흔적 있으면 RECEIPT 추가 금지 (중복 RECEIPT 방지).
+  if (existingSale && !existingReceipt) {
+    const hasCustomerPayment = await prisma.customerLedger.findFirst({
+      where: {
+        customerId,
+        type: "RECEIPT",
+        referenceType: "CUSTOMER_PAYMENT",
+      },
+      select: { id: true },
+    });
+    if (hasCustomerPayment) {
+      console.log(
+        `  skip ${referenceId} — SALE 단독이지만 customer-payment 정산 흔적 있음 (중복 위험)`,
+      );
+      return false;
+    }
+    // customer-payment 도 없는데 SALE 만? 백필이 부분 적용된 상태일 가능성.
+    // RECEIPT 만 추가하면 위험하니 skip — 수동 검토 권장.
+    console.log(
+      `  skip ${referenceId} — SALE 단독, customer-payment 없음 (수동 검토 필요)`,
+    );
+    return false;
+  }
+
+  // 둘 다 없는 케이스 — 새로 한 쌍 생성 (PAID 주문 흔적 없음 → backfill 의 본래 목적)
   let touched = false;
-  // balance 는 0 으로 일단 적고, 마지막에 rebalance 가 정확히 계산
-  if (!hasSale) {
+  if (!existingSale) {
     await prisma.customerLedger.create({
       data: {
         customerId,
@@ -68,7 +96,7 @@ async function ensurePaidPair(
     });
     touched = true;
   }
-  if (!hasReceipt) {
+  if (!existingReceipt) {
     await prisma.customerLedger.create({
       data: {
         customerId,
