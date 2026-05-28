@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureBulkStock, fifoConsume, isOversellAllowed } from "@/lib/inventory/fifo";
 import { learnDiagnosisPartSet } from "@/lib/repair-diagnosis-usage";
+import { calcRepairTotals } from "@/lib/repair";
 import { rebalanceCustomerLedger } from "@/lib/customer-ledger";
 
 type Action = "order" | "quotation" | "statement";
@@ -41,6 +42,8 @@ interface CheckoutItem {
   isAddon?: boolean;
   /** 메인 카트 라인의 cartItemId — ADDON 만 의미 있음. 서버가 stagedItem index 매핑 */
   parentCartItemId?: string;
+  /** 수리 라인 — 라인별 매핑된 RepairTicket id. 라인별로 ticket finalize 분기. */
+  repairTicketId?: string | null;
 }
 
 interface RepairTicketData {
@@ -80,7 +83,7 @@ interface CheckoutBody {
   taxInvoiceRequested?: boolean;
   memo?: string | null;
   items: CheckoutItem[];
-  repairTicketId?: string | null;
+  /** DEPRECATED — 라인별 item.repairTicketId 로 이관. 호환 위해 read 만 허용 (안 받음) */
   rentalId?: string | null;
   repairTicketData?: RepairTicketData | null;
   rentalRecords?: RentalRecord[] | null;
@@ -412,21 +415,32 @@ export async function POST(request: NextRequest) {
   });
   const productMap = new Map(products.map((p) => [p.id, p]));
 
-  // 중복 픽업/반납 idempotency — 같은 RepairTicket / Rental 에 이미 non-CANCELLED Order 가 있으면 차단.
-  // schema 가 unique 가 아니라서 race condition 으로 두 번째 결제 요청이 통과될 수 있음 → 명시적 가드.
-  if (body.repairTicketId) {
-    const existingOrder = await prisma.order.findFirst({
+  // 중복 픽업/반납 idempotency — 카트 안 각 수리 라인의 ticket 이 이미 non-CANCELLED Order 와
+  // 연결돼 있으면 차단. 한 카트에 수리 여러 건 가능하므로 라인별로 검사.
+  const cartRepairTicketIds = Array.from(
+    new Set(
+      body.items
+        .filter((i) => i.itemType === "repair" && i.repairTicketId)
+        .map((i) => i.repairTicketId as string),
+    ),
+  );
+  if (cartRepairTicketIds.length > 0) {
+    const existing = await prisma.repairTicket.findFirst({
       where: {
-        repairTicketId: body.repairTicketId,
-        status: { not: "CANCELLED" },
+        id: { in: cartRepairTicketIds },
+        orderId: { not: null },
+        order: { status: { not: "CANCELLED" } },
       },
-      select: { id: true, orderNo: true },
+      select: {
+        ticketNo: true,
+        order: { select: { id: true, orderNo: true } },
+      },
     });
-    if (existingOrder) {
+    if (existing) {
       return NextResponse.json(
         {
-          error: `이 수리는 이미 결제됐습니다 (${existingOrder.orderNo})`,
-          existing: existingOrder,
+          error: `이 수리는 이미 결제됐습니다 (${existing.order?.orderNo})`,
+          existing: { ticketNo: existing.ticketNo, order: existing.order },
         },
         { status: 409 },
       );
@@ -529,7 +543,7 @@ export async function POST(request: NextRequest) {
           partialPaymentKind,
           taxInvoiceRequested: !!body.taxInvoiceRequested,
           memo: body.memo || null,
-          repairTicketId: body.repairTicketId || null,
+          // RepairTicket link 는 N:1 (RepairTicket.orderId) — finalize 블록에서 별도 update.
           rentalId: body.rentalId || null,
           createdById: user.id,
         },
@@ -698,31 +712,68 @@ export async function POST(request: NextRequest) {
         if (updates.length > 0) await Promise.all(updates);
       }
 
-      // 기존 RepairTicket 픽업/결제 — body.repairTicketId 단독 (repairTicketData 없음)
+      // 기존 RepairTicket 픽업/결제 — 카트에 수리 라인 N건이면 각자 ticket 별로 finalize.
+      // 라인별 합계 = 그 ticket 의 finalAmount. 라인별 inferredDiscount = subtotal - 라인 net.
       // 분기:
       //  - IN_STORE: 결제 즉시 PICKED_UP + 보증 시작 (손님 손에 들어감)
       //  - PICKUP/DELIVERY/SHIPPING: READY 에 머무름 — 보증은 Order COMPLETED 시점부터 시작
-      if (body.repairTicketId && !body.repairTicketData) {
-        const existing = await tx.repairTicket.findUnique({
-          where: { id: body.repairTicketId },
-          select: {
-            id: true,
-            status: true,
-            repairWarrantyMonths: true,
-            customerId: true,
-            ticketNo: true,
-          },
-        });
-        if (existing && existing.status !== "PICKED_UP" && existing.status !== "CANCELLED") {
-          // 수리 라인 합계 = 본 수리에 대한 finalAmount
-          // itemType=repair 만 — 기술료(service)·임대(rental) 라인은 제외
-          const repairLines = body.items.filter((i) => i.itemType === "repair");
-          const repairTotal = repairLines.reduce(
+      if (!body.repairTicketData) {
+        // 라인 → ticket 그룹화 (한 ticket 에 여러 라인 있을 수 있음. 일반적으론 1:1)
+        const linesByTicket = new Map<string, typeof body.items>();
+        for (const it of body.items) {
+          if (it.itemType !== "repair" || !it.repairTicketId) continue;
+          const arr = linesByTicket.get(it.repairTicketId) ?? [];
+          arr.push(it);
+          linesByTicket.set(it.repairTicketId, arr);
+        }
+
+        for (const [ticketId, lines] of linesByTicket) {
+          const existing = await tx.repairTicket.findUnique({
+            where: { id: ticketId },
+            select: {
+              id: true,
+              status: true,
+              repairWarrantyMonths: true,
+              customerId: true,
+              ticketNo: true,
+              diagnosisFee: true,
+              parts: {
+                select: {
+                  totalPrice: true,
+                  status: true,
+                  billLost: true,
+                },
+              },
+              labors: { select: { totalPrice: true } },
+            },
+          });
+          if (
+            !existing ||
+            existing.status === "PICKED_UP" ||
+            existing.status === "CANCELLED"
+          ) {
+            continue;
+          }
+
+          // 이 ticket 의 라인들 net 합 = 그 ticket 의 finalAmount
+          const repairTotal = lines.reduce(
             (s, i) =>
               s +
               Math.max(0, i.unitPrice - (i.discountPerUnit || 0)) * i.quantity,
             0,
           );
+          // 카트에서 가격을 깎아 결제한 경우 → 그 차액을 RepairTicket.totalDiscount 로 역기록.
+          const ticketSubtotal = calcRepairTotals({
+            parts: existing.parts.map((p) => ({
+              totalPrice: p.totalPrice,
+              status: p.status,
+              billLost: p.billLost,
+            })),
+            labors: existing.labors.map((l) => ({ totalPrice: l.totalPrice })),
+            diagnosisFee: existing.diagnosisFee,
+            totalDiscount: "0",
+          }).subtotal;
+          const inferredDiscount = Math.max(0, ticketSubtotal - repairTotal);
           const customerPatch =
             existing.customerId == null && body.customerId
               ? { customerId: body.customerId }
@@ -731,7 +782,8 @@ export async function POST(request: NextRequest) {
           if (fulfillmentType === "IN_STORE") {
             const pickupAt = new Date();
             const warrantyEnds =
-              existing.repairWarrantyMonths != null && existing.repairWarrantyMonths > 0
+              existing.repairWarrantyMonths != null &&
+              existing.repairWarrantyMonths > 0
                 ? new Date(
                     pickupAt.getFullYear(),
                     pickupAt.getMonth() + existing.repairWarrantyMonths,
@@ -744,8 +796,10 @@ export async function POST(request: NextRequest) {
                 status: "PICKED_UP",
                 pickedUpAt: pickupAt,
                 finalAmount: repairTotal,
+                totalDiscount: String(inferredDiscount),
                 paymentMethod: body.paymentMethod ?? null,
                 repairWarrantyEnds: warrantyEnds,
+                orderId: orderHeader.id,
                 ...customerPatch,
               },
             });
@@ -760,7 +814,9 @@ export async function POST(request: NextRequest) {
                 status: "READY",
                 readyAt: new Date(),
                 finalAmount: repairTotal,
+                totalDiscount: String(inferredDiscount),
                 paymentMethod: body.paymentMethod ?? null,
+                orderId: orderHeader.id,
                 ...customerPatch,
               },
             });
@@ -812,6 +868,8 @@ export async function POST(request: NextRequest) {
             quotedAt: now,
             repairWarrantyMonths: warrantyMonths,
             repairWarrantyEnds: warrantyEnds,
+            // 결제 Order link — N:1 (orderId)
+            orderId: order.id,
             createdById: user.id,
             labors: {
               create: rd.labors.map((l) => ({
@@ -823,7 +881,6 @@ export async function POST(request: NextRequest) {
             },
           },
         });
-        await tx.order.update({ where: { id: order.id }, data: { repairTicketId: ticket.id } });
         // Phase 4 세트 학습 — IN_STORE 즉시 픽업 케이스만 (PICKED_UP 진입)
         if (isInStorePickup) {
           await learnDiagnosisPartSet(tx, ticket.id);

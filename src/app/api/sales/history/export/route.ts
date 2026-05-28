@@ -186,10 +186,12 @@ export async function GET(request: NextRequest) {
       claimType: true,
       claimReason: true,
       fulfillmentType: true,
-      repairTicketId: true,
       rentalId: true,
       channel: { select: { name: true } },
-      repairTicket: { select: { ticketNo: true, workKind: true } },
+      repairTickets: {
+        select: { id: true, ticketNo: true, workKind: true },
+        orderBy: { receivedAt: "asc" },
+      },
       rental: { select: { rentalNo: true } },
     },
     orderBy: { orderDate: "desc" },
@@ -197,7 +199,7 @@ export async function GET(request: NextRequest) {
   });
 
   const linkedTicketIds = new Set(
-    orders.map((o) => o.repairTicketId).filter((v): v is string => !!v),
+    orders.flatMap((o) => o.repairTickets.map((t) => t.id)),
   );
   const linkedRentalIds = new Set(
     orders.map((o) => o.rentalId).filter((v): v is string => !!v),
@@ -322,15 +324,20 @@ export async function GET(request: NextRequest) {
     shippingCostBorne: number;
   };
 
-  const orderRows: Row[] = orders.map((o) => ({
-    type: o.repairTicketId
-      ? o.repairTicket?.workKind === "CUSTOM_BUILD"
+  const orderRows: Row[] = orders.map((o) => {
+    const firstTicket = o.repairTickets[0];
+    return {
+    type: firstTicket
+      ? firstTicket.workKind === "CUSTOM_BUILD"
         ? "rebuild"
         : "repair"
       : o.rentalId
         ? "rental"
         : "product",
-    refNo: o.repairTicket?.ticketNo ?? o.rental?.rentalNo ?? o.orderNo,
+    refNo:
+      o.repairTickets.length > 1
+        ? `${firstTicket.ticketNo} 외 ${o.repairTickets.length - 1}건`
+        : (firstTicket?.ticketNo ?? o.rental?.rentalNo ?? o.orderNo),
     channelOrderNo: o.channelOrderNo,
     date: o.orderDate,
     customerName: o.customerName,
@@ -345,7 +352,8 @@ export async function GET(request: NextRequest) {
     amount: Number(o.totalAmount),
     shippingFee: Number(o.shippingFee ?? 0),
     shippingCostBorne: Number(o.shippingCostBorne ?? 0),
-  }));
+    };
+  });
 
   const orphanRepairRows: Row[] = orphanTickets.map((t) => ({
     type: t.workKind === "CUSTOM_BUILD" ? "rebuild" : "repair",

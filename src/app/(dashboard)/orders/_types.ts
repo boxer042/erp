@@ -95,7 +95,7 @@ export interface OrderListItem {
   exchangedFromOrders?: Array<{ id: string }>;
   channel: { name: string; code: string } | null;
   createdBy: { name: string };
-  repairTicket: { id: string; ticketNo: string; status: string } | null;
+  repairTickets: Array<{ id: string; ticketNo: string; status: string }>;
   items: Array<{
     id: string;
     quantity: string;

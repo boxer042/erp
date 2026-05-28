@@ -1492,8 +1492,8 @@ model Order {
   memo                String?
   // 한 RepairTicket / Rental 은 결제 Order 1건만 가질 수 있음 (1:1).
   // application-level idempotency 외에 DB 차원에서도 강제 — 미래 흐름 추가 시 안전망.
-  repairTicketId      String?             @unique @map("repair_ticket_id")
-  repairTicket        RepairTicket?       @relation(fields: [repairTicketId], references: [id])
+  // 한 Order 에 수리 여러 건 link 가능 (N:1, RepairTicket.orderId 가 fk)
+  repairTickets       RepairTicket[]
   rentalId            String?             @unique @map("rental_id")
   rental              Rental?             @relation(fields: [rentalId], references: [id])
   createdById         String              @map("created_by_id")
@@ -2327,8 +2327,9 @@ model RepairTicket {
 
   parts  RepairPart[]
   labors RepairLabor[]
-  // Order.repairTicketId 가 @unique 이므로 1:1 — 결제 Order 0~1건
-  order  Order?
+  // 결제 Order — N:1. 한 Order 에 수리 여러 건 link 가능. 결제 전엔 null.
+  orderId String? @map("order_id")
+  order   Order?  @relation(fields: [orderId], references: [id])
 
   @@index([customerId])
   @@index([status])
@@ -2340,6 +2341,7 @@ model RepairTicket {
   @@index([repairCategoryId])
   @@index([symptomTemplateId])
   @@index([diagnosisTemplateId])
+  @@index([orderId])
   @@map("repair_tickets")
 }
 

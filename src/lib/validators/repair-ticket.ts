@@ -39,6 +39,12 @@ export const repairTicketUpdateSchema = z.object({
   assignedToId: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),
   repairCategoryId: z.string().nullable().optional(),
+  // 접수 일시 — 잘못 입력된 경우 수정 가능. ISO 문자열로 받아 Date 로 변환.
+  receivedAt: z
+    .string()
+    .datetime({ offset: true })
+    .or(z.string().datetime())
+    .optional(),
 });
 
 export type RepairTicketUpdateInput = z.infer<typeof repairTicketUpdateSchema>;

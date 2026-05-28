@@ -56,5 +56,7 @@ backups/
 *.sql.gz
 *.dump
 *.backup
+# 마이그레이션 스크립트는 추적 (한 번만 실행되더라도 이력 보존)
+!scripts/*.sql
 # Claude Code local settings
 .claude/

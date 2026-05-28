@@ -41,11 +41,12 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
   const rentalItems = session.items.filter((i) => i.itemType === "rental");
   const customerId = session.customerId ?? null;
 
+  // 새 RepairTicket 생성 흐름 — 카트 안 모든 repair 라인에 repairTicketId 가 없을 때.
+  // 한 라인이라도 기존 ticket(repairTicketId 있음) 이면 기존 finalize 흐름으로 전환되어 repairTicketData 는 미사용.
+  const anyExistingRepair = repairItems.some((i) => i.repairMeta?.repairTicketId);
   const firstRepairMeta = repairItems[0]?.repairMeta;
-  // 기존 RepairTicket 픽업 결제: 첫 행에 repairTicketId가 있으면 픽업 모드로 전환
-  const linkedRepairTicketId = firstRepairMeta?.repairTicketId ?? null;
   const repairTicketData =
-    repairItems.length > 0 && customerId && !linkedRepairTicketId
+    repairItems.length > 0 && customerId && !anyExistingRepair
       ? {
           symptom: firstRepairMeta?.issueDescription,
           deviceBrand: firstRepairMeta?.deviceBrand,
@@ -103,7 +104,7 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
       opts.action === "order" ? opts.partialPaymentKind ?? null : null,
     taxInvoiceRequested: opts.action === "order" ? !!opts.taxInvoiceRequested : false,
     memo: opts.memo ?? null,
-    items: session.items.map((i) => {
+    items: applySessionDiscount(session.items.map((i) => {
       // ADDON 자식 라인은 옵션 가산 무관 (단독 상품). 메인 라인만 base 환산.
       if (i.isAddon) {
         return {
@@ -146,10 +147,11 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
         optionValueIds: i.optionValueIds ?? [],
         // 메인 라인 cartItemId — ADDON 자식의 parentCartItemId 매칭용
         cartItemId: i.cartItemId,
+        // 수리 라인 — 라인별 RepairTicket 매핑. 서버가 라인별로 ticket finalize.
+        repairTicketId: i.repairMeta?.repairTicketId ?? null,
       };
-    }),
+    }), session.totalDiscount),
     repairTicketData,
-    repairTicketId: linkedRepairTicketId,
     rentalRecords,
     fulfillmentType,
     shippingPaymentType: opts.shippingPaymentType ?? "PREPAID",
@@ -166,4 +168,89 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
 export async function submitCheckout(session: CartSession, opts: CheckoutPayloadOptions) {
   const payload = buildCheckoutPayload(session, opts);
   return apiMutate<{ id: string; no: string }>("/api/pos/checkout", "POST", payload);
+}
+
+// ─── 세션 할인 비례 분배 ────────────────────────────────────────────────────
+// 카트 [할인] 버튼으로 입력한 session.totalDiscount("₩30,000" 또는 "10%") 를
+// 각 라인의 discountPerUnit 에 비례 분배한다. 서버는 totalDiscount 필드를 받지
+// 않으므로 여기서 라인에 흩뿌리지 않으면 Order.totalAmount / RepairTicket.totalDiscount /
+// 마진 리포트 모두 카트 UI 와 어긋난다.
+//
+// 분배 기준: 라인별 (unitPrice - discountPerUnit) × qty 비율.
+// 라운딩: 양수 lineNet 의 마지막 라인이 잔액 흡수해 합 일치.
+//
+// 제한: 옵션 addPrice 가 있는 라인의 OPTION_REF 자식(서버 재구성) 에는 분배 안 됨 —
+// 메인 라인의 base 금액 비율로만 흩어지므로, 옵션 addPrice 가 큰 카트에선 분배 합이
+// session 할인보다 작아져 Order.totalAmount 가 UI 보다 살짝 높을 수 있음. POS 일반
+// 사용(수리·일반 상품)에선 영향 없음.
+type DistributableItem = {
+  unitPrice: number;
+  discountPerUnit: number;
+  quantity: number;
+};
+
+function applySessionDiscount<T extends DistributableItem>(
+  items: T[],
+  totalDiscount: string | undefined | null,
+): T[] {
+  const subtotalNet = items.reduce(
+    (s, i) => s + Math.max(0, i.unitPrice - i.discountPerUnit) * i.quantity,
+    0,
+  );
+  const sessionDiscount = parseSessionDiscount(totalDiscount, subtotalNet);
+  if (sessionDiscount <= 0 || subtotalNet <= 0) return items;
+
+  // 마지막 양수 lineNet 라인 — 잔액 흡수용
+  const lineNets = items.map(
+    (i) => Math.max(0, i.unitPrice - i.discountPerUnit) * i.quantity,
+  );
+  let lastIdx = -1;
+  for (let i = lineNets.length - 1; i >= 0; i--) {
+    if (lineNets[i] > 0) {
+      lastIdx = i;
+      break;
+    }
+  }
+
+  let distributed = 0;
+  for (let idx = 0; idx < items.length; idx++) {
+    const lineNet = lineNets[idx];
+    if (lineNet <= 0) continue;
+    const item = items[idx];
+
+    let shareTotal: number;
+    if (idx === lastIdx) {
+      // 마지막 라인 — 남은 잔액 전부 흡수 (라운딩 보정)
+      shareTotal = Math.min(sessionDiscount - distributed, lineNet);
+    } else {
+      shareTotal = Math.min(
+        Math.round((sessionDiscount * lineNet) / subtotalNet),
+        lineNet,
+      );
+    }
+
+    // 라인 KRW → 개당 KRW (정수). 라인이 qty=3 이고 shareTotal 이 qty 배수가 아니면 1~2원 손실.
+    const perUnit = Math.round(shareTotal / item.quantity);
+    // unitPrice 를 음수로 깎지 못함
+    const capped = Math.min(item.unitPrice - item.discountPerUnit, perUnit);
+    if (capped <= 0) continue;
+    item.discountPerUnit += capped;
+    distributed += capped * item.quantity;
+  }
+
+  return items;
+}
+
+function parseSessionDiscount(
+  totalDiscount: string | undefined | null,
+  subtotalNet: number,
+): number {
+  const s = (totalDiscount ?? "0").trim();
+  if (!s || s === "0") return 0;
+  if (s.endsWith("%")) {
+    const pct = Math.min(100, Math.max(0, parseFloat(s.slice(0, -1)) || 0));
+    return Math.round((subtotalNet * pct) / 100);
+  }
+  const raw = parseFloat(s.replace(/,/g, "")) || 0;
+  return Math.min(subtotalNet, Math.max(0, raw));
 }

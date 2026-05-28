@@ -541,27 +541,36 @@ export default function PosV2CustomerPage({
                 toast.error("청구할 금액이 없습니다");
                 return;
               }
-              add(
-                {
-                  itemType: "repair",
-                  name: `수리 ${ticket.ticketNo}`,
-                  imageUrl: null,
-                  unitPrice: finalAmount,
-                  taxType: "TAXABLE",
-                  repairMeta: {
-                    repairTicketId: ticket.id,
-                    deviceModel:
-                      ticket.serialItem?.product?.name ??
-                      ticket.serialItem?.displayName ??
-                      ticket.repairProduct?.name ??
-                      ticket.repairProductText ??
-                      undefined,
-                    issueDescription: ticket.symptom ?? undefined,
-                  },
-                },
-                { sessionId: session.id },
+              // 이미 카트에 같은 수리가 있으면 add() 가 silent skip — 사용자가 카트에서
+              // 깎은 가격 보존이 우선. 토스트 메시지를 정확히 분기해 알림.
+              const alreadyInCart = session.items.some(
+                (it) => it.repairMeta?.repairTicketId === ticket.id,
               );
-              toast.success(`카트에 추가됨 — ${ticket.ticketNo}`);
+              if (alreadyInCart) {
+                toast.info(`이미 카트에 있습니다 — ${ticket.ticketNo}`);
+              } else {
+                add(
+                  {
+                    itemType: "repair",
+                    name: `수리 ${ticket.ticketNo}`,
+                    imageUrl: null,
+                    unitPrice: finalAmount,
+                    taxType: "TAXABLE",
+                    repairMeta: {
+                      repairTicketId: ticket.id,
+                      deviceModel:
+                        ticket.serialItem?.product?.name ??
+                        ticket.serialItem?.displayName ??
+                        ticket.repairProduct?.name ??
+                        ticket.repairProductText ??
+                        undefined,
+                      issueDescription: ticket.symptom ?? undefined,
+                    },
+                  },
+                  { sessionId: session.id },
+                );
+                toast.success(`카트에 추가됨 — ${ticket.ticketNo}`);
+              }
               setDetail(null);
               setMode("product"); // 상품 탭으로 전환 — 결제 흐름 유도
             }}

@@ -231,11 +231,14 @@ export async function GET(request: NextRequest) {
       claimType: true,
       claimReason: true,
       fulfillmentType: true,
-      repairTicketId: true,
       rentalId: true,
       channelId: true,
       channel: { select: { id: true, name: true } },
-      repairTicket: { select: { ticketNo: true, workKind: true } },
+      // N:1 — 한 Order 에 수리 여러 건. 첫 ticket 이 대표 표시용
+      repairTickets: {
+        select: { id: true, ticketNo: true, workKind: true },
+        orderBy: { receivedAt: "asc" },
+      },
       rental: { select: { rentalNo: true } },
       exchangedFromOrders: { select: { id: true } },
       // PARTIAL_REFUND 매출 보정용 — 항목별 누적 환불 금액 (세전).
@@ -251,7 +254,7 @@ export async function GET(request: NextRequest) {
 
   // 이미 Order 로 잡힌 ticket/rental id — orphan 쿼리에서 제외
   const linkedTicketIds = new Set(
-    orders.map((o) => o.repairTicketId).filter((v): v is string => !!v),
+    orders.flatMap((o) => o.repairTickets.map((t) => t.id)),
   );
   const linkedRentalIds = new Set(
     orders.map((o) => o.rentalId).filter((v): v is string => !!v),
@@ -363,7 +366,7 @@ export async function GET(request: NextRequest) {
 
   // ── 정규화 ────────────────────────────────────────────────
   const orderRows: SalesHistoryRow[] = orders.map((o) => {
-    const t: SalesHistoryRow["type"] = o.repairTicketId
+    const t: SalesHistoryRow["type"] = o.repairTickets.length > 0
       ? "repair"
       : o.rentalId
         ? "rental"
@@ -401,8 +404,10 @@ export async function GET(request: NextRequest) {
       id: `order-${o.id}`,
       type: t,
       refNo:
-        t === "repair" && o.repairTicket
-          ? o.repairTicket.ticketNo
+        t === "repair" && o.repairTickets.length > 0
+          ? o.repairTickets.length === 1
+            ? o.repairTickets[0].ticketNo
+            : `${o.repairTickets[0].ticketNo} 외 ${o.repairTickets.length - 1}건`
           : t === "rental" && o.rental
             ? o.rental.rentalNo
             : o.orderNo,
@@ -427,7 +432,7 @@ export async function GET(request: NextRequest) {
       isExchangeReplacement: (o.exchangedFromOrders?.length ?? 0) > 0,
       extraSalesCount,
       extraSalesAmount,
-      repairWorkKind: o.repairTicket?.workKind ?? null,
+      repairWorkKind: o.repairTickets[0]?.workKind ?? null,
       sourceId: o.id,
       isOrphan: false,
     };

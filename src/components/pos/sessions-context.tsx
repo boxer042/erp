@@ -464,6 +464,17 @@ export function SessionsProvider({ children }: { children: React.ReactNode }) {
       const optKey = (it.optionValueIds ?? []).slice().sort().join(",");
       mutateSessions((prev) =>
         updateSession(prev, targetId, (s) => {
+          // 수리 라인 — 같은 RepairTicket 은 한 라인. 재진입 시 사용자가 카트에서
+          // 깎은 unitPrice/quantity 가 ticket 의 현재 finalAmount 로 덮어쓰이지 않도록 skip.
+          // 가격 갱신이 필요하면 사용자가 카트에서 라인 삭제 후 다시 추가하는 흐름.
+          if (it.itemType === "repair" && it.repairMeta?.repairTicketId) {
+            const existing = s.items.find(
+              (p) =>
+                p.itemType === "repair" &&
+                p.repairMeta?.repairTicketId === it.repairMeta?.repairTicketId,
+            );
+            if (existing) return s;
+          }
           // ADDON 자식 라인은 항상 새 라인 (메인-자식 트리 보존, 같은 productId merge 안 함)
           if (!it.isAddon && it.productId && it.itemType === "product") {
             // 같은 productId + 같은 옵션 조합이면 수량만 +1 (옵션 다르면 별도 라인)

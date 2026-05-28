@@ -1734,18 +1734,20 @@ export async function PUT(
         });
       }
     }
-    // complete 액션 — Order 가 COMPLETED 가 되는 시점에 연결된 RepairTicket 도 PICKED_UP 으로 전환.
+    // complete 액션 — Order 가 COMPLETED 가 되는 시점에 연결된 RepairTicket(N건) 모두 PICKED_UP 으로 전환.
     // POS IN_STORE 결제 시엔 이미 PICKED_UP 이므로 무시 (READY 상태일 때만 전환). 보증은 이 시점부터 시작.
-    if (action === "complete" && order.repairTicketId) {
-      const ticket = await tx.repairTicket.findUnique({
-        where: { id: order.repairTicketId },
+    if (action === "complete") {
+      const tickets = await tx.repairTicket.findMany({
+        where: {
+          orderId: id,
+          status: { notIn: ["PICKED_UP", "CANCELLED"] },
+        },
         select: {
           id: true,
-          status: true,
           repairWarrantyMonths: true,
         },
       });
-      if (ticket && ticket.status !== "PICKED_UP" && ticket.status !== "CANCELLED") {
+      for (const ticket of tickets) {
         const pickupAt = new Date();
         const warrantyEnds =
           ticket.repairWarrantyMonths != null && ticket.repairWarrantyMonths > 0

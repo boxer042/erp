@@ -181,6 +181,26 @@ export async function POST(request: NextRequest) {
     : [];
   const existingById = new Map(existing.map((r) => [r.id, r]));
 
+  // customerId 사전 검증 — 클라이언트 localStorage 에 삭제된/다른 환경의 customerId 가 남아 있으면
+  // FK violation 으로 전체 sync 가 실패함. 존재하지 않는 id 는 sync 시 null 로 강등.
+  const customerIdsRaw = Array.from(
+    new Set(
+      incoming
+        .map((s) => s.customerId)
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  );
+  const validCustomerIds = customerIdsRaw.length
+    ? new Set(
+        (
+          await prisma.customer.findMany({
+            where: { id: { in: customerIdsRaw } },
+            select: { id: true },
+          })
+        ).map((c) => c.id),
+      )
+    : new Set<string>();
+
   // 1) 삭제 — 본인 user 의 세션만, soft delete (다른 기기가 옛 데이터로 부활 시도해도 거부)
   if (deletedIds.length > 0) {
     await prisma.posSession.updateMany({
@@ -205,10 +225,14 @@ export async function POST(request: NextRequest) {
 
     const clientUpdatedAt = s.updatedAt ? new Date(s.updatedAt) : new Date();
 
+    // 존재하지 않는 customerId 는 null 로 강등 (FK violation 방지). 클라이언트 stale 데이터 보호.
+    const safeCustomerId =
+      s.customerId && validCustomerIds.has(s.customerId) ? s.customerId : null;
+
     const payload: Prisma.PosSessionUncheckedCreateInput = {
       id: s.id,
       userId: user.id,
-      customerId: s.customerId ?? null,
+      customerId: safeCustomerId,
       customerName: s.customerName ?? null,
       customerPhone: s.customerPhone ?? null,
       label: s.label ?? "고객",

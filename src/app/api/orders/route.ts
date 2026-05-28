@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
       channel: { select: { name: true, code: true } },
       createdBy: { select: { name: true } },
       // shippingPaymentType, shippingFee 자동 포함 (Order 의 scalar 필드)
-      repairTicket: { select: { id: true, ticketNo: true, status: true } },
+      repairTickets: { select: { id: true, ticketNo: true, status: true } },
       // 교환 새 주문 식별용 — 비어있으면 일반 주문, 있으면 -EX
       exchangedFromOrders: { select: { id: true } },
       items: {

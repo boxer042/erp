@@ -98,7 +98,7 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
         id: true,
         status: true,
         paymentStatus: true,
-        repairTicketId: true,
+        repairTickets: { select: { id: true }, take: 1 },
         rentalId: true,
         taxAmount: true,
         items: {
@@ -198,7 +198,7 @@ async function aggregatePeriod(from: Date, to: Date): Promise<PeriodReport> {
   let outputVat = 0;
 
   for (const order of orders) {
-    const isRepair = order.repairTicketId !== null;
+    const isRepair = order.repairTickets.length > 0;
     const isRental = order.rentalId !== null;
 
     // 매출 차감 분류

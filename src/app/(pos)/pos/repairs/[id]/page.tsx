@@ -46,6 +46,7 @@ import { RejectSheet, quoteRejectReasonLabel } from "./_reject-sheet";
 import { RepairTicketActionMenu } from "./_repair-action-menu";
 import { SymptomCard, DiagnosisCard, NotesCard } from "./_notes-cards";
 import { PackagesCard, ReferenceInfoSection } from "./_reference-cards";
+import { ReceivedAtEditor } from "./_received-at-editor";
 import { Card, Field } from "./_shared";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 import { QuickCustomerSheet } from "@/app/(pos)/pos/_quick-customer-sheet";
@@ -279,7 +280,11 @@ export function RepairDetail({
       <main className="flex-1 overflow-y-auto">
         <div className="flex flex-col gap-3 p-4 sm:p-6">
           {/* 고객 / 기기 */}
-          <CustomerDeviceCard ticket={t} onCustomerClick={onCustomerClick} />
+          <CustomerDeviceCard
+            ticket={t}
+            onCustomerClick={onCustomerClick}
+            onChanged={invalidate}
+          />
 
           {/* 가져온 기기 — 시리얼/구매내역/상품명/직접입력 4모드 */}
           <ProductLinkCard ticket={t} readonly={readonly} onChanged={invalidate} />
@@ -461,6 +466,14 @@ export function RepairDetail({
                   </span>
                 </span>
               )}
+              {totals.discountAmount > 0 && (
+                <span className="text-[var(--jm-danger-fg)]">
+                  할인{" "}
+                  <span className="tabular-nums">
+                    -{fmtKRWInc(totals.discountAmount)}
+                  </span>
+                </span>
+              )}
             </div>
           )}
           {actions.length > 0 && (
@@ -518,9 +531,11 @@ export function RepairDetail({
 function CustomerDeviceCard({
   ticket,
   onCustomerClick,
+  onChanged,
 }: {
   ticket: RepairTicketDetail;
   onCustomerClick?: () => void;
+  onChanged?: () => void;
 }) {
   // onCustomerClick 있으면 고객 영역만 클릭 가능 — 헤더 고객 썸네일과 동일한 시트 트리거
   const customerContent = ticket.customer ? (
@@ -578,9 +593,12 @@ function CustomerDeviceCard({
           </span>
         </Field>
         <Field label="접수">
-          <span className="text-[14px] text-[var(--jm-text)]">
-            {format(new Date(ticket.receivedAt), "yyyy-MM-dd HH:mm")}
-          </span>
+          <ReceivedAtEditor
+            ticketId={ticket.id}
+            receivedAt={ticket.receivedAt}
+            readonly={ticket.status === "CANCELLED"}
+            onSaved={onChanged}
+          />
         </Field>
       </div>
     </Card>

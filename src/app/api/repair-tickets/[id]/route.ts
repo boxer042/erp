@@ -178,6 +178,9 @@ export async function PUT(
           ...(d.repairCategoryId !== undefined
             ? { repairCategoryId: d.repairCategoryId || null }
             : {}),
+          ...(d.receivedAt !== undefined
+            ? { receivedAt: new Date(d.receivedAt) }
+            : {}),
           ...(symptomTemplateIdPatch ?? {}),
           ...(diagnosisTemplateIdPatch ?? {}),
         },
