@@ -245,8 +245,8 @@ export default function MarginReportPage() {
       );
       csv = toCSV(sorted, [
         { key: "productName", label: "상품명" },
-        { key: "sku", label: "SKU" },
         { key: "spec", label: "규격" },
+        { key: "sku", label: "SKU" },
         { key: "quantity", label: "판매수량" },
         { key: "revenue", label: "매출(VAT포함)" },
         { key: "supplyRevenue", label: "공급가매출" },
@@ -511,8 +511,8 @@ export default function MarginReportPage() {
                     <TableRow>
                       <TableHead>순위</TableHead>
                       <TableHead>상품</TableHead>
-                      <TableHead>SKU</TableHead>
                       <TableHead>규격</TableHead>
+                      <TableHead>SKU</TableHead>
                       <TableHead className="text-right">판매수량</TableHead>
                       <TableHead className="text-right">매출(공급가)</TableHead>
                       <TableHead className="text-right">원가</TableHead>
@@ -529,8 +529,8 @@ export default function MarginReportPage() {
                         <TableRow key={p.productId}>
                           <TableCell className="text-[12px] text-muted-foreground tabular-nums">{idx + 1}</TableCell>
                           <TableCell className="text-[12px] font-medium">{p.productName}</TableCell>
-                          <TableCell className="text-[12px] text-muted-foreground">{p.sku}</TableCell>
                           <TableCell className="text-[12px] text-muted-foreground">{p.spec ?? "-"}</TableCell>
+                          <TableCell className="text-[12px] text-muted-foreground">{p.sku}</TableCell>
                           <TableCell className="text-right tabular-nums text-[12px]">{p.quantity}</TableCell>
                           <TableCell className="text-right tabular-nums">₩{fmt(p.supplyRevenue)}</TableCell>
                           <TableCell className="text-right tabular-nums">₩{fmt(p.costAmount)}</TableCell>
