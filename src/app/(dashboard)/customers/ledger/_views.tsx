@@ -128,9 +128,15 @@ export function LedgerView({
                           {PAYMENT_KIND_LABELS[e.paymentKind]}
                         </JmBadge>
                       )}
-                      {/* 부분 결제 잔금 SALE — description 에 "잔금" 포함 + "(계약금 외)" 여부로 분기.
-                          (API 가 backend 에서 두 가지 description 패턴으로 저장: "잔금" / "잔금 (계약금 외)") */}
-                      {e.type === "SALE" && e.description.includes("잔금") && (
+                      {/* 부분결제/계약금 배지 — 두 포맷 인식
+                          · 구 포맷 (백필 전): SALE("잔금") 단독 1행
+                          · 신규 포맷 (a7489fc 이후): SALE 전액 + RECEIPT("일부결제" 또는 "계약금") 2행
+                          어느 행에 붙어도 한눈에 "이 거래는 부분결제다"가 보이도록. */}
+                      {((e.type === "SALE" && e.description.includes("잔금")) ||
+                        (e.type === "RECEIPT" &&
+                          e.referenceType === "ORDER" &&
+                          (e.description.includes("일부결제") ||
+                            e.description.includes("계약금")))) && (
                         <JmBadge variant="warning" size="sm" shape="square">
                           {e.description.includes("계약금") ? "계약금" : "부분결제"}
                         </JmBadge>

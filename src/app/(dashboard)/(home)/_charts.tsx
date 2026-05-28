@@ -22,6 +22,15 @@ export interface DailySeriesPoint {
 }
 
 export function DailySalesArea({ data }: { data: DailySeriesPoint[] }) {
+  // 데이터 없을 때 recharts 가 ResponsiveContainer 초기 measurement 에서 width(-1) 경고를 띄움.
+  // 빈 placeholder 로 같은 높이만 차지 — layout shift 없이 차트만 생략.
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[200px] items-center justify-center text-jm-xs text-[var(--jm-text-subtle)]">
+        데이터 없음
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={200}>
       <AreaChart data={data} margin={{ top: 10, right: 12, left: -10, bottom: 0 }}>
@@ -74,6 +83,13 @@ export interface MarginTrendPoint {
 }
 
 export function MarginTrendLine({ data }: { data: MarginTrendPoint[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[200px] items-center justify-center text-jm-xs text-[var(--jm-text-subtle)]">
+        데이터 없음
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={200}>
       <LineChart data={data} margin={{ top: 10, right: 12, left: -10, bottom: 0 }}>
@@ -176,6 +192,16 @@ const DONUT_COLORS = [
 
 export function ChannelDonut({ data }: { data: ChannelDonutDatum[] }) {
   const total = data.reduce((s, d) => s + d.value, 0);
+  // recharts ResponsiveContainer width/height="100%" 이라 데이터 0 일 때 초기 measurement
+  // 가 -1 로 잡혀 dev 콘솔에 width(-1) 경고가 뜸. 호출처에서 length === 0 가드 하지만
+  // 컴포넌트 자체에도 안전망 추가.
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[180px] items-center justify-center text-jm-xs text-[var(--jm-text-subtle)] sm:h-[200px]">
+        데이터 없음
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
       <div className="h-[180px] w-full min-w-0 sm:h-[200px] sm:flex-1">
