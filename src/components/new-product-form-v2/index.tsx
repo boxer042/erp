@@ -2253,32 +2253,30 @@ export function NewProductForm({
                         title="조립 템플릿"
                         badge={<span className="text-jm-2xs text-[var(--jm-text-muted)]">선택사항</span>}
                       />
-                      <JmCard><JmCardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-jm-xs text-[var(--jm-text-muted)]">템플릿</label>
-                          <div className="flex gap-2">
-                            <div className="min-w-0 flex-1">
-                              <AssemblyTemplateCombobox
-                                templates={templates.map((t) => ({ id: t.id, name: t.name }))}
-                                value={templateId}
-                                onChange={(id) => {
-                                  if (id) applyTemplate(id);
-                                  else {
-                                    setTemplateId("");
-                                    setPresetId("");
-                                  }
-                                }}
-                              />
-                            </div>
+                      <JmCard><JmCardContent className="flex flex-col gap-4">
+                        {/* 템플릿 — 콤보박스 풀폭 한 줄 + 액션 버튼들 그 아래 */}
+                        <div className="flex flex-col gap-2">
+                          <label className="text-jm-xs font-medium text-[var(--jm-text-muted)]">템플릿</label>
+                          <AssemblyTemplateCombobox
+                            templates={templates.map((t) => ({ id: t.id, name: t.name }))}
+                            value={templateId}
+                            onChange={(id) => {
+                              if (id) applyTemplate(id);
+                              else {
+                                setTemplateId("");
+                                setPresetId("");
+                              }
+                            }}
+                          />
+                          <div className="flex flex-wrap gap-1.5">
                             {templateId && (
                               <JmButton
                                 type="button"
                                 variant="outline"
-                                size="sm"
+                                size="xs"
                                 onClick={() => {
                                   const tpl = templates.find((t) => t.id === templateId);
                                   setUpdateTemplateName(tpl?.name ?? "");
-                                  // 기존 가변 슬롯 prefill (slotId 매칭)
                                   const variableSlotIdSet = new Set(
                                     (tpl?.slots ?? [])
                                       .filter((s) => s.isVariable)
@@ -2301,65 +2299,62 @@ export function NewProductForm({
                                 disabled={
                                   !setComponents.some((r) => r.label && r.label.trim())
                                 }
-                                className="shrink-0 h-9"
                               >
-                                <Plus className="size-3.5" />
+                                <Plus />
                                 기존 템플릿 수정
                               </JmButton>
                             )}
                             <JmButton
                               type="button"
                               variant="outline"
-                              size="sm"
+                              size="xs"
                               onClick={() => {
                                 setSaveTemplateName(form.name || "");
                                 setVariableSlotIds(new Set());
                                 setSaveTemplateOpen(true);
                               }}
                               disabled={
-                                // 슬롯라벨이 채워진 유효한 행이 1개 이상이어야 저장 가능
                                 !setComponents.some((r) => r.label && r.label.trim())
                               }
-                              className="shrink-0 h-9"
                             >
-                              <Plus className="size-3.5" />
+                              <Plus />
                               {templateId ? "새 템플릿으로 저장" : "템플릿으로 저장"}
                             </JmButton>
                           </div>
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-jm-xs text-[var(--jm-text-muted)]">프리셋</label>
-                          <div className="flex gap-2">
-                            <AssemblyPresetCombobox
-                              presets={
-                                (templates.find((t) => t.id === templateId)?.presets ?? []).map(
-                                  (p) => ({ id: p.id, name: p.name }),
-                                )
-                              }
-                              value={presetId}
-                              onChange={(id) => {
-                                if (id) applyPreset(id);
-                                else setPresetId("");
-                              }}
-                              disabled={
-                                !templateId ||
-                                (templates.find((t) => t.id === templateId)?.presets?.length ?? 0) === 0
-                              }
-                            />
+
+                        {/* 프리셋 — 콤보박스 풀폭 한 줄 + 저장 버튼 아래 */}
+                        <div className="flex flex-col gap-2">
+                          <label className="text-jm-xs font-medium text-[var(--jm-text-muted)]">프리셋</label>
+                          <AssemblyPresetCombobox
+                            presets={
+                              (templates.find((t) => t.id === templateId)?.presets ?? []).map(
+                                (p) => ({ id: p.id, name: p.name }),
+                              )
+                            }
+                            value={presetId}
+                            onChange={(id) => {
+                              if (id) applyPreset(id);
+                              else setPresetId("");
+                            }}
+                            disabled={
+                              !templateId ||
+                              (templates.find((t) => t.id === templateId)?.presets?.length ?? 0) === 0
+                            }
+                          />
+                          <div className="flex flex-wrap gap-1.5">
                             <JmButton
                               type="button"
                               variant="outline"
-                              size="sm"
+                              size="xs"
                               disabled={!templateId}
                               onClick={() => setSavePresetOpen(true)}
-                              className="shrink-0 h-9"
                             >
+                              <Plus />
                               프리셋으로 저장
                             </JmButton>
                           </div>
                         </div>
-                        {/* 가변(canonical) 토글 제거 — 첫 조립실적 등록 시 시스템이 자동 격상하므로
-                            사용자 결정 부담만 됨. canonicalProductId 로 변형 연결 진입은 유지. */}
                       </JmCardContent></JmCard>
                     </section>
                   )}
@@ -2420,6 +2415,7 @@ export function NewProductForm({
                                 }
                                 templateSlotIdByLabelId={selectedTemplateSlotIdByLabelId}
                                 isAssembled={showLabel}
+                                allowNegativeQty
                                 rightContent={
                                   hasCost ? (
                                     <span className="text-jm-sm tabular-nums text-[var(--jm-text)]">
