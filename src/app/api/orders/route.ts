@@ -150,6 +150,8 @@ export async function GET(request: NextRequest) {
           // 진입 경로 SKU — 워크보드 chip 표시용 (자사몰/외부 채널만 채워짐, POS 는 null)
           entryProductId: true,
           entryProduct: { select: { id: true, name: true, sku: true } },
+          // 서비스로 지급된 라인 — 상세 시트에 "서비스" 배지 표시
+          isService: true,
         },
         // 품목별 행 워크보드 — 모든 OrderItem 노출 (take 제거)
         // MAIN 먼저, OPTION_REF/ADDON 자식 라인은 parentItemId 따라 정렬됨 (클라이언트 평탄화에서 처리)

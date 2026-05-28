@@ -94,6 +94,8 @@ export type SalesHistoryRow = {
   extraSalesAmount: number;
   /** 할인액 (VAT 포함) — 통합판매내역 행에 표시. 수리: RepairTicket.totalDiscount 합 × 1.1 */
   discountAmount: number;
+  /** 서비스로 지급된 라인 수 — 0 보다 크면 "서비스 N건" 배지 표시 */
+  serviceItemCount: number;
   /** 수리 작업 성격 — REPAIR(일반) / CUSTOM_BUILD(리빌드). type=repair 일 때만 의미. */
   repairWorkKind: "REPAIR" | "CUSTOM_BUILD" | null;
   /** 연결된 원천 — 판매:Order id, 수리:ticket id (orphan), 임대:rental id (orphan) */
@@ -253,7 +255,13 @@ export async function GET(request: NextRequest) {
       // refundedAmount 합계가 totalAmount 와 같으면 사실상 전액 환불 → REFUNDED 와 동일 처리.
       // 수리/임대 결제에 추가구매 라인이 같이 들어간 경우 — productId 있는 라인 = 추가구매.
       items: {
-        select: { refundedAmount: true, productId: true, totalPrice: true },
+        select: {
+          refundedAmount: true,
+          productId: true,
+          totalPrice: true,
+          // 서비스 라인 수 집계용 — 통합판매내역 행에 "서비스 N건" 배지 표시
+          isService: true,
+        },
       },
     },
     orderBy: { orderDate: "desc" },
@@ -416,6 +424,9 @@ export async function GET(request: NextRequest) {
     );
     const discountAmountVatIncl = Math.round(repairDiscountNet * 1.1);
 
+    // 서비스 라인 수 — 행에 "서비스 N건" 배지 표시
+    const serviceItemCount = (o.items ?? []).filter((it) => it.isService).length;
+
     return {
       id: `order-${o.id}`,
       type: t,
@@ -449,6 +460,7 @@ export async function GET(request: NextRequest) {
       isExchangeReplacement: (o.exchangedFromOrders?.length ?? 0) > 0,
       extraSalesCount,
       extraSalesAmount,
+      serviceItemCount,
       repairWorkKind: o.repairTickets[0]?.workKind ?? null,
       sourceId: o.id,
       isOrphan: false,
@@ -485,6 +497,7 @@ export async function GET(request: NextRequest) {
       extraSalesCount: 0,
       extraSalesAmount: 0,
       discountAmount: 0,
+      serviceItemCount: 0,
       repairWorkKind: t.workKind,
       sourceId: t.id,
       isOrphan: true,
@@ -520,6 +533,7 @@ export async function GET(request: NextRequest) {
       extraSalesCount: 0,
       extraSalesAmount: 0,
       discountAmount: 0,
+      serviceItemCount: 0,
       repairWorkKind: null,
       sourceId: r.id,
       isOrphan: true,

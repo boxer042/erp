@@ -73,6 +73,8 @@ export interface SalesHistoryRow {
   repairWorkKind: "REPAIR" | "CUSTOM_BUILD" | null;
   /** 할인액 (VAT 포함) — 행 아래에 "할인 -₩X" 으로 표시. 수리 ticket.totalDiscount 합산 × 1.1 */
   discountAmount: number;
+  /** 서비스로 지급된 라인 수 — 행에 "서비스 N건" 배지 표시 */
+  serviceItemCount: number;
   sourceId: string;
   isOrphan: boolean;
 }

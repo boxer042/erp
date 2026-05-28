@@ -122,6 +122,8 @@ export interface OrderListItem {
     /** 진입 경로 SKU — funnel 분석용. SWAP/cross-sell 발생 시 productId 와 다름. POS 결제는 null */
     entryProductId: string | null;
     entryProduct: { id: string; name: string; sku: string } | null;
+    /** 서비스로 지급된 라인 — 영수증/명세표/상세 시트에 "서비스" 배지 표시 */
+    isService: boolean;
   }>;
   _count: { items: number };
   /** 부분 출고/반품 진행 상태 — 항목 전체 합계 (분할 발송 이력 표시용 — 첫 행) */

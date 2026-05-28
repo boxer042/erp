@@ -220,6 +220,8 @@ interface OrderDetail {
     /** 진입 경로 SKU — 자사몰/외부 채널 funnel */
     entryProductId?: string | null;
     entryProduct?: { id: string; name: string; sku: string } | null;
+    /** 서비스로 지급된 라인 — 상세 시트에 "서비스" 배지 표시 */
+    isService?: boolean;
   }>;
   /** 분할 송장 회차별 발송 이력 (shipmentNo 순) */
   shipments: Array<{
@@ -1760,6 +1762,12 @@ function ReadView({
                             </span>
                           )}
                           {item.product?.name ?? item.serviceName ?? "—"}
+                          {/* 서비스로 지급 — 0원 라인이라 매출 0 이지만 흔적은 명시 */}
+                          {item.isService && (
+                            <span className="ml-1.5 inline-flex items-center rounded-md bg-[var(--jm-success-bg)] px-1.5 py-px text-jm-3xs font-semibold text-[var(--jm-success-fg)]">
+                              서비스
+                            </span>
+                          )}
                           {/* SWAP 결과 라인은 상품명에 옵션 이미 반영 — 부속 표시 안 함 */}
                           {item.optionSnapshot &&
                             Object.keys(item.optionSnapshot).length > 0 &&

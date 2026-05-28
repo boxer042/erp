@@ -166,6 +166,13 @@ export function SalesAmountCell({ row }: { row: SalesHistoryRow }) {
           </span>
         </span>
       )}
+      {/* 서비스로 지급된 라인이 있는 거래 — 0원 행이라도 "그냥 0원" 이 아니라
+          무상 제공임을 명시. 영수증/명세표와 동일 정책. */}
+      {row.serviceItemCount > 0 && !reversed && (
+        <span className="text-[10px] font-semibold text-[var(--jm-success-fg)]">
+          서비스 {row.serviceItemCount}건 포함
+        </span>
+      )}
     </div>
   );
 }
