@@ -1006,7 +1006,7 @@ export async function POST(request: NextRequest) {
       }
 
       return order;
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     return NextResponse.json({ kind: "order", id: result.id, no: result.orderNo }, { status: 201 });
   } catch (e) {
