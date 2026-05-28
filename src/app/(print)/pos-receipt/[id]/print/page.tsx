@@ -12,7 +12,7 @@ export default async function PosReceiptPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ auto?: string }>;
+  searchParams: Promise<{ auto?: string; supplyOnly?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -44,6 +44,7 @@ export default async function PosReceiptPrintPage({
   return (
     <ReceiptClient
       auto={sp.auto === "1"}
+      initialSupplyOnly={sp.supplyOnly === "1"}
       data={{
         orderNo: order.orderNo,
         orderDate: format(new Date(order.orderDate), "yyyy-MM-dd HH:mm"),

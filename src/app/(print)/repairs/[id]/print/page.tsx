@@ -23,7 +23,7 @@ export default async function RepairPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ auto?: string }>;
+  searchParams: Promise<{ auto?: string; supplyOnly?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -95,7 +95,12 @@ export default async function RepairPrintPage({
 
   return (
     <div className="h-screen w-screen">
-      <RepairStatementPdf company={company} repair={repair} autoPrint={sp.auto === "1"} />
+      <RepairStatementPdf
+        company={company}
+        repair={repair}
+        autoPrint={sp.auto === "1"}
+        supplyOnly={sp.supplyOnly === "1"}
+      />
     </div>
   );
 }

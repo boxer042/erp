@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { formatBusinessNumber, formatPhone } from "@/lib/utils";
 
 interface Line {
@@ -60,8 +60,20 @@ const FULFILLMENT_LABEL: Record<string, string> = {
 /**
  * POS 영수증 — 80mm 영수증 프린터 친화. 좁은 폭, 모노 스페이스.
  * @page size 80mm × auto.
+ *
+ * supplyOnly: true 면 부가세 행을 숨기고 합계도 공급가액 기준으로만 표시.
  */
-export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
+export function ReceiptClient({
+  data,
+  auto,
+  initialSupplyOnly = false,
+}: {
+  data: Data;
+  auto: boolean;
+  initialSupplyOnly?: boolean;
+}) {
+  const [supplyOnly, setSupplyOnly] = useState(initialSupplyOnly);
+
   useEffect(() => {
     if (auto) {
       const t = setTimeout(() => window.print(), 200);
@@ -70,14 +82,32 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
   }, [auto]);
 
   const fmt = (n: number) => `₩${n.toLocaleString("ko-KR")}`;
+  const displayTotal = supplyOnly ? data.subtotal : data.totalAmount;
 
   return (
     <>
       <style>{`
         @page { size: 80mm auto; margin: 0; }
         @media print {
-          html, body { background: #fff; margin: 0; padding: 0; }
+          html, body {
+            background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 80mm;
+            height: auto;
+          }
           .receipt-toolbar { display: none !important; }
+          .receipt-outer {
+            padding: 0 !important;
+            background: #fff !important;
+          }
+          .receipt {
+            box-shadow: none !important;
+            margin: 0 auto !important;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+          }
+          .receipt :last-child { margin-bottom: 0 !important; }
         }
         .receipt {
           width: 76mm;
@@ -134,7 +164,8 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
           top: 0,
           zIndex: 10,
           display: "flex",
-          gap: 8,
+          gap: 12,
+          alignItems: "center",
           padding: "12px 16px",
           background: "#f5f5f5",
           borderBottom: "1px solid #ddd",
@@ -155,12 +186,28 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
         >
           인쇄
         </button>
-        <span style={{ fontSize: 13, color: "#666", alignSelf: "center" }}>
-          80mm 영수증
-        </span>
+        <span style={{ fontSize: 13, color: "#666" }}>80mm 영수증</span>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 13,
+            color: "#333",
+            cursor: "pointer",
+            marginLeft: "auto",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={supplyOnly}
+            onChange={(e) => setSupplyOnly(e.target.checked)}
+          />
+          공급가액만 (세액 제외)
+        </label>
       </div>
 
-      <div style={{ padding: "16px 0", background: "#f5f5f5" }}>
+      <div className="receipt-outer" style={{ padding: "16px 0", background: "#f5f5f5" }}>
         <div className="receipt" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
           <h1>{data.company.name}</h1>
           <div className="meta">
@@ -275,14 +322,16 @@ export function ReceiptClient({ data, auto }: { data: Data; auto: boolean }) {
             <span className="label">공급가액</span>
             <span className="val">{fmt(data.subtotal)}</span>
           </div>
-          <div className="row">
-            <span className="label">부가세</span>
-            <span className="val">{fmt(data.taxAmount)}</span>
-          </div>
+          {!supplyOnly && (
+            <div className="row">
+              <span className="label">부가세</span>
+              <span className="val">{fmt(data.taxAmount)}</span>
+            </div>
+          )}
           <hr />
           <div className="total-row">
-            <span>합계</span>
-            <span>{fmt(data.totalAmount)}</span>
+            <span>{supplyOnly ? "합계 (공급가액)" : "합계 (VAT 포함)"}</span>
+            <span>{fmt(displayTotal)}</span>
           </div>
 
           {/* 부분 결제 — 즉시 결제 / 잔금(미수) 분리 표시 */}

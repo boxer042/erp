@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -182,6 +183,41 @@ function calcRepairFinalTotal(ticket: RepairTicketDetail): number {
   }).finalTotal;
 }
 
+// 수리내역서 인쇄 다이얼로그 — 공급가액만 토글 포함
+function RepairStatementDialog({
+  open,
+  onOpenChange,
+  ticketId,
+  ticketNo,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  ticketId: string;
+  ticketNo: string;
+}) {
+  const [supplyOnly, setSupplyOnly] = useState(false);
+  const src = `/repairs/${ticketId}/print${supplyOnly ? "?supplyOnly=1" : ""}`;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border p-4">
+          <DialogTitle>수리내역서 — {ticketNo}</DialogTitle>
+          <label className="mr-8 flex cursor-pointer items-center gap-2 text-sm">
+            <Switch checked={supplyOnly} onCheckedChange={setSupplyOnly} />
+            <span>공급가액만 (세액 제외)</span>
+          </label>
+        </DialogHeader>
+        <iframe
+          key={src}
+          src={src}
+          className="size-full flex-1 border-0"
+          title="수리내역서"
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // 상태 진행 버튼들 — 현재 상태에서 가능한 액션
 function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
   const actions: { action: string; label: string; variant?: "default" | "outline" | "destructive" }[] = [];
@@ -315,18 +351,12 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* 내역서 출력 모달 */}
-      <Dialog open={statementOpen} onOpenChange={setStatementOpen}>
-        <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
-          <DialogHeader className="border-b border-border p-4">
-            <DialogTitle>수리내역서 — {t.ticketNo}</DialogTitle>
-          </DialogHeader>
-          <iframe
-            src={`/repairs/${t.id}/print`}
-            className="size-full flex-1 border-0"
-            title="수리내역서"
-          />
-        </DialogContent>
-      </Dialog>
+      <RepairStatementDialog
+        open={statementOpen}
+        onOpenChange={setStatementOpen}
+        ticketId={t.id}
+        ticketNo={t.ticketNo}
+      />
     </div>
   );
 }

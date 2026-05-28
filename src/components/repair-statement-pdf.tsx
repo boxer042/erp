@@ -61,6 +61,8 @@ interface Props {
   company: CompanyInfo;
   repair: RepairStatementData;
   autoPrint?: boolean;
+  /** true 면 부가세 행을 숨기고 공급가액 기준으로만 표시 (수리 금액은 세전 정책) */
+  supplyOnly?: boolean;
 }
 
 const fmt = (v: string | number) =>
@@ -209,7 +211,7 @@ function InfoRow({ label, value, last }: { label: string; value: string; last?: 
   );
 }
 
-function RepairStatementDocument({ company, repair }: Props) {
+function RepairStatementDocument({ company, repair, supplyOnly }: Props) {
   const totalParts = repair.parts.reduce(
     (acc, p) => acc + Math.round(parseFloat(String(p.totalPrice))),
     0,
@@ -218,6 +220,14 @@ function RepairStatementDocument({ company, repair }: Props) {
     (acc, l) => acc + Math.round(parseFloat(String(l.totalPrice))),
     0,
   );
+
+  // 합계 분리 표시
+  // repair.finalAmount 는 세전(공급가액) 기준 (ERP 정책: 모든 가격은 세전 저장).
+  // 기본 모드(VAT 포함): 공급가액 / 부가세 / 합계 분리 표시
+  // supplyOnly 모드(공급가액만): 부가세 행 숨김
+  const supplyAmount = Math.round(repair.finalAmount);
+  const taxAmount = Math.round(supplyAmount * 0.1);
+  const totalWithTax = supplyAmount + taxAmount;
 
   return (
     <Document title={`수리내역서_${repair.ticketNo}`}>
@@ -361,10 +371,22 @@ function RepairStatementDocument({ company, repair }: Props) {
           </View>
         )}
 
+        {/* 공급가액 / 부가세 (supplyOnly 모드에서는 부가세 행 숨김) */}
+        <View style={s.infoBox}>
+          <InfoRow label="공급가액" value={`₩${fmt(supplyAmount)}`} last={supplyOnly} />
+          {!supplyOnly && (
+            <InfoRow label="부가세 (10%)" value={`₩${fmt(taxAmount)}`} last />
+          )}
+        </View>
+
         {/* 합계 */}
         <View style={s.totalRow}>
-          <Text style={s.totalLabel}>최종 청구</Text>
-          <Text style={s.totalValue}>₩{fmt(repair.finalAmount)}</Text>
+          <Text style={s.totalLabel}>
+            {supplyOnly ? "최종 청구 (공급가액)" : "최종 청구 (VAT 포함)"}
+          </Text>
+          <Text style={s.totalValue}>
+            ₩{fmt(supplyOnly ? supplyAmount : totalWithTax)}
+          </Text>
         </View>
 
         {/* 보증 안내 */}
@@ -396,12 +418,14 @@ function RepairStatementDocument({ company, repair }: Props) {
   );
 }
 
-export function RepairStatementPdf({ company, repair, autoPrint }: Props) {
+export function RepairStatementPdf({ company, repair, autoPrint, supplyOnly }: Props) {
   useEffect(() => {
     if (!autoPrint) return;
     let canceled = false;
     (async () => {
-      const blob = await pdf(<RepairStatementDocument company={company} repair={repair} />).toBlob();
+      const blob = await pdf(
+        <RepairStatementDocument company={company} repair={repair} supplyOnly={supplyOnly} />,
+      ).toBlob();
       if (canceled) return;
       const url = URL.createObjectURL(blob);
       window.location.href = url;
@@ -409,13 +433,13 @@ export function RepairStatementPdf({ company, repair, autoPrint }: Props) {
     return () => {
       canceled = true;
     };
-  }, [autoPrint, company, repair]);
+  }, [autoPrint, company, repair, supplyOnly]);
 
   if (autoPrint) return null;
 
   return (
     <PDFViewer style={{ width: "100%", height: "100%", border: 0 }}>
-      <RepairStatementDocument company={company} repair={repair} />
+      <RepairStatementDocument company={company} repair={repair} supplyOnly={supplyOnly} />
     </PDFViewer>
   );
 }

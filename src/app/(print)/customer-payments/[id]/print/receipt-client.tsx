@@ -69,8 +69,25 @@ export function PaymentReceiptClient({
       <style>{`
         @page { size: 80mm auto; margin: 0; }
         @media print {
-          html, body { background: #fff; margin: 0; padding: 0; }
+          html, body {
+            background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 80mm;
+            height: auto;
+          }
           .receipt-toolbar { display: none !important; }
+          .receipt-outer {
+            padding: 0 !important;
+            background: #fff !important;
+          }
+          .receipt {
+            box-shadow: none !important;
+            margin: 0 auto !important;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+          }
+          .receipt :last-child { margin-bottom: 0 !important; }
         }
         .receipt {
           width: 76mm;
@@ -146,7 +163,7 @@ export function PaymentReceiptClient({
         </span>
       </div>
 
-      <div style={{ padding: "16px 0", background: "#f5f5f5" }}>
+      <div className="receipt-outer" style={{ padding: "16px 0", background: "#f5f5f5" }}>
         <div className="receipt" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
           <h1>{data.company.name}</h1>
           <div className="meta">
