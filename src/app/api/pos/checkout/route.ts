@@ -949,34 +949,59 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // CustomerLedger — 외상 발생 시 매출(debit) 기록
-      //   UNPAID: 전액 미수 → debit = totalAmount
-      //   PARTIAL_PAID: 잔금만 미수 → debit = outstandingAmount
-      // date 는 order.orderDate 로 명시 — RECEIPT(자정) 와 정렬 일관성 보장
-      if (body.customerId && outstandingAmount > 0) {
-        const ledgerDesc = isPartialPaid
+      // CustomerLedger — 모든 거래를 SALE/RECEIPT 쌍으로 기록 (audit trail).
+      //   PAID:        SALE(totalAmount) + RECEIPT(totalAmount) → balance 변화 0
+      //   UNPAID:      SALE(totalAmount) — RECEIPT 없음 → balance +totalAmount (미수금)
+      //   PARTIAL_PAID: SALE(totalAmount) + RECEIPT(paidAmount) → balance +outstandingAmount
+      // 매장에서 모든 거래 흐름을 원장 한 곳에서 확인할 수 있게 함.
+      // date 는 order.orderDate 로 명시 — RECEIPT(자정) 와 정렬 일관성 보장.
+      if (body.customerId) {
+        const total = totalAmount;
+        const paid = isUnpaid
+          ? 0
+          : isPartialPaid
+            ? paidAmountInput ?? 0
+            : total;
+        const saleDesc = `POS 주문 ${order.orderNo}`;
+        const receiptDesc = isPartialPaid
           ? partialPaymentKind === "DEPOSIT"
-            ? `POS 주문 ${order.orderNo} 잔금 (계약금 외)`
-            : `POS 주문 ${order.orderNo} 잔금`
-          : `POS 주문 ${order.orderNo}`;
+            ? `POS 주문 ${order.orderNo} 계약금`
+            : `POS 주문 ${order.orderNo} 일부결제`
+          : `POS 주문 ${order.orderNo} 결제`;
         const last = await tx.customerLedger.findFirst({
           where: { customerId: body.customerId },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         });
-        const prevBalance = last ? Number(last.balance) : 0;
+        let runningBalance = last ? Number(last.balance) : 0;
         await tx.customerLedger.create({
           data: {
             customerId: body.customerId,
             date: order.orderDate,
             type: "SALE",
-            description: ledgerDesc,
-            debitAmount: outstandingAmount,
+            description: saleDesc,
+            debitAmount: total,
             creditAmount: 0,
-            balance: prevBalance + outstandingAmount,
+            balance: runningBalance + total,
             referenceId: order.id,
             referenceType: "ORDER",
           },
         });
+        runningBalance += total;
+        if (paid > 0) {
+          await tx.customerLedger.create({
+            data: {
+              customerId: body.customerId,
+              date: order.orderDate,
+              type: "RECEIPT",
+              description: receiptDesc,
+              debitAmount: 0,
+              creditAmount: paid,
+              balance: runningBalance - paid,
+              referenceId: order.id,
+              referenceType: "ORDER",
+            },
+          });
+        }
         await rebalanceCustomerLedger(tx, body.customerId);
       }
 

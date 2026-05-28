@@ -92,6 +92,8 @@ export type SalesHistoryRow = {
   extraSalesCount: number;
   /** 추가구매 라인 합계 (세전 totalPrice 합). 표시용 배지. */
   extraSalesAmount: number;
+  /** 할인액 (VAT 포함) — 통합판매내역 행에 표시. 수리: RepairTicket.totalDiscount 합 × 1.1 */
+  discountAmount: number;
   /** 수리 작업 성격 — REPAIR(일반) / CUSTOM_BUILD(리빌드). type=repair 일 때만 의미. */
   repairWorkKind: "REPAIR" | "CUSTOM_BUILD" | null;
   /** 연결된 원천 — 판매:Order id, 수리:ticket id (orphan), 임대:rental id (orphan) */
@@ -236,7 +238,13 @@ export async function GET(request: NextRequest) {
       channel: { select: { id: true, name: true } },
       // N:1 — 한 Order 에 수리 여러 건. 첫 ticket 이 대표 표시용
       repairTickets: {
-        select: { id: true, ticketNo: true, workKind: true },
+        select: {
+          id: true,
+          ticketNo: true,
+          workKind: true,
+          // 통합판매내역에서 행 아래 "할인 -₩X" 표시용 (VAT 포함으로 환산)
+          totalDiscount: true,
+        },
         orderBy: { receivedAt: "asc" },
       },
       rental: { select: { rentalNo: true } },
@@ -400,6 +408,14 @@ export async function GET(request: NextRequest) {
       (s, it) => s + Number(it.totalPrice ?? 0),
       0,
     );
+    // 수리 라인 할인 합산 (VAT 포함) — 같은 Order 에 수리 N건이면 모두 합쳐서 표시.
+    // RepairTicket.totalDiscount 는 NET 저장값이라 × 1.1 로 환산.
+    const repairDiscountNet = o.repairTickets.reduce(
+      (s, rt) => s + (parseInt((rt.totalDiscount ?? "0").replace(/,/g, ""), 10) || 0),
+      0,
+    );
+    const discountAmountVatIncl = Math.round(repairDiscountNet * 1.1);
+
     return {
       id: `order-${o.id}`,
       type: t,
@@ -427,6 +443,7 @@ export async function GET(request: NextRequest) {
       amount,
       netAmount: isReversed ? 0 : partialNet,
       partialRefundAmount: isPartial ? partialRefundAmount : 0,
+      discountAmount: discountAmountVatIncl,
       shippingFee: Number(o.shippingFee ?? 0),
       shippingCostBorne: Number(o.shippingCostBorne ?? 0),
       isExchangeReplacement: (o.exchangedFromOrders?.length ?? 0) > 0,
@@ -467,6 +484,7 @@ export async function GET(request: NextRequest) {
       isExchangeReplacement: false,
       extraSalesCount: 0,
       extraSalesAmount: 0,
+      discountAmount: 0,
       repairWorkKind: t.workKind,
       sourceId: t.id,
       isOrphan: true,
@@ -501,6 +519,7 @@ export async function GET(request: NextRequest) {
       isExchangeReplacement: false,
       extraSalesCount: 0,
       extraSalesAmount: 0,
+      discountAmount: 0,
       repairWorkKind: null,
       sourceId: r.id,
       isOrphan: true,

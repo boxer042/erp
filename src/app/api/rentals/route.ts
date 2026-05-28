@@ -171,16 +171,18 @@ export async function POST(request: NextRequest) {
         where: { id: assetId },
         data: { status: isActiveNow ? "RENTED" : asset.status },
       });
-    // UNPAID이면 고객원장 기록
-    // date 는 임대 시작일(startDate) 로 명시 — RECEIPT(자정) 와 정렬 일관성 보장
-    // 원장 기록은 VAT 포함 금액 — POS checkout 경로 (totalAmount = VAT-incl) 와 일관성 보장.
-    if (paymentMethod === "UNPAID") {
+    // CustomerLedger — 모든 임대 거래를 SALE/RECEIPT 쌍으로 기록.
+    //   UNPAID: SALE 만 (미수금 발생)
+    //   그 외: SALE + RECEIPT → balance 0 (즉시 정산)
+    // 원장에서 모든 임대 결제 흔적 확인 가능. VAT 포함 금액.
+    {
       const last = await tx.customerLedger.findFirst({
         where: { customerId },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       });
-      const prev = last ? Number(last.balance) : 0;
+      let runningBalance = last ? Number(last.balance) : 0;
       const debitInclVat = Math.round(rentalAmount * 1.1);
+      const isUnpaid = paymentMethod === "UNPAID" || !paymentMethod;
       await tx.customerLedger.create({
         data: {
           customerId,
@@ -189,11 +191,27 @@ export async function POST(request: NextRequest) {
           description: `임대 ${r.rentalNo}`,
           debitAmount: debitInclVat,
           creditAmount: 0,
-          balance: prev + debitInclVat,
+          balance: runningBalance + debitInclVat,
           referenceId: r.id,
           referenceType: "RENTAL",
         },
       });
+      runningBalance += debitInclVat;
+      if (!isUnpaid && debitInclVat > 0) {
+        await tx.customerLedger.create({
+          data: {
+            customerId,
+            date: start,
+            type: "RECEIPT",
+            description: `임대 ${r.rentalNo} 결제`,
+            debitAmount: 0,
+            creditAmount: debitInclVat,
+            balance: runningBalance - debitInclVat,
+            referenceId: r.id,
+            referenceType: "RENTAL",
+          },
+        });
+      }
       await rebalanceCustomerLedger(tx, customerId);
     }
       return r;

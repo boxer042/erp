@@ -71,6 +71,8 @@ export interface SalesHistoryRow {
   extraSalesAmount: number;
   /** 수리 작업 성격 — type=repair 일 때만 의미. CUSTOM_BUILD 면 "리빌드" 라벨. */
   repairWorkKind: "REPAIR" | "CUSTOM_BUILD" | null;
+  /** 할인액 (VAT 포함) — 행 아래에 "할인 -₩X" 으로 표시. 수리 ticket.totalDiscount 합산 × 1.1 */
+  discountAmount: number;
   sourceId: string;
   isOrphan: boolean;
 }

@@ -403,27 +403,39 @@ export function RepairDetail({
       {/* 하단 sticky — 합계 + 다음 액션. 부속·공임 추가하며 작업할 때 합계가 항상 보임 */}
       {(actions.length > 0 || !readonly) && (
         <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:px-6">
-          {/* 공급가액 / 부가세 / 청구 합계 3분할 — DB 저장값은 세전, 표시만 분해 */}
-          <div className="mb-2.5 flex flex-col gap-0.5 rounded-xl bg-[var(--jm-bg)] px-3 py-2">
-            <div className="flex items-baseline justify-between text-jm-2xs">
-              <span className="text-[var(--jm-text-muted)]">공급가액</span>
-              <span className="tabular-nums text-[var(--jm-text)]">
-                {fmtKRW(finalAmount)}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between text-jm-2xs">
-              <span className="text-[var(--jm-text-muted)]">부가세 (10%)</span>
-              <span className="tabular-nums text-[var(--jm-text)]">
-                {fmtKRWTax(finalAmount)}
-              </span>
-            </div>
-            <div className="mt-0.5 flex items-baseline justify-between border-t border-[var(--jm-border)] pt-1">
-              <span className="text-jm-2xs font-semibold text-[var(--jm-text)]">
-                청구 합계
+          {/* 요약 카드 — 할인 흐름을 한눈에 보이도록 명시적 3행 노출.
+              할인 있을 때: 원래 금액 → 할인 → 청구 금액 (계산 결과)
+              할인 없을 때: 청구 금액만 (불필요한 0원 표시 피함) */}
+          <div className="mb-2.5 flex flex-col gap-1 rounded-xl bg-[var(--jm-bg)] px-3 py-2.5">
+            {totals.discountAmount > 0 && (
+              <>
+                <div className="flex items-baseline justify-between text-jm-sm">
+                  <span className="text-[var(--jm-text-muted)]">원래 금액</span>
+                  <span className="tabular-nums text-[var(--jm-text)]">
+                    {fmtKRWInc(totals.subtotal)}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between text-jm-sm text-[var(--jm-danger-fg)]">
+                  <span>할인</span>
+                  <span className="tabular-nums">
+                    -{fmtKRWInc(totals.discountAmount)}
+                  </span>
+                </div>
+                <div className="h-px bg-[var(--jm-border)]" />
+              </>
+            )}
+            <div className="flex items-baseline justify-between">
+              <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
+                청구 금액
               </span>
               <span className="text-jm-lg font-bold tabular-nums text-[var(--jm-text)]">
                 {fmtKRWInc(finalAmount)}
               </span>
+            </div>
+            {/* 공급가액 / 부가세 분해 — 작은 보조 정보 */}
+            <div className="mt-0.5 flex items-baseline justify-between text-jm-2xs text-[var(--jm-text-subtle)]">
+              <span>공급가액 {fmtKRW(finalAmount)}</span>
+              <span>부가세 (10%) {fmtKRWTax(finalAmount)}</span>
             </div>
           </div>
 
@@ -463,14 +475,6 @@ export function RepairDetail({
                   진단{" "}
                   <span className="tabular-nums">
                     {fmtKRWInc(totals.diagnosisFee)}
-                  </span>
-                </span>
-              )}
-              {totals.discountAmount > 0 && (
-                <span className="text-[var(--jm-danger-fg)]">
-                  할인{" "}
-                  <span className="tabular-nums">
-                    -{fmtKRWInc(totals.discountAmount)}
                   </span>
                 </span>
               )}

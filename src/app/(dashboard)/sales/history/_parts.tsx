@@ -144,17 +144,29 @@ export function SalesAmountCell({ row }: { row: SalesHistoryRow }) {
     row.paymentStatus === "SALES_CANCELLED";
   const unpaid = row.paymentStatus === "UNPAID";
   return (
-    <span
-      className={`tabular-nums font-semibold ${
-        reversed
-          ? "text-[var(--jm-text-muted)] line-through"
-          : unpaid
-            ? "text-[var(--jm-warning-fg)]"
-            : "text-[var(--jm-text)]"
-      }`}
-    >
-      {formatKrw(row.amount)}
-    </span>
+    <div className="flex flex-col items-end gap-0.5">
+      <span
+        className={`tabular-nums font-semibold ${
+          reversed
+            ? "text-[var(--jm-text-muted)] line-through"
+            : unpaid
+              ? "text-[var(--jm-warning-fg)]"
+              : "text-[var(--jm-text)]"
+        }`}
+      >
+        {formatKrw(row.amount)}
+      </span>
+      {/* 할인이 있던 거래 — 원가와 할인액을 한눈에 보여줘 결제액 차이 이해를 돕는다.
+          원가 = 결제액 + 할인. 할인은 -₩X 형태로 강조. */}
+      {row.discountAmount > 0 && !reversed && (
+        <span className="text-[10px] tabular-nums text-[var(--jm-text-subtle)]">
+          원가 ₩{(row.amount + row.discountAmount).toLocaleString("ko-KR")}
+          <span className="ml-1 text-[var(--jm-danger-fg)]">
+            -₩{row.discountAmount.toLocaleString("ko-KR")}
+          </span>
+        </span>
+      )}
+    </div>
   );
 }
 

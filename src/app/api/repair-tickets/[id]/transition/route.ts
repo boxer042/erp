@@ -203,17 +203,20 @@ export async function POST(
         /* 통계 실패는 무시 */
       }
 
-      if (paymentMethod === "UNPAID" && ticket.customerId) {
-        // date 는 pickedUpAt 으로 명시 (현재 픽업 처리 시각). RECEIPT(자정) 와 정렬 일관성 보장.
-        // 원장 기록은 VAT 포함 금액(손님이 실제로 갚아야 할 금액) — POS checkout 경로와 일관성 보장.
+      // CustomerLedger — 모든 픽업 거래를 SALE/RECEIPT 쌍으로 기록.
+      //   UNPAID: SALE 만 (미수금 발생)
+      //   그 외 (CASH/CARD/TRANSFER 등): SALE + RECEIPT → balance 0 (즉시 정산)
+      // 원장에서 모든 수리 결제 흔적 확인 가능. VAT 포함 금액 — POS checkout 경로와 일관성.
+      if (ticket.customerId) {
         const customerId = ticket.customerId;
         const debitInclVat = Math.round(finalAmt * 1.1);
+        const isUnpaid = paymentMethod === "UNPAID" || !paymentMethod;
         await prisma.$transaction(async (tx) => {
           const last = await tx.customerLedger.findFirst({
             where: { customerId },
             orderBy: [{ date: "desc" }, { createdAt: "desc" }],
           });
-          const prevBalance = last ? Number(last.balance) : 0;
+          let runningBalance = last ? Number(last.balance) : 0;
           // 거절·진단비 케이스 라벨 분기 — 원장에서 정상 수리 매출과 구분 (사후 분석/정산 시 명확)
           const description = ticket.quoteRejectedAt
             ? `수리 ${ticket.ticketNo} (거절·진단비)`
@@ -226,11 +229,27 @@ export async function POST(
               description,
               debitAmount: debitInclVat,
               creditAmount: 0,
-              balance: prevBalance + debitInclVat,
+              balance: runningBalance + debitInclVat,
               referenceId: ticket.id,
               referenceType: "REPAIR_TICKET",
             },
           });
+          runningBalance += debitInclVat;
+          if (!isUnpaid && debitInclVat > 0) {
+            await tx.customerLedger.create({
+              data: {
+                customerId,
+                date: pickupAt,
+                type: "RECEIPT",
+                description: `${description} 결제`,
+                debitAmount: 0,
+                creditAmount: debitInclVat,
+                balance: runningBalance - debitInclVat,
+                referenceId: ticket.id,
+                referenceType: "REPAIR_TICKET",
+              },
+            });
+          }
           await rebalanceCustomerLedger(tx, customerId);
         });
       }
