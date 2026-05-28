@@ -5,7 +5,13 @@
  * 멱등성: 이미 orderId 가 채워진 ticket 은 건드리지 않음.
  */
 import dotenv from "dotenv";
-dotenv.config({ path: process.env.PRISMA_ENV_FILE ?? ".env.local" });
+// PRISMA_ENV_FILE 명시 시 override — 셸 env 가 .env.prod 를 가로채는 사고 방지
+const envFile = process.env.PRISMA_ENV_FILE;
+if (envFile) {
+  dotenv.config({ path: envFile, override: true });
+} else {
+  dotenv.config({ path: ".env.local" });
+}
 
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";

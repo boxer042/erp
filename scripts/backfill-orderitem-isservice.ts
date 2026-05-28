@@ -10,7 +10,14 @@
  *   PRISMA_ENV_FILE=.env.prod npx tsx scripts/backfill-orderitem-isservice.ts   # 운영
  */
 import dotenv from "dotenv";
-dotenv.config({ path: process.env.PRISMA_ENV_FILE ?? ".env.local" });
+// PRISMA_ENV_FILE 명시 시 override:true — 셸/이전 env 의 변수보다 .env.prod 가 우선되도록.
+// 그렇지 않으면 "injected env (0)" 가 되어 실제로는 다른 DB 에 붙는 사고 발생.
+const envFile = process.env.PRISMA_ENV_FILE;
+if (envFile) {
+  dotenv.config({ path: envFile, override: true });
+} else {
+  dotenv.config({ path: ".env.local" });
+}
 
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";

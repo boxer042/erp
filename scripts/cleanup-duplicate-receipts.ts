@@ -23,7 +23,13 @@
  *   PRISMA_ENV_FILE=.env.prod npx tsx scripts/cleanup-duplicate-receipts.ts   # 운영
  */
 import dotenv from "dotenv";
-dotenv.config({ path: process.env.PRISMA_ENV_FILE ?? ".env.local" });
+// PRISMA_ENV_FILE 명시 시 override — 셸 env 가 .env.prod 를 가로채는 사고 방지
+const envFile = process.env.PRISMA_ENV_FILE;
+if (envFile) {
+  dotenv.config({ path: envFile, override: true });
+} else {
+  dotenv.config({ path: ".env.local" });
+}
 
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
