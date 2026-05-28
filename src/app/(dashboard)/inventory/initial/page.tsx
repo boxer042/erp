@@ -620,7 +620,7 @@ export default function InitialInventoryPage() {
                                     rowIndex={idx}
                                     products={supplierProducts}
                                     onSelect={(sp) => selectProductForRow(idx, sp)}
-                                    onCreateNewInline={(name) => handleCreateNewInline(idx, name)}
+                                    onCreateNew={(name) => handleCreateNewInline(idx, name)}
                                     onSelectPending={(p) => handleSelectPending(idx, p)}
                                     existingIds={items
                                       .map((i) => i.supplierProductId)

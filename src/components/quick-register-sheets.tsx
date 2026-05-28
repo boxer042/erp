@@ -785,7 +785,9 @@ export function QuickCustomerSheet({
   const isBusiness = type === "BUSINESS";
 
   const handleSubmit = async () => {
-    if (!name.trim() || !phone.trim()) return;
+    // 기업 고객은 상호명 필수. 개인 고객은 이름 미입력 시 서버가 자동으로 전화번호로 채움.
+    if (isBusiness && !name.trim()) return;
+    if (!phone.trim()) return;
     setSubmitting(true);
     try {
       const url = isEdit ? `/api/customers/${editData!.id}` : "/api/customers";
@@ -1144,7 +1146,7 @@ export function QuickCustomerSheet({
           <JmButton
             variant="cta"
             onClick={handleSubmit}
-            disabled={!name.trim() || !phone.trim() || submitting}
+            disabled={(isBusiness && !name.trim()) || !phone.trim() || submitting}
           >
             {submitting && <Loader2 className="size-4 animate-spin" />}
             <span>{isEdit ? "수정" : "등록"}</span>

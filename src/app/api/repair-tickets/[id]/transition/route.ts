@@ -205,7 +205,9 @@ export async function POST(
 
       if (paymentMethod === "UNPAID" && ticket.customerId) {
         // date 는 pickedUpAt 으로 명시 (현재 픽업 처리 시각). RECEIPT(자정) 와 정렬 일관성 보장.
+        // 원장 기록은 VAT 포함 금액(손님이 실제로 갚아야 할 금액) — POS checkout 경로와 일관성 보장.
         const customerId = ticket.customerId;
+        const debitInclVat = Math.round(finalAmt * 1.1);
         await prisma.$transaction(async (tx) => {
           const last = await tx.customerLedger.findFirst({
             where: { customerId },
@@ -222,9 +224,9 @@ export async function POST(
               date: pickupAt,
               type: "SALE",
               description,
-              debitAmount: finalAmt,
+              debitAmount: debitInclVat,
               creditAmount: 0,
-              balance: prevBalance + finalAmt,
+              balance: prevBalance + debitInclVat,
               referenceId: ticket.id,
               referenceType: "REPAIR_TICKET",
             },

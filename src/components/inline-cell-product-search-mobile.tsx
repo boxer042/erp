@@ -21,6 +21,8 @@ export interface SupplierProductLike {
   supplierCode?: string | null;
   unitPrice: string;
   spec?: string | null;
+  /** 매핑 없음 — 등록 시 오르판 로트로 들어감 (incoming/initial 만 사용; returns 는 무관) */
+  hasMapping?: boolean | null;
 }
 
 export interface PendingNewProduct {

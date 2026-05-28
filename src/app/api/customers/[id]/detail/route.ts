@@ -150,21 +150,32 @@ export async function GET(
   // 미수금 = 가장 최근 ledger 의 누적 balance (없으면 0)
   const outstandingAmount = ledgerSum?.balance?.toString() ?? "0";
 
+  // 수리·임대 finalAmount 는 세전(공급가액) 저장값. 손님 화면 표시는 VAT 포함 (×1.1)
+  // 통일 — Order.totalAmount(VAT-incl) 와 시각적으로 동일한 의미로 보이도록.
+  const toVatIncl = (raw: unknown) =>
+    Math.round(Number(raw ?? 0) * 1.1).toString();
+
   return NextResponse.json({
     customer,
     stats: {
       orderCount: orderStats._count,
       orderTotal: orderStats._sum.totalAmount?.toString() ?? "0",
       repairCount: repairStats._count,
-      repairTotal: repairStats._sum.finalAmount?.toString() ?? "0",
+      repairTotal: toVatIncl(repairStats._sum.finalAmount),
       rentalCount: rentalStats._count,
-      rentalTotal: rentalStats._sum.finalAmount?.toString() ?? "0",
+      rentalTotal: toVatIncl(rentalStats._sum.finalAmount),
       serialCount,
       outstandingAmount,
     },
     recentOrders,
-    recentRepairs,
-    recentRentals,
+    recentRepairs: recentRepairs.map((r) => ({
+      ...r,
+      finalAmount: toVatIncl(r.finalAmount),
+    })),
+    recentRentals: recentRentals.map((r) => ({
+      ...r,
+      finalAmount: toVatIncl(r.finalAmount),
+    })),
     recentSerials,
     machines,
     notes,

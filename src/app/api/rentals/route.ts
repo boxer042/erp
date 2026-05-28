@@ -173,21 +173,23 @@ export async function POST(request: NextRequest) {
       });
     // UNPAID이면 고객원장 기록
     // date 는 임대 시작일(startDate) 로 명시 — RECEIPT(자정) 와 정렬 일관성 보장
+    // 원장 기록은 VAT 포함 금액 — POS checkout 경로 (totalAmount = VAT-incl) 와 일관성 보장.
     if (paymentMethod === "UNPAID") {
       const last = await tx.customerLedger.findFirst({
         where: { customerId },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       });
       const prev = last ? Number(last.balance) : 0;
+      const debitInclVat = Math.round(rentalAmount * 1.1);
       await tx.customerLedger.create({
         data: {
           customerId,
           date: start,
           type: "SALE",
           description: `임대 ${r.rentalNo}`,
-          debitAmount: rentalAmount,
+          debitAmount: debitInclVat,
           creditAmount: 0,
-          balance: prev + rentalAmount,
+          balance: prev + debitInclVat,
           referenceId: r.id,
           referenceType: "RENTAL",
         },

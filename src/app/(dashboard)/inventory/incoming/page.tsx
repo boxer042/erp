@@ -1897,7 +1897,7 @@ function IncomingPageInner() {
                                     rowIndex={idx}
                                     products={supplierProducts}
                                     onSelect={(sp) => selectProductForRow(idx, sp)}
-                                    onCreateNewInline={(name) => handleCreateNewInline(idx, name)}
+                                    onCreateNew={(name) => handleCreateNewInline(idx, name)}
                                     existingIds={items.map((i) => i.supplierProductId).filter(Boolean)}
                                     selectedName={item.supplierProductName}
                                     isNew={item.isNew}

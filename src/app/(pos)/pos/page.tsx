@@ -278,7 +278,11 @@ export default function PosV2HomePage() {
                           customerBusinessNumber: s.customerBusinessNumber,
                           activeCount: {
                             product: s.items.filter((i) => i.itemType === "product").length,
-                            repair: s.openRepairCount ?? 0,
+                            // openRepairCount 는 의도적으로 "카트 밖" 수리만 셈 (API 가 cartRepairIds 제외).
+                            // 그래서 카트에 결제 대기 중인 repair 라인이 있어도 카드에서 빠지던 버그 보강.
+                            repair:
+                              (s.openRepairCount ?? 0) +
+                              s.items.filter((i) => i.itemType === "repair").length,
                             rental: s.items.filter((i) => i.itemType === "rental").length,
                           },
                           updatedAt: s.updatedAt,

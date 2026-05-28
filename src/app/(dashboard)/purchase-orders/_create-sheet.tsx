@@ -2,17 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { useIsCompactDevice } from "@/hooks/use-mobile";
 import {
   jmToast as toast,
   JmButton,
   JmCombobox,
   type JmComboboxItem,
-  JmComboboxDrawer,
   JmDrawer,
   JmDrawerBody,
   JmDrawerContent,
@@ -27,6 +25,7 @@ import {
 } from "@/jm";
 
 import { QuickSupplierSheet, QuickSupplierProductSheet } from "@/components/quick-register-sheets";
+import { SupplierProductCombobox } from "@/components/supplier-product-combobox";
 
 import {
   emptyItem,
@@ -78,10 +77,6 @@ export function PurchaseOrderCreateSheet({
   const [quickSpOpen, setQuickSpOpen] = useState(false);
   const [quickSpName, setQuickSpName] = useState("");
   const [quickSpRowIndex, setQuickSpRowIndex] = useState<number | null>(null);
-
-  // 모바일/태블릿 — 공급상품 콤보박스를 JmComboboxDrawer (바텀 시트) 로 전환
-  const isCompactDevice = useIsCompactDevice();
-  const [drawerOpenIdx, setDrawerOpenIdx] = useState<number | null>(null);
 
   const suppliersQuery = useQuery<SupplierLite[]>({
     queryKey: queryKeys.suppliers.list(),
@@ -357,50 +352,21 @@ export function PurchaseOrderCreateSheet({
                                 onChange={(e) => updateItem(idx, { name: e.target.value })}
                                 placeholder="자유 품명 (입고 시 공급상품 매핑)"
                               />
-                            ) : isCompactDevice ? (
-                              <button
-                                type="button"
-                                onClick={() => setDrawerOpenIdx(idx)}
-                                className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
-                              >
-                                <span
-                                  className={`truncate text-left ${
-                                    it.supplierProductId ? "text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"
-                                  }`}
-                                >
-                                  {it.supplierProductId
-                                    ? it.supplierProductName ||
-                                      (supplierProductsQuery.data ?? []).find((sp) => sp.id === it.supplierProductId)?.name ||
-                                      "공급상품"
-                                    : "공급상품 선택..."}
-                                </span>
-                                <ChevronsUpDown className="size-3.5 shrink-0 text-[var(--jm-text-muted)]" />
-                              </button>
                             ) : (
-                              <JmCombobox<JmComboboxItem>
-                                items={(supplierProductsQuery.data ?? []).map((sp) => ({
-                                  id: sp.id,
-                                  label: sp.name + (sp.spec ? ` (${sp.spec})` : ""),
-                                  description: [
-                                    sp.supplierCode,
-                                    sp.unitPrice ? `₩${parseFloat(sp.unitPrice).toLocaleString("ko-KR")}` : null,
-                                  ].filter(Boolean).join(" · ") || undefined,
-                                }))}
+                              <SupplierProductCombobox
+                                supplierProducts={supplierProductsQuery.data ?? []}
                                 value={it.supplierProductId}
-                                size="sm"
-                                placeholder="공급상품 선택..."
-                                searchPlaceholder="품명·품번 검색"
-                                onChange={(item) => {
-                                  const sp = supplierProductsQuery.data?.find((s) => s.id === item.id);
-                                  if (!sp) return;
+                                onChange={(sp) =>
                                   updateItem(idx, {
                                     supplierProductId: sp.id,
                                     supplierProductName: sp.name,
                                     supplierCode: sp.supplierCode ?? null,
                                     unitOfMeasure: sp.unitOfMeasure,
-                                    unitPrice: sp.unitPrice ? String(Math.round(parseFloat(sp.unitPrice))) : it.unitPrice,
-                                  });
-                                }}
+                                    unitPrice: sp.unitPrice
+                                      ? String(Math.round(parseFloat(sp.unitPrice)))
+                                      : it.unitPrice,
+                                  })
+                                }
                                 onCreateNew={(name) => {
                                   setQuickSpName(name);
                                   setQuickSpRowIndex(idx);
@@ -561,69 +527,6 @@ export function PurchaseOrderCreateSheet({
           }
           setQuickSpOpen(false);
         }}
-      />
-
-      {/* 모바일·태블릿용 공급상품 선택 드로워 — 모든 행이 공유 (drawerOpenIdx 로 어느 행이 열렸는지 식별) */}
-      <JmComboboxDrawer<SupplierProductLite>
-        open={drawerOpenIdx !== null}
-        onOpenChange={(o) => {
-          if (!o) setDrawerOpenIdx(null);
-        }}
-        items={supplierProductsQuery.data ?? []}
-        loading={supplierProductsQuery.isPending}
-        getKey={(sp) => sp.id}
-        renderItem={(sp) => (
-          <div className="space-y-0.5">
-            <div className="font-medium text-[var(--jm-text)]">
-              {sp.name}
-              {sp.spec && (
-                <span className="ml-1 text-jm-xs font-normal text-[var(--jm-text-muted)]">
-                  ({sp.spec})
-                </span>
-              )}
-            </div>
-            <div className="text-jm-xs text-[var(--jm-text-muted)]">
-              {[sp.supplierCode, sp.unitPrice ? `₩${parseFloat(sp.unitPrice).toLocaleString("ko-KR")}` : null]
-                .filter(Boolean)
-                .join(" · ") || "—"}
-            </div>
-          </div>
-        )}
-        filterFn={(sp, q) => {
-          const lower = q.toLowerCase();
-          return (
-            sp.name.toLowerCase().includes(lower) ||
-            (sp.supplierCode?.toLowerCase().includes(lower) ?? false) ||
-            (sp.spec?.toLowerCase().includes(lower) ?? false)
-          );
-        }}
-        onSelect={(sp) => {
-          if (drawerOpenIdx === null) return;
-          updateItem(drawerOpenIdx, {
-            supplierProductId: sp.id,
-            supplierProductName: sp.name,
-            supplierCode: sp.supplierCode ?? null,
-            unitOfMeasure: sp.unitOfMeasure,
-            unitPrice: sp.unitPrice ? String(Math.round(parseFloat(sp.unitPrice))) : "",
-          });
-          setDrawerOpenIdx(null);
-        }}
-        onCreate={(name) => {
-          if (drawerOpenIdx === null) return;
-          setQuickSpName(name);
-          setQuickSpRowIndex(drawerOpenIdx);
-          setQuickSpOpen(true);
-          setDrawerOpenIdx(null);
-        }}
-        createLabel={(q) => (
-          <span className="text-jm-sm">
-            <span className="font-semibold">&ldquo;{q}&rdquo;</span>{" "}
-            <span className="text-[var(--jm-text-muted)]">새 공급상품 등록</span>
-          </span>
-        )}
-        title="공급상품 선택"
-        placeholder="품명·품번·규격 검색"
-        emptyText="검색 결과가 없습니다"
       />
     </>
   );

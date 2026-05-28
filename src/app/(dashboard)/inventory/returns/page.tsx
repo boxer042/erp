@@ -23,8 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { SupplierCombobox } from "@/components/supplier-combobox";
-import { useIsCompactDevice } from "@/hooks/use-mobile";
-import { MobileInlineCellProductSearch } from "@/components/inline-cell-product-search-mobile";
+import { InlineCellProductSearch } from "@/components/inline-cell-product-search";
 import {
   Plus, X, CalendarIcon, Loader2, FileText, ArrowUpRight, ChevronsUpDown,
 } from "lucide-react";
@@ -231,133 +230,6 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
         </PopoverContent>
       </Popover>
     </div>
-  );
-}
-
-// 테이블 셀 내 품명 검색 (입고 페이지 패턴)
-function InlineCellProductSearch({
-  rowIndex,
-  products,
-  onSelect,
-  onCreateNew,
-  existingIds,
-  selectedName = "",
-}: {
-  rowIndex: number;
-  products: SupplierProduct[];
-  onSelect: (sp: SupplierProduct) => void;
-  onCreateNew: (name: string) => void;
-  existingIds: string[];
-  selectedName?: string;
-}) {
-  const isMobile = useIsCompactDevice();
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-
-  if (isMobile) {
-    return (
-      <MobileInlineCellProductSearch
-        rowIndex={rowIndex}
-        products={products}
-        onSelect={onSelect}
-        onCreateNew={onCreateNew}
-        existingIds={existingIds}
-        selectedName={selectedName}
-        disableAlreadyAdded
-      />
-    );
-  }
-
-  const filtered = products.filter((p) => {
-    const q = search.toLowerCase();
-    return p.name.toLowerCase().includes(q) || (p.supplierCode?.toLowerCase().includes(q) ?? false);
-  });
-
-  const hasExactMatch = products.some((p) => p.name.toLowerCase() === search.toLowerCase());
-
-  return (
-    <Popover open={open} onOpenChange={(v) => {
-      setOpen(v);
-      if (v && selectedName) setSearch(selectedName);
-      if (!v) setSearch("");
-    }}>
-      <PopoverTrigger
-        data-product-trigger={rowIndex}
-        className={`flex h-7 w-full items-center rounded bg-transparent px-2 text-sm cursor-pointer hover:bg-muted ${selectedName ? "text-foreground" : "text-primary"}`}
-      >
-        {selectedName ? (
-          <span className="truncate font-medium">{selectedName}</span>
-        ) : (
-          <span className="flex items-center gap-1.5"><Plus className="size-3.5 shrink-0" />품명 검색...</span>
-        )}
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="품명 또는 품번..."
-            value={search}
-            onValueChange={setSearch}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && search.trim() && filtered.length === 0) {
-                e.preventDefault();
-                onCreateNew(search.trim());
-                setOpen(false);
-                setSearch("");
-              }
-            }}
-          />
-          <CommandList>
-            <CommandEmpty>
-              {search.trim() ? (
-                <button
-                  type="button"
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-primary hover:bg-accent rounded cursor-pointer"
-                  onClick={() => { onCreateNew(search.trim()); setOpen(false); setSearch(""); }}
-                >
-                  <Plus className="size-4" />
-                  &quot;{search.trim()}&quot; 직접 입력
-                </button>
-              ) : "결과 없음"}
-            </CommandEmpty>
-            <CommandGroup>
-              {filtered.map((p) => {
-                const alreadyAdded = existingIds.includes(p.id);
-                return (
-                  <CommandItem
-                    key={p.id}
-                    value={p.id}
-                    disabled={alreadyAdded}
-                    onSelect={() => {
-                      if (!alreadyAdded) {
-                        onSelect(p);
-                        setOpen(false);
-                        setSearch("");
-                      }
-                    }}
-                  >
-                    <span className="flex-1">{p.name}</span>
-                    {p.supplierCode && <span className="text-xs text-muted-foreground mr-2">{p.supplierCode}</span>}
-                    <span className="text-xs text-muted-foreground">₩{parseFloat(p.unitPrice).toLocaleString("ko-KR")}</span>
-                    {alreadyAdded && <Badge variant="secondary" className="ml-2 text-xs">추가됨</Badge>}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-            {search.trim() && !hasExactMatch && filtered.length > 0 && (
-              <CommandGroup>
-                <CommandItem
-                  onSelect={() => { onCreateNew(search.trim()); setOpen(false); setSearch(""); }}
-                  className="text-primary"
-                >
-                  <Plus className="size-4" />
-                  &quot;{search.trim()}&quot; 직접 입력
-                </CommandItem>
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
   );
 }
 
@@ -976,6 +848,7 @@ export default function SupplierReturnsPage() {
                                 onCreateNew={(name) => { setQuickSpName(name); setQuickSpOpen(true); }}
                                 existingIds={items.map((i) => i.supplierProductId).filter(Boolean)}
                                 selectedName={item.supplierProductName}
+                                disableAlreadyAdded
                               />
                             ) : (
                               <span className="text-xs text-muted-foreground px-2">거래처를 선택하세요</span>
