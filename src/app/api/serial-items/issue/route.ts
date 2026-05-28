@@ -40,6 +40,8 @@ interface IssuedLabel {
   displayName: string;
   source: SerialItemSource;
   repairTicketId: string | null;
+  /** 수리 라벨일 때 ticket 번호 — UI 재출력 선택 모달에서 사용 */
+  ticketNo: string | null;
   /** 이번 호출에서 새로 발번됐는지 (false 면 기존 라벨 — 재출력 후보) */
   newlyIssued: boolean;
 }
@@ -129,6 +131,7 @@ export async function POST(request: NextRequest) {
           displayName: product.name,
           source: "SALE",
           repairTicketId: null,
+          ticketNo: null,
           newlyIssued: true,
         });
       }
@@ -147,6 +150,7 @@ export async function POST(request: NextRequest) {
             "(미상)",
           source: ticket.serialItem.source,
           repairTicketId: ticket.id,
+          ticketNo: ticket.ticketNo,
           newlyIssued: false,
         });
         continue;
@@ -160,6 +164,7 @@ export async function POST(request: NextRequest) {
         displayName: useProduct?.name ?? useText ?? "(미상)",
         source: "REPAIR",
         repairTicketId: ticket.id,
+        ticketNo: ticket.ticketNo,
         newlyIssued: true,
       });
     }
@@ -202,6 +207,7 @@ export async function POST(request: NextRequest) {
           displayName: product.name,
           source: "SALE",
           repairTicketId: null,
+          ticketNo: null,
           newlyIssued: true,
         });
       }
@@ -227,6 +233,7 @@ export async function POST(request: NextRequest) {
             "(미상)",
           source: ticket.serialItem.source,
           repairTicketId: ticket.id,
+          ticketNo: ticket.ticketNo,
           newlyIssued: false,
         });
         continue;
@@ -271,6 +278,7 @@ export async function POST(request: NextRequest) {
         displayName: useProduct?.name ?? useText ?? "(미상)",
         source: "REPAIR",
         repairTicketId: ticket.id,
+        ticketNo: ticket.ticketNo,
         newlyIssued: true,
       });
     }

@@ -14,6 +14,7 @@ import {
 } from "@/components/pos/temp-customer";
 import { BottomTabBar } from "../../_components/bottom-tab-bar";
 import { MenuSheet } from "../../_components/menu-sheet";
+import { ReprintPickerModal } from "../../_components/reprint-picker-modal";
 import { ProductsMode } from "../../_products-mode";
 import { RepairMode } from "../../_repair-mode";
 import { RentalMode } from "../../_rental-mode";
@@ -126,6 +127,11 @@ export default function PosV2CustomerPage({
     orderId: string;
     orderNo: string;
     labelCodes: string[];
+    reprintCandidates: {
+      code: string;
+      ticketNo: string;
+      displayName: string;
+    }[];
     statementId: string | null;
   } | null>(null);
   const [detail, setDetail] = useState<Detail>(null);
@@ -184,12 +190,18 @@ export default function PosV2CustomerPage({
         <PostPaymentPrintDialog
           hasLabels={paymentResult.labelCodes.length > 0}
           hasStatement={!!paymentResult.statementId}
+          reprintCandidates={paymentResult.reprintCandidates}
           onChoose={(opts) => {
             const r = paymentResult;
             setPaymentResult(null);
             const queue: PrintQueueItem[] = [];
-            if (opts.labels && r.labelCodes.length > 0) {
-              queue.push({ kind: "labels", codes: r.labelCodes });
+            // 신규 라벨 + 사용자가 선택한 재출력 라벨을 한 큐에 모음 (라벨 프린터 1회 호출)
+            const allLabelCodes = [
+              ...(opts.labels ? r.labelCodes : []),
+              ...opts.reprintCodes,
+            ];
+            if (allLabelCodes.length > 0) {
+              queue.push({ kind: "labels", codes: allLabelCodes });
             }
             if (opts.statement && r.statementId) {
               queue.push({ kind: "statement", id: r.statementId });
@@ -786,23 +798,56 @@ function PrintModal({
 function PostPaymentPrintDialog({
   hasLabels,
   hasStatement,
+  reprintCandidates,
   onChoose,
 }: {
   hasLabels: boolean;
   hasStatement: boolean;
+  /** 기존 시리얼 보유 수리 라벨 — 있으면 [재출력 포함] 체크박스 노출 */
+  reprintCandidates: { code: string; ticketNo: string; displayName: string }[];
   onChoose: (opts: {
     receipt: boolean;
     labels: boolean;
     statement: boolean;
+    reprintCodes: string[];
   }) => void;
 }) {
   const [receipt, setReceipt] = useState(true);
   const [labels, setLabels] = useState(true);
   const [statement, setStatement] = useState(false);
+  const [includeReprint, setIncludeReprint] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const submit = () => onChoose({ receipt, labels, statement });
+  const hasReprintCandidates = reprintCandidates.length > 0;
+  const nothingChecked = !receipt && !labels && !statement && !includeReprint;
+
+  const submit = () => {
+    // 재출력 포함 체크 시 picker 모달로 — 어떤 ticket 재출력할지 선택
+    if (includeReprint && hasReprintCandidates) {
+      setPickerOpen(true);
+      return;
+    }
+    onChoose({ receipt, labels, statement, reprintCodes: [] });
+  };
   const skip = () =>
-    onChoose({ receipt: false, labels: false, statement: false });
+    onChoose({
+      receipt: false,
+      labels: false,
+      statement: false,
+      reprintCodes: [],
+    });
+
+  if (pickerOpen) {
+    return (
+      <ReprintPickerModal
+        candidates={reprintCandidates}
+        onConfirm={(codes) =>
+          onChoose({ receipt, labels, statement, reprintCodes: codes })
+        }
+        onBack={() => setPickerOpen(false)}
+      />
+    );
+  }
 
   return (
     <div
@@ -843,7 +888,7 @@ function PostPaymentPrintDialog({
           {hasLabels && (
             <PrintToggle
               label="시리얼 라벨"
-              sub="라벨 프린터"
+              sub="신규 발번분 — 라벨 프린터"
               checked={labels}
               onChange={setLabels}
             />
@@ -856,16 +901,24 @@ function PostPaymentPrintDialog({
               onChange={setStatement}
             />
           )}
+          {hasReprintCandidates && (
+            <PrintToggle
+              label={`재출력 포함 (${reprintCandidates.length}건)`}
+              sub="이미 시리얼 있는 수리 — 어떤 라벨 재출력할지 다음 단계에서 선택"
+              checked={includeReprint}
+              onChange={setIncludeReprint}
+            />
+          )}
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
           <button
             type="button"
             onClick={submit}
-            disabled={!receipt && !labels && !statement}
+            disabled={nothingChecked}
             className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
           >
-            출력하기
+            {includeReprint && hasReprintCandidates ? "다음 — 재출력 선택" : "출력하기"}
           </button>
           <button
             type="button"
@@ -879,6 +932,7 @@ function PostPaymentPrintDialog({
     </div>
   );
 }
+
 
 function PrintToggle({
   label,

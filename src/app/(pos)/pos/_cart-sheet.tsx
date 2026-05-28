@@ -15,6 +15,10 @@ import { PriceInputDialog } from "./_components/price-input-dialog";
 import { DiscountInputDialog } from "./_components/discount-input-dialog";
 import { QuotationLoadSheet } from "./_quotation-load-sheet";
 import { ServiceFeeSheet } from "./_service-fee-sheet";
+import {
+  ReprintPickerModal,
+  type ReprintCandidate,
+} from "./_components/reprint-picker-modal";
 
 interface Props {
   open: boolean;
@@ -92,6 +96,13 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   const [shippingOpen, setShippingOpen] = useState(false);
   const [quotationLoadOpen, setQuotationLoadOpen] = useState(false);
   const [serviceFeeOpen, setServiceFeeOpen] = useState(false);
+  // 시리얼 발번 결과 — 기존 라벨 발견 시 picker 모달 분기.
+  // pendingNewCodes: 신규 발번된 코드 (이미 DB 에 발급됨, picker 결과와 합쳐 출력).
+  // reprintCandidates: 기존 시리얼 보유 ticket — picker 에서 선택.
+  const [reprintState, setReprintState] = useState<{
+    newCodes: string[];
+    candidates: ReprintCandidate[];
+  } | null>(null);
 
   const parkMutation = useMutation({
     mutationFn: () =>
@@ -146,12 +157,22 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   };
 
   const serialIssueMutation = useMutation<{
-    labels: { code: string; newlyIssued: boolean }[];
+    labels: {
+      code: string;
+      newlyIssued: boolean;
+      ticketNo: string | null;
+      displayName: string;
+    }[];
     consentMissing: boolean;
   }>({
     mutationFn: () =>
       apiMutate<{
-        labels: { code: string; newlyIssued: boolean }[];
+        labels: {
+          code: string;
+          newlyIssued: boolean;
+          ticketNo: string | null;
+          displayName: string;
+        }[];
         consentMissing: boolean;
       }>(
         "/api/serial-items/issue",
@@ -159,8 +180,6 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
         {
           customerId: session.customerId ?? null,
           productItems: trackableCandidates,
-          // 수리 ticket 도 함께 — API 가 시리얼 미발번 ticket 만 신규 발번, 기존 있으면
-          // newlyIssued: false 로 반환 (재출력 안내 토스트만 띄움)
           repairTicketIds: repairTicketIdsForLabels,
         },
       ),
@@ -169,30 +188,35 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
       const newCodes = res.labels
         .filter((l) => l.newlyIssued)
         .map((l) => l.code);
-      const existingCount = res.labels.length - newCodes.length;
+      const candidates: ReprintCandidate[] = res.labels
+        .filter((l) => !l.newlyIssued && l.ticketNo)
+        .map((l) => ({
+          code: l.code,
+          ticketNo: l.ticketNo as string,
+          displayName: l.displayName,
+        }));
 
-      if (newCodes.length === 0 && existingCount === 0) {
+      if (newCodes.length === 0 && candidates.length === 0) {
         toast.info("발번 가능한 항목이 없습니다");
         return;
       }
-      if (newCodes.length === 0) {
-        toast.info(
-          `기존 라벨 ${existingCount}장 — 재출력은 수리 상세에서 진행하세요`,
-        );
-        return;
-      }
-
-      setSessionLabels(newCodes, session.id, session.id);
-      const breakdown =
-        existingCount > 0
-          ? `신규 ${newCodes.length}장 발번 · 기존 ${existingCount}장은 수리 상세에서 재출력`
-          : `라벨 ${newCodes.length}장 발번 완료`;
-      toast.success(breakdown);
       if (res.consentMissing) {
         toast.warning(
           "이 손님은 시리얼 조회 서비스 미동의 — QR 없이 발급되었습니다. 동의는 손님 정보에서 설정하세요.",
         );
       }
+      if (newCodes.length > 0) {
+        setSessionLabels(newCodes, session.id, session.id);
+      }
+
+      // 기존 라벨 발견 → picker 모달로 재출력 여부 묻기 (신규는 picker 닫을 때 함께 출력)
+      if (candidates.length > 0) {
+        setReprintState({ newCodes, candidates });
+        return;
+      }
+
+      // 신규만 — 바로 출력
+      toast.success(`라벨 ${newCodes.length}장 발번 완료`);
       onPrintLabels?.(newCodes);
       onOpenChange(false);
     },
@@ -200,6 +224,34 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
       toast.error(err instanceof ApiError ? err.message : err.message),
     onSettled: () => setIssuingKind(null),
   });
+
+  /** picker 모달에서 사용자가 재출력 선택 완료 — 신규 + 선택 코드 함께 출력 */
+  const finishReprint = (reprintCodes: string[]) => {
+    if (!reprintState) return;
+    const allCodes = [...reprintState.newCodes, ...reprintCodes];
+    const parts: string[] = [];
+    if (reprintState.newCodes.length > 0)
+      parts.push(`신규 ${reprintState.newCodes.length}장`);
+    if (reprintCodes.length > 0) parts.push(`재출력 ${reprintCodes.length}장`);
+    toast.success(parts.join(" · ") || "출력 진행");
+    setReprintState(null);
+    if (allCodes.length > 0) onPrintLabels?.(allCodes);
+    onOpenChange(false);
+  };
+  /** picker 닫기 (백드롭/뒤로) — 신규만 출력, 재출력 건너뜀 */
+  const skipReprint = () => {
+    if (!reprintState) return;
+    if (reprintState.newCodes.length > 0) {
+      toast.success(
+        `신규 ${reprintState.newCodes.length}장 발번 완료 (재출력 건너뜀)`,
+      );
+      onPrintLabels?.(reprintState.newCodes);
+    } else {
+      toast.info("재출력 건너뜀");
+    }
+    setReprintState(null);
+    onOpenChange(false);
+  };
 
   return (
     <>
@@ -413,6 +465,14 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
         />
       )}
 
+      {/* 재출력 라벨 선택 모달 — 기존 시리얼 보유 수리 ticket 있을 때만 노출 */}
+      {reprintState && (
+        <ReprintPickerModal
+          candidates={reprintState.candidates}
+          onConfirm={finishReprint}
+          onBack={skipReprint}
+        />
+      )}
     </>
   );
 }

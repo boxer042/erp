@@ -51,6 +51,12 @@ interface Props {
     orderId: string;
     orderNo: string;
     labelCodes: string[];
+    /** 기존 시리얼 보유 수리 라벨 — 결제 후 [재출력 포함] 옵션에서 사용 */
+    reprintCandidates: {
+      code: string;
+      ticketNo: string;
+      displayName: string;
+    }[];
     statementId: string | null;
   }) => void;
   /** 고객 썸네일 카드 클릭 — 부모가 CustomerActionSheet 띄우도록 (재사용) */
@@ -330,7 +336,16 @@ function Body({
   const hasUnresolvedVariant = unresolvedVariants.length > 0;
 
   const checkoutMutation = useMutation<
-    { id: string; no: string; labelCodes: string[] },
+    {
+      id: string;
+      no: string;
+      labelCodes: string[];
+      reprintCandidates: {
+        code: string;
+        ticketNo: string;
+        displayName: string;
+      }[];
+    },
     Error
   >({
     mutationFn: async () => {
@@ -354,10 +369,16 @@ function Body({
         }
       }
 
-      // 1) 라벨 자동 발번 — 상품(trackable) + 수리(시리얼 미발번 ticket 만 자동 신규)
-      //    이미 시리얼 있는 수리는 API 가 newlyIssued: false 로 반환만 — 결제 시점에
-      //    자동 재출력 안 함. 재출력은 수리 상세 페이지에서 명시적으로 진행.
+      // 1) 라벨 자동 발번 — 상품(trackable) + 수리. API 가 신규/기존 자동 분기:
+      //    · 시리얼 미발번 수리 → 신규 발번 (newlyIssued: true) → labelCodes 에 포함
+      //    · 시리얼 이미 있는 수리 → 신규 발번 안 함, 기존 코드 반환 (newlyIssued: false)
+      //      → reprintCandidates 에 모아 결제 후 다이얼로그에서 "재출력 포함" 옵션 노출
       let labelCodes: string[] = [];
+      let reprintCandidates: {
+        code: string;
+        ticketNo: string;
+        displayName: string;
+      }[] = [];
       const trackableCandidates = productItems
         .filter((i) => i.productId)
         .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) }));
@@ -368,7 +389,12 @@ function Body({
       if (trackableCandidates.length > 0 || repairTicketIds.length > 0) {
         try {
           const res = await apiMutate<{
-            labels: { code: string; newlyIssued: boolean }[];
+            labels: {
+              code: string;
+              newlyIssued: boolean;
+              ticketNo: string | null;
+              displayName: string;
+            }[];
           }>(
             "/api/serial-items/issue",
             "POST",
@@ -378,8 +404,14 @@ function Body({
               repairTicketIds,
             },
           );
-          // 결제 시점 인쇄는 신규만 — 기존 라벨은 재출력 대상 아님
           labelCodes = res.labels.filter((l) => l.newlyIssued).map((l) => l.code);
+          reprintCandidates = res.labels
+            .filter((l) => !l.newlyIssued && l.ticketNo)
+            .map((l) => ({
+              code: l.code,
+              ticketNo: l.ticketNo as string,
+              displayName: l.displayName,
+            }));
           if (labelCodes.length > 0) {
             setSessionLabels(labelCodes, session.id, session.id);
           }
@@ -413,7 +445,7 @@ function Body({
             }
           : undefined,
       });
-      return { ...result, labelCodes };
+      return { ...result, labelCodes, reprintCandidates };
     },
     onSuccess: async (data) => {
       // 외상 결제는 미수금 자동 등록됐다는 명시적 안내
@@ -461,6 +493,7 @@ function Body({
         orderId: data.id,
         orderNo: data.no,
         labelCodes: data.labelCodes,
+        reprintCandidates: data.reprintCandidates,
         statementId,
       });
     },
