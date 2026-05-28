@@ -138,7 +138,13 @@ function Body({
   const productQuery = useQuery<ProductDetailResponse>({
     queryKey: ["pos", "variant-options", productId],
     queryFn: () =>
-      apiGet<ProductDetailResponse>(`/api/products/${productId}`),
+      apiGet<ProductDetailResponse>(
+        `/api/products/${productId}/variant-picker`,
+      ),
+    // 슬림 엔드포인트 — variant/option 정보는 결제 한 번에 거의 안 바뀌므로 5분 캐시.
+    // 같은 카트 안에서 여러 라인 변형 선택해도 매번 fetch 안 함.
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
   });
 
   const product = productQuery.data;
