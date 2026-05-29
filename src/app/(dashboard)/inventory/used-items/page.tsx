@@ -26,6 +26,7 @@ import {
   USED_ITEM_SOURCE_LABEL,
   totalUsedItemCost,
   daysInStock,
+  usedItemName,
   type UsedItemListRow,
   type UsedItemStatus,
 } from "@/components/used-items/_types";
@@ -198,7 +199,7 @@ export default function UsedItemsPage() {
                         <Link href={`/inventory/used-items/${r.id}`} className="block">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-[var(--jm-text)]">
-                              {r.displayName}
+                              {usedItemName(r)}
                             </span>
                             {!r.productId && (
                               <span className="text-jm-2xs text-[var(--jm-text-muted)]">

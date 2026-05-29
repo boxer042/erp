@@ -128,6 +128,7 @@ export function AssemblyRegisterSheet({
             displayName: string;
             acquiredCost: string;
             productId: string | null;
+            product?: { name: string } | null;
           }>
         >("/api/used-items?status=IN_STOCK&includeCosts=true&limit=500").catch(
           () => [] as Array<{
@@ -136,15 +137,16 @@ export function AssemblyRegisterSheet({
             displayName: string;
             acquiredCost: string;
             productId: string | null;
+            product?: { name: string } | null;
           }>,
         ),
       ]);
 
-      // 중고도 ProductOption 형태로 변환 — id 는 UsedItem.id, name 에 "(중고)" 자동 prefix.
-      // ProductCombobox UI 자체는 변경 없음 — 검색·선택만 통합.
+      // 중고도 ProductOption 형태로 변환 — 카탈로그 매칭이면 live product.name, 아니면 displayName.
+      // name 에 "(중고)" 자동 prefix. ProductCombobox UI 자체는 변경 없음.
       const usedAsProducts: ProductOption[] = usedItemsData.map((u) => ({
         id: u.id,
-        name: `${u.displayName} (중고)`,
+        name: `${u.product?.name ?? u.displayName} (중고)`,
         sku: u.internalCode,
         sellingPrice: "0",
         unitCost: u.acquiredCost,

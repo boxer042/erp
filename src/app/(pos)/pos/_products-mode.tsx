@@ -94,6 +94,7 @@ export function ProductsMode({
       displayName: string;
       acquiredCost: string;
       productId: string | null;
+      product?: { name: string } | null;
     }>
   >({
     queryKey: ["pos-v2", "used-items-in-stock"],
@@ -105,6 +106,7 @@ export function ProductsMode({
           displayName: string;
           acquiredCost: string;
           productId: string | null;
+          product?: { name: string } | null;
         }>
       >("/api/used-items?status=IN_STOCK&limit=500"),
     staleTime: 1000 * 60 * 5,
@@ -126,20 +128,21 @@ export function ProductsMode({
         (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
       );
 
-      // 중고도 같은 검색어로 필터 — name/internalCode 부분일치. sellingPrice 0 → 자동 가격 다이얼로그
+      // 중고도 같은 검색어로 필터 — 카탈로그 매칭이면 live product.name, 아니면 displayName.
+      // sellingPrice 0 → 카트 추가 시 가격 다이얼로그 자동
       const usedMatched: ProductLite[] = (usedItemsQuery.data ?? [])
+        .map((u) => ({ u, label: u.product?.name ?? u.displayName }))
         .filter(
-          (u) =>
-            u.displayName.toLowerCase().includes(q) ||
+          ({ u, label }) =>
+            label.toLowerCase().includes(q) ||
             u.internalCode.toLowerCase().includes(q),
         )
-        .map((u) => ({
+        .map(({ u, label }) => ({
           id: u.id,
-          name: `${u.displayName} (중고)`,
+          name: `${label} (중고)`,
           sku: u.internalCode,
           brand: null,
           spec: null,
-          // 0원 = 카트 추가 시 가격 다이얼로그 자동 — 매장 직원이 매번 가격 결정
           sellingPrice: "0",
           imageUrl: null,
           taxType: "TAXABLE",

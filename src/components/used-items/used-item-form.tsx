@@ -100,6 +100,9 @@ export function UsedItemForm({ value, onChange, editing }: Props) {
 
   const patch = (p: Partial<UsedItemFormValue>) => onChange({ ...value, ...p });
 
+  // 카탈로그 매칭 확정 상태 — 품명 readOnly + 자동 처리
+  const isMatched = showProductMatch && !!value.productId;
+
   return (
     <div className="space-y-4">
       {/* 기본 정보 */}
@@ -109,11 +112,21 @@ export function UsedItemForm({ value, onChange, editing }: Props) {
         </JmCardHeader>
         <JmCardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <JmFormField label="품명" required>
+            <JmFormField
+              label="품명"
+              required
+              hint={
+                isMatched
+                  ? "카탈로그 매칭 — 카탈로그 상품명을 자동 사용 (변경 시 함께 반영)"
+                  : undefined
+              }
+            >
               <JmInput
                 value={value.displayName}
                 onChange={(e) => patch({ displayName: e.target.value })}
                 placeholder="예: 센다이 엔진 SD225R"
+                readOnly={isMatched}
+                className={isMatched ? "opacity-70" : undefined}
               />
             </JmFormField>
             <JmFormField label="규격">
@@ -132,20 +145,28 @@ export function UsedItemForm({ value, onChange, editing }: Props) {
                 checked={showProductMatch}
                 onCheckedChange={(c) => {
                   setShowProductMatch(c === true);
+                  // 매칭 해제 시 productId 제거 (displayName 은 마지막 값 유지 → 편집 가능)
                   if (c !== true) patch({ productId: null });
                 }}
                 disabled={editing}
               />
               <span>매장 카탈로그 상품과 매칭</span>
               <span className="text-jm-xs text-[var(--jm-text-muted)]">
-                — 매칭하면 같은 모델 신품과 함께 검색됨
+                — 매칭하면 같은 모델 신품과 함께 검색 + 품명 자동
               </span>
             </label>
             {showProductMatch && (
               <ProductCombobox
                 products={productsQuery.data ?? []}
                 value={value.productId ?? ""}
-                onChange={(p) => patch({ productId: p.id || null })}
+                onChange={(p) =>
+                  // 매칭 시 품명을 카탈로그 상품명으로 자동 채움 (제출 폴백 스냅샷 + 즉시 표시).
+                  // 표시 surface 들은 live product.name 우선이라 이후 카탈로그 rename 자동 반영.
+                  patch({
+                    productId: p.id || null,
+                    displayName: p.id ? p.name : value.displayName,
+                  })
+                }
                 placeholder="카탈로그에서 상품 선택..."
               />
             )}

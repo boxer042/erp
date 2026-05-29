@@ -37,6 +37,7 @@ import {
   USED_ITEM_SOURCE_LABEL,
   totalUsedItemCost,
   daysInStock,
+  usedItemName,
   type UsedItemDetail,
 } from "@/components/used-items/_types";
 import { UsedItemStatusBadge } from "@/components/used-items/used-item-status-badge";
@@ -140,7 +141,7 @@ export default function UsedItemDetailPage({ params }: PageProps) {
         </Link>
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <span className="text-jm-base font-semibold">{item.displayName}</span>
+            <span className="text-jm-base font-semibold">{usedItemName(item)}</span>
             <UsedItemStatusBadge status={item.status} />
           </div>
           <span className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">

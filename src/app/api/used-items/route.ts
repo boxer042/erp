@@ -17,9 +17,9 @@ function newToken() {
  *   - productId: 특정 카탈로그 모델의 중고만
  *   - search: displayName / internalCode 부분일치
  *   - acquiredFrom: 출처 필터
- *   - includeProduct: true 시 product 정보 포함
  *   - includeCosts: true 시 addedCosts 포함
  *   - limit: 기본 200
+ *   (product 정보는 항상 포함 — 표시 이름을 카탈로그 product.name 으로 끌어오기 위함)
  */
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
   const productId = sp.get("productId");
   const search = sp.get("search")?.trim();
   const acquiredFrom = sp.get("acquiredFrom");
-  const includeProduct = sp.get("includeProduct") === "true";
   const includeCosts = sp.get("includeCosts") === "true";
   const limit = Math.min(parseInt(sp.get("limit") ?? "200", 10) || 200, 500);
 
@@ -44,6 +43,8 @@ export async function GET(request: NextRequest) {
             OR: [
               { displayName: { contains: search, mode: "insensitive" } },
               { internalCode: { contains: search, mode: "insensitive" } },
+              // 카탈로그 매칭 중고는 displayName 이 옛 스냅샷일 수 있으니 live product.name 으로도 검색
+              { product: { name: { contains: search, mode: "insensitive" } } },
             ],
           }
         : {}),
@@ -51,9 +52,9 @@ export async function GET(request: NextRequest) {
     orderBy: [{ createdAt: "desc" }],
     take: limit,
     include: {
-      product: includeProduct
-        ? { select: { id: true, name: true, sku: true } }
-        : false,
+      // product 는 항상 포함 — 카탈로그 매칭 시 표시 이름을 product.name(live) 으로 끌어옴 (옵션 B).
+      // includeProduct 파라미터와 무관하게 검색 merge·목록·상세 모두 live 이름이 필요.
+      product: { select: { id: true, name: true, sku: true } },
       sourceCustomer: { select: { id: true, name: true } },
       serialItem: { select: { id: true, code: true, warrantyEnds: true } },
       addedCosts: includeCosts ? { orderBy: { createdAt: "desc" } } : false,

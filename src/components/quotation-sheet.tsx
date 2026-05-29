@@ -204,15 +204,21 @@ export function QuotationSheet({
           apiGet<ProductOption[]>("/api/products"),
           // 중고 단품 (IN_STOCK) — 판매 견적에 통합 노출. 판매되면 status≠IN_STOCK 라 자동 숨김.
           apiGet<
-            Array<{ id: string; internalCode: string; displayName: string; unitOfMeasure?: string }>
+            Array<{
+              id: string;
+              internalCode: string;
+              displayName: string;
+              unitOfMeasure?: string;
+              product?: { name: string } | null;
+            }>
           >("/api/used-items?status=IN_STOCK&limit=500").catch(() => []),
         ]);
         setCustomers(c);
-        // 중고도 ProductOption 형태로 합침 — id=usedItemId, name 에 "(중고)" 자동 prefix.
+        // 중고도 ProductOption 형태로 합침 — 카탈로그 매칭이면 live product.name, 아니면 displayName.
         // 선택 시 onChange 가 usedItemId 분기로 처리 (productId 는 null 유지 → FK 안전).
         const usedAsProducts: ProductOption[] = usedItems.map((u) => ({
           id: u.id,
-          name: `${u.displayName} (중고)`,
+          name: `${u.product?.name ?? u.displayName} (중고)`,
           sku: u.internalCode,
           sellingPrice: "0",
           unitCost: null,

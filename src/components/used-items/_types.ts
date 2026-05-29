@@ -123,3 +123,15 @@ export function daysInStock(acquiredAt: string): number {
   const ms = Date.now() - new Date(acquiredAt).getTime();
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
+
+/**
+ * 표시용 이름 — 카탈로그 매칭이면 product.name(live) 우선, 아니면 displayName(스냅샷/비카탈로그).
+ * 카탈로그 상품명이 바뀌면 매칭된 중고 이름도 자동으로 따라감 (옵션 B).
+ * product 가 null(미include 또는 삭제)이면 displayName 폴백.
+ */
+export function usedItemName(u: {
+  displayName: string;
+  product?: { name: string } | null;
+}): string {
+  return u.product?.name ?? u.displayName;
+}
