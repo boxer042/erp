@@ -27,13 +27,27 @@ export interface JmQuantityStepperProps {
 const fmt = (v: number, decimal: boolean) =>
   decimal ? String(v) : String(Math.round(v));
 
+const parse = (s: string, decimal: boolean) =>
+  decimal ? parseFloat(s) : parseInt(s, 10);
+
+// 입력 정규화 — 정수: 숫자만 / 소수: 숫자 + 소수점 1개까지만 ("1.2.3" → "1.23")
+const sanitize = (s: string, decimal: boolean) => {
+  if (!decimal) return s.replace(/\D/g, "");
+  const cleaned = s.replace(/[^\d.]/g, "");
+  const dot = cleaned.indexOf(".");
+  return dot === -1
+    ? cleaned
+    : cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, "");
+};
+
 /**
  * 수량 스테퍼 — 둥근 ± 버튼 + 직접 입력 가능한 중앙 인풋.
  * POS 카트 라인·수리 부속 등에서 공용. 정수/소수(벌크) 모두 지원.
  *
  * 동작 원칙:
  * - 중앙 인풋에 직접 타이핑 → blur 시 clamp·반올림 후 onChange 로 확정
- * - ± 버튼은 step 단위로 증감 후 즉시 확정
+ * - ± 버튼은 표시값(draft) 기준 step 단위로 증감 — 부모가 비동기로 value 를
+ *   갱신해도(예: 수리 부속 react-query refetch) 연타 누적이 안전
  * - 외부에서 value 가 바뀌면 (편집 중이 아닐 때) 인풋 표시값 자동 동기화
  */
 export const JmQuantityStepper = React.forwardRef<
@@ -65,6 +79,12 @@ export const JmQuantityStepper = React.forwardRef<
       if (!focused) setDraft(fmt(value, decimal));
     }
 
+    // ± 버튼·blur 는 prop(value) 이 아니라 현재 표시값(draft) 기준으로 증감한다.
+    // 부모가 비동기로 value 를 갱신하면(react-query refetch) prop 이 지연돼
+    // 연타 시 stale 값으로 누적이 안 되는 문제가 생기므로 표시값을 기준으로 한다.
+    const shown = parse(draft, decimal);
+    const base = Number.isFinite(shown) ? shown : value;
+
     const commit = (raw: number) => {
       const n = clamp(decimal ? raw : Math.round(raw));
       setDraft(fmt(n, decimal));
@@ -72,17 +92,12 @@ export const JmQuantityStepper = React.forwardRef<
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setDraft(
-        decimal
-          ? e.target.value.replace(/[^\d.]/g, "")
-          : e.target.value.replace(/\D/g, ""),
-      );
+      setDraft(sanitize(e.target.value, decimal));
     };
 
     const handleBlur = () => {
       setFocused(false);
-      const parsed = decimal ? parseFloat(draft) : parseInt(draft, 10);
-      commit(Number.isFinite(parsed) ? parsed : min);
+      commit(Number.isFinite(shown) ? shown : min);
     };
 
     const btn =
@@ -92,8 +107,8 @@ export const JmQuantityStepper = React.forwardRef<
       <div ref={ref} className={cn("flex items-center gap-1", className)}>
         <button
           type="button"
-          disabled={disabled || value <= min}
-          onClick={() => commit(value - step)}
+          disabled={disabled || base <= min}
+          onClick={() => commit(base - step)}
           className={btn}
           aria-label={`${label} 감소`}
         >
@@ -112,8 +127,8 @@ export const JmQuantityStepper = React.forwardRef<
         />
         <button
           type="button"
-          disabled={disabled || value >= max}
-          onClick={() => commit(value + step)}
+          disabled={disabled || base >= max}
+          onClick={() => commit(base + step)}
           className={btn}
           aria-label={`${label} 증가`}
         >
