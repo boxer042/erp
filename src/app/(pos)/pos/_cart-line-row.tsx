@@ -24,6 +24,7 @@ interface Props {
 export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
   const { remove, updateQty, updateUnitPrice, applySelections, toggleZeroRate, add } = useSessions();
   const [priceOpen, setPriceOpen] = useState(false);
+  const [totalOpen, setTotalOpen] = useState(false);
   const [variantOpen, setVariantOpen] = useState(false);
   const [addonOpen, setAddonOpen] = useState(false);
   // 추가구매 버튼은 메인 product 라인만 (ADDON 자식 라인은 자기 자식 가질 수 없음, 서비스 라인은 무관)
@@ -272,15 +273,19 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
             </button>
           </div>
 
-          {/* 라인 합계 */}
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          {/* 라인 합계 — 클릭하면 합계 편집 다이얼로그. 합계 입력 → 수량으로 나눠 단가 자동 환산. */}
+          <button
+            type="button"
+            onClick={() => setTotalOpen(true)}
+            className="flex flex-col items-end rounded-lg px-2 py-1 text-right hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
+          >
+            <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
               합계
-            </div>
-            <div className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
+            </span>
+            <span className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
               ₩{lineDisplay.toLocaleString("ko-KR")}
-            </div>
-          </div>
+            </span>
+          </button>
         </div>
 
         {/* 매핑 옵션 자식 행 — 별도 상품으로 추가 구매되는 옵션 (예: 메모리, 필터) */}
@@ -342,6 +347,22 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
         onSubmit={(net, isService) =>
           updateUnitPrice(item.cartItemId, net, sessionId, isService)
         }
+      />
+
+      {/* 라인 합계 다이얼로그 — 합계 입력 → 수량으로 나눠 단가 자동 환산 */}
+      <PriceInputDialog
+        open={totalOpen}
+        onOpenChange={setTotalOpen}
+        title={`${item.name} — 라인 합계`}
+        initialNet={unitNet * item.quantity}
+        taxType={taxType}
+        isZeroRate={item.isZeroRate}
+        allowService={false}
+        onSubmit={(netTotal) => {
+          const q = Math.max(isBulk ? 0.0001 : 1, item.quantity);
+          const newUnit = Math.round(netTotal / q);
+          updateUnitPrice(item.cartItemId, newUnit, sessionId);
+        }}
       />
 
       {/* 변형/옵션 선택 시트 — canonical 또는 옵션 보유 상품 */}

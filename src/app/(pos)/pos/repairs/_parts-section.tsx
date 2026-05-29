@@ -242,6 +242,7 @@ function PartRow({
 }) {
   const [qty, setQty] = useState(String(Math.round(Number(part.quantity))));
   const [priceOpen, setPriceOpen] = useState(false);
+  const [totalOpen, setTotalOpen] = useState(false);
 
   const update = useMutation({
     mutationFn: (data: {
@@ -396,15 +397,20 @@ function PartRow({
           </button>
         </div>
 
-        {/* 라인 합계 */}
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+        {/* 라인 합계 — 클릭하면 합계 편집 다이얼로그. 합계 입력 → 수량으로 나눠 단가 자동 환산. */}
+        <button
+          type="button"
+          onClick={() => !readonly && setTotalOpen(true)}
+          disabled={readonly}
+          className="flex flex-col items-end rounded-lg px-2 py-1 text-right hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)] disabled:hover:bg-transparent"
+        >
+          <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
             합계
-          </div>
-          <div className="text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
+          </span>
+          <span className="text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
             {fmtKRWInc(part.totalPrice)}
-          </div>
-        </div>
+          </span>
+        </button>
       </div>
 
       {/* 가격 다이얼로그 — 단가 클릭 */}
@@ -415,6 +421,21 @@ function PartRow({
         initialNet={Number(part.unitPrice) || 0}
         taxType="TAXABLE"
         onSubmit={(net) => update.mutate({ unitPrice: net })}
+      />
+
+      {/* 합계 다이얼로그 — 합계 클릭. 입력값 ÷ 수량 = 새 단가로 자동 저장. */}
+      <PriceInputDialog
+        open={totalOpen}
+        onOpenChange={setTotalOpen}
+        title={`${part.product.name} — 라인 합계`}
+        initialNet={Number(part.totalPrice) || 0}
+        taxType="TAXABLE"
+        allowService={false}
+        onSubmit={(netTotal) => {
+          const q = Math.max(1, Number(qty) || 1);
+          const newUnit = Math.round(netTotal / q);
+          update.mutate({ unitPrice: newUnit });
+        }}
       />
     </div>
   );
