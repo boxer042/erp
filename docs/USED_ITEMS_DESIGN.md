@@ -1,8 +1,10 @@
-# 중고상품 도메인 설계 초안
+# 중고상품 도메인 설계
 
-**상태**: Draft — 매장 운영 정책 정리 + 모델/페이지 골격 합의 단계
+**상태**: ✅ Phase 1~5 구현 완료 (2026-05-29, main 머지) — e2e 16/16 통과
 **작성일**: 2026-05-29
-**전제**: 구현 전, 추가 보완·수정 가능
+**구현 커밋**: `d0f5374` (Phase 1~4) · `ac4449e` (Phase 5) — main 통합 완료
+
+> 아래는 합의된 설계 + 구현 결과. 미구현/보류 항목은 §11.6 · §12.3 참고.
 
 ---
 
@@ -600,14 +602,16 @@ POS 결제 시:
 
 ### 11.6 추정 일정
 
-| 단계 | 작업 | 추정 |
+| 단계 | 작업 | 상태 |
 |---|---|---|
-| Phase 1 | 모델·schema (UsedItem · UsedItemCost · AssemblyUsedItemConsumption · SerialItem 확장 · RentalAsset 핸드오프) + 기본 CRUD API + `src/components/used-items/*` 분리 컴포넌트 + `/inventory/used-items` 목록·매입 등록·상세 페이지 3개 + 사진 업로드 | 1.5주 |
-| Phase 2 | Assembly 검색 API 에 UsedItem 통합 + 라벨 prefix + 선택 시 분기 처리 + 마진 계산 (AssemblyUsedItemConsumption → lot.unitCost 합산) + 폐기 시 자동 Expense 생성 | 1주 |
-| Phase 3 | POS 검색 통합 (신품 우선 정렬 + `(중고)` prefix) + EMERGENCY_USE reconcile 페이지 | 4~5일 |
-| Phase 4 | 임대 → 중고 전환 (RentalAsset.convertedUsedItemId + UI 액션) + 시리얼 발번 흐름 (UsedItem → SerialItem link + 판매 시 손님 정보 덮어쓰기) | 4일 |
-| Phase 5 | 고객 랜딩 노출 + 견적서·명세표 검색 통합 + 자사몰 향후 대비 (사진/시리얼 노출 정책 결정) | 4일 |
-| **합계** | | **약 3.5~4주** |
+| Phase 1 | 모델·schema (UsedItem · UsedItemCost · AssemblyUsedItemConsumption · SerialItem 확장 · RentalAsset 핸드오프) + 기본 CRUD API + `src/components/used-items/*` 분리 컴포넌트 + `/inventory/used-items` 목록·매입 등록·상세 페이지 3개 + 사진 업로드 | ✅ 완료 |
+| Phase 2 | Assembly 검색 API 에 UsedItem 통합 + 라벨 prefix + 선택 시 분기 처리 + 마진 계산 (AssemblyUsedItemConsumption → lot.unitCost 합산) + 폐기 시 자동 Expense 생성 | ✅ 완료 |
+| Phase 3 | POS 검색 통합 (신품 우선 정렬 + `(중고)` prefix) + EMERGENCY_USE reconcile 페이지 | ✅ 완료 |
+| Phase 4 | 임대 → 중고 전환 (RentalAsset.convertedUsedItemId + UI 액션) + 시리얼 발번 흐름 (UsedItem → SerialItem link + 판매 시 손님 정보 덮어쓰기) | ✅ 완료 |
+| Phase 5 | 견적서·명세표 검색 통합 | ✅ 완료 |
+| Phase 5 (보류) | 고객 랜딩 / 자사몰 중고 노출 | ⏸ 공개 storefront 그리드 부재 — 자사몰 구축 시점에 디자인과 함께 결정 |
+
+**검증**: e2e 16/16 통과 (`e2e/used-items*.spec.ts` 5개 파일 — lifecycle·Assembly·POS·임대전환·문서). tsc 0 에러.
 
 **컨벤션 준수 사항**:
 - 모든 페이지·컴포넌트는 jm 디자인 시스템만 사용 (shadcn 금지)
@@ -676,9 +680,11 @@ _(현재 결정 대기 항목 없음. 자사몰 노출 디테일은 Phase 5 시�
 
 ---
 
-## 14. 다음 액션
+## 14. 다음 액션 (구현 완료 후 남은 것)
 
-1. **이 문서 사용자 확인** — 빠진 케이스 / 잘못 이해한 부분 / 추가 요구사항 보충
-2. 12.2 추가 검토 항목 매장 운영 정책 결정
-3. Phase 1 부터 구현 시작 (모델 → API → 페이지 골격)
+Phase 1~5 구현 완료. 남은 항목은 전부 **보류 / 향후 확장**:
+
+1. **자사몰·고객 랜딩 중고 노출** — 공개 상품 그리드(storefront)가 아직 없어 보류. 자사몰 구축 시 함께 결정 (사진 필수 여부 / 시리얼 공개 정책 등)
+2. **§12.3 향후 확장** — 중고 위탁 판매, 이미지 기반 카테고리 자동 분류, 자사몰 listing 자동 동기화
+3. **운영 후 피드백 반영** — 매장에서 실제 운용하며 발견되는 UX/정책 조정 (예: 매대 검색 정렬 우선순위 미세조정, EMERGENCY_USE reconcile 진입 동선)
 
