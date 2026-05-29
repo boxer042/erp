@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useSessions, type CartItem } from "@/components/pos/sessions-context";
+import { PosLineItemRow } from "./_components/line-item-row";
 import { PriceInputDialog } from "./_components/price-input-dialog";
 import { VariantSelectSheet } from "./_variant-select-sheet";
 import { AddonRecommendSheet, type AddonSelection } from "./_addon-recommend-sheet";
@@ -93,16 +94,14 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
 
   return (
     <>
-      <div
-        className={`flex flex-col gap-3 border-b border-[var(--jm-border)] py-3 last:border-b-0 ${
+      <PosLineItemRow
+        className={
           item.isAddon
             ? "ml-6 border-l-2 border-l-[var(--jm-border-strong)] pl-3 pr-4 bg-[var(--jm-bg)]"
-            : "px-4"
-        }`}
-      >
-        {/* 1행: 이미지 + 이름 + 삭제 */}
-        <div className="flex items-start gap-3">
-          {item.imageUrl ? (
+            : undefined
+        }
+        image={
+          item.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={item.imageUrl}
@@ -120,16 +119,12 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                 />
               </svg>
             </div>
-          )}
-          <div className="flex min-w-0 flex-1 flex-col">
-            <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
-              {item.name}
-            </span>
-            {item.sku && (
-              <span className="font-mono text-[11px] text-[var(--jm-text-subtle)]">
-                {item.sku}
-              </span>
-            )}
+          )
+        }
+        name={item.name}
+        sku={item.sku}
+        headerBelow={
+          <>
             {/* 옵션 표시 — 옵션 변경 버튼 바로 위 별도 줄 (상품명 부속 텍스트보다 가독성 높음) */}
             {optionSummary && (
               <span className="mt-0.5 line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">
@@ -198,36 +193,12 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                 </button>
               )}
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => remove(item.cartItemId, sessionId)}
-            className="shrink-0 text-[var(--jm-text-disabled)] hover:text-[var(--jm-danger-fg)]"
-            aria-label="삭제"
-          >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M5 6h10M8 6V4h4v2M7 6v10h6V6"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* 2행: 단가 (클릭 가능) + 수량 ± + 라인 합계 */}
-        <div className="flex items-center justify-between gap-2">
-          {/* 단가 클릭 → 가격 다이얼로그 */}
-          <button
-            type="button"
-            onClick={() => setPriceOpen(true)}
-            className="flex flex-col items-start rounded-lg px-2 py-1 text-left hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
-          >
-            <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
-              단가 {display === "net" ? "(세전)" : "(VAT 포함)"}
-            </span>
+          </>
+        }
+        onDelete={() => remove(item.cartItemId, sessionId)}
+        unitPriceLabel={`단가 ${display === "net" ? "(세전)" : "(VAT 포함)"}`}
+        unitPrice={
+          <>
             <div className="flex items-baseline gap-1.5">
               {showListDiff && (
                 <span className="text-[11px] tabular-nums text-[var(--jm-text-subtle)] line-through">
@@ -249,45 +220,23 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                   : `+₩${listDiff.toLocaleString("ko-KR")} (${listDiffPercent.toFixed(1)}% 인상)`}
               </span>
             )}
-          </button>
-
-          {/* 수량 ± */}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setQty(item.quantity - (isBulk ? 0.5 : 1))}
-              disabled={item.quantity <= (isBulk ? 0.0001 : 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[18px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)] disabled:opacity-30"
-            >
-              −
-            </button>
-            <span className="min-w-[40px] text-center text-[15px] font-semibold tabular-nums text-[var(--jm-text)]">
-              {isBulk ? item.quantity : Math.round(item.quantity)}
-            </span>
-            <button
-              type="button"
-              onClick={() => setQty(item.quantity + (isBulk ? 0.5 : 1))}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[18px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
-            >
-              +
-            </button>
-          </div>
-
-          {/* 라인 합계 — 클릭하면 합계 편집 다이얼로그. 합계 입력 → 수량으로 나눠 단가 자동 환산. */}
-          <button
-            type="button"
-            onClick={() => setTotalOpen(true)}
-            className="flex flex-col items-end rounded-lg px-2 py-1 text-right hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
-          >
-            <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
-              합계
-            </span>
-            <span className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
-              ₩{lineDisplay.toLocaleString("ko-KR")}
-            </span>
-          </button>
-        </div>
-
+          </>
+        }
+        onUnitPriceClick={() => setPriceOpen(true)}
+        quantity={{
+          value: item.quantity,
+          onChange: setQty,
+          min: isBulk ? 0.0001 : 1,
+          step: isBulk ? 0.5 : 1,
+          decimal: isBulk,
+        }}
+        total={
+          <span className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
+            ₩{lineDisplay.toLocaleString("ko-KR")}
+          </span>
+        }
+        onTotalClick={() => setTotalOpen(true)}
+      >
         {/* 매핑 옵션 자식 행 — 별도 상품으로 추가 구매되는 옵션 (예: 메모리, 필터) */}
         {item.optionRefs && item.optionRefs.length > 0 && (
           <div className="ml-4 flex flex-col gap-1.5 border-l-2 border-[var(--jm-border)] pl-3">
@@ -330,7 +279,7 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
             })}
           </div>
         )}
-      </div>
+      </PosLineItemRow>
 
       {/* 가격 다이얼로그 */}
       <PriceInputDialog

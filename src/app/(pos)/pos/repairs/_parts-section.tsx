@@ -2,18 +2,13 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Minus, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
-import {
-  JmBadge,
-  JmButton,
-  JmCard,
-  JmComboboxDrawer,
-  JmIconButton,
-} from "@/jm";
+import { JmBadge, JmButton, JmCard, JmComboboxDrawer } from "@/jm";
 import { fmtKRWInc } from "./_helpers";
 import type { RepairPart } from "./_types";
+import { PosLineItemRow } from "@/app/(pos)/pos/_components/line-item-row";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 
 interface ProductOption {
@@ -240,7 +235,6 @@ function PartRow({
   readonly: boolean;
   onChanged: () => void;
 }) {
-  const [qty, setQty] = useState(String(Math.round(Number(part.quantity))));
   const [priceOpen, setPriceOpen] = useState(false);
   const [totalOpen, setTotalOpen] = useState(false);
 
@@ -272,32 +266,22 @@ function PartRow({
 
   const isLost = part.status === "LOST";
 
-  const setQtyAndCommit = (next: number) => {
-    const n = Math.max(1, Math.round(next));
-    setQty(String(n));
-    if (n !== Number(part.quantity)) update.mutate({ quantity: n });
+  const commitQty = (next: number) => {
+    if (next !== Number(part.quantity)) update.mutate({ quantity: next });
   };
 
   return (
-    <div
-      className={`flex flex-col gap-3 border-b border-[var(--jm-border)] px-4 py-3 last:border-b-0 sm:px-5 ${
-        isLost ? "opacity-60" : ""
-      }`}
-    >
-      {/* 1행: 이름/SKU + USED/LOST + (LOST 면) 청구 토글 + 삭제 */}
-      <div className="flex items-start gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <span
-              className={`line-clamp-1 text-jm-sm font-semibold text-[var(--jm-text)] ${
-                isLost && !part.billLost ? "line-through" : ""
-              }`}
-            >
-              {part.product.name}
-            </span>
-            <div className="flex shrink-0 items-center gap-1">
+    <>
+      <PosLineItemRow
+        className={isLost ? "sm:px-5 opacity-60" : "sm:px-5"}
+        name={part.product.name}
+        nameStrikethrough={isLost && !part.billLost}
+        sku={part.product.sku}
+        headerEnd={
+          readonly ? undefined : (
+            <>
               {/* LOST 일 때만 — 청구 토글 (회사 손실 vs 고객 청구) */}
-              {!readonly && isLost && (
+              {isLost && (
                 <button
                   type="button"
                   onClick={() => update.mutate({ billLost: !part.billLost })}
@@ -316,102 +300,35 @@ function PartRow({
                   </JmBadge>
                 </button>
               )}
-              {!readonly && (
-                <button
-                  type="button"
-                  onClick={() => update.mutate({ status: isLost ? "USED" : "LOST" })}
-                  className="appearance-none border-0 bg-transparent p-0"
-                >
-                  <JmBadge
-                    variant={isLost ? "danger" : "success"}
-                    size="sm"
-                  >
-                    {isLost ? "LOST" : "USED"}
-                  </JmBadge>
-                </button>
-              )}
-            </div>
-          </div>
-          <span className="font-mono text-jm-2xs text-[var(--jm-text-subtle)]">
-            {part.product.sku}
-          </span>
-        </div>
-        {!readonly && (
-          <JmIconButton
-            size="sm"
-            variant="ghost"
-            onClick={() => del.mutate()}
-            disabled={del.isPending}
-            aria-label="삭제"
-          >
-            <Trash2 className="size-4" />
-          </JmIconButton>
-        )}
-      </div>
-
-      {/* 2행: 단가 (클릭 가능, 좌측) + 수량 ± (중앙) + 라인 합계 (우측) */}
-      <div className="flex items-center justify-between gap-2">
-        {/* 단가 — 클릭 시 가격 다이얼로그 */}
-        <button
-          type="button"
-          onClick={() => !readonly && setPriceOpen(true)}
-          disabled={readonly}
-          className="flex flex-col items-start rounded-lg px-2 py-1 text-left hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)] disabled:hover:bg-transparent"
-        >
-          <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
-            단가
-          </span>
+              <button
+                type="button"
+                onClick={() => update.mutate({ status: isLost ? "USED" : "LOST" })}
+                className="appearance-none border-0 bg-transparent p-0"
+              >
+                <JmBadge variant={isLost ? "danger" : "success"} size="sm">
+                  {isLost ? "LOST" : "USED"}
+                </JmBadge>
+              </button>
+            </>
+          )
+        }
+        onDelete={readonly ? undefined : () => del.mutate()}
+        deleteDisabled={del.isPending}
+        unitPrice={
           <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
             {fmtKRWInc(part.unitPrice)}
           </span>
-        </button>
-
-        {/* 수량 ± */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={readonly || Number(qty) <= 1}
-            onClick={() => setQtyAndCommit(Number(qty) - 1)}
-            className="flex size-9 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text)] hover:bg-[var(--jm-border)] disabled:opacity-30"
-            aria-label="수량 감소"
-          >
-            <Minus className="size-4" />
-          </button>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={qty}
-            onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))}
-            onBlur={() => setQtyAndCommit(parseInt(qty, 10) || 1)}
-            disabled={readonly}
-            className="h-9 w-12 rounded-md bg-transparent text-center text-jm-base font-semibold tabular-nums text-[var(--jm-text)] outline-none focus:bg-[var(--jm-bg)]"
-          />
-          <button
-            type="button"
-            disabled={readonly}
-            onClick={() => setQtyAndCommit(Number(qty) + 1)}
-            className="flex size-9 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text)] hover:bg-[var(--jm-border)] disabled:opacity-30"
-            aria-label="수량 증가"
-          >
-            <Plus className="size-4" />
-          </button>
-        </div>
-
-        {/* 라인 합계 — 클릭하면 합계 편집 다이얼로그. 합계 입력 → 수량으로 나눠 단가 자동 환산. */}
-        <button
-          type="button"
-          onClick={() => !readonly && setTotalOpen(true)}
-          disabled={readonly}
-          className="flex flex-col items-end rounded-lg px-2 py-1 text-right hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)] disabled:hover:bg-transparent"
-        >
-          <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
-            합계
-          </span>
+        }
+        onUnitPriceClick={readonly ? undefined : () => setPriceOpen(true)}
+        quantity={{ value: Number(part.quantity), onChange: commitQty }}
+        total={
           <span className="text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
             {fmtKRWInc(part.totalPrice)}
           </span>
-        </button>
-      </div>
+        }
+        onTotalClick={readonly ? undefined : () => setTotalOpen(true)}
+        disabled={readonly}
+      />
 
       {/* 가격 다이얼로그 — 단가 클릭 */}
       <PriceInputDialog
@@ -432,11 +349,11 @@ function PartRow({
         taxType="TAXABLE"
         allowService={false}
         onSubmit={(netTotal) => {
-          const q = Math.max(1, Number(qty) || 1);
+          const q = Math.max(1, Number(part.quantity) || 1);
           const newUnit = Math.round(netTotal / q);
           update.mutate({ unitPrice: newUnit });
         }}
       />
-    </div>
+    </>
   );
 }
