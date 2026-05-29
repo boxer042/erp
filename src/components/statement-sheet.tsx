@@ -41,6 +41,8 @@ const STATUS_OPTIONS = [
 interface ItemForm {
   rowType: "product" | "free";
   productId: string | null;
+  /** 중고 단품 선택 시 콤보박스 표시값 — UI 전용. 저장 시 productId=null 자유 입력 라인으로 처리. */
+  usedItemId?: string | null;
   name: string;
   spec: string;
   unitOfMeasure: string;
@@ -55,6 +57,7 @@ interface ItemForm {
 const emptyProductItem = (): ItemForm => ({
   rowType: "product",
   productId: null,
+  usedItemId: null,
   name: "",
   spec: "",
   unitOfMeasure: "EA",
@@ -69,6 +72,7 @@ const emptyProductItem = (): ItemForm => ({
 const emptyFreeItem = (): ItemForm => ({
   rowType: "free",
   productId: null,
+  usedItemId: null,
   name: "",
   spec: "",
   unitOfMeasure: "EA",
@@ -142,12 +146,26 @@ export function StatementSheet({
     if (!open) return;
     setForm(editData ? editData : emptyForm());
     (async () => {
-      const [c, p] = await Promise.all([
+      const [c, p, usedItems] = await Promise.all([
         apiGet<CustomerOption[]>("/api/customers"),
         apiGet<ProductOption[]>("/api/products"),
+        // 중고 단품 (IN_STOCK) — 명세표에 통합 노출. 판매되면 status≠IN_STOCK 라 자동 숨김.
+        apiGet<
+          Array<{ id: string; internalCode: string; displayName: string; unitOfMeasure?: string }>
+        >("/api/used-items?status=IN_STOCK&limit=500").catch(() => []),
       ]);
       setCustomers(c);
-      setProducts(p);
+      const usedAsProducts: ProductOption[] = usedItems.map((u) => ({
+        id: u.id,
+        name: `${u.displayName} (중고)`,
+        sku: u.internalCode,
+        sellingPrice: "0",
+        unitCost: null,
+        unitOfMeasure: u.unitOfMeasure ?? "EA",
+        isSet: false,
+        usedItemId: u.id,
+      }));
+      setProducts([...p, ...usedAsProducts]);
     })();
   }, [open, editData]);
 
@@ -401,16 +419,28 @@ export function StatementSheet({
                             {it.rowType === "product" ? (
                               <ProductCombobox
                                 products={products}
-                                value={it.productId || ""}
+                                value={it.usedItemId || it.productId || ""}
                                 onChange={(pr) =>
-                                  updateItem(idx, {
-                                    productId: pr.id,
-                                    name: pr.name,
-                                    unitOfMeasure: pr.unitOfMeasure,
-                                    unitPrice: pr.sellingPrice,
-                                    isTaxable: pr.taxType !== "TAX_FREE",
-                                    isZeroRateEligible: pr.zeroRateEligible ?? false,
-                                  })
+                                  pr.usedItemId
+                                    ? updateItem(idx, {
+                                        // 중고 단품 — productId null 유지 (FK 안전), 이름만 채움. 단가는 직접 입력.
+                                        productId: null,
+                                        usedItemId: pr.usedItemId,
+                                        name: pr.name,
+                                        unitOfMeasure: pr.unitOfMeasure,
+                                        unitPrice: "0",
+                                        isTaxable: true,
+                                        isZeroRateEligible: false,
+                                      })
+                                    : updateItem(idx, {
+                                        productId: pr.id,
+                                        usedItemId: null,
+                                        name: pr.name,
+                                        unitOfMeasure: pr.unitOfMeasure,
+                                        unitPrice: pr.sellingPrice,
+                                        isTaxable: pr.taxType !== "TAX_FREE",
+                                        isZeroRateEligible: pr.zeroRateEligible ?? false,
+                                      })
                                 }
                                 placeholder="상품 선택..."
                               />
