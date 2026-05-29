@@ -46,6 +46,8 @@ interface LowStockItem {
   categoryId: string | null;
   categoryName: string | null;
   isOut: boolean;
+  /** 음수 재고 — 적자 출고 상태 (재고 없이 판매됨). 결품보다 더 강한 경고. */
+  isNegative: boolean;
   mappings: LowStockMapping[];
 }
 
@@ -54,6 +56,8 @@ interface Response {
   summary: {
     totalCount: number;
     outOfStockCount: number;
+    /** 음수 재고 상품 수 — 적자 출고로 시스템상 마이너스 */
+    negativeStockCount: number;
     lowStockCount: number;
   };
 }
@@ -61,7 +65,7 @@ interface Response {
 export default function LowStockPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "out" | "low">("all");
+  const [filter, setFilter] = useState<"all" | "negative" | "out" | "low">("all");
 
   const dataQuery = useQuery<Response>({
     queryKey: ["inventory-low-stock"],
@@ -73,8 +77,9 @@ export default function LowStockPage() {
   const summary = dataQuery.data?.summary;
 
   const items = all.filter((i) => {
-    if (filter === "out" && !i.isOut) return false;
-    if (filter === "low" && i.isOut) return false;
+    if (filter === "negative" && !i.isNegative) return false;
+    if (filter === "out" && (!i.isOut || i.isNegative)) return false;
+    if (filter === "low" && (i.isOut || i.isNegative)) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       if (
@@ -108,7 +113,7 @@ export default function LowStockPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
-        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
           <SummaryCard
             icon={<AlertTriangle className="size-4" />}
             label="전체"
@@ -116,6 +121,16 @@ export default function LowStockPage() {
             tone="default"
             active={filter === "all"}
             onClick={() => setFilter("all")}
+            loading={dataQuery.isPending}
+          />
+          {/* 음수 재고 — 적자 출고. 결품보다 더 시급. */}
+          <SummaryCard
+            icon={<AlertTriangle className="size-4" />}
+            label="음수 (적자)"
+            value={summary?.negativeStockCount ?? 0}
+            tone="danger"
+            active={filter === "negative"}
+            onClick={() => setFilter("negative")}
             loading={dataQuery.isPending}
           />
           <SummaryCard
@@ -188,7 +203,9 @@ export default function LowStockPage() {
                       onClick={() => router.push(`/products/${it.productId}`)}
                     >
                       <TableCell>
-                        {it.isOut ? (
+                        {it.isNegative ? (
+                          <Badge variant="destructive">음수재고</Badge>
+                        ) : it.isOut ? (
                           <Badge variant="destructive">결품</Badge>
                         ) : (
                           <Badge
@@ -217,7 +234,7 @@ export default function LowStockPage() {
                       </TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-semibold ${
-                          it.isOut ? "text-rose-700" : ""
+                          it.isNegative || it.isOut ? "text-rose-700" : ""
                         }`}
                       >
                         {it.quantity.toLocaleString("ko-KR")} {it.unitOfMeasure}

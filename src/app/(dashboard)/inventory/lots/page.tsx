@@ -79,6 +79,8 @@ const SOURCE_OPTIONS = [
   { value: "INITIAL", label: "기초" },
   { value: "ADJUSTMENT", label: "조정" },
   { value: "SET_PRODUCE", label: "세트조립" },
+  // 적자 — receivedQty=0 + remainingQty<0 + source=ADJUSTMENT 로 derive. 서버에서 동일 조건으로 필터.
+  { value: "DEFICIT", label: "적자만" },
 ];
 
 function LotsSkeletonRows({ rows = 8 }: { rows?: number }) {
@@ -316,7 +318,13 @@ export default function InventoryLotsPage() {
                       <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
                         {formatQty(lot.receivedQty)}
                       </JmTableCell>
-                      <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)] font-medium">
+                      <JmTableCell
+                        className={`px-3 py-2 text-right tabular-nums font-medium ${
+                          parseFloat(lot.remainingQty) < 0
+                            ? "text-[var(--jm-danger-fg)]"
+                            : "text-[var(--jm-text)]"
+                        }`}
+                      >
                         {formatQty(lot.remainingQty)}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
@@ -326,13 +334,22 @@ export default function InventoryLotsPage() {
                         {formatWon(remainingValue)}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2">
-                        <JmBadge
-                          variant={sourceJmVariants[lot.source] ?? "default"}
-                          size="sm"
-                          shape="square"
-                        >
-                          {sourceLabels[lot.source]}
-                        </JmBadge>
+                        {/* 적자 로트 — 의도적 ADJUSTMENT 와 구분해서 빨간 "적자" 배지 */}
+                        {parseFloat(lot.receivedQty) === 0 &&
+                        parseFloat(lot.remainingQty) < 0 &&
+                        lot.source === "ADJUSTMENT" ? (
+                          <JmBadge variant="danger" size="sm" shape="square">
+                            적자
+                          </JmBadge>
+                        ) : (
+                          <JmBadge
+                            variant={sourceJmVariants[lot.source] ?? "default"}
+                            size="sm"
+                            shape="square"
+                          >
+                            {sourceLabels[lot.source]}
+                          </JmBadge>
+                        )}
                       </JmTableCell>
                       <JmTableCell className="px-3 py-2 text-[var(--jm-text-muted)] text-jm-xs">
                         {lot.memo || "-"}

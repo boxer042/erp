@@ -42,8 +42,8 @@ export async function GET() {
     JOIN inventories inv ON inv.product_id = p.id
     LEFT JOIN product_categories pc ON pc.id = p.category_id
     WHERE p.is_active = true
-      AND inv.quantity < inv.safety_stock
-    ORDER BY (inv.quantity = 0) DESC, inv.quantity ASC, p.name ASC
+      AND (inv.quantity < inv.safety_stock OR inv.quantity <= 0)
+    ORDER BY (inv.quantity < 0) DESC, (inv.quantity = 0) DESC, inv.quantity ASC, p.name ASC
     LIMIT 500
   `;
 
@@ -100,6 +100,8 @@ export async function GET() {
       categoryId: r.category_id,
       categoryName: r.category_name,
       isOut: Number(r.quantity) === 0,
+      // 음수 재고 — 적자 출고로 시스템상 마이너스. 결품(0)보다 더 강한 경고.
+      isNegative: Number(r.quantity) < 0,
       mappings: mappingList,
     };
   });
@@ -107,6 +109,7 @@ export async function GET() {
   const summary = {
     totalCount: items.length,
     outOfStockCount: items.filter((i) => i.isOut).length,
+    negativeStockCount: items.filter((i) => i.isNegative).length,
     lowStockCount: items.filter((i) => !i.isOut).length,
   };
 

@@ -163,6 +163,7 @@ export default async function DashboardPage({
     pendingChannelOrders,
     // 재고
     lowStockItems,
+    negativeStockCount,
     inventoryLots,
     deadstockLots,
     bestsellerGroups,
@@ -360,6 +361,10 @@ export default async function DashboardPage({
       .then((items) =>
         items.filter((i) => Number(i.quantity) <= Number(i.safetyStock)),
       ),
+    // 음수 재고(적자 출고) 상품 수 — allowNegativeStock=ON 으로 재고 없이 판매된 케이스. 실사보정 필요.
+    prisma.inventory.count({
+      where: { quantity: { lt: 0 }, product: { isActive: true } },
+    }),
     prisma.inventoryLot.findMany({
       where: { remainingQty: { gt: 0 } },
       select: { remainingQty: true, unitCost: true },
@@ -1021,6 +1026,16 @@ export default async function DashboardPage({
             value={colored(lowStockItems.length, "danger")}
             icon={<AlertTriangle className="size-4" />}
             hint="안전재고 미달"
+            positiveIsGood={false}
+            size="sm"
+          />
+          {/* 음수 재고 — 재고 없이 판매된 상태. 실사보정으로 정산 필요. */}
+          <ClickableStat
+            href="/inventory/lots?source=DEFICIT"
+            label="음수 재고"
+            value={colored(negativeStockCount, "danger")}
+            icon={<AlertTriangle className="size-4" />}
+            hint="적자 출고 — 실사보정 필요"
             positiveIsGood={false}
             size="sm"
           />

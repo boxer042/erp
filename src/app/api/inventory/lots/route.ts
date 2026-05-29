@@ -30,6 +30,12 @@ export async function GET(request: NextRequest) {
   if (source && ["INCOMING", "INITIAL", "ADJUSTMENT", "SET_PRODUCE"].includes(source)) {
     where.source = source as Prisma.InventoryLotWhereInput["source"];
   }
+  // DEFICIT — 적자 로트만 (재고 없이 출고로 생성된 음수 로트). source/receivedQty/remainingQty 3조건.
+  if (source === "DEFICIT") {
+    where.source = "ADJUSTMENT";
+    where.receivedQty = 0;
+    where.remainingQty = { lt: 0 };
+  }
   if (hasRemaining) {
     where.remainingQty = { gt: 0 };
   }

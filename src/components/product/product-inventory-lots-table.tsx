@@ -130,9 +130,19 @@ export function ProductInventoryLotsTable({
               )}
             </JmTableCell>
             <JmTableCell className="px-3 py-2">
-              <JmBadge variant="outline" size="sm" shape="square" className="text-jm-2xs">
-                {LOT_SOURCE_LABELS[lot.source] ?? lot.source}
-              </JmBadge>
+              {/* 적자 로트 — 재고 없이 출고된 음수 로트 (source=ADJUSTMENT + receivedQty=0 + remainingQty<0).
+                  의도적 실사보정과 구분하기 위해 빨간 "적자" 배지로 별도 표시. */}
+              {Number(lot.receivedQty) === 0 &&
+              Number(lot.remainingQty) < 0 &&
+              lot.source === "ADJUSTMENT" ? (
+                <JmBadge variant="danger" size="sm" shape="square" className="text-jm-2xs">
+                  적자
+                </JmBadge>
+              ) : (
+                <JmBadge variant="outline" size="sm" shape="square" className="text-jm-2xs">
+                  {LOT_SOURCE_LABELS[lot.source] ?? lot.source}
+                </JmBadge>
+              )}
             </JmTableCell>
             <JmTableCell className="px-3 py-2 text-jm-xs text-[var(--jm-text-muted)]">
               {lot.supplierProduct?.supplier.name ?? "-"}
@@ -140,7 +150,13 @@ export function ProductInventoryLotsTable({
             <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
               {fmtNumber(lot.receivedQty)}
             </JmTableCell>
-            <JmTableCell className="px-3 py-2 text-right tabular-nums font-medium text-[var(--jm-text)]">
+            <JmTableCell
+              className={`px-3 py-2 text-right tabular-nums font-medium ${
+                Number(lot.remainingQty) < 0
+                  ? "text-[var(--jm-danger-fg)]"
+                  : "text-[var(--jm-text)]"
+              }`}
+            >
               {fmtNumber(lot.remainingQty)}
             </JmTableCell>
             <JmTableCell className="px-3 py-2 text-right tabular-nums text-[var(--jm-text)]">
