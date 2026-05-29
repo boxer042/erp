@@ -94,7 +94,7 @@ export async function POST(
           }),
         });
       }
-    });
+    }, { timeout: 30000, maxWait: 10000 });
     return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json(

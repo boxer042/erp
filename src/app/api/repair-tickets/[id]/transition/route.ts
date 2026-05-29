@@ -198,7 +198,7 @@ export async function POST(
       try {
         await prisma.$transaction(async (tx) => {
           await learnDiagnosisPartSet(tx, id);
-        });
+        }, { timeout: 30000, maxWait: 10000 });
       } catch {
         /* 통계 실패는 무시 */
       }
@@ -251,7 +251,7 @@ export async function POST(
             });
           }
           await rebalanceCustomerLedger(tx, customerId);
-        });
+        }, { timeout: 30000, maxWait: 10000 });
       }
       return NextResponse.json(updated);
     }
@@ -389,7 +389,7 @@ export async function POST(
             },
           });
         }
-      });
+      }, { timeout: 30000, maxWait: 10000 });
       return NextResponse.json({
         success: true,
         hardDeleted: autoHardDelete,

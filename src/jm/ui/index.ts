@@ -146,6 +146,7 @@ export {
   type JmDatePickerProps,
   type JmCalendarProps,
 } from "./date-picker";
+export { JmTimePicker, type JmTimePickerProps } from "./time-picker";
 export { JmToaster, jmToast, type JmToasterProps } from "./toast";
 export { JmSlider, type JmSliderProps } from "./slider";
 export { JmProgress, type JmProgressProps } from "./progress";

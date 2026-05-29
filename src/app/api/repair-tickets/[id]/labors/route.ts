@@ -61,7 +61,7 @@ export async function POST(
       );
     }
     return created;
-  });
+  }, { timeout: 30000, maxWait: 10000 });
 
   return NextResponse.json(labor, { status: 201 });
 }

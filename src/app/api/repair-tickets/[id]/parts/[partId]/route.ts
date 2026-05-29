@@ -47,63 +47,68 @@ export async function PATCH(
   const allowOversell = await isOversellAllowed();
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const before = await snapshotTicketUsage(tx, ticket.id);
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const before = await snapshotTicketUsage(tx, ticket.id);
 
-      const oldQty = Number(part.quantity);
-      const newQty = data.quantity != null ? Number(data.quantity) : oldQty;
-      const newPrice = data.unitPrice != null ? Number(data.unitPrice) : Number(part.unitPrice);
+        const oldQty = Number(part.quantity);
+        const newQty = data.quantity != null ? Number(data.quantity) : oldQty;
+        const newPrice = data.unitPrice != null ? Number(data.unitPrice) : Number(part.unitPrice);
 
-      // 수량 변경 — 차이만큼 추가 차감 또는 부분 복원
-      if (newQty > oldQty) {
-        const delta = newQty - oldQty;
-        await consumeRepairPart(tx, part.id, {
-          ticketId: ticket.id,
-          ticketNo: ticket.ticketNo,
-          productId: part.productId,
-          productName: part.product.name,
-          quantity: delta,
-        }, allowOversell);
-      } else if (newQty < oldQty) {
-        // 부분 복원 — 단순화: 전체 복원 후 새 수량으로 재차감
-        await restoreRepairPart(tx, part.id, {
-          ticketId: ticket.id,
-          ticketNo: ticket.ticketNo,
-          productId: part.productId,
-          productName: part.product.name,
-          quantity: oldQty,
-          reason: "수량 변경",
-        });
-        if (newQty > 0) {
+        // 수량 변경 — 차이만큼 추가 차감 또는 부분 복원
+        if (newQty > oldQty) {
+          const delta = newQty - oldQty;
           await consumeRepairPart(tx, part.id, {
             ticketId: ticket.id,
             ticketNo: ticket.ticketNo,
             productId: part.productId,
             productName: part.product.name,
-            quantity: newQty,
+            quantity: delta,
           }, allowOversell);
+        } else if (newQty < oldQty) {
+          // 부분 복원 — 단순화: 전체 복원 후 새 수량으로 재차감
+          await restoreRepairPart(tx, part.id, {
+            ticketId: ticket.id,
+            ticketNo: ticket.ticketNo,
+            productId: part.productId,
+            productName: part.product.name,
+            quantity: oldQty,
+            reason: "수량 변경",
+          });
+          if (newQty > 0) {
+            await consumeRepairPart(tx, part.id, {
+              ticketId: ticket.id,
+              ticketNo: ticket.ticketNo,
+              productId: part.productId,
+              productName: part.product.name,
+              quantity: newQty,
+            }, allowOversell);
+          }
         }
-      }
 
-      const updated = await tx.repairPart.update({
-        where: { id: part.id },
-        data: {
-          quantity: new Prisma.Decimal(newQty),
-          unitPrice: new Prisma.Decimal(newPrice),
-          totalPrice: new Prisma.Decimal(newQty).times(newPrice),
-          ...(data.discount !== undefined ? { discount: data.discount } : {}),
-          ...(data.status !== undefined ? { status: data.status } : {}),
-          ...(data.billLost !== undefined ? { billLost: data.billLost } : {}),
-        },
-        include: { product: { select: { id: true, name: true, sku: true } } },
-      });
+        const updated = await tx.repairPart.update({
+          where: { id: part.id },
+          data: {
+            quantity: new Prisma.Decimal(newQty),
+            unitPrice: new Prisma.Decimal(newPrice),
+            totalPrice: new Prisma.Decimal(newQty).times(newPrice),
+            ...(data.discount !== undefined ? { discount: data.discount } : {}),
+            ...(data.status !== undefined ? { status: data.status } : {}),
+            ...(data.billLost !== undefined ? { billLost: data.billLost } : {}),
+          },
+          include: { product: { select: { id: true, name: true, sku: true } } },
+        });
 
-      // status USED↔LOST 변경 시 set 이 바뀌므로 delta 적용
-      const after = await snapshotTicketUsage(tx, ticket.id);
-      await applyUsageDelta(tx, before, after);
+        // status USED↔LOST 변경 시 set 이 바뀌므로 delta 적용
+        const after = await snapshotTicketUsage(tx, ticket.id);
+        await applyUsageDelta(tx, before, after);
 
-      return updated;
-    });
+        return updated;
+      },
+      // FIFO 소진·복원 + InventoryMovement + RepairDiagnosisTemplate usage delta 가 합쳐져
+      // 5초 default 를 넘기는 케이스가 잦음. POS checkout 과 동일하게 30초로 확장.
+      { timeout: 30000, maxWait: 10000 },
+    );
 
     return NextResponse.json(result);
   } catch (e) {
@@ -141,22 +146,25 @@ export async function DELETE(
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const before = await snapshotTicketUsage(tx, ticket.id);
-      if (part.consumedAt) {
-        await restoreRepairPart(tx, part.id, {
-          ticketId: ticket.id,
-          ticketNo: ticket.ticketNo,
-          productId: part.productId,
-          productName: part.product.name,
-          quantity: Number(part.quantity),
-          reason: "부속 행 삭제",
-        });
-      }
-      await tx.repairPart.delete({ where: { id: partId } });
-      const after = await snapshotTicketUsage(tx, ticket.id);
-      await applyUsageDelta(tx, before, after);
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        const before = await snapshotTicketUsage(tx, ticket.id);
+        if (part.consumedAt) {
+          await restoreRepairPart(tx, part.id, {
+            ticketId: ticket.id,
+            ticketNo: ticket.ticketNo,
+            productId: part.productId,
+            productName: part.product.name,
+            quantity: Number(part.quantity),
+            reason: "부속 행 삭제",
+          });
+        }
+        await tx.repairPart.delete({ where: { id: partId } });
+        const after = await snapshotTicketUsage(tx, ticket.id);
+        await applyUsageDelta(tx, before, after);
+      },
+      { timeout: 30000, maxWait: 10000 },
+    );
     return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json(

@@ -260,7 +260,7 @@ export async function PUT(
       }
 
       return updated;
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     return NextResponse.json(ticket);
   } catch (e) {

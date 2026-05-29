@@ -66,7 +66,7 @@ export async function PATCH(
       );
     }
     return u;
-  });
+  }, { timeout: 30000, maxWait: 10000 });
 
   return NextResponse.json(updated);
 }
@@ -98,6 +98,6 @@ export async function DELETE(
     await tx.repairLabor.delete({ where: { id: laborId } });
     const after = await snapshotTicketUsage(tx, labor.repairTicket.id);
     await applyUsageDelta(tx, before, after);
-  });
+  }, { timeout: 30000, maxWait: 10000 });
   return NextResponse.json({ success: true });
 }

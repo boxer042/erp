@@ -115,7 +115,7 @@ export async function POST(
       await applyUsageDelta(tx, before, after);
 
       return resultPart;
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     return NextResponse.json(result, { status: 201 });
   } catch (e) {

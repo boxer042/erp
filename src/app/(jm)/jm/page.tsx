@@ -58,6 +58,7 @@ import {
   JmDateRangePicker,
   JmDatePicker,
   JmCalendar,
+  JmTimePicker,
   type DateRange,
   JmDialog,
   JmDialogBody,
@@ -251,6 +252,7 @@ export default function JmShowcasePage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
   const [inlineDate, setInlineDate] = useState<Date | undefined>(undefined);
+  const [timeValue, setTimeValue] = useState<string>("14:30");
 
   // Slider / Segmented / Alert 상태
   const [singleVal, setSingleVal] = useState(40);
@@ -1918,6 +1920,26 @@ export default function JmShowcasePage() {
                 </span>
               </p>
             )}
+          </div>
+        </Section>
+
+        {/* TIME PICKER */}
+        <Section
+          title="시간 선택 (TimePicker)"
+          subtitle="JmTimePicker — native <input type='time'> 위에 jm 토큰 입힌 24시간제 입력. 모바일은 wheel, 데스크톱은 hh:mm spinner."
+        >
+          <div className="grid gap-4 sm:max-w-md">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <JmTimePicker value={timeValue} onChange={setTimeValue} size="sm" />
+              <JmTimePicker value={timeValue} onChange={setTimeValue} size="md" />
+              <JmTimePicker value={timeValue} onChange={setTimeValue} size="lg" />
+            </div>
+            <p className="text-[13px] text-[var(--jm-text-muted)]">
+              선택:{" "}
+              <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
+                {timeValue}
+              </span>
+            </p>
           </div>
         </Section>
 

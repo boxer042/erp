@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { JmButton, JmCalendar } from "@/jm";
+import { JmButton, JmCalendar, JmTimePicker } from "@/jm";
 import { BottomSheet } from "./bottom-sheet";
 
 /**
@@ -88,22 +88,20 @@ export function DateTimePickerSheet({
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             날짜
           </span>
-          <JmCalendar
-            value={date}
-            onChange={(d) => d && setDate(d)}
-            toDate={toDate ?? new Date()}
-          />
+          {/* JmCalendar 는 inline-block 폭 — flex 컨테이너에서 가운데 정렬 위해 wrapper 사용 */}
+          <div className="flex justify-center">
+            <JmCalendar
+              value={date}
+              onChange={(d) => d && setDate(d)}
+              toDate={toDate ?? new Date()}
+            />
+          </div>
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             시간
           </span>
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-jm-base tabular-nums text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
-          />
+          <JmTimePicker value={time} onChange={setTime} size="md" />
         </div>
       </div>
     </BottomSheet>
