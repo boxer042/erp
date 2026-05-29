@@ -259,17 +259,19 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
                           onClick={() => handleSelectPending(p)}
                           className="flex min-h-12 w-full items-center gap-2 rounded-md px-4 py-2 text-left text-jm-sm text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
                         >
-                          <span className="flex-1 truncate">{p.name}</span>
-                          {p.spec && (
-                            <span className="text-jm-xs text-[var(--jm-text-muted)] ml-1">
-                              ({p.spec})
-                            </span>
-                          )}
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate">{p.name}</span>
+                            {p.spec && (
+                              <span className="truncate text-jm-xs text-[var(--jm-text-muted)]">
+                                {p.spec}
+                              </span>
+                            )}
+                          </span>
                           <JmBadge
                             variant="info"
                             size="sm"
                             shape="square"
-                            className="ml-2 text-jm-xs"
+                            className="ml-2 text-jm-xs shrink-0"
                           >
                             행 {p.rowIndex + 1} 재사용
                           </JmBadge>
@@ -299,11 +301,11 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
                           disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
                         )}
                       >
-                        <span className="flex-1 truncate">
-                          {p.name}
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate">{p.name}</span>
                           {p.spec && (
-                            <span className="text-jm-xs text-[var(--jm-text-muted)] ml-1">
-                              ({p.spec})
+                            <span className="truncate text-jm-xs text-[var(--jm-text-muted)]">
+                              {p.spec}
                             </span>
                           )}
                         </span>
