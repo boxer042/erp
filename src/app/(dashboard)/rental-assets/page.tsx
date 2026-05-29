@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { BookOpen, ImagePlus, Loader2, Pencil, Printer, QrCode, Recycle, Trash2, X } from "lucide-react";
+import { BookOpen, Loader2, Pencil, Printer, QrCode, Recycle, Trash2 } from "lucide-react";
 import {
   jmToast,
   JmBadge,
@@ -29,16 +29,11 @@ import {
   JmInput,
   JmSelect,
   JmSkeleton,
-  JmTable,
-  JmTableBody,
-  JmTableCell,
-  JmTableHead,
-  JmTableHeader,
-  JmTableRow,
 } from "@/jm";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import { QuickBrandSheet } from "@/components/quick-register-sheets";
+import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { formatComma, parseComma } from "@/lib/utils";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 
@@ -48,28 +43,29 @@ const toYmd = (d: Date) =>
 // 임대 요율은 과세 — 세전 저장값을 VAT 포함 금액으로 변환해 표시.
 const withVat = (net: number) => Math.round(net * 1.1);
 
-function RentalAssetsSkeletonRows({ rows = 8 }: { rows?: number }) {
+function RentalAssetsSkeletonCards({ count = 8 }: { count?: number }) {
   return (
     <>
-      {Array.from({ length: rows }).map((_, i) => (
-        <JmTableRow key={i} className="hover:bg-transparent">
-          <JmTableCell><JmSkeleton className="size-10 rounded-md" /></JmTableCell>
-          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
-          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
-          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
-          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
-          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-16" /></div></JmTableCell>
-          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-16" /></div></JmTableCell>
-          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-16" /></div></JmTableCell>
-          <JmTableCell><JmSkeleton className="h-5 w-12 rounded-full" /></JmTableCell>
-          <JmTableCell>
-            <div className="flex justify-end gap-1">
-              {Array.from({ length: 5 }).map((_, k) => (
-                <JmSkeleton key={k} className="h-7 w-7 rounded-md" />
-              ))}
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex flex-col rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3"
+        >
+          <div className="flex items-start gap-3">
+            <JmSkeleton className="size-16 shrink-0 rounded-lg" />     {/* 썸네일 */}
+            <div className="flex-1 space-y-1.5 py-0.5">
+              <JmSkeleton className="h-4 w-28" />                       {/* 자산명 */}
+              <JmSkeleton className="h-3 w-20" />                       {/* 자산번호 */}
+              <JmSkeleton className="h-3 w-32" />                       {/* 브랜드·모델 */}
             </div>
-          </JmTableCell>
-        </JmTableRow>
+          </div>
+          <JmSkeleton className="mt-2.5 h-12 w-full rounded-lg" />      {/* 요율 박스 */}
+          <div className="mt-2 flex justify-end gap-1">                  {/* 액션 */}
+            {Array.from({ length: 5 }).map((_, k) => (
+              <JmSkeleton key={k} className="h-7 w-7 rounded-md" />
+            ))}
+          </div>
+        </div>
       ))}
     </>
   );
@@ -216,28 +212,6 @@ export default function RentalAssetsPage() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : err.message || "저장 실패"),
   });
 
-  // 이미지 업로드 — Supabase Storage product-images 버킷 재사용
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const handleImagePick = async (file: File) => {
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file, file.name);
-      const res = await fetch("/api/products/upload", { method: "POST", body: fd });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(err.error || "업로드 실패");
-        return;
-      }
-      const { url } = (await res.json()) as { url: string };
-      setForm((prev) => ({ ...prev, imageUrl: url }));
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
   // 라벨 출력 — 자산번호 = 라벨 코드. 새 탭으로 인쇄 미리보기 (?auto=1 자동 인쇄).
   const printLabel = (assetNo: string) => {
     window.open(
@@ -321,6 +295,63 @@ export default function RentalAssetsPage() {
     removeMutation.mutate(id);
   };
 
+  // 카드 공용 액션 버튼 — 각 버튼은 카드 클릭(수정 열기)과 분리되도록 stopPropagation
+  const renderActions = (a: Asset) => (
+    <div className="flex flex-wrap justify-end gap-1">
+      <JmIconButton
+        variant="ghost"
+        size="sm"
+        aria-label="라벨 인쇄"
+        onClick={(e) => { e.stopPropagation(); printLabel(a.assetNo); }}
+      >
+        <Printer />
+      </JmIconButton>
+      <JmIconButton
+        variant="ghost"
+        size="sm"
+        aria-label="사용설명서"
+        onClick={(e) => { e.stopPropagation(); router.push(`/rental-assets/${a.id}/manual`); }}
+      >
+        <BookOpen />
+      </JmIconButton>
+      <JmIconButton
+        variant="ghost"
+        size="sm"
+        aria-label="QR 라벨"
+        onClick={(e) => { e.stopPropagation(); qrMutation.mutate(a.id); }}
+      >
+        <QrCode />
+      </JmIconButton>
+      <JmIconButton
+        variant="ghost"
+        size="sm"
+        aria-label="수정"
+        onClick={(e) => { e.stopPropagation(); openEdit(a); }}
+      >
+        <Pencil />
+      </JmIconButton>
+      {a.status !== "RENTED" && a.status !== "RETIRED" && (
+        <JmIconButton
+          variant="ghost"
+          size="sm"
+          aria-label="중고로 전환"
+          onClick={(e) => { e.stopPropagation(); openConvert(a); }}
+        >
+          <Recycle />
+        </JmIconButton>
+      )}
+      <JmIconButton
+        variant="ghost"
+        size="sm"
+        aria-label="삭제"
+        className="text-[var(--jm-danger-fg)]"
+        onClick={(e) => { e.stopPropagation(); remove(a.id); }}
+      >
+        <Trash2 />
+      </JmIconButton>
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       <DataTableToolbar
@@ -332,131 +363,92 @@ export default function RentalAssetsPage() {
       />
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        <JmTable className="min-w-[1000px]">
-          <JmTableHeader>
-            <JmTableRow>
-              <JmTableHead className="w-16" />
-              <JmTableHead>자산번호</JmTableHead>
-              <JmTableHead>자산명</JmTableHead>
-              <JmTableHead>브랜드</JmTableHead>
-              <JmTableHead>모델번호</JmTableHead>
-              <JmTableHead className="text-right">일 요율 (VAT 포함)</JmTableHead>
-              <JmTableHead className="text-right">월 요율 (VAT 포함)</JmTableHead>
-              <JmTableHead className="text-right">보증금</JmTableHead>
-              <JmTableHead>상태</JmTableHead>
-              <JmTableHead className="w-24" />
-            </JmTableRow>
-          </JmTableHeader>
-          <JmTableBody>
-            {loading ? (
-              <RentalAssetsSkeletonRows />
-            ) : assets.length === 0 ? (
-              <JmTableRow className="hover:bg-transparent">
-                <JmTableCell colSpan={10} className="py-8 text-center text-[var(--jm-text-muted)]">
-                  등록된 임대 자산이 없습니다
-                </JmTableCell>
-              </JmTableRow>
-            ) : assets.map((a) => (
-              <JmTableRow
+        {loading ? (
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <RentalAssetsSkeletonCards />
+          </div>
+        ) : assets.length === 0 ? (
+          <div className="py-16 text-center text-jm-sm text-[var(--jm-text-muted)]">
+            등록된 임대 자산이 없습니다
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {assets.map((a) => (
+              <div
                 key={a.id}
-                className="cursor-pointer"
-                onClick={() => openEdit(a)}
+                className="flex flex-col rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3 transition-colors hover:border-[var(--jm-border-strong)]"
               >
-                <JmTableCell>
+                {/* 상단 — 썸네일 + 이름/번호/브랜드 (클릭 시 수정) */}
+                <div
+                  className="flex cursor-pointer items-start gap-3"
+                  onClick={() => openEdit(a)}
+                >
                   {a.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={a.imageUrl}
                       alt={a.name}
-                      className="size-10 rounded-md border border-[var(--jm-border)] object-cover"
+                      className="size-16 shrink-0 rounded-lg border border-[var(--jm-border)] object-cover"
                     />
                   ) : (
-                    <div className="flex size-10 items-center justify-center rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-xs font-semibold text-[var(--jm-text-muted)]">
+                    <div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-lg font-semibold text-[var(--jm-text-muted)]">
                       {a.name.charAt(0)}
                     </div>
                   )}
-                </JmTableCell>
-                <JmTableCell className="font-[family-name:var(--jm-font-mono)] text-jm-xs">
-                  {a.assetNo}
-                </JmTableCell>
-                <JmTableCell className="font-medium">{a.name}</JmTableCell>
-                <JmTableCell className="text-[var(--jm-text-muted)]">{a.brand ?? "-"}</JmTableCell>
-                <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
-                  {a.modelNo || "-"}
-                </JmTableCell>
-                <JmTableCell className="text-right tabular-nums">
-                  ₩{withVat(Number(a.dailyRate)).toLocaleString("ko-KR")}
-                </JmTableCell>
-                <JmTableCell className="text-right tabular-nums">
-                  ₩{withVat(Number(a.monthlyRate)).toLocaleString("ko-KR")}
-                </JmTableCell>
-                <JmTableCell className="text-right tabular-nums">
-                  ₩{Number(a.depositAmount).toLocaleString("ko-KR")}
-                </JmTableCell>
-                <JmTableCell>
-                  <JmBadge variant={STATUS_VARIANT[a.status] ?? "outline"} size="sm">
-                    {STATUS_LABEL[a.status] ?? a.status}
-                  </JmBadge>
-                </JmTableCell>
-                <JmTableCell>
-                  <div className="flex justify-end gap-1">
-                    <JmIconButton
-                      variant="ghost"
-                      size="sm"
-                      aria-label="라벨 인쇄"
-                      onClick={(e) => { e.stopPropagation(); printLabel(a.assetNo); }}
-                    >
-                      <Printer />
-                    </JmIconButton>
-                    <JmIconButton
-                      variant="ghost"
-                      size="sm"
-                      aria-label="사용설명서"
-                      onClick={(e) => { e.stopPropagation(); router.push(`/rental-assets/${a.id}/manual`); }}
-                    >
-                      <BookOpen />
-                    </JmIconButton>
-                    <JmIconButton
-                      variant="ghost"
-                      size="sm"
-                      aria-label="QR 라벨"
-                      onClick={(e) => { e.stopPropagation(); qrMutation.mutate(a.id); }}
-                    >
-                      <QrCode />
-                    </JmIconButton>
-                    <JmIconButton
-                      variant="ghost"
-                      size="sm"
-                      aria-label="수정"
-                      onClick={(e) => { e.stopPropagation(); openEdit(a); }}
-                    >
-                      <Pencil />
-                    </JmIconButton>
-                    {a.status !== "RENTED" && a.status !== "RETIRED" && (
-                      <JmIconButton
-                        variant="ghost"
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-2">
+                      <span className="line-clamp-2 font-medium text-[var(--jm-text)]">
+                        {a.name}
+                      </span>
+                      <JmBadge
+                        variant={STATUS_VARIANT[a.status] ?? "outline"}
                         size="sm"
-                        aria-label="중고로 전환"
-                        onClick={(e) => { e.stopPropagation(); openConvert(a); }}
+                        className="ml-auto shrink-0"
                       >
-                        <Recycle />
-                      </JmIconButton>
+                        {STATUS_LABEL[a.status] ?? a.status}
+                      </JmBadge>
+                    </div>
+                    <div className="mt-0.5 font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
+                      {a.assetNo}
+                    </div>
+                    {(a.brand || a.modelNo) && (
+                      <div className="mt-0.5 truncate text-jm-xs text-[var(--jm-text-muted)]">
+                        {[a.brand, a.modelNo].filter(Boolean).join(" · ")}
+                      </div>
                     )}
-                    <JmIconButton
-                      variant="ghost"
-                      size="sm"
-                      aria-label="삭제"
-                      className="text-[var(--jm-danger-fg)]"
-                      onClick={(e) => { e.stopPropagation(); remove(a.id); }}
-                    >
-                      <Trash2 />
-                    </JmIconButton>
                   </div>
-                </JmTableCell>
-              </JmTableRow>
+                </div>
+
+                {/* 요율 — VAT 포함 표시 */}
+                <div className="mt-2.5 grid grid-cols-3 gap-2 rounded-lg bg-[var(--jm-surface-muted)] px-3 py-2 text-jm-xs tabular-nums">
+                  <div className="flex flex-col">
+                    <span className="text-[var(--jm-text-muted)]">일 요율</span>
+                    <span className="font-medium text-[var(--jm-text)]">
+                      ₩{withVat(Number(a.dailyRate)).toLocaleString("ko-KR")}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[var(--jm-text-muted)]">월 요율</span>
+                    <span className="font-medium text-[var(--jm-text)]">
+                      ₩{withVat(Number(a.monthlyRate)).toLocaleString("ko-KR")}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[var(--jm-text-muted)]">보증금</span>
+                    <span className="font-medium text-[var(--jm-text)]">
+                      ₩{Number(a.depositAmount).toLocaleString("ko-KR")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 액션 */}
+                <div className="mt-2 border-t border-[var(--jm-border)] pt-2">
+                  {renderActions(a)}
+                </div>
+              </div>
             ))}
-          </JmTableBody>
-        </JmTable>
+          </div>
+        )}
       </div>
 
       <JmDrawer open={sheet} onOpenChange={setSheet}>
@@ -485,53 +477,11 @@ export default function RentalAssetsPage() {
 
               {/* ── 사진 + 자산명 (헤더 블록) ── */}
               <div className="flex items-start gap-4">
-                <div className="shrink-0">
-                  {form.imageUrl ? (
-                    <div className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={form.imageUrl}
-                        alt="자산 사진"
-                        className="size-24 rounded-lg border border-[var(--jm-border)] object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setForm({ ...form, imageUrl: "" })}
-                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] text-white shadow hover:scale-110 transition-transform"
-                        aria-label="이미지 제거"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex size-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface)] transition-colors disabled:opacity-50"
-                      disabled={uploading}
-                      aria-label="이미지 업로드"
-                    >
-                      {uploading ? (
-                        <Loader2 className="size-5 animate-spin" />
-                      ) : (
-                        <>
-                          <ImagePlus className="size-5" />
-                          <span className="text-jm-2xs">사진 추가</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleImagePick(f);
-                    }}
-                  />
-                </div>
+                <ThumbnailUpload
+                  value={form.imageUrl || null}
+                  onChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url ?? "" }))}
+                  disabled={submitting}
+                />
                 <div className="flex-1 min-w-0 space-y-3">
                   <Field label="자산명" required>
                     <JmInput
@@ -541,18 +491,6 @@ export default function RentalAssetsPage() {
                       placeholder="예: 카메라 본체 A세트"
                     />
                   </Field>
-                  {form.imageUrl && (
-                    <JmButton
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus />}
-                      <span>사진 변경</span>
-                    </JmButton>
-                  )}
                 </div>
               </div>
 
@@ -804,6 +742,7 @@ export default function RentalAssetsPage() {
         <PriceInputDialog
           open
           onOpenChange={(v) => !v && setPriceEdit(null)}
+          z="elevated"
           initialNet={
             parseFloat(
               parseComma(priceEdit === "daily" ? form.dailyRate : form.monthlyRate),
