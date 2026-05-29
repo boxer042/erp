@@ -28,4 +28,10 @@ export interface ProductLite {
    * 카탈로그 노출 시 "₩50,000~" 형식 표시. 일반 FINISHED 상품은 null.
    */
   minOptionPrice?: number | null;
+  /**
+   * UsedItem marker — 검색 결과에 중고 단품도 통합 표시할 때 사용.
+   * id 는 UsedItem.id (Product 와 별개), name 에 자동 "(중고)" prefix.
+   * 카트 추가·결제 시 이 필드 있으면 UsedItem 흐름으로 분기.
+   */
+  usedItemId?: string;
 }

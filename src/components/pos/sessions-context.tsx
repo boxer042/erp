@@ -91,6 +91,13 @@ export interface CartItem {
    * 카트 PriceInputDialog 의 [서비스로 지급] 토글로 설정.
    */
   isService?: boolean;
+  /**
+   * UsedItem 단품 — 매대 검색에서 중고로 선택된 라인. 결제 시 백엔드가
+   * UsedItem.status=SOLD + SerialItem 손님 정보 채움 + OrderItem.unitCostSnapshot
+   * = 누적 비용 (acquiredCost + Σ addedCosts) 으로 처리.
+   * 일반 product/lot 흐름 우회 (lot 차감 안 함).
+   */
+  usedItemId?: string;
   repairMeta?: RepairMeta;
   rentalMeta?: RentalMeta;
 }

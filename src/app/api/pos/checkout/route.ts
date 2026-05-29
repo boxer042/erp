@@ -46,6 +46,13 @@ interface CheckoutItem {
   repairTicketId?: string | null;
   /** 서비스로 지급 — true 면 OrderItem.isService=true 저장. 영수증/명세표에서 배지 노출. */
   isService?: boolean;
+  /**
+   * UsedItem 단품 라인 — 카트에서 중고 매대 검색으로 선택된 라인.
+   * 서버: lot 차감 우회 + UsedItem.status=SOLD + UsedItem.orderItemId link +
+   * 연결 SerialItem(있으면) customerId/orderItemId/soldAt 자동 채움.
+   * OrderItem.unitCostSnapshot = acquiredCost + Σ addedCosts (UsedItem 누적 비용)
+   */
+  usedItemId?: string | null;
 }
 
 interface RepairTicketData {
@@ -179,6 +186,8 @@ export async function POST(request: NextRequest) {
     optionSnapshot: Record<string, string> | null;
     entryProductId: string | null;
     isService: boolean;
+    /** UsedItem 단품 — 있으면 처리 루프에서 fifoConsume 우회, status=SOLD + serialItem 채움 */
+    usedItemId: string | null;
   };
 
   const stagedItems: StagedItem[] = [];
@@ -208,6 +217,7 @@ export async function POST(request: NextRequest) {
         optionSnapshot: null,
         entryProductId: null, // ADDON 도 funnel 분석 대상 아님 (메인의 부산물)
         isService: !!it.isService,
+        usedItemId: it.usedItemId ?? null,
       });
       continue;
     }
@@ -296,6 +306,7 @@ export async function POST(request: NextRequest) {
       // POS 결제는 직원 입력이라 entryProductId 항상 null. 자사몰/채널 import 시에만 채움.
       entryProductId: it.entryProductId ?? null,
       isService: !!it.isService,
+      usedItemId: it.usedItemId ?? null,
     });
     for (const ref of refs) {
       stagedItems.push({
@@ -315,6 +326,7 @@ export async function POST(request: NextRequest) {
         optionSnapshot: null,
         entryProductId: null, // OPTION_REF 자식 라인은 funnel 분석 대상 아님
         isService: false, // OPTION_REF 는 메인의 옵션 추가구매 — 별도 서비스 분류 안 함
+        usedItemId: null,
       });
     }
   }
@@ -581,6 +593,7 @@ export async function POST(request: NextRequest) {
         productId: string | null;
         quantity: number;
         lineRole: "MAIN" | "OPTION_REF" | "ADDON";
+        usedItemId: string | null;
       }> = [];
       for (const stage of stagedItems) {
         const parentId =
@@ -619,6 +632,7 @@ export async function POST(request: NextRequest) {
           productId: oi.productId,
           quantity: Number(oi.quantity),
           lineRole: stage.lineRole,
+          usedItemId: stage.usedItemId,
         });
       }
       // 이후 로직(FIFO/labelCodes 매칭/RepairTicket 등)이 사용하는 order 객체 — 기존 구조 유지
@@ -664,6 +678,53 @@ export async function POST(request: NextRequest) {
       };
 
       for (const item of order.items) {
+        // ─── 분기: UsedItem 단품 ──────────────────────────────
+        // lot 차감 우회 + status=SOLD + serialItem 채움 + orderItemId link
+        // unitCostSnapshot = acquiredCost + Σ addedCosts (UsedItem 누적 비용)
+        if (item.usedItemId) {
+          const used = await tx.usedItem.findUnique({
+            where: { id: item.usedItemId },
+            include: { addedCosts: { select: { amount: true } } },
+          });
+          if (!used) {
+            throw new Error(`중고 단품을 찾을 수 없습니다 (${item.usedItemId})`);
+          }
+          if (used.status !== "IN_STOCK") {
+            throw new Error(
+              `중고 단품 ${used.internalCode} 은 더 이상 판매 가능 상태가 아닙니다 (이미 ${used.status})`,
+            );
+          }
+          const usedCost =
+            Number(used.acquiredCost) +
+            used.addedCosts.reduce((s, c) => s + Number(c.amount), 0);
+
+          await tx.usedItem.update({
+            where: { id: used.id },
+            data: {
+              status: "SOLD",
+              orderItemId: item.id,
+            },
+          });
+
+          // 연결된 SerialItem 이 있으면 손님 정보 + soldAt 채움
+          if (used.serialItemId) {
+            await tx.serialItem.update({
+              where: { id: used.serialItemId },
+              data: {
+                customerId: body.customerId ?? null,
+                orderItemId: item.id,
+                soldAt: new Date(),
+              },
+            });
+          }
+
+          await tx.orderItem.update({
+            where: { id: item.id },
+            data: { unitCostSnapshot: usedCost / Math.max(1, item.quantity) },
+          });
+          continue;
+        }
+
         // 서비스 항목(productId 없음)은 재고 소진 스킵
         if (!item.productId) continue;
 

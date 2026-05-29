@@ -46,6 +46,12 @@ export interface ProductOption {
   productType?: "FINISHED" | "PARTS" | "SET" | "ASSEMBLED" | "OPTION_PARENT";
   /** 상품 대표 이미지 — 옵션 연결 카드 썸네일 등 */
   imageUrl?: string | null;
+  /**
+   * UsedItem marker — 검색 결과에 중고 단품도 통합 표시할 때 사용.
+   * id 는 UsedItem.id (Product 와 별개 UUID), name 은 자동 "(중고)" prefix 부착.
+   * onChange 콜백에서 이 필드 있으면 UsedItem 흐름으로 분기.
+   */
+  usedItemId?: string;
 }
 
 type ProductItem = JmComboboxItem & {

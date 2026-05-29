@@ -36,6 +36,8 @@ import {
 
 interface ComponentRow {
   componentId: string;
+  /** 중고 단품 끼움 — 있으면 UsedItem 흡수 흐름 (status=ASSEMBLED_INTO) */
+  usedItemId?: string | null;
   quantity: string;
   slotId?: string | null;
   slotLabelId?: string | null;
@@ -106,19 +108,53 @@ export function AssemblyRegisterSheet({
 
   const fetchProducts = useCallback(async () => {
     try {
-      const data = await apiGet<
-        Array<{
-          id: string;
-          name: string;
-          sku: string;
-          sellingPrice: string;
-          unitCost: string | null;
-          unitOfMeasure: string;
-          isSet: boolean;
-        }>
-      >("/api/products?isBulk=all");
-      setProducts(
-        data.map((p) => ({
+      // 신품 카탈로그 + IN_STOCK 중고 단품 병렬 fetch
+      const [productsData, usedItemsData] = await Promise.all([
+        apiGet<
+          Array<{
+            id: string;
+            name: string;
+            sku: string;
+            sellingPrice: string;
+            unitCost: string | null;
+            unitOfMeasure: string;
+            isSet: boolean;
+          }>
+        >("/api/products?isBulk=all"),
+        apiGet<
+          Array<{
+            id: string;
+            internalCode: string;
+            displayName: string;
+            acquiredCost: string;
+            productId: string | null;
+          }>
+        >("/api/used-items?status=IN_STOCK&includeCosts=true&limit=500").catch(
+          () => [] as Array<{
+            id: string;
+            internalCode: string;
+            displayName: string;
+            acquiredCost: string;
+            productId: string | null;
+          }>,
+        ),
+      ]);
+
+      // 중고도 ProductOption 형태로 변환 — id 는 UsedItem.id, name 에 "(중고)" 자동 prefix.
+      // ProductCombobox UI 자체는 변경 없음 — 검색·선택만 통합.
+      const usedAsProducts: ProductOption[] = usedItemsData.map((u) => ({
+        id: u.id,
+        name: `${u.displayName} (중고)`,
+        sku: u.internalCode,
+        sellingPrice: "0",
+        unitCost: u.acquiredCost,
+        unitOfMeasure: "EA",
+        isSet: false,
+        usedItemId: u.id,
+      }));
+
+      setProducts([
+        ...productsData.map((p) => ({
           id: p.id,
           name: p.name,
           sku: p.sku,
@@ -127,7 +163,8 @@ export function AssemblyRegisterSheet({
           unitOfMeasure: p.unitOfMeasure,
           isSet: p.isSet,
         })),
-      );
+        ...usedAsProducts,
+      ]);
     } catch {
       // ignore
     }
@@ -269,6 +306,7 @@ export function AssemblyRegisterSheet({
         memo: memo || undefined,
         components: filteredComponents.map((c) => ({
           componentId: c.componentId,
+          usedItemId: c.usedItemId ?? null,
           quantity: c.quantity,
           slotId: c.slotId ?? null,
           slotLabelId: c.slotLabelId ?? null,
@@ -327,7 +365,8 @@ export function AssemblyRegisterSheet({
     const emptyNames: string[] = [];
     const filledComponents: ComponentRow[] = [];
     components.forEach((c, idx) => {
-      const hasComponent = c.componentId.trim().length > 0;
+      // 중고 단품 끼움 = usedItemId 있으면 채워진 것으로 인정 (componentId 비어있어도 OK)
+      const hasComponent = c.componentId.trim().length > 0 || !!c.usedItemId;
       const qty = parseFloat(c.quantity);
       // 음수 qty = 회수 (부속을 분해해서 재고로 돌려놓는 케이스). qty === 0 만 무효.
       const hasQuantity = !Number.isNaN(qty) && qty !== 0;
@@ -538,10 +577,22 @@ export function AssemblyRegisterSheet({
                           <JmTableCell className="p-1">
                             <ProductCombobox
                               products={products}
-                              value={c.componentId}
-                              onChange={(p) =>
-                                updateComponent(idx, { componentId: p.id })
-                              }
+                              value={c.usedItemId ?? c.componentId}
+                              onChange={(p) => {
+                                if (p.usedItemId) {
+                                  // 중고 단품 선택 — usedItemId 채우고 componentId 는 카탈로그 매칭이면 그대로
+                                  updateComponent(idx, {
+                                    usedItemId: p.usedItemId,
+                                    // 결과 lot.unitCost 합산에만 사용되니 componentId 는 기존 슬롯값 유지
+                                  });
+                                } else {
+                                  // 신품 Product — 기존 흐름. usedItemId clear.
+                                  updateComponent(idx, {
+                                    componentId: p.id,
+                                    usedItemId: null,
+                                  });
+                                }
+                              }}
                               filterType="component"
                               disabled={!c.isVariable}
                             />

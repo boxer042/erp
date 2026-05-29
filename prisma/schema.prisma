@@ -477,70 +477,70 @@ enum ProductLandingMode {
 }
 
 model Product {
-  id                 String             @id @default(uuid())
-  name               String
-  brand              String?
-  brandId            String?            @map("brand_id")
-  brandRef           Brand?             @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  modelName          String?            @map("model_name")
-  spec               String?
-  sku                String             @unique
-  barcode            String?            @unique
-  description        String?
-  unitOfMeasure      String             @default("EA") @map("unit_of_measure")
-  productType        ProductType        @default(FINISHED) @map("product_type")
-  taxType            TaxType            @default(TAXABLE) @map("tax_type")
-  taxRate            Decimal            @default(0.1) @map("tax_rate") @db.Decimal(5, 4)
-  zeroRateEligible   Boolean            @default(false) @map("zero_rate_eligible")
-  listPrice          Decimal            @default(0) @map("list_price") @db.Decimal(15, 2)
-  sellingPrice       Decimal            @default(0) @map("selling_price") @db.Decimal(15, 2)
-  isSet              Boolean            @default(false) @map("is_set")
-  isCanonical        Boolean            @default(false) @map("is_canonical")
-  canonicalProductId String?            @map("canonical_product_id")
-  canonicalProduct   Product?           @relation("ProductVariants", fields: [canonicalProductId], references: [id], onDelete: SetNull)
-  variants           Product[]          @relation("ProductVariants")
-  categoryId         String?            @map("category_id")
-  category           ProductCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  isBulk             Boolean            @default(false) @map("is_bulk")
-  containerSize      Decimal?           @map("container_size") @db.Decimal(10, 4)
-  bulkProductId      String?            @map("bulk_product_id")
-  bulkProduct        Product?           @relation("ProductBulk", fields: [bulkProductId], references: [id], onDelete: SetNull)
-  salesContainers    Product[]          @relation("ProductBulk")
-  isActive           Boolean            @default(true) @map("is_active")
+  id                   String             @id @default(uuid())
+  name                 String
+  brand                String?
+  brandId              String?            @map("brand_id")
+  brandRef             Brand?             @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  modelName            String?            @map("model_name")
+  spec                 String?
+  sku                  String             @unique
+  barcode              String?            @unique
+  description          String?
+  unitOfMeasure        String             @default("EA") @map("unit_of_measure")
+  productType          ProductType        @default(FINISHED) @map("product_type")
+  taxType              TaxType            @default(TAXABLE) @map("tax_type")
+  taxRate              Decimal            @default(0.1) @map("tax_rate") @db.Decimal(5, 4)
+  zeroRateEligible     Boolean            @default(false) @map("zero_rate_eligible")
+  listPrice            Decimal            @default(0) @map("list_price") @db.Decimal(15, 2)
+  sellingPrice         Decimal            @default(0) @map("selling_price") @db.Decimal(15, 2)
+  isSet                Boolean            @default(false) @map("is_set")
+  isCanonical          Boolean            @default(false) @map("is_canonical")
+  canonicalProductId   String?            @map("canonical_product_id")
+  canonicalProduct     Product?           @relation("ProductVariants", fields: [canonicalProductId], references: [id], onDelete: SetNull)
+  variants             Product[]          @relation("ProductVariants")
+  categoryId           String?            @map("category_id")
+  category             ProductCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  isBulk               Boolean            @default(false) @map("is_bulk")
+  containerSize        Decimal?           @map("container_size") @db.Decimal(10, 4)
+  bulkProductId        String?            @map("bulk_product_id")
+  bulkProduct          Product?           @relation("ProductBulk", fields: [bulkProductId], references: [id], onDelete: SetNull)
+  salesContainers      Product[]          @relation("ProductBulk")
+  isActive             Boolean            @default(true) @map("is_active")
   /**
    * 카탈로그 노출 차단 — true 면 자사몰/POS 그리드 등 일반 카탈로그에서 숨김.
    * 옵션 swap 의 대상 SKU(예: 가습기-블랙)를 단독 노출 안 시키고 옵션으로만 선택 가능하게 할 때 사용.
    * 재고/매핑/주문/결제는 정상 작동. isActive=false 와 다름 (그건 삭제·비활성).
    */
-  catalogHidden      Boolean            @default(false) @map("catalog_hidden")
-  autoMapped         Boolean            @default(false) @map("auto_mapped")
-  trackable          Boolean            @default(false) @map("trackable")
-  warrantyMonths     Int?               @map("warranty_months")
-  imageUrl           String?            @map("image_url")
-  memo               String?
-  landingBlocks      Json?              @map("landing_blocks")
-  landingMode        ProductLandingMode @default(BLOCKS) @map("landing_mode")
-  singleHtmlUrl      String?            @map("single_html_url")
+  catalogHidden        Boolean            @default(false) @map("catalog_hidden")
+  autoMapped           Boolean            @default(false) @map("auto_mapped")
+  trackable            Boolean            @default(false) @map("trackable")
+  warrantyMonths       Int?               @map("warranty_months")
+  imageUrl             String?            @map("image_url")
+  memo                 String?
+  landingBlocks        Json?              @map("landing_blocks")
+  landingMode          ProductLandingMode @default(BLOCKS) @map("landing_mode")
+  singleHtmlUrl        String?            @map("single_html_url")
   // 사용법·관리 매뉴얼 — landingBlocks 와 동일한 블록 구조(ManualBlock[]). 시리얼 손님 페이지에서 노출.
-  manualBlocks       Json?              @map("manual_blocks")
-  hasManual          Boolean            @default(false) @map("has_manual")
+  manualBlocks         Json?              @map("manual_blocks")
+  hasManual            Boolean            @default(false) @map("has_manual")
   // 상품정보 고시 (전자상거래법 표시 의무)
-  countryOfOrigin    String?            @map("country_of_origin")
-  manufacturer       String?
-  importer           String?
-  certifications     String?
-  manufactureDate    String?            @map("manufacture_date")
-  warrantyPolicy     String?            @map("warranty_policy")
-  asResponsible      String?            @map("as_responsible")
-  assemblyTemplateId String?            @map("assembly_template_id")
-  assemblyTemplate   AssemblyTemplate?  @relation("ProductDefaultTemplate", fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
+  countryOfOrigin      String?            @map("country_of_origin")
+  manufacturer         String?
+  importer             String?
+  certifications       String?
+  manufactureDate      String?            @map("manufacture_date")
+  warrantyPolicy       String?            @map("warranty_policy")
+  asResponsible        String?            @map("as_responsible")
+  assemblyTemplateId   String?            @map("assembly_template_id")
+  assemblyTemplate     AssemblyTemplate?  @relation("ProductDefaultTemplate", fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
   // 원가 변동 안내 — 마지막으로 "확인" 또는 "판매가 조정" 된 시점의 단위 원가(세전).
   // 현재 계산된 unitCost 와 다르면 리스트에 원가↑/↓ 배지 노출. 확인/판매가 수정 시 currentUnitCost 로 갱신.
-  acknowledgedUnitCost Decimal?         @map("acknowledged_unit_cost") @db.Decimal(15, 4)
-  acknowledgedAt       DateTime?        @map("acknowledged_at")
-  acknowledgedById     String?          @map("acknowledged_by_id")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+  acknowledgedUnitCost Decimal?           @map("acknowledged_unit_cost") @db.Decimal(15, 4)
+  acknowledgedAt       DateTime?          @map("acknowledged_at")
+  acknowledgedById     String?            @map("acknowledged_by_id")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
   setComponents            SetComponent[]                   @relation("SetParent")
   partOfSets               SetComponent[]                   @relation("SetChild")
@@ -582,6 +582,7 @@ model Product {
   assemblyComponentConsumptions AssemblyComponentConsumption[]
   assemblyTemplateSlotDefaults  AssemblyTemplateSlot[]
   assemblyPresetItems           AssemblyPresetItem[]
+  usedItems                     UsedItem[]
 
   specValues   ProductSpecValue[]
   priceHistory ProductPriceHistory[]
@@ -1158,32 +1159,32 @@ enum PurchaseOrderStatus {
 }
 
 model PurchaseOrder {
-  id           String              @id @default(uuid())
-  poNo         String              @unique @map("po_no")
-  supplierId   String              @map("supplier_id")
-  supplier     Supplier            @relation(fields: [supplierId], references: [id])
-  status       PurchaseOrderStatus @default(DRAFT)
-  orderDate    DateTime            @map("order_date")
-  expectedDate DateTime?           @map("expected_date")
-  totalAmount  Decimal             @default(0) @map("total_amount") @db.Decimal(15, 2)
-  memo         String?
+  id                 String              @id @default(uuid())
+  poNo               String              @unique @map("po_no")
+  supplierId         String              @map("supplier_id")
+  supplier           Supplier            @relation(fields: [supplierId], references: [id])
+  status             PurchaseOrderStatus @default(DRAFT)
+  orderDate          DateTime            @map("order_date")
+  expectedDate       DateTime?           @map("expected_date")
+  totalAmount        Decimal             @default(0) @map("total_amount") @db.Decimal(15, 2)
+  memo               String?
   // 출고 정보(2026-05-23 도입). PICKUP 은 우리가 PO 발송 시 사전 설정 — 외부 페이지에서 거래처는 변경 불가.
   // 그 외 4종(COURIER/DIRECT_DELIVERY/QUICK_OR_CARGO/OTHER_SUPPLIER)은 거래처가 [수락] 모달에서 선택.
-  shippingMethod ShippingMethod?   @map("shipping_method")
+  shippingMethod     ShippingMethod?     @map("shipping_method")
   // 거래처가 약속한 납기일(PICKUP 인 경우 "출고 가능일"). [수락] 시 입력.
-  promisedDate   DateTime?         @map("promised_date")
+  promisedDate       DateTime?           @map("promised_date")
   // 송장번호 / 직접배달 시간대 / 외부 운송사명 등 자유 메모.
-  shippingMemo   String?           @map("shipping_memo")
+  shippingMemo       String?             @map("shipping_memo")
   // 가격 미정 라인이 있을 때 거래처가 [수락] 모달에서 단가를 직접 입력 — 이때 우리쪽 확인 필요 여부.
   // false (기본): 거래처 입력 즉시 CONFIRMED. true: 거래처 입력 → COUNTER_OFFER → 우리 검토 후 수락.
-  requirePriceReview Boolean       @default(false) @map("require_price_review")
+  requirePriceReview Boolean             @default(false) @map("require_price_review")
   // 발주가 매입견적서를 기반으로 작성된 경우
-  quotationId  String?             @map("quotation_id")
-  quotation    Quotation?          @relation(fields: [quotationId], references: [id])
-  createdById  String              @map("created_by_id")
-  createdBy    User                @relation(fields: [createdById], references: [id])
-  createdAt    DateTime            @default(now()) @map("created_at")
-  updatedAt    DateTime            @updatedAt @map("updated_at")
+  quotationId        String?             @map("quotation_id")
+  quotation          Quotation?          @relation(fields: [quotationId], references: [id])
+  createdById        String              @map("created_by_id")
+  createdBy          User                @relation(fields: [createdById], references: [id])
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
 
   items        PurchaseOrderItem[]
   incomings    Incoming[]
@@ -1195,19 +1196,19 @@ model PurchaseOrder {
 }
 
 enum ShippingMethod {
-  COURIER          // 택배 출고 (CJ·한진·우체국 등)
-  DIRECT_DELIVERY  // 직접 배달 (거래처 차량으로 매장 배송)
-  QUICK_OR_CARGO   // 퀵·용달 (외부 운송사)
-  OTHER_SUPPLIER   // 다른 거래처 출고 (재고 부족 시 타 거래처에서 출고)
-  PICKUP           // 매장 직접 수령 (우리가 PO 발송 시 사전 선택)
+  COURIER // 택배 출고 (CJ·한진·우체국 등)
+  DIRECT_DELIVERY // 직접 배달 (거래처 차량으로 매장 배송)
+  QUICK_OR_CARGO // 퀵·용달 (외부 운송사)
+  OTHER_SUPPLIER // 다른 거래처 출고 (재고 부족 시 타 거래처에서 출고)
+  PICKUP // 매장 직접 수령 (우리가 PO 발송 시 사전 선택)
 }
 
 // 거래처가 [수락] 시 라인별로 줄 수 있는 출고 응답.
 // 기본 NORMAL — 라인별 분기를 사용하지 않으면 모든 라인이 NORMAL.
 enum POLineFulfillmentStatus {
-  NORMAL          // 정상 (PO 납기일 기준)
-  OUT_OF_STOCK    // 재고 없음 (이번 발주에서 제외, 매장이 별도 결정)
-  DELAYED         // 지연 (lineDelayedDate 에 라인별 약속 납기)
+  NORMAL // 정상 (PO 납기일 기준)
+  OUT_OF_STOCK // 재고 없음 (이번 발주에서 제외, 매장이 별도 결정)
+  DELAYED // 지연 (lineDelayedDate 에 라인별 약속 납기)
 }
 
 enum ProposalStatus {
@@ -1253,41 +1254,41 @@ model PurchaseOrderAccessToken {
 }
 
 model PurchaseOrderItem {
-  id                    String           @id @default(uuid())
-  purchaseOrderId       String           @map("purchase_order_id")
-  purchaseOrder         PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  id                    String                  @id @default(uuid())
+  purchaseOrderId       String                  @map("purchase_order_id")
+  purchaseOrder         PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   // 자유입력 라인 도입(2026-05-23) — 입고 전까지 거래처 공급상품을 특정할 수 없을 때
   // supplierProductId 없이 name 만으로 발주 가능. 입고 시 SupplierProductCombobox 로 매핑.
   // 둘 중 하나는 반드시 존재해야 함 (API 검증).
-  supplierProductId     String?          @map("supplier_product_id")
-  supplierProduct       SupplierProduct? @relation(fields: [supplierProductId], references: [id])
+  supplierProductId     String?                 @map("supplier_product_id")
+  supplierProduct       SupplierProduct?        @relation(fields: [supplierProductId], references: [id])
   // 자유입력 라인의 품명. supplierProductId 있으면 supplierProduct.name 우선 (override 용 보조 필드는 아님).
   name                  String?
   // 가격 미정 플래그(2026-05-23). true 면 외부 발주서에서 ₩0 대신 "가격 미정" 으로 표시되고
   // [수락] 버튼이 숨겨져 거래처가 반드시 [단가 변경 요청] 으로 가격 제안하게 강제.
   // 우리가 단가 수락하면 unitPrice 갱신 + priceUndetermined=false + PO 가 SENT 로 회귀.
-  priceUndetermined     Boolean          @default(false) @map("price_undetermined")
+  priceUndetermined     Boolean                 @default(false) @map("price_undetermined")
   // 거래처 라인별 출고 응답(2026-05-25 도입). [수락] 모달에서 "라인별로 다르게" 선택 시 설정.
   // NORMAL: 정상 (PO 납기일 기준)
   // OUT_OF_STOCK: 재고 없음 — 입고 prefill 에서 스킵, 매장이 별도 결정 ([발주 종료]/타 거래처 재발주)
   // DELAYED: 지연 — lineDelayedDate 에 약속 납기 저장, 입고 워크보드에서 따로 노출
   lineStatus            POLineFulfillmentStatus @default(NORMAL) @map("line_status")
   lineDelayedDate       DateTime?               @map("line_delayed_date")
-  quantity              Decimal          @db.Decimal(15, 4)
+  quantity              Decimal                 @db.Decimal(15, 4)
   // 분할 입고 누적 수량. quantity 도달 시 PurchaseOrder.status 가 RECEIVED 로 자동 전환.
   // 사용자가 "발주 종료" 누르면 잔량 무시하고 CLOSED.
-  receivedQty           Decimal         @default(0) @map("received_qty") @db.Decimal(15, 4)
-  unitPrice             Decimal         @map("unit_price") @db.Decimal(15, 2)
-  totalPrice            Decimal         @map("total_price") @db.Decimal(15, 2)
+  receivedQty           Decimal                 @default(0) @map("received_qty") @db.Decimal(15, 4)
+  unitPrice             Decimal                 @map("unit_price") @db.Decimal(15, 2)
+  totalPrice            Decimal                 @map("total_price") @db.Decimal(15, 2)
   // 거래처가 토큰 페이지에서 제안한 새 단가.
   // 수락 시 unitPrice 로 옮기되 proposedUnitPrice 는 보존 (이력 표시용).
   // 거절 시에도 보존. 새 제안이 들어오면 덮어쓰여짐 (단일 라운드 추적).
-  proposedUnitPrice     Decimal?        @map("proposed_unit_price") @db.Decimal(15, 2)
-  proposalStatus        ProposalStatus  @default(NONE) @map("proposal_status")
-  proposalRespondedAt   DateTime?       @map("proposal_responded_at")
-  proposalRejectionNote String?         @map("proposal_rejection_note")
+  proposedUnitPrice     Decimal?                @map("proposed_unit_price") @db.Decimal(15, 2)
+  proposalStatus        ProposalStatus          @default(NONE) @map("proposal_status")
+  proposalRespondedAt   DateTime?               @map("proposal_responded_at")
+  proposalRejectionNote String?                 @map("proposal_rejection_note")
   memo                  String?
-  sortOrder             Int             @default(0) @map("sort_order")
+  sortOrder             Int                     @default(0) @map("sort_order")
 
   incomingItems IncomingItem[]
 
@@ -1326,7 +1327,7 @@ enum OrderStatus {
 enum OrderPaymentStatus {
   UNPAID
   PAID
-  PARTIAL_PAID    // 부분 결제 — 일부 즉시 결제 + 잔액 미수금 (계약금/일부결제 케이스)
+  PARTIAL_PAID // 부분 결제 — 일부 즉시 결제 + 잔액 미수금 (계약금/일부결제 케이스)
   REFUND_PENDING
   PARTIAL_REFUND
   REFUNDED
@@ -1335,8 +1336,8 @@ enum OrderPaymentStatus {
 
 /**
  * 부분 결제 구분 — paymentStatus=PARTIAL_PAID 일 때만 의미.
- *  - DEPOSIT: 계약금 (영수증·증명서에 "계약금" 라벨로 출력)
- *  - PARTIAL: 일반 일부 결제 ("부분결제 영수증" 으로 출력)
+ * - DEPOSIT: 계약금 (영수증·증명서에 "계약금" 라벨로 출력)
+ * - PARTIAL: 일반 일부 결제 ("부분결제 영수증" 으로 출력)
  */
 enum PartialPaymentKind {
   DEPOSIT
@@ -1583,6 +1584,8 @@ model OrderItem {
   lotConsumptions LotConsumption[]
   serialItems     SerialItem[]
   shipmentItems   ShipmentItem[]
+  // 단품 판매된 UsedItem 역방향 (1:1). null 이면 일반 신품 판매.
+  soldUsedItem    UsedItem?
 
   @@index([parentItemId])
   @@index([entryProductId])
@@ -1886,19 +1889,20 @@ model Customer {
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")
 
-  quotations  Quotation[]
-  statements  Statement[]
-  orders      Order[]
-  ledger      CustomerLedger[]
-  payments    CustomerPayment[]
-  refunds     CustomerRefund[]
-  machines    CustomerMachine[]
-  notes       CustomerNote[]
-  repairs     RepairTicket[]
-  rentals     Rental[]
-  expenses    Expense[]
-  serialItems SerialItem[]
-  posSessions PosSession[]
+  quotations       Quotation[]
+  statements       Statement[]
+  orders           Order[]
+  ledger           CustomerLedger[]
+  payments         CustomerPayment[]
+  refunds          CustomerRefund[]
+  machines         CustomerMachine[]
+  notes            CustomerNote[]
+  repairs          RepairTicket[]
+  rentals          Rental[]
+  expenses         Expense[]
+  serialItems      SerialItem[]
+  posSessions      PosSession[]
+  usedItemsSourced UsedItem[]        @relation("UsedItemSourceCustomer")
 
   @@index([name])
   @@index([phone])
@@ -2147,7 +2151,7 @@ model ProductMedia {
 
 enum OrderPaymentMethod {
   CASH
-  CASH_RECEIPT  // 현금영수증 발행 — 손님 휴대폰/사업자번호로 국세청 영수증 발급된 현금 결제
+  CASH_RECEIPT // 현금영수증 발행 — 손님 휴대폰/사업자번호로 국세청 영수증 발급된 현금 결제
   CARD
   TRANSFER
   MIXED
@@ -2331,11 +2335,11 @@ model RepairTicket {
   createdAt              DateTime                 @default(now()) @map("created_at")
   updatedAt              DateTime                 @updatedAt @map("updated_at")
 
-  parts  RepairPart[]
-  labors RepairLabor[]
+  parts   RepairPart[]
+  labors  RepairLabor[]
   // 결제 Order — N:1. 한 Order 에 수리 여러 건 link 가능. 결제 전엔 null.
-  orderId String? @map("order_id")
-  order   Order?  @relation(fields: [orderId], references: [id])
+  orderId String?       @map("order_id")
+  order   Order?        @relation(fields: [orderId], references: [id])
 
   @@index([customerId])
   @@index([status])
@@ -2660,7 +2664,9 @@ model RentalAsset {
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
 
-  rentals Rental[]
+  rentals           Rental[]
+  // 임대 lifecycle 종료 후 중고로 전환된 경우 양방향 link
+  convertedUsedItem UsedItem?
 
   @@map("rental_assets")
 }
@@ -2898,7 +2904,9 @@ model Assembly {
   createdBy     String?      @map("created_by")
   createdAt     DateTime     @default(now()) @map("created_at")
 
-  consumptions AssemblyComponentConsumption[]
+  consumptions         AssemblyComponentConsumption[]
+  // 이 조립 인스턴스에 끼운 UsedItem 들 (자유 라인, BOM 정의 외)
+  usedItemConsumptions AssemblyUsedItemConsumption[]
 
   @@index([productId, assembledAt])
   @@map("assemblies")
@@ -2931,10 +2939,12 @@ enum SerialItemStatus {
 }
 
 // 시리얼 라벨 발번 출처. SALE=일반 판매, REPAIR=수리 받으러 온 기기에 부여(시스템 도입 전 판매분 등).
+// USED_INTAKE=중고 매입 시점 발번 (UsedItem 단품 판매 가능 케이스).
 // 임대 자산은 SerialItem 이 아니라 RentalAsset 자체의 QR(accessToken)로 별도 운영.
 enum SerialItemSource {
   SALE
   REPAIR
+  USED_INTAKE
 }
 
 // 손님 공개 페이지(/s/[token]) 접근 단계 — SerialAccessLog.stage
@@ -2970,7 +2980,8 @@ model SerialItem {
   orderItem            OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   customerId           String?          @map("customer_id")
   customer             Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  soldAt               DateTime         @map("sold_at")
+  // USED_INTAKE 발번 시점엔 판매 전이라 nullable. 단품 판매 시 자동 채움.
+  soldAt               DateTime?        @map("sold_at")
   warrantyEnds         DateTime?        @map("warranty_ends")
   status               SerialItemStatus @default(ACTIVE)
   memo                 String?
@@ -2979,6 +2990,7 @@ model SerialItem {
 
   repairTickets RepairTicket[]
   accessLogs    SerialAccessLog[]
+  usedItem      UsedItem?
 
   @@index([code])
   @@index([productId])
@@ -3003,6 +3015,137 @@ model SerialAccessLog {
   @@index([serialItemId])
   @@index([accessedAt])
   @@map("serial_access_logs")
+}
+
+// ============================================================
+// UsedItem — 중고 도메인 (전체 설계: docs/USED_ITEMS_DESIGN.md)
+// ============================================================
+//
+// 카탈로그 신품 (Product) 과 별개로 중고 단품을 추적.
+// - 카탈로그 매칭되면 productId link (같은 모델 신품과 비교 가능)
+// - 비카탈로그 (매장이 평소 안 다루는 모델) 도 자유 입력으로 수용
+// - status lifecycle: IN_STOCK → ASSEMBLED_INTO / SOLD / SCRAPPED
+// - 폐기 시 자동으로 Expense row 생성 (acquiredCost + addedCosts 합)
+// - 시리얼 발번 가능 (USED_INTAKE source) — 단품 판매 시 손님 정보 덮어쓰기
+// - 임대 자산 (RentalAsset) 에서 lifecycle 종료 후 전환 가능
+// - Assembly 자유 라인으로 끼움 가능 (UI 변경 없이 구성품 검색에 통합)
+
+model UsedItem {
+  id           String @id @default(uuid())
+  // UU{YYMMDD}-NNNN — internalCode (라벨/검색 식별자)
+  internalCode String @unique @map("internal_code")
+  // 자유 입력 (비카탈로그도 OK). 카탈로그 매칭이면 보통 product.name 과 같지만 매장이 별도 표기 가능.
+  displayName  String @map("display_name")
+
+  // 카탈로그 매칭 — 있으면 같은 모델의 신품과 묶임. null 이면 순수 비카탈로그 단품.
+  productId String?  @map("product_id")
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // 매입 정보
+  acquiredFrom      UsedItemSource @map("acquired_from")
+  acquiredCost      Decimal        @default(0) @map("acquired_cost") @db.Decimal(15, 2)
+  // VAT 처리 — 95% 개인 매입이라 기본 false (받은 금액 = 공급가액).
+  // 사업자 매입으로 세금계산서 받은 드문 케이스만 true (받은 금액 ÷ 1.1 = 공급가액).
+  isAcquiredTaxable Boolean        @default(false) @map("is_acquired_taxable")
+  acquiredAt        DateTime       @map("acquired_at")
+
+  // 매입처 — 등록 고객은 sourceCustomer, 비등록은 sourceMemo 자유 텍스트
+  sourceCustomerId String?   @map("source_customer_id")
+  sourceCustomer   Customer? @relation("UsedItemSourceCustomer", fields: [sourceCustomerId], references: [id], onDelete: SetNull)
+  sourceMemo       String?   @map("source_memo")
+
+  // lifecycle
+  status UsedItemStatus @default(IN_STOCK)
+
+  // 상세
+  spec      String?
+  imageUrls Json?   @map("image_urls") // ["https://..." , ...]
+  memo      String?
+
+  // 사후 비용 가산 (수리·부품·공임 등) — 합계는 OrderItem.unitCostSnapshot 에 흡수
+  addedCosts UsedItemCost[]
+
+  // 결과 lineage — 셋 중 하나 (배타적)
+  // ASSEMBLED_INTO 시 — 어느 Assembly 인스턴스에 흡수됐는지 (AssemblyUsedItemConsumption 으로 더 풍부하게 추적)
+  // SOLD 시         — 어느 OrderItem 으로 판매됐는지
+  // (SCRAPPED 시는 lineage 없음, 자동 Expense 만)
+  orderItemId String?    @unique @map("order_item_id")
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  // 임대 자산에서 전환된 출처 (역방향) — 1:1
+  rentalAssetId String?      @unique @map("rental_asset_id")
+  rentalAsset   RentalAsset? @relation(fields: [rentalAssetId], references: [id], onDelete: SetNull)
+
+  // 시리얼 발번 — 단품 판매 가능 케이스만 (매입 등록 시 토글). 1:1
+  serialItemId String?     @unique @map("serial_item_id")
+  serialItem   SerialItem? @relation(fields: [serialItemId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+
+  // Assembly 흡수 detail (status=ASSEMBLED_INTO 일 때 1건)
+  assemblyConsumption AssemblyUsedItemConsumption?
+
+  @@index([productId])
+  @@index([status])
+  @@index([acquiredFrom])
+  @@index([sourceCustomerId])
+  @@index([createdAt])
+  @@map("used_items")
+}
+
+// 사후 비용 가산 (SSD 교체 6만, 공임 2만 등)
+model UsedItemCost {
+  id            String           @id @default(uuid())
+  usedItemId    String           @map("used_item_id")
+  usedItem      UsedItem         @relation(fields: [usedItemId], references: [id], onDelete: Cascade)
+  costType      UsedItemCostType @map("cost_type")
+  amount        Decimal          @db.Decimal(15, 2)
+  description   String
+  referenceType String?          @map("reference_type") // REPAIR_TICKET | MANUAL ...
+  referenceId   String?          @map("reference_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  createdById   String?          @map("created_by_id")
+
+  @@index([usedItemId])
+  @@map("used_item_costs")
+}
+
+// Assembly 인스턴스가 흡수한 UsedItem — 자유 라인 (BOM 정의에 없는 ad-hoc).
+// 결과 lot.unitCost 합산에 costSnapshot 사용. UsedItem 1개 = 1 record.
+model AssemblyUsedItemConsumption {
+  id           String   @id @default(uuid())
+  assemblyId   String   @map("assembly_id")
+  assembly     Assembly @relation(fields: [assemblyId], references: [id], onDelete: Cascade)
+  usedItemId   String   @unique @map("used_item_id")
+  usedItem     UsedItem @relation(fields: [usedItemId], references: [id], onDelete: Restrict)
+  // 흡수 시점의 (acquiredCost + Σ addedCosts) 스냅샷. 이후 addedCosts 변경되어도 결과 lot.unitCost 불변.
+  costSnapshot Decimal  @map("cost_snapshot") @db.Decimal(15, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([assemblyId])
+  @@map("assembly_used_item_consumptions")
+}
+
+enum UsedItemSource {
+  PURCHASED // 손님에게서 매입 (또는 외부 일반 매입)
+  SCAVENGED // 손님이 버리고 간 기기에서 탈거 (원가 0)
+  RENTAL_RETIREMENT // 임대 자산 lifecycle 종료 후 중고로 전환
+  EMERGENCY_USE // 시스템 등록 전 급매 → 사후 reconcile 로 정리
+}
+
+enum UsedItemStatus {
+  IN_STOCK // 보관 중 — 매대 노출 대상
+  ASSEMBLED_INTO // 조립에 흡수됨
+  SOLD // 단품 판매 완료
+  SCRAPPED // 폐기 — 자동 Expense 생성
+}
+
+enum UsedItemCostType {
+  PART
+  LABOR
+  OTHER
 }
 
 // 개인정보처리방침 버전 — 손님 동의 버전 관리. 정책 갱신 시 새 row + isCurrent 이전.

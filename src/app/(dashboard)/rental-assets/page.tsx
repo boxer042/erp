@@ -7,15 +7,24 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { BookOpen, ImagePlus, Loader2, Pencil, Printer, QrCode, Trash2, X } from "lucide-react";
+import { BookOpen, ImagePlus, Loader2, Pencil, Printer, QrCode, Recycle, Trash2, X } from "lucide-react";
 import {
+  jmToast,
   JmBadge,
   JmButton,
+  JmCheckbox,
   JmDatePicker,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
   JmDrawer,
   JmDrawerContent,
   JmDrawerHeader,
   JmDrawerTitle,
+  JmFormField,
   JmIconButton,
   JmInput,
   JmSelect,
@@ -253,6 +262,49 @@ export default function RentalAssetsPage() {
       toast.error(e instanceof ApiError ? e.message : "QR 발급에 실패했습니다"),
   });
 
+  // 중고 전환 — 임대 lifecycle 종료 후 UsedItem 으로 핸드오프
+  const [convertTarget, setConvertTarget] = useState<Asset | null>(null);
+  const [convertForm, setConvertForm] = useState({
+    acquiredCost: "0",
+    issueSerial: false,
+    warrantyMonths: 0,
+    memo: "",
+  });
+
+  const openConvert = (a: Asset) => {
+    setConvertTarget(a);
+    setConvertForm({
+      acquiredCost: "0",
+      issueSerial: false,
+      warrantyMonths: 0,
+      memo: "",
+    });
+  };
+
+  const convertMutation = useMutation({
+    mutationFn: () => {
+      if (!convertTarget) throw new Error("자산이 선택되지 않았습니다");
+      return apiMutate<{ id: string; internalCode: string }>(
+        `/api/rental-assets/${convertTarget.id}/convert-to-used`,
+        "POST",
+        {
+          acquiredCost: convertForm.acquiredCost || "0",
+          issueSerial: convertForm.issueSerial,
+          warrantyMonths: convertForm.issueSerial ? convertForm.warrantyMonths : 0,
+          memo: convertForm.memo || null,
+        },
+      );
+    },
+    onSuccess: (created) => {
+      jmToast.success(`중고 단품으로 전환되었습니다 (${created.internalCode})`);
+      setConvertTarget(null);
+      refresh();
+      router.push(`/inventory/used-items/${created.id}`);
+    },
+    onError: (e) =>
+      jmToast.error(e instanceof ApiError ? e.message : "중고 전환에 실패했습니다"),
+  });
+
   const submitting = saveMutation.isPending;
   const save = () => saveMutation.mutate();
 
@@ -380,6 +432,16 @@ export default function RentalAssetsPage() {
                     >
                       <Pencil />
                     </JmIconButton>
+                    {a.status !== "RENTED" && a.status !== "RETIRED" && (
+                      <JmIconButton
+                        variant="ghost"
+                        size="sm"
+                        aria-label="중고로 전환"
+                        onClick={(e) => { e.stopPropagation(); openConvert(a); }}
+                      >
+                        <Recycle />
+                      </JmIconButton>
+                    )}
                     <JmIconButton
                       variant="ghost"
                       size="sm"
@@ -621,6 +683,122 @@ export default function RentalAssetsPage() {
           setQuickBrandOpen(false);
         }}
       />
+
+      {/* 중고 전환 다이얼로그 */}
+      <JmDialog
+        open={!!convertTarget}
+        onOpenChange={(v) => !v && setConvertTarget(null)}
+      >
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>임대 자산 → 중고 전환</JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody>
+            {convertTarget && (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+                  <div className="font-medium text-[var(--jm-text)]">
+                    {convertTarget.name}
+                  </div>
+                  <div className="mt-0.5 font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
+                    {convertTarget.assetNo}
+                  </div>
+                </div>
+
+                <JmFormField
+                  label="매입가 (감가상각 잔존가)"
+                  hint="0 입력 가능 — 감가상각 끝난 자산"
+                >
+                  <div className="flex items-center gap-2">
+                    <JmInput
+                      type="text"
+                      inputMode="numeric"
+                      value={formatComma(convertForm.acquiredCost)}
+                      onChange={(e) =>
+                        setConvertForm({
+                          ...convertForm,
+                          acquiredCost: parseComma(e.target.value),
+                        })
+                      }
+                      onFocus={focusCaretEnd}
+                    />
+                    <span className="shrink-0 text-jm-sm text-[var(--jm-text-muted)]">
+                      원
+                    </span>
+                  </div>
+                </JmFormField>
+
+                <label className="flex cursor-pointer items-center gap-2 text-jm-sm">
+                  <JmCheckbox
+                    checked={convertForm.issueSerial}
+                    onCheckedChange={(c) =>
+                      setConvertForm({
+                        ...convertForm,
+                        issueSerial: c === true,
+                      })
+                    }
+                  />
+                  <span>시리얼 라벨 발번</span>
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                    — 단품 판매 예정이면 ON
+                  </span>
+                </label>
+
+                {convertForm.issueSerial && (
+                  <JmFormField label="보증 기간 (개월)" hint="0 = 보증 없음">
+                    <div className="flex items-center gap-2">
+                      <JmInput
+                        type="number"
+                        min={0}
+                        max={120}
+                        value={String(convertForm.warrantyMonths)}
+                        onChange={(e) =>
+                          setConvertForm({
+                            ...convertForm,
+                            warrantyMonths: Math.max(
+                              0,
+                              Math.min(120, parseInt(e.target.value, 10) || 0),
+                            ),
+                          })
+                        }
+                        className="w-32"
+                      />
+                      <span className="text-jm-sm text-[var(--jm-text-muted)]">
+                        개월
+                      </span>
+                    </div>
+                  </JmFormField>
+                )}
+
+                <JmFormField label="메모">
+                  <JmInput
+                    value={convertForm.memo}
+                    onChange={(e) =>
+                      setConvertForm({ ...convertForm, memo: e.target.value })
+                    }
+                    placeholder="(선택) 자산 사용 이력 등"
+                  />
+                </JmFormField>
+              </div>
+            )}
+          </JmDialogBody>
+          <JmDialogFooter>
+            <JmButton variant="ghost" onClick={() => setConvertTarget(null)}>
+              취소
+            </JmButton>
+            <JmButton
+              variant="cta"
+              onClick={() => convertMutation.mutate()}
+              disabled={convertMutation.isPending}
+            >
+              {convertMutation.isPending && (
+                <Loader2 className="size-3.5 animate-spin" />
+              )}
+              전환
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
       {priceEdit && (
         <PriceInputDialog

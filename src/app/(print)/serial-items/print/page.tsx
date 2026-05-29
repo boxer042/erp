@@ -64,7 +64,7 @@ export default async function SerialItemsPrintPage({
         code: it.code,
         productName,
         source: it.source,
-        soldAt: it.soldAt.toISOString().slice(0, 10),
+        soldAt: it.soldAt ? it.soldAt.toISOString().slice(0, 10) : "",
         warrantyEnds: it.warrantyEnds ? it.warrantyEnds.toISOString().slice(0, 10) : null,
         qrDataUrl,
         qrUrl: url,

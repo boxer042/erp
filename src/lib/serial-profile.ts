@@ -75,7 +75,8 @@ export interface SerialProfile {
   status: SerialDetailRaw["status"];
   source: SerialDetailRaw["source"];
   masked: boolean;
-  soldAt: string;
+  /** USED_INTAKE 발번 시점엔 아직 안 팔린 상태라 null 가능. */
+  soldAt: string | null;
   warranty: { ends: string | null; active: boolean; daysLeft: number | null };
   device: {
     productId: string | null;
@@ -192,7 +193,7 @@ export function buildSerialProfile(
     status: raw.status,
     source: raw.source,
     masked,
-    soldAt: raw.soldAt.toISOString(),
+    soldAt: raw.soldAt?.toISOString() ?? null,
     warranty: {
       ends: raw.warrantyEnds?.toISOString() ?? null,
       active: w.active,

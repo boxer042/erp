@@ -399,6 +399,18 @@ export async function POST(request: NextRequest) {
       });
       const compById = new Map(compProducts.map((p) => [p.id, p]));
 
+      // UsedItem 끼운 라인 — 한 번에 조회
+      const usedItemIds = data.components
+        .map((c) => c.usedItemId)
+        .filter((v): v is string => !!v);
+      const usedItems = usedItemIds.length
+        ? await tx.usedItem.findMany({
+            where: { id: { in: usedItemIds } },
+            include: { addedCosts: { select: { amount: true } } },
+          })
+        : [];
+      const usedItemMap = new Map(usedItems.map((u) => [u.id, u]));
+
       let totalComponentCost = 0;
       for (const comp of data.components) {
         const compQty = parseFloat(comp.quantity);
@@ -407,6 +419,38 @@ export async function POST(request: NextRequest) {
 
         const compProduct = compById.get(comp.componentId);
         const displayName = compProduct?.name ?? comp.componentId;
+
+        // ─── 분기 1: UsedItem 자유 라인 ───────────────────────────
+        if (comp.usedItemId) {
+          const used = usedItemMap.get(comp.usedItemId);
+          if (!used) {
+            throw new Error(`중고 단품을 찾을 수 없습니다 (${comp.usedItemId})`);
+          }
+          if (used.status !== "IN_STOCK") {
+            throw new Error(
+              `중고 단품 ${used.internalCode} 은 더 이상 보관 중 상태가 아닙니다`,
+            );
+          }
+          // UsedItem 1개 = 단품 1개. quantity 합산 의미 없음 — 그냥 흡수.
+          const costSnapshot =
+            Number(used.acquiredCost) +
+            used.addedCosts.reduce((s, c) => s + Number(c.amount), 0);
+
+          await tx.usedItem.update({
+            where: { id: used.id },
+            data: { status: "ASSEMBLED_INTO" },
+          });
+          await tx.assemblyUsedItemConsumption.create({
+            data: {
+              assemblyId: assembly.id,
+              usedItemId: used.id,
+              costSnapshot,
+            },
+          });
+          // 결과 lot.unitCost 에 합산 (단품 1개 흡수 → 그대로 더함)
+          totalComponentCost += costSnapshot;
+          continue;
+        }
 
         if (totalQty > 0) {
           // 차감 (CONSUME) — 정상 부속 소비

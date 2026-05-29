@@ -5,7 +5,7 @@ import { useEffect } from "react";
 interface Label {
   code: string;
   productName: string;
-  source: "SALE" | "REPAIR";
+  source: "SALE" | "REPAIR" | "USED_INTAKE";
   soldAt: string;
   warrantyEnds: string | null;
   qrDataUrl: string | null;
@@ -29,6 +29,7 @@ interface Props {
 const SOURCE_BADGE: Record<Label["source"], string | null> = {
   SALE: null,
   REPAIR: "수리",
+  USED_INTAKE: "중고",
 };
 
 /**

@@ -2,6 +2,12 @@ import { z } from "zod";
 
 export const assemblyComponentSchema = z.object({
   componentId: z.string().min(1, "구성품을 선택해주세요"),
+  /**
+   * 중고 단품 자유 라인 — 이 값 있으면 그 UsedItem 의 lot 차감.
+   * componentId 는 표시용 (카탈로그 매칭 UsedItem 의 productId 또는 임의 Product id).
+   * 빈 값이면 기존 fifoConsume 흐름.
+   */
+  usedItemId: z.string().nullable().optional(),
   quantity: z.string().min(1, "수량을 입력해주세요"),
   slotId: z.string().nullable().optional(),
   slotLabelId: z.string().nullable().optional(),
