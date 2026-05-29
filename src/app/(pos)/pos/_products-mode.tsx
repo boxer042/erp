@@ -65,6 +65,7 @@ export function ProductsMode({
       const params = new URLSearchParams();
       if (categoryId) params.set("categoryId", categoryId);
       params.set("excludeVariants", "true");
+      params.set("isBulk", "all");
       return apiGet<ProductLite[]>(`/api/products?${params}`);
     },
     staleTime: 1000 * 60,
@@ -77,8 +78,35 @@ export function ProductsMode({
     queryFn: () => {
       const params = new URLSearchParams();
       params.set("excludeVariants", "true");
+      params.set("isBulk", "all");
       return apiGet<ProductLite[]>(`/api/products?${params}`);
     },
+    staleTime: 1000 * 60 * 5,
+    enabled: isSearching,
+  });
+
+  // 중고 단품 (IN_STOCK) — 검색 시 같은 그리드에 통합 노출. 라벨은 "(중고)" 자동 prefix.
+  // 정책: 신품 우선 정렬 (concat 순서로 자연 정렬)
+  const usedItemsQuery = useQuery<
+    Array<{
+      id: string;
+      internalCode: string;
+      displayName: string;
+      acquiredCost: string;
+      productId: string | null;
+    }>
+  >({
+    queryKey: ["pos-v2", "used-items-in-stock"],
+    queryFn: () =>
+      apiGet<
+        Array<{
+          id: string;
+          internalCode: string;
+          displayName: string;
+          acquiredCost: string;
+          productId: string | null;
+        }>
+      >("/api/used-items?status=IN_STOCK&limit=500"),
     staleTime: 1000 * 60 * 5,
     enabled: isSearching,
   });
@@ -94,13 +122,44 @@ export function ProductsMode({
   const products = useMemo(() => {
     if (isSearching) {
       const q = deferredSearch.toLowerCase();
-      return (allProductsQuery.data ?? []).filter(
+      const matched = (allProductsQuery.data ?? []).filter(
         (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
       );
+
+      // 중고도 같은 검색어로 필터 — name/internalCode 부분일치. sellingPrice 0 → 자동 가격 다이얼로그
+      const usedMatched: ProductLite[] = (usedItemsQuery.data ?? [])
+        .filter(
+          (u) =>
+            u.displayName.toLowerCase().includes(q) ||
+            u.internalCode.toLowerCase().includes(q),
+        )
+        .map((u) => ({
+          id: u.id,
+          name: `${u.displayName} (중고)`,
+          sku: u.internalCode,
+          brand: null,
+          spec: null,
+          // 0원 = 카트 추가 시 가격 다이얼로그 자동 — 매장 직원이 매번 가격 결정
+          sellingPrice: "0",
+          imageUrl: null,
+          taxType: "TAXABLE",
+          usedItemId: u.id,
+        }));
+
+      // 신품 우선 정렬: 신품 먼저, 중고 뒤
+      return [...matched, ...usedMatched];
     }
     return productsQuery.data ?? [];
-  }, [isSearching, deferredSearch, allProductsQuery.data, productsQuery.data]);
-  const isProductsPending = isSearching ? allProductsQuery.isPending : productsQuery.isPending;
+  }, [
+    isSearching,
+    deferredSearch,
+    allProductsQuery.data,
+    usedItemsQuery.data,
+    productsQuery.data,
+  ]);
+  const isProductsPending = isSearching
+    ? allProductsQuery.isPending || usedItemsQuery.isPending
+    : productsQuery.isPending;
   // 미니카트 합계는 전체 카트 (상품+임대+수리) — 결제는 전체 항목 결제
   const totals = useMemo(
     () => calcCartTotals(session),
@@ -118,7 +177,8 @@ export function ProductsMode({
     const baseline = list > 0 ? list : selling;
     add(
       {
-        productId: p.id,
+        // UsedItem 단품은 카탈로그 productId 가 아니라 usedItemId 로 추적. productId 는 카탈로그 매칭일 때만 보존.
+        productId: p.usedItemId ? undefined : p.id,
         itemType: "product",
         name: p.name,
         sku: p.sku,
@@ -132,6 +192,7 @@ export function ProductsMode({
         isCanonical: p.isCanonical,
         isOptionParent: p.productType === "OPTION_PARENT",
         hasProductOptions: p.hasProductOptions,
+        usedItemId: p.usedItemId,
       },
       { sessionId: session.id },
     );
