@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SupplierPaymentDialog } from "@/components/supplier-payment-dialog";
 import { SupplierAdjustmentDialog } from "@/components/supplier-adjustment-dialog";
+import { DocumentPrintDialog } from "@/components/document-print-dialog";
 import { type PaymentMethod } from "@/lib/validators/supplier";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 
@@ -157,6 +158,9 @@ export default function SupplierLedgerPage() {
 
   // 조정 등록/수정 Dialog
   const [adjDialogOpen, setAdjDialogOpen] = useState(false);
+  // PDF 모달 (거래처 원장 / 품목별 원장 공통)
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printPath, setPrintPath] = useState<string | null>(null);
   const [editingAdjustment, setEditingAdjustment] = useState<{
     id: string;
     supplier: { id: string; name: string };
@@ -408,6 +412,8 @@ export default function SupplierLedgerPage() {
                 disabled={!selectedSupplierId}
                 onClick={() => {
                   if (!selectedSupplierId) return;
+                  // 모달 — 다른 문서들(견적서/명세표)과 동일하게 iframe 임베드.
+                  // 모달 안 toggle 로 supplyOnly 분기. 기간·view 만 base path 에 보존.
                   const params = new URLSearchParams();
                   if (from) params.set("from", from.toISOString());
                   if (to) {
@@ -415,9 +421,12 @@ export default function SupplierLedgerPage() {
                     toInc.setDate(toInc.getDate() + 1);
                     params.set("to", toInc.toISOString());
                   }
-                  params.set("auto", "1");
                   if (viewMode === "items") params.set("view", "items");
-                  window.open(`/suppliers/ledger/${selectedSupplierId}/print?${params.toString()}`, "_blank");
+                  const qs = params.toString();
+                  setPrintPath(
+                    `/suppliers/ledger/${selectedSupplierId}/print${qs ? `?${qs}` : ""}`,
+                  );
+                  setPrintOpen(true);
                 }}
                 className={cn(
                   "flex-1 h-7 rounded-md border text-[11px] flex items-center justify-center gap-1 transition-colors",
@@ -800,6 +809,18 @@ export default function SupplierLedgerPage() {
         }
         initialAdjustment={editingAdjustment ?? undefined}
         onSaved={fetchLedger}
+      />
+
+      {/* 거래처 원장 PDF 모달 — 공급가액만 토글 / PDF 다운로드 / 새 탭 인쇄 */}
+      <DocumentPrintDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        printPath={printPath}
+        title={
+          selectedSupplierSummary
+            ? `거래처 원장 — ${selectedSupplierSummary.supplierName}`
+            : "거래처 원장"
+        }
       />
 
       <IncomingStatementModal

@@ -78,6 +78,14 @@ export function ReceiptClient({
 }) {
   const [supplyOnly, setSupplyOnly] = useState(initialSupplyOnly);
 
+  // 파일명(브라우저 "PDF로 저장" 기본 파일명) — 다른 문서들(견적서/명세표)과 동일 패턴.
+  // "공급자_상대방_문서번호" — 영수증의 문서번호 = orderNo.
+  useEffect(() => {
+    const companyName = data.company.name || "우리";
+    const customerName = data.customer?.name || data.recipientName || "고객";
+    document.title = `${companyName}_${customerName}_${data.orderNo}`;
+  }, [data.company.name, data.customer?.name, data.recipientName, data.orderNo]);
+
   useEffect(() => {
     if (auto) {
       const t = setTimeout(() => window.print(), 200);

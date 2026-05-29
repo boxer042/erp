@@ -25,10 +25,10 @@ export default async function SupplierLedgerPrintPage({
   searchParams,
 }: {
   params: Promise<{ supplierId: string }>;
-  searchParams: Promise<{ from?: string; to?: string; auto?: string; view?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; auto?: string; view?: string; supplyOnly?: string }>;
 }) {
   const { supplierId } = await params;
-  const { from, to, auto, view } = await searchParams;
+  const { from, to, auto, view, supplyOnly } = await searchParams;
   const OUR_COMPANY = await loadOurCompany();
 
   const supplier = await prisma.supplier.findUnique({
@@ -230,6 +230,7 @@ export default async function SupplierLedgerPrintPage({
         balance: e.balance.toString(),
       }))}
       autoPrint={auto === "1"}
+      supplyOnly={supplyOnly === "1"}
     />
   );
 }

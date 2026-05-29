@@ -22,36 +22,34 @@ interface PartyInfo {
   address?: string | null;
 }
 
-export interface LedgerRow {
+export interface CustomerLedgerRow {
   id: string;
   date: string;
-  type: "PURCHASE" | "PAYMENT" | "ADJUSTMENT" | "REFUND";
+  type: "SALE" | "RECEIPT" | "ADJUSTMENT" | "REFUND";
   description: string;
   debitAmount: string | number;
   creditAmount: string | number;
   balance: string | number;
 }
 
-export interface SupplierLedgerPdfProps {
+export interface CustomerLedgerPdfProps {
   company: PartyInfo; // 우리
-  supplier: PartyInfo; // 거래처
+  customer: PartyInfo; // 고객
   periodFrom?: string | null;
   periodTo?: string | null;
   openingBalance: number;
-  entries: LedgerRow[]; // ASC by date
+  entries: CustomerLedgerRow[]; // ASC by date
   autoPrint?: boolean;
   /** 공급가액만 (세액 제외) — true 면 모든 debit/credit/balance 를 ÷ 1.1 로 표시 */
   supplyOnly?: boolean;
 }
 
 const TYPE_LABELS = {
-  PURCHASE: "매입",
-  PAYMENT: "결제",
+  SALE: "매출",
+  RECEIPT: "수금",
   ADJUSTMENT: "조정",
-  REFUND: "환급",
+  REFUND: "환불",
 } as const;
-
-// supplyOnly 분기는 LedgerDocument 안에서 closure 로 적용. 여기는 raw 표시용 (사용 X).
 
 const BORDER = "#000";
 const BW = 0.6;
@@ -89,10 +87,9 @@ const s = StyleSheet.create({
   },
   tr: {
     flexDirection: "row",
-    borderLeftWidth: BW,
-    borderRightWidth: BW,
-    borderBottomWidth: BW,
+    borderWidth: BW,
     borderColor: BORDER,
+    borderTopWidth: 0,
   },
   td: {
     paddingVertical: 3,
@@ -101,32 +98,31 @@ const s = StyleSheet.create({
     borderColor: BORDER,
     fontSize: 8.5,
   },
-  tdRight: { textAlign: "right" },
   tdCenter: { textAlign: "center" },
+  tdRight: { textAlign: "right" },
   footerRow: {
     flexDirection: "row",
-    borderLeftWidth: BW,
-    borderRightWidth: BW,
-    borderBottomWidth: BW,
+    borderWidth: BW,
     borderColor: BORDER,
-    backgroundColor: "#fafafa",
+    borderTopWidth: 0,
+    backgroundColor: "#f9f9f9",
   },
 });
 
 const COL = {
-  date: "12%",
-  type: "8%",
-  desc: "40%",
-  debit: "13%",
-  credit: "13%",
-  balance: "14%",
+  date: "11%",
+  type: "9%",
+  desc: "36%",
+  debit: "14%",
+  credit: "14%",
+  balance: "16%",
 };
 
 function PartyBlock({ label, party }: { label: string; party: PartyInfo }) {
   return (
     <View style={s.partyBox}>
       <Text style={s.partyLabel}>{label}</Text>
-      <Text style={s.partyName}>{party.name || "-"}</Text>
+      <Text style={s.partyName}>{party.name}</Text>
       {party.businessNumber && (
         <Text style={s.partyDetail}>사업자: {party.businessNumber}</Text>
       )}
@@ -137,9 +133,10 @@ function PartyBlock({ label, party }: { label: string; party: PartyInfo }) {
   );
 }
 
-function LedgerDocument(props: SupplierLedgerPdfProps) {
-  const { company, supplier, periodFrom, periodTo, openingBalance, entries, supplyOnly } = props;
+function LedgerDocument(props: CustomerLedgerPdfProps) {
+  const { company, customer, periodFrom, periodTo, openingBalance, entries, supplyOnly } = props;
 
+  // supplyOnly 면 모든 금액 ÷ 1.1 — 영수증/명세표와 동일한 토글 동작
   const adj = (v: number) => (supplyOnly ? Math.round(v / 1.1) : Math.round(v));
   const fmt = (v: string | number) => adj(parseFloat(String(v))).toLocaleString("ko-KR");
 
@@ -155,12 +152,12 @@ function LedgerDocument(props: SupplierLedgerPdfProps) {
 
   // 파일명 — 다른 문서들(statement/quotation)과 동일한 "공급자_상대방_문서번호" 패턴.
   // 문서번호 위치엔 "원장_기간" 사용.
-  const docTitle = `${company.name}_${supplier.name}_원장_${periodLabel}`;
+  const docTitle = `${company.name}_${customer.name}_원장_${periodLabel}`;
 
   return (
     <Document title={docTitle}>
       <Page size="A4" style={s.page}>
-        <Text style={s.title}>거 래 처 원 장</Text>
+        <Text style={s.title}>고 객 원 장</Text>
         <Text style={s.subtitle}>
           기간: {periodLabel}
           {supplyOnly ? " · 공급가액만 (세액 제외)" : ""}
@@ -168,16 +165,15 @@ function LedgerDocument(props: SupplierLedgerPdfProps) {
 
         <View style={{ flexDirection: "row", gap: 8, marginTop: 12, marginBottom: 10 }}>
           <PartyBlock label="공급자 (우리)" party={company} />
-          <PartyBlock label="거래처" party={supplier} />
+          <PartyBlock label="고객" party={customer} />
         </View>
 
-        {/* 테이블 헤더 */}
         <View style={s.tableHeader}>
           <Text style={[s.th, { width: COL.date }]}>일자</Text>
           <Text style={[s.th, { width: COL.type }]}>유형</Text>
           <Text style={[s.th, { width: COL.desc }]}>적요</Text>
-          <Text style={[s.th, { width: COL.debit }]}>차변(매입)</Text>
-          <Text style={[s.th, { width: COL.credit }]}>대변(결제)</Text>
+          <Text style={[s.th, { width: COL.debit }]}>차변(매출)</Text>
+          <Text style={[s.th, { width: COL.credit }]}>대변(수금)</Text>
           <Text style={[s.th, { width: COL.balance, borderRightWidth: 0 }]}>잔액</Text>
         </View>
 
@@ -195,7 +191,6 @@ function LedgerDocument(props: SupplierLedgerPdfProps) {
           </Text>
         </View>
 
-        {/* 엔트리 */}
         {entries.map((e) => (
           <View key={e.id} style={s.tr} wrap={false}>
             <Text style={[s.td, { width: COL.date }, s.tdCenter]}>
@@ -217,7 +212,6 @@ function LedgerDocument(props: SupplierLedgerPdfProps) {
           </View>
         ))}
 
-        {/* 합계 */}
         <View style={s.footerRow}>
           <Text style={[s.td, { width: COL.date, fontWeight: "bold" }, s.tdCenter]}>
             합계
@@ -242,14 +236,14 @@ function LedgerDocument(props: SupplierLedgerPdfProps) {
         </View>
 
         <Text style={{ marginTop: 12, fontSize: 8, color: "#555" }}>
-          * 잔액이 양수이면 미지급금(우리가 거래처에 지급할 금액)입니다.
+          * 잔액이 양수이면 미수금(고객이 우리에게 지급할 금액)입니다.
         </Text>
       </Page>
     </Document>
   );
 }
 
-export function SupplierLedgerPdf(props: SupplierLedgerPdfProps) {
+export function CustomerLedgerPdf(props: CustomerLedgerPdfProps) {
   const [autoLoading, setAutoLoading] = useState(props.autoPrint);
 
   useEffect(() => {

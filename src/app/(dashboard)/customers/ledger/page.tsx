@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
-import { Plus, Search, SlidersHorizontal, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, FileEdit, PanelLeftClose, PanelLeftOpen, Printer } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   JmBadge,
@@ -25,6 +25,7 @@ import {
 } from "@/jm";
 import { cn } from "@/lib/utils";
 import { CustomerPaymentDialog } from "@/components/customer-payment-dialog";
+import { DocumentPrintDialog } from "@/components/document-print-dialog";
 import { CustomerAdjustmentDialog } from "@/components/customer-adjustment-dialog";
 import { OrderDetailSheet } from "@/app/(dashboard)/orders/_detail-sheet";
 import { type PaymentMethod } from "@/lib/validators/supplier";
@@ -85,6 +86,10 @@ export default function CustomerLedgerPage() {
 
   // 주문 상세 모달 — SALE/REFUND 행 더블클릭 시 페이지 이탈 없이 OrderDetailSheet 열기
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+
+  // PDF 모달 — 고객 원장 출력 (공급가액만 토글 / 다운로드 / 새 탭)
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printPath, setPrintPath] = useState<string | null>(null);
 
   const ledgerQuery = useQuery({
     queryKey: queryKeys.ledger.customers({
@@ -232,6 +237,35 @@ export default function CustomerLedgerPage() {
                 <FileEdit className="size-3.5" /><span>조정 등록</span>
               </JmButton>
             </div>
+            {/* PDF 출력 — 거래처 원장과 동일 패턴. 고객 선택돼 있을 때만 활성. */}
+            <button
+              type="button"
+              disabled={!selectedCustomerId}
+              onClick={() => {
+                if (!selectedCustomerId) return;
+                const params = new URLSearchParams();
+                if (from) params.set("from", from.toISOString());
+                if (to) {
+                  const toInc = new Date(to);
+                  toInc.setDate(toInc.getDate() + 1);
+                  params.set("to", toInc.toISOString());
+                }
+                const qs = params.toString();
+                setPrintPath(
+                  `/customers/ledger/${selectedCustomerId}/print${qs ? `?${qs}` : ""}`,
+                );
+                setPrintOpen(true);
+              }}
+              className={cn(
+                "w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1 transition-colors",
+                selectedCustomerId
+                  ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)] hover:bg-[var(--jm-info-bg)]/80"
+                  : "border-[var(--jm-border)] bg-[var(--jm-surface)] opacity-40 cursor-not-allowed text-[var(--jm-text-muted)]"
+              )}
+              title={selectedCustomerId ? "고객 원장 PDF 출력" : "고객을 선택하세요"}
+            >
+              <Printer className="size-3" /> PDF 출력
+            </button>
           </div>
 
           <div className="px-3 pt-2 flex flex-wrap gap-1 shrink-0">
@@ -584,6 +618,18 @@ export default function CustomerLedgerPage() {
         onOpenChange={(o) => {
           if (!o) setDetailOrderId(null);
         }}
+      />
+
+      {/* 고객 원장 PDF 모달 — 공급가액만 토글 / PDF 다운로드 / 새 탭 인쇄 */}
+      <DocumentPrintDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        printPath={printPath}
+        title={
+          selectedCustomerSummary
+            ? `고객 원장 — ${selectedCustomerSummary.customerName}`
+            : "고객 원장"
+        }
       />
     </JmScope>
   );
