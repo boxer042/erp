@@ -168,6 +168,7 @@ export function MobileInlineCellProductSearch<T extends SupplierProductLike>({
         }}
       >
         <JmDrawerContent
+          side="bottom"
           className={cn(
             "flex flex-col",
             isPhoneSize
