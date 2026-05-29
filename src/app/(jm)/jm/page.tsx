@@ -88,6 +88,7 @@ import {
   JmIconButton,
   JmInput,
   JmNumberInput,
+  JmQuantityStepper,
   JmPill,
   JmRadio,
   JmRadioGroup,
@@ -246,6 +247,10 @@ export default function JmShowcasePage() {
   const [qty, setQty] = useState("");
   const [discount, setDiscount] = useState("10");
   const [taxAmount, setTaxAmount] = useState("12500");
+
+  // QuantityStepper 상태
+  const [stepperQty, setStepperQty] = useState(1);
+  const [stepperBulkQty, setStepperBulkQty] = useState(1.5);
 
   // Radio / DateRange 상태
   const [paymentMethod, setPaymentMethod] = useState("card");
@@ -1479,6 +1484,37 @@ export default function JmShowcasePage() {
               </div>
             </JmCardContent>
           </JmCard>
+        </Section>
+
+        {/* QUANTITY STEPPER */}
+        <Section
+          title="수량 스테퍼 (JmQuantityStepper)"
+          subtitle="둥근 ± 버튼 + 직접 타이핑 가능한 중앙 인풋. POS 카트·수리 부속 공용. 정수/소수(벌크) 지원."
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label={`정수 (현재 ${stepperQty})`}>
+              <JmQuantityStepper value={stepperQty} onChange={setStepperQty} />
+            </Field>
+            <Field label={`소수·벌크 step 0.5 (현재 ${stepperBulkQty})`}>
+              <JmQuantityStepper
+                value={stepperBulkQty}
+                onChange={setStepperBulkQty}
+                min={0.0001}
+                step={0.5}
+                decimal
+              />
+            </Field>
+            <Field label="최대 10 제한">
+              <JmQuantityStepper
+                value={stepperQty}
+                onChange={setStepperQty}
+                max={10}
+              />
+            </Field>
+            <Field label="비활성 (readonly)">
+              <JmQuantityStepper value={stepperQty} onChange={setStepperQty} disabled />
+            </Field>
+          </div>
         </Section>
 
         {/* CHECKBOX & SWITCH */}

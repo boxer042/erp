@@ -19,6 +19,10 @@ export {
 } from "./card";
 export { JmInput, type JmInputProps } from "./input";
 export { JmNumberInput, type JmNumberInputProps } from "./number-input";
+export {
+  JmQuantityStepper,
+  type JmQuantityStepperProps,
+} from "./quantity-stepper";
 export { JmSearchInput, type JmSearchInputProps } from "./search-input";
 export { JmTextarea } from "./textarea";
 export { JmPill, type JmPillProps } from "./pill";
