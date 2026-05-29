@@ -197,9 +197,7 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                   ₩{listDisplay.toLocaleString("ko-KR")}
                 </span>
               )}
-              <span className="text-[15px] font-semibold tabular-nums text-[var(--jm-text)]">
-                ₩{unitDisplay.toLocaleString("ko-KR")}
-              </span>
+              <span>₩{unitDisplay.toLocaleString("ko-KR")}</span>
             </div>
             {showListDiff && (
               <span
@@ -222,11 +220,7 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
           step: isBulk ? 0.5 : 1,
           decimal: isBulk,
         }}
-        total={
-          <span className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
-            ₩{lineDisplay.toLocaleString("ko-KR")}
-          </span>
-        }
+        total={`₩${lineDisplay.toLocaleString("ko-KR")}`}
         onTotalClick={() => setTotalOpen(true)}
       >
         {/* 매핑 옵션 자식 행 — 별도 상품으로 추가 구매되는 옵션 (예: 메모리, 필터) */}
