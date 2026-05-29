@@ -314,18 +314,10 @@ function PartRow({
         }
         onDelete={readonly ? undefined : () => del.mutate()}
         deleteDisabled={del.isPending}
-        unitPrice={
-          <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
-            {fmtKRWInc(part.unitPrice)}
-          </span>
-        }
+        unitPrice={fmtKRWInc(part.unitPrice)}
         onUnitPriceClick={readonly ? undefined : () => setPriceOpen(true)}
         quantity={{ value: Number(part.quantity), onChange: commitQty }}
-        total={
-          <span className="text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
-            {fmtKRWInc(part.totalPrice)}
-          </span>
-        }
+        total={fmtKRWInc(part.totalPrice)}
         onTotalClick={readonly ? undefined : () => setTotalOpen(true)}
         disabled={readonly}
       />
