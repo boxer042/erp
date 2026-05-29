@@ -10,6 +10,8 @@ export type FifoConsumption = {
 export type FifoResult = {
   consumptions: FifoConsumption[];
   unitCostAvg: number;
+  /** 재고 없이 소진된 수량 (적자 출고). >0 이면 호출자가 oversold 알림 트리거. */
+  deficitQty: number;
 };
 
 /**
@@ -92,6 +94,7 @@ export async function fifoConsume(
   // 재고 부족분 — 음수 재고 허용 시 적자(deficit) 로트를 만들어 소진.
   // 로트는 remainingQty 가 음수가 되어 (받은 적 없는 재고를 판 표시),
   // Inventory.quantity 와 Σ remainingQty 가 함께 음수로 정합. 추후 재고조정으로 정산.
+  let deficitQty = 0;
   if (need > 0) {
     const estCost = await estimateUnitCost(tx, productId);
     const deficitLot = await tx.inventoryLot.create({
@@ -110,9 +113,10 @@ export async function fifoConsume(
     });
     consumptions.push({ lotId: deficitLot.id, quantity: need, unitCost: estCost });
     totalCost += need * estCost;
+    deficitQty = need;
     need = 0;
   }
-  return { consumptions, unitCostAvg: totalCost / qty };
+  return { consumptions, unitCostAvg: totalCost / qty, deficitQty };
 }
 
 /**

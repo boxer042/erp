@@ -345,6 +345,7 @@ function Body({
         ticketNo: string;
         displayName: string;
       }[];
+      oversoldLines?: { name: string; deficitQty: number }[];
     },
     Error
   >({
@@ -458,6 +459,17 @@ function Body({
         });
       } else {
         toast.success(`결제 완료 — ${data.no}`);
+      }
+      // 적자 출고 경고 — 재고 없이 나간 라인이 있으면 직원에게 명시.
+      // 결제는 정상 완료됐지만 시스템 재고가 음수가 됐다는 사후 안내. 실사보정으로 정산 필요.
+      if (data.oversoldLines && data.oversoldLines.length > 0) {
+        const summary = data.oversoldLines
+          .map((l) => `${l.name} (-${l.deficitQty}개)`)
+          .join(", ");
+        toast.warning("재고 없이 출고됨 — 실사보정 권장", {
+          description: summary,
+          duration: 8000,
+        });
       }
       // 거래명세표 자동 발행 — 등록 고객일 때만 (사업자/B2B 증빙용 DB 기록).
       // 출력 자체는 결제 후 다이얼로그에서 사장님이 선택.

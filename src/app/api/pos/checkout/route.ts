@@ -605,6 +605,10 @@ export async function POST(request: NextRequest) {
       // 이후 로직(FIFO/labelCodes 매칭/RepairTicket 등)이 사용하는 order 객체 — 기존 구조 유지
       const order = { ...orderHeader, items: createdItems };
 
+      // 적자 출고 누적 — 재고 없이 나간 라인 추적해 결제 후 직원에게 toast 알림.
+      // 같은 상품이 세트 부속·일반 라인 등 여러 번 차감되면 합산.
+      const oversoldMap = new Map<string, { name: string; deficitQty: number }>();
+
       // 공용 FIFO 헬퍼 위임 — 재고 부족 시 allowOversell 이면 적자 로트로 처리.
       const consumeForOrderItem = async (
         productId: string,
@@ -613,13 +617,20 @@ export async function POST(request: NextRequest) {
         name: string,
       ) => {
         await ensureBulkStock(tx, productId, qty, name, allowOversell);
-        const { consumptions, unitCostAvg } = await fifoConsume(
+        const { consumptions, unitCostAvg, deficitQty } = await fifoConsume(
           tx,
           productId,
           qty,
           name,
           allowOversell,
         );
+        if (deficitQty > 0) {
+          const prev = oversoldMap.get(productId);
+          oversoldMap.set(productId, {
+            name,
+            deficitQty: (prev?.deficitQty ?? 0) + deficitQty,
+          });
+        }
         if (consumptions.length > 0) {
           await tx.lotConsumption.createMany({
             data: consumptions.map((c) => ({
@@ -1012,10 +1023,20 @@ export async function POST(request: NextRequest) {
         await rebalanceCustomerLedger(tx, body.customerId);
       }
 
-      return order;
+      // 적자 출고 라인 — 직원 toast 안내용. 같은 상품 여러 번 차감되면 합산.
+      const oversoldLines = Array.from(oversoldMap.values());
+      return { order, oversoldLines };
     }, { timeout: 30000, maxWait: 10000 });
 
-    return NextResponse.json({ kind: "order", id: result.id, no: result.orderNo }, { status: 201 });
+    return NextResponse.json(
+      {
+        kind: "order",
+        id: result.order.id,
+        no: result.order.orderNo,
+        oversoldLines: result.oversoldLines,
+      },
+      { status: 201 },
+    );
   } catch (e) {
     if (e instanceof Error && e.message === "RENTAL_OVERLAP") {
       const conflict = (e as Error & {

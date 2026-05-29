@@ -170,7 +170,12 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
 
 export async function submitCheckout(session: CartSession, opts: CheckoutPayloadOptions) {
   const payload = buildCheckoutPayload(session, opts);
-  return apiMutate<{ id: string; no: string }>("/api/pos/checkout", "POST", payload);
+  return apiMutate<{
+    id: string;
+    no: string;
+    // 적자 출고 라인 — 재고 없이 출고된 상품. POS 가 toast 로 직원에게 안내.
+    oversoldLines?: { name: string; deficitQty: number }[];
+  }>("/api/pos/checkout", "POST", payload);
 }
 
 // ─── 세션 할인 비례 분배 ────────────────────────────────────────────────────
