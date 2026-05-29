@@ -621,7 +621,6 @@ function TextModeForm({
   return (
     <JmInput
       size="md"
-      autoFocus
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={handleBlur}

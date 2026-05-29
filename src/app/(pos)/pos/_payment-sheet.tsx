@@ -25,6 +25,7 @@ import {
 } from "@/components/pos/temp-customer";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { PriceInputDialog } from "./_components/price-input-dialog";
+import { DateTimePickerSheet } from "./_components/datetime-picker-sheet";
 import { issueStatement } from "./_issue-document";
 
 type FulfillmentType =
@@ -198,21 +199,58 @@ function CustomerCard({
 }
 
 /**
- * 결제시간 카드 — 결제 시트가 열린 순간의 시각.
- * 시간대별 매출 트래픽 분석을 위해 Order.orderDate 로 자동 기록되는 값을 시각적으로도 명시.
+ * 결제시간 카드 — 시트 마운트 시각이 기본. 카드 클릭으로 과거 시점으로 수정 가능.
+ * 시간대별 매출 트래픽 분석용 Order.orderDate 로 저장. 미래는 허용 안 함.
  */
-function CheckoutAtCard({ at }: { at: Date }) {
+function CheckoutAtCard({
+  at,
+  onChange,
+}: {
+  at: Date;
+  onChange: (next: Date) => void;
+}) {
+  const [editorOpen, setEditorOpen] = useState(false);
   return (
-    <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-        결제시간
-      </span>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]">
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
-            <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
+    <>
+      <button
+        type="button"
+        onClick={() => setEditorOpen(true)}
+        className="flex w-full flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3 text-left transition-colors active:bg-[var(--jm-surface-muted)] sm:hover:bg-[var(--jm-surface-muted)]"
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          결제시간
+        </span>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
+              <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
+              <path
+                d="M10 6v4l2.5 2"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
+              {format(at, "HH:mm")}
+            </span>
+            <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+              {format(at, "M월 d일 (eee)", { locale: ko })}
+            </span>
+          </div>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            className="shrink-0 text-[var(--jm-text-subtle)]"
+            aria-hidden
+          >
             <path
-              d="M10 6v4l2.5 2"
+              d="M9 2.5l2.5 2.5L5 11.5H2.5V9L9 2.5z"
               stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
@@ -220,16 +258,19 @@ function CheckoutAtCard({ at }: { at: Date }) {
             />
           </svg>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
-            {format(at, "HH:mm")}
-          </span>
-          <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
-            {format(at, "M월 d일 (eee)", { locale: ko })}
-          </span>
-        </div>
-      </div>
-    </div>
+      </button>
+      {editorOpen && (
+        <DateTimePickerSheet
+          value={at}
+          onConfirm={(next) => {
+            onChange(next);
+            setEditorOpen(false);
+          }}
+          onClose={() => setEditorOpen(false)}
+          title="결제시간 변경"
+        />
+      )}
+    </>
   );
 }
 
@@ -282,8 +323,9 @@ function Body({
   const [registerPromptOpen, setRegisterPromptOpen] = useState(false);
   // 세금계산서 발행 요청 — Order.taxInvoiceRequested 로 저장 (사장님이 추후 발행)
   const [taxInvoiceRequested, setTaxInvoiceRequested] = useState(false);
-  // 결제시간 — 시트가 열린 순간 고정. Body 가 마운트될 때마다 새로 계산.
-  const [paymentAt] = useState(() => new Date());
+  // 결제시간 — 시트가 열린 순간 기본. 사용자가 CheckoutAtCard 탭하면 과거 시점으로 수정 가능.
+  // 미래 시점은 picker 자체에서 차단 (toDate=today). Order.orderDate 로 저장.
+  const [paymentAt, setPaymentAt] = useState(() => new Date());
   // 출고 방식 — 매장판매(즉시 종결) / 픽업대기(워크보드) / 배달 / 택배. 수리·임대 라인이 있으면 IN_STORE 강제.
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("IN_STORE");
   const [shippingRecipientName, setShippingRecipientName] = useState("");
@@ -445,6 +487,7 @@ function Body({
               expectedShipDate: expectedShipDate || null,
             }
           : undefined,
+        checkoutAt: paymentAt,
       });
       return { ...result, labelCodes, reprintCandidates };
     },
@@ -607,7 +650,7 @@ function Body({
                 (hasRentalOrRepair || method === "UNPAID")
               }
             />
-            <CheckoutAtCard at={paymentAt} />
+            <CheckoutAtCard at={paymentAt} onChange={setPaymentAt} />
           </div>
 
           {/* 등록 권장 / 필수 안내 — 미등록 + (임대·수리 또는 외상) */}

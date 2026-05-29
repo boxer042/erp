@@ -110,6 +110,12 @@ interface CheckoutBody {
   shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
   /** 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 마진에서만 차감, 손님 청구 무관 */
   shippingCostBorne?: number;
+  /**
+   * 결제시간 override — 클라이언트가 결제시트의 [결제시간] 카드 탭으로 과거 시점 입력 가능.
+   * 미지정 또는 null → 서버 now(). 미래 시점은 거부 (현재 시각 + 5분 마진까지만 허용).
+   * Order.orderDate 로 저장. 모든 ledger date / RECEIPT / customer-payment 와 일관성.
+   */
+  checkoutAt?: string | null;
 }
 
 function genNo(prefix: string) {
@@ -504,6 +510,19 @@ export async function POST(request: NextRequest) {
 
   const allowOversell = await isOversellAllowed();
 
+  // 결제시간 결정 — 클라이언트 override 가 있으면 그 시각, 미지정 시 now().
+  // 미래 시점은 거부 (현재 시각 + 5분 마진 — 시계 차이 보정). 너무 과거(예: 1년 전)도 일단 허용
+  // (사후 입력 케이스에 제한 두면 운영 unflexible).
+  const nowMs = Date.now();
+  const requestedAt = body.checkoutAt ? new Date(body.checkoutAt).getTime() : null;
+  if (requestedAt !== null && requestedAt > nowMs + 5 * 60 * 1000) {
+    return NextResponse.json(
+      { error: "결제시간은 현재 시각보다 미래로 설정할 수 없습니다." },
+      { status: 400 },
+    );
+  }
+  const orderDate = requestedAt !== null ? new Date(requestedAt) : new Date();
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const orderHeader = await tx.order.create({
@@ -527,7 +546,7 @@ export async function POST(request: NextRequest) {
               ? null
               : body.shippingRecipientPhone || body.customerPhone || null,
           shippingAddress: body.shippingAddress || null,
-          orderDate: new Date(),
+          orderDate,
           subtotalAmount: subtotal,
           discountAmount: 0,
           shippingFee: 0,

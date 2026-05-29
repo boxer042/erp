@@ -34,6 +34,11 @@ export interface CheckoutPayloadOptions {
   shippingPaymentType?: "PREPAID" | "COD" | "STORE_BURDEN";
   /** 배송 원가(매장 지불) — 우리가 낸 퀵비·택배비. 마진에서만 차감 */
   shippingCostBorne?: number;
+  /**
+   * 결제시간 override — 미지정 시 서버 now() 사용. 매장 사후 입력(영수증 정정 등) 케이스만 사용.
+   * Order.orderDate 로 저장. 미래 시점은 서버에서 거부.
+   */
+  checkoutAt?: Date;
 }
 
 export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayloadOptions) {
@@ -165,6 +170,8 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
     expectedShipDate: shipping?.expectedShipDate ?? null,
     // 결제 직전 발번된 라벨 — 서버에서 OrderItem 과 매칭해 orderItemId 연결
     labelCodes: session.labelCodes ?? [],
+    // 결제시간 override — 미지정 시 서버 now() 사용. 영수증 정정 등 사후 입력용.
+    checkoutAt: opts.checkoutAt ? opts.checkoutAt.toISOString() : null,
   };
 }
 
