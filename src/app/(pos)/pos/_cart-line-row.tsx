@@ -78,14 +78,6 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
           ? Math.round(listNet * 1.1)
           : listNet
       : 0;
-  const baseUnitDisplay =
-    optionAdd > 0
-      ? display === "net"
-        ? baseUnitNet
-        : taxApplies
-          ? Math.round(baseUnitNet * 1.1)
-          : baseUnitNet
-      : 0;
 
   const setQty = (next: number) => {
     const min = isBulk ? 0.0001 : 1;
