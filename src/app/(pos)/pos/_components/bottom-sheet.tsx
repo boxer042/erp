@@ -61,7 +61,7 @@ function Body({
       <button
         type="button"
         onClick={() => !locked && onOpenChange(false)}
-        className={`fixed inset-0 ${backdropZ} bg-black/40 backdrop-blur-sm`}
+        className={`fixed inset-0 ${backdropZ} bg-black/40 pointer-fine:backdrop-blur-sm`}
         aria-label="닫기"
       />
       <div

@@ -81,7 +81,8 @@ export function JmDrawerContent({
         className={cn(
           "fixed inset-0 z-50 bg-black/30 transition-opacity duration-200",
           "data-starting-style:opacity-0 data-ending-style:opacity-0",
-          "supports-backdrop-filter:backdrop-blur-sm",
+          // backdrop-filter 는 모바일(터치)에서 탭/리페인트 시 깜빡임을 유발 → fine pointer(데스크탑)에서만 블러 적용
+          "pointer-fine:supports-backdrop-filter:backdrop-blur-sm",
           backdropClassName,
         )}
       />

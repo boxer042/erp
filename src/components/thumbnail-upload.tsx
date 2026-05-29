@@ -76,7 +76,9 @@ export function ThumbnailUpload({
             <img
               src={value}
               alt="썸네일"
-              className="size-full rounded-lg border border-[var(--jm-border)] object-cover"
+              onClick={() => { if (!disabled && !uploading) galleryRef.current?.click(); }}
+              title="클릭하여 갤러리에서 변경"
+              className="size-full cursor-pointer rounded-lg border border-[var(--jm-border)] object-cover"
               style={box}
             />
             <button
@@ -103,12 +105,12 @@ export function ThumbnailUpload({
           </button>
         )}
 
-        {/* 카메라 — 모바일에서 바로 촬영 (데스크탑은 파일 선택으로 폴백) */}
+        {/* 카메라 — 터치 기기(coarse pointer)에서만 노출해 바로 촬영. 데스크탑은 갤러리/파일 선택(박스·이미지 클릭)으로 충분 */}
         <button
           type="button"
           onClick={() => cameraRef.current?.click()}
           disabled={disabled || uploading}
-          className="absolute -bottom-1.5 -right-1.5 flex size-6 items-center justify-center rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] shadow transition-transform hover:scale-110 disabled:opacity-50"
+          className="absolute -bottom-1.5 -right-1.5 hidden size-6 items-center justify-center rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] shadow transition-transform hover:scale-110 disabled:opacity-50 pointer-coarse:flex"
           aria-label="촬영"
         >
           <Camera className="size-3.5" />
