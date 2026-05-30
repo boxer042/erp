@@ -131,6 +131,7 @@ export default function RentalDetailPage({
   const overdueDays = isOverdue
     ? Math.max(
         0,
+        // eslint-disable-next-line react-hooks/purity -- Date.now() 는 경과일·기본일 계산용 표시값 (순간 impurity 무해)
         Math.floor((Date.now() - end.getTime()) / 86400000),
       )
     : 0;

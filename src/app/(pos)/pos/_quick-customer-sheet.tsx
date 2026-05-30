@@ -90,6 +90,7 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
   // 이름 변경 시 자동 감지 (사용자가 토글 직접 안 만졌을 때만)
   useEffect(() => {
     if (autoTypeLocked) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
     setType(detectBusinessType(name) ? "BUSINESS" : "INDIVIDUAL");
   }, [name, autoTypeLocked]);
 

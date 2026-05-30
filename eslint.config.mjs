@@ -26,6 +26,10 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
 
+  // 한글 본문(도움말·가이드)에 따옴표/어퍼스트로피가 자연스럽게 등장 — 타이포그래픽
+  // 이스케이프를 강제하면 가독성만 해침. 흔히 비활성하는 노이즈 룰.
+  { rules: { "react/no-unescaped-entities": "off" } },
+
   // ── 시스템 경계 잠금 (error — shadcn 완전 제거됨, 영구 0 유지) ───────────
   // @/components/ui (shadcn) 는 삭제됨. 전 영역에서 재도입 금지 — @/jm 사용.
   {

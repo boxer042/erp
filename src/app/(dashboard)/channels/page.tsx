@@ -392,6 +392,7 @@ function ChannelConfigDialog({
   useEffect(() => {
     const cfg = configQuery.data?.config ?? null;
     if (!cfg) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
     setAutoStockSync(!!cfg.autoStockSync);
     setAutoTrackingPush(cfg.autoTrackingPush !== false);
     if (typeof cfg.pollingMinutes === "number")

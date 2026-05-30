@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -990,9 +990,10 @@ function MappingSection({ channels }: { channels: Channel[] }) {
   );
   const [addOpen, setAddOpen] = useState(false);
 
-  // channels 가 늦게 로드되면 default 동기화
-  useMemo(() => {
+  // channels 가 늦게 로드되면 default 동기화 (side effect 이므로 useEffect)
+  useEffect(() => {
     if (!selectedChannel && channels[0]?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
       setSelectedChannel(channels[0].id);
     }
   }, [channels, selectedChannel]);

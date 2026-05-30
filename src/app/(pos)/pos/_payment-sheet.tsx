@@ -301,6 +301,7 @@ function Body({
   });
   // 착불(COD) 로 전환 시 매장 부담 금액 자동 리셋 — 착불은 매장 회계 무관
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
     if (shippingPaymentType === "COD") setShippingCostBorne("");
   }, [shippingPaymentType]);
 

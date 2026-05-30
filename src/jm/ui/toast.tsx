@@ -15,8 +15,7 @@ import { cn } from "@/jm/lib/cn";
  *   jmToast.success("저장되었습니다");
  *   jmToast.error("저장 실패", { description: "..." });
  */
-export interface JmToasterProps
-  extends React.ComponentProps<typeof Toaster> {}
+export type JmToasterProps = React.ComponentProps<typeof Toaster>;
 
 export function JmToaster({
   position = "top-right",

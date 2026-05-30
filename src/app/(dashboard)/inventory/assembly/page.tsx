@@ -108,6 +108,7 @@ export default function AssemblyPage() {
     const pid = searchParams.get("productId");
     if (!pid || autoTriggeredRef.current) return;
     autoTriggeredRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
     setInitialProductId(pid);
     setSheetOpen(true);
   }, [searchParams]);

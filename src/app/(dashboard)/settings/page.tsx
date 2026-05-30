@@ -85,8 +85,6 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const [stats, setStats] = useState<Stats | null>(null);
-
   const companyQuery = useQuery({
     queryKey: queryKeys.companyInfo.all,
     queryFn: () => apiGet<CompanyInfoData>("/api/company-info"),
@@ -96,6 +94,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (companyQuery.data && !companyDirty) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
       setCompanyForm({
         name: companyQuery.data.name ?? "",
         businessNumber: companyQuery.data.businessNumber ?? "",
@@ -203,9 +202,8 @@ export default function SettingsPage() {
     },
   });
 
-  useEffect(() => {
-    if (statsQuery.data) setStats(statsQuery.data);
-  }, [statsQuery.data]);
+  // 쿼리 데이터를 그대로 사용 (별도 state 미러 불필요).
+  const stats = statsQuery.data ?? null;
 
   const setCompanyField = (key: keyof typeof companyForm, value: string) => {
     setCompanyForm((p) => ({ ...p, [key]: value }));
@@ -905,6 +903,7 @@ function CardFeeSection() {
   const [tierDirty, setTierDirty] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
     if (merchant && !tierDirty) setTier(merchant.merchantTier ?? "");
   }, [merchant, tierDirty]);
 

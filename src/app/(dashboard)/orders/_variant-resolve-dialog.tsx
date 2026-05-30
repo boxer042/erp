@@ -143,6 +143,7 @@ export function VariantResolveDialog({
   // 다이얼로그 닫힐 때 선택 초기화
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
       setSelections({});
       setSubmitting(false);
     }

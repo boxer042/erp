@@ -655,6 +655,7 @@ export function CalloutBox({
     >
       <div className="flex items-start gap-2.5">
         {Icon && (
+          // eslint-disable-next-line react-hooks/static-components -- 동적 아이콘 lookup — 렌더마다 새 컴포넌트 생성 아님(안정적 ref)
           <Icon
             className={cn("mt-[3px] h-4 w-4 shrink-0", style.text)}
             aria-hidden
@@ -1724,6 +1725,7 @@ export function HtmlEmbedBlockView({ block }: { block: HtmlEmbedBlock }) {
 
   // 새 iframe 마운트 시 측정값 리셋 (이전 콘텐츠 높이 흔적 제거)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 의도된 동기화/리셋 이펙트 (서버데이터→편집폼 seed / 닫힐때 리셋 / URL prefill 등). 파생값 아님
     setMeasuredHeight(null);
   }, [block.htmlUrl]);
 

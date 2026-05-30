@@ -239,8 +239,10 @@ function RentalCreateSheet({
   } | null>(null);
 
   const todayIso = format(new Date(), "yyyy-MM-dd");
+  // eslint-disable-next-line react-hooks/purity -- Date.now() 는 경과일·기본일 계산용 표시값 (순간 impurity 무해)
   const tomorrowIso = format(new Date(Date.now() + 86400000), "yyyy-MM-dd");
   const dayAfterIso = format(
+    // eslint-disable-next-line react-hooks/purity -- Date.now() 는 경과일·기본일 계산용 표시값 (순간 impurity 무해)
     new Date(Date.now() + 86400000 * 2),
     "yyyy-MM-dd",
   );
