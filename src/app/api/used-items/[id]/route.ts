@@ -38,6 +38,31 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
           assembly: { select: { id: true, assemblyNo: true, assembledAt: true } },
         },
       },
+      // 이 단품이 "중고 조립 결과물" 이면 — 재료 내역 (중고 + 신품 부품)
+      buildAsResult: {
+        include: {
+          usedItemSources: {
+            include: {
+              usedItem: {
+                select: { id: true, internalCode: true, displayName: true, product: { select: { name: true } } },
+              },
+            },
+          },
+          partConsumptions: {
+            include: { component: { select: { id: true, name: true, sku: true } } },
+          },
+        },
+      },
+      // 이 단품이 다른 조립의 "재료" 로 소진됐으면 — 결과물 link
+      buildAsSource: {
+        include: {
+          build: {
+            select: {
+              resultUsedItem: { select: { id: true, internalCode: true, displayName: true } },
+            },
+          },
+        },
+      },
     },
   });
 

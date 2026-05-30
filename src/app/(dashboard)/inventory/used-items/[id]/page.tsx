@@ -325,13 +325,83 @@ export default function UsedItemDetailPage({ params }: PageProps) {
           disabled={isLocked}
         />
 
+        {/* 중고 조립 결과물 — 재료 내역 (케이스 B) */}
+        {item.buildAsResult && (
+          <JmCard>
+            <JmCardHeader>
+              <JmCardTitle>조립 재료</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent className="space-y-2 text-jm-sm">
+              <p className="text-jm-xs text-[var(--jm-text-muted)]">
+                {format(new Date(item.buildAsResult.builtAt), "yyyy-MM-dd")} 조립 · 공임 ₩
+                {parseFloat(item.buildAsResult.laborCost).toLocaleString("ko-KR")}
+              </p>
+              {item.buildAsResult.usedItemSources.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2">
+                  <Link
+                    href={`/inventory/used-items/${s.usedItem.id}`}
+                    className="flex items-center gap-2 hover:underline"
+                  >
+                    <span className="rounded bg-[var(--jm-info-bg)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-info-fg)]">
+                      중고
+                    </span>
+                    <span className="text-[var(--jm-text)]">
+                      {s.usedItem.product?.name ?? s.usedItem.displayName}
+                    </span>
+                    <span className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
+                      {s.usedItem.internalCode}
+                    </span>
+                  </Link>
+                  <span className="shrink-0 tabular-nums text-[var(--jm-text-muted)]">
+                    ₩{Math.round(parseFloat(s.costSnapshot)).toLocaleString("ko-KR")}
+                  </span>
+                </div>
+              ))}
+              {item.buildAsResult.partConsumptions.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
+                      신품
+                    </span>
+                    <span className="text-[var(--jm-text)]">{p.component.name}</span>
+                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                      ×{parseFloat(p.quantity)}
+                    </span>
+                  </div>
+                  <span className="shrink-0 tabular-nums text-[var(--jm-text-muted)]">
+                    ₩{Math.round(parseFloat(p.unitCost) * parseFloat(p.quantity)).toLocaleString("ko-KR")}
+                  </span>
+                </div>
+              ))}
+            </JmCardContent>
+          </JmCard>
+        )}
+
         {/* lineage — 활용 history */}
-        {(item.orderItem || item.assemblyConsumption || item.rentalAsset) && (
+        {(item.orderItem ||
+          item.assemblyConsumption ||
+          item.rentalAsset ||
+          item.buildAsSource) && (
           <JmCard>
             <JmCardHeader>
               <JmCardTitle>활용 이력</JmCardTitle>
             </JmCardHeader>
             <JmCardContent className="space-y-2 text-jm-sm">
+              {item.buildAsSource && (
+                <div className="flex items-center gap-2">
+                  <FileText className="size-4 text-[var(--jm-text-muted)]" />
+                  <span className="text-[var(--jm-text-muted)]">조립 재료로 소진</span>
+                  <Link
+                    href={`/inventory/used-items/${item.buildAsSource.build.resultUsedItem.id}`}
+                    className="text-[var(--jm-text)] hover:underline"
+                  >
+                    {item.buildAsSource.build.resultUsedItem.displayName}
+                    <span className="ml-1 font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
+                      {item.buildAsSource.build.resultUsedItem.internalCode}
+                    </span>
+                  </Link>
+                </div>
+              )}
               {item.assemblyConsumption && (
                 <div className="flex items-center gap-2">
                   <FileText className="size-4 text-[var(--jm-text-muted)]" />

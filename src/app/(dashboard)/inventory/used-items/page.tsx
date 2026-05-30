@@ -111,6 +111,11 @@ export default function UsedItemsPage() {
                 사후 정리
               </JmButton>
             </Link>
+            <Link href="/inventory/used-items/build">
+              <JmButton variant="outline" size="sm">
+                조립품 만들기
+              </JmButton>
+            </Link>
             <Link href="/inventory/used-items/new">
               <JmButton variant="cta">
                 <Plus className="size-4" />

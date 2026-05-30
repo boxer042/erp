@@ -583,6 +583,7 @@ model Product {
   assemblyTemplateSlotDefaults  AssemblyTemplateSlot[]
   assemblyPresetItems           AssemblyPresetItem[]
   usedItems                     UsedItem[]
+  usedItemBuildParts            UsedItemBuildPart[]            @relation("ProductUsedItemBuildPart")
 
   specValues   ProductSpecValue[]
   priceHistory ProductPriceHistory[]
@@ -3087,6 +3088,11 @@ model UsedItem {
   // Assembly 흡수 detail (status=ASSEMBLED_INTO 일 때 1건)
   assemblyConsumption AssemblyUsedItemConsumption?
 
+  // 중고 조립 (케이스 B) — 이 단품이 "조립 결과물" 이면 1건 (source=BUILT)
+  buildAsResult UsedItemBuild?       @relation("UsedItemBuildResult")
+  // 이 단품이 다른 조립의 "재료" 로 소진됐으면 1건 (status=ASSEMBLED_INTO)
+  buildAsSource UsedItemBuildSource?
+
   @@index([productId])
   @@index([status])
   @@index([acquiredFrom])
@@ -3128,11 +3134,62 @@ model AssemblyUsedItemConsumption {
   @@map("assembly_used_item_consumptions")
 }
 
+// 중고 조립 (케이스 B) — 여러 중고 + (선택) 신품 부품을 합쳐 새 단품(BUILT)을 만듦.
+// 카탈로그 Product 를 만들지 않아 더미 SKU 가 안 생김. 결과물도 일회성 단품.
+model UsedItemBuild {
+  id               String   @id @default(uuid())
+  // 결과물 — source=BUILT 인 UsedItem (1:1)
+  resultUsedItemId String   @unique @map("result_used_item_id")
+  resultUsedItem   UsedItem @relation("UsedItemBuildResult", fields: [resultUsedItemId], references: [id], onDelete: Cascade)
+  laborCost        Decimal  @default(0) @map("labor_cost") @db.Decimal(15, 2)
+  builtAt          DateTime @map("built_at")
+  memo             String?
+  createdById      String?  @map("created_by_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  usedItemSources  UsedItemBuildSource[]
+  partConsumptions UsedItemBuildPart[]
+
+  @@index([resultUsedItemId])
+  @@map("used_item_builds")
+}
+
+// 조립 재료 ① — 소진된 중고 단품 (status=ASSEMBLED_INTO). UsedItem 1개 = 1 record.
+model UsedItemBuildSource {
+  id           String        @id @default(uuid())
+  buildId      String        @map("build_id")
+  build        UsedItemBuild @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  usedItemId   String        @unique @map("used_item_id")
+  usedItem     UsedItem      @relation(fields: [usedItemId], references: [id], onDelete: Restrict)
+  // 소진 시점 (acquiredCost + Σ addedCosts) 스냅샷 — 결과물 누적원가 합산에 사용
+  costSnapshot Decimal       @map("cost_snapshot") @db.Decimal(15, 2)
+
+  @@index([buildId])
+  @@map("used_item_build_sources")
+}
+
+// 조립 재료 ② — 소진된 신품 부품 lot (FIFO 차감). 한 Product 가 여러 lot 으로 나뉘면 여러 record.
+model UsedItemBuildPart {
+  id          String        @id @default(uuid())
+  buildId     String        @map("build_id")
+  build       UsedItemBuild @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  componentId String        @map("component_id")
+  component   Product       @relation("ProductUsedItemBuildPart", fields: [componentId], references: [id], onDelete: Restrict)
+  lotId       String        @map("lot_id")
+  quantity    Decimal       @db.Decimal(10, 4)
+  unitCost    Decimal       @map("unit_cost") @db.Decimal(15, 4)
+
+  @@index([buildId])
+  @@index([lotId])
+  @@map("used_item_build_parts")
+}
+
 enum UsedItemSource {
   PURCHASED // 손님에게서 매입 (또는 외부 일반 매입)
   SCAVENGED // 손님이 버리고 간 기기에서 탈거 (원가 0)
   RENTAL_RETIREMENT // 임대 자산 lifecycle 종료 후 중고로 전환
   EMERGENCY_USE // 시스템 등록 전 급매 → 사후 reconcile 로 정리
+  BUILT // 여러 중고 + (선택) 신품 부품을 조립해 만든 단품 (케이스 B)
 }
 
 enum UsedItemStatus {

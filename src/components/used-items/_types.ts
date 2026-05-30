@@ -103,6 +103,35 @@ export interface UsedItemDetail extends UsedItemListRow {
       assembledAt: string;
     };
   } | null;
+  // 중고 조립 결과물 — 재료 내역 (케이스 B)
+  buildAsResult?: {
+    id: string;
+    laborCost: string;
+    builtAt: string;
+    usedItemSources: Array<{
+      id: string;
+      costSnapshot: string;
+      usedItem: {
+        id: string;
+        internalCode: string;
+        displayName: string;
+        product?: { name: string } | null;
+      };
+    }>;
+    partConsumptions: Array<{
+      id: string;
+      quantity: string;
+      unitCost: string;
+      component: { id: string; name: string; sku: string };
+    }>;
+  } | null;
+  // 다른 조립의 재료로 소진된 경우 — 결과물 link
+  buildAsSource?: {
+    id: string;
+    build: {
+      resultUsedItem: { id: string; internalCode: string; displayName: string };
+    };
+  } | null;
 }
 
 /** 누적 비용 = 매입가 + Σ addedCosts.amount */
