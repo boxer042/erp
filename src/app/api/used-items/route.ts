@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
     take: limit,
     include: {
       // product 는 항상 포함 — 카탈로그 매칭 시 표시 이름을 product.name(live) 으로 끌어옴 (옵션 B).
-      // includeProduct 파라미터와 무관하게 검색 merge·목록·상세 모두 live 이름이 필요.
-      product: { select: { id: true, name: true, sku: true } },
+      // categoryId 는 중고 조립 슬롯의 카테고리 제약 필터링에 사용.
+      product: { select: { id: true, name: true, sku: true, categoryId: true } },
       sourceCustomer: { select: { id: true, name: true } },
       serialItem: { select: { id: true, code: true, warrantyEnds: true } },
       addedCosts: includeCosts ? { orderBy: { createdAt: "desc" } } : false,

@@ -335,20 +335,28 @@ export default function UsedItemDetailPage({ params }: PageProps) {
               <p className="text-jm-xs text-[var(--jm-text-muted)]">
                 {format(new Date(item.buildAsResult.builtAt), "yyyy-MM-dd")} 조립 · 공임 ₩
                 {parseFloat(item.buildAsResult.laborCost).toLocaleString("ko-KR")}
+                {item.buildAsResult.assemblyTemplate && (
+                  <> · 템플릿 {item.buildAsResult.assemblyTemplate.name}</>
+                )}
               </p>
               {item.buildAsResult.usedItemSources.map((s) => (
                 <div key={s.id} className="flex items-center justify-between gap-2">
                   <Link
                     href={`/inventory/used-items/${s.usedItem.id}`}
-                    className="flex items-center gap-2 hover:underline"
+                    className="flex min-w-0 items-center gap-2 hover:underline"
                   >
-                    <span className="rounded bg-[var(--jm-info-bg)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-info-fg)]">
+                    {s.slotLabel && (
+                      <span className="shrink-0 rounded bg-[var(--jm-surface-strong)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
+                        {s.slotLabel}
+                      </span>
+                    )}
+                    <span className="shrink-0 rounded bg-[var(--jm-info-bg)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-info-fg)]">
                       중고
                     </span>
-                    <span className="text-[var(--jm-text)]">
+                    <span className="truncate text-[var(--jm-text)]">
                       {s.usedItem.product?.name ?? s.usedItem.displayName}
                     </span>
-                    <span className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
+                    <span className="shrink-0 font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
                       {s.usedItem.internalCode}
                     </span>
                   </Link>
@@ -359,12 +367,17 @@ export default function UsedItemDetailPage({ params }: PageProps) {
               ))}
               {item.buildAsResult.partConsumptions.map((p) => (
                 <div key={p.id} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {p.slotLabel && (
+                      <span className="shrink-0 rounded bg-[var(--jm-surface-strong)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
+                        {p.slotLabel}
+                      </span>
+                    )}
+                    <span className="shrink-0 rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
                       신품
                     </span>
-                    <span className="text-[var(--jm-text)]">{p.component.name}</span>
-                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
+                    <span className="truncate text-[var(--jm-text)]">{p.component.name}</span>
+                    <span className="shrink-0 text-jm-xs text-[var(--jm-text-muted)]">
                       ×{parseFloat(p.quantity)}
                     </span>
                   </div>

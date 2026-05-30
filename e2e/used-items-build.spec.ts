@@ -91,7 +91,7 @@ test.describe("케이스 B — 중고 조립", () => {
         builtAt: new Date().toISOString().slice(0, 10),
         laborCost: "20000",
         issueSerial: false,
-        sourceUsedItemIds: [used1.id, used2.id],
+        sources: [{ usedItemId: used1.id }, { usedItemId: used2.id }],
         parts: [{ componentId: part.id, quantity: "2" }],
       },
     });
@@ -157,7 +157,7 @@ test.describe("케이스 B — 중고 조립", () => {
         displayName: `차단테스트${ts}`,
         builtAt: new Date().toISOString().slice(0, 10),
         laborCost: "0",
-        sourceUsedItemIds: [soldUsed.id],
+        sources: [{ usedItemId: soldUsed.id }],
         parts: [],
       },
     });
@@ -166,6 +166,62 @@ test.describe("케이스 B — 중고 조립", () => {
     expect(body.error).toMatch(/보관 중 상태가 아닙니다/);
 
     await prisma.usedItem.delete({ where: { id: soldUsed.id } });
+  });
+
+  test("템플릿 기반 빌드 — 슬롯 라벨 + 템플릿 link 가 lineage 에 기록", async ({
+    page,
+  }) => {
+    const ts = Date.now();
+
+    // 조립 템플릿 + 슬롯 1개 (카테고리 제약 없이) fixture
+    const template = await prisma.assemblyTemplate.create({
+      data: {
+        name: `중고조립템플릿${ts}`,
+        slots: {
+          create: [{ label: "엔진 슬롯", order: 0, isVariable: true, defaultQuantity: 1 }],
+        },
+      },
+    });
+
+    // 중고 재료 1개
+    const used = await prisma.usedItem.create({
+      data: {
+        internalCode: `UU260530-BT${String(ts).slice(-3)}`,
+        displayName: `템플릿중고엔진${ts}`,
+        acquiredFrom: "PURCHASED",
+        acquiredCost: "40000",
+        isAcquiredTaxable: false,
+        acquiredAt: new Date(),
+        status: "IN_STOCK",
+      },
+    });
+
+    const res = await page.request.post("/api/used-items/build", {
+      timeout: 90_000,
+      data: {
+        displayName: `템플릿조립결과${ts}`,
+        builtAt: new Date().toISOString().slice(0, 10),
+        laborCost: "10000",
+        assemblyTemplateId: template.id,
+        sources: [{ usedItemId: used.id, slotLabel: "엔진 슬롯" }],
+        parts: [],
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const built = (await res.json()) as { id: string };
+
+    // lineage: assemblyTemplateId + slotLabel 기록
+    const result = await prisma.usedItem.findUnique({
+      where: { id: built.id },
+      include: { buildAsResult: { include: { usedItemSources: true } } },
+    });
+    expect(result?.buildAsResult?.assemblyTemplateId).toBe(template.id);
+    expect(result?.buildAsResult?.usedItemSources[0]?.slotLabel).toBe("엔진 슬롯");
+
+    // cleanup
+    await prisma.usedItem.delete({ where: { id: built.id } }); // result + build cascade
+    await prisma.usedItem.delete({ where: { id: used.id } });
+    await prisma.assemblyTemplate.delete({ where: { id: template.id } });
   });
 
   test("빌드 화면 로드 + 목록 [조립품 만들기] 진입", async ({ page }) => {
@@ -177,6 +233,8 @@ test.describe("케이스 B — 중고 조립", () => {
     await page.getByRole("button", { name: "조립품 만들기" }).click();
     await page.waitForURL(/\/inventory\/used-items\/build/);
     await expect(page.getByText("중고 조립품 만들기")).toBeVisible();
-    await expect(page.getByText("재료 ① 중고 상품 (필수)")).toBeVisible();
+    // 통일된 구성품 영역 + 결과물
+    await expect(page.getByRole("heading", { name: "구성품" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "결과물" })).toBeVisible();
   });
 });

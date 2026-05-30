@@ -2807,6 +2807,7 @@ model AssemblyTemplate {
   slots              AssemblyTemplateSlot[]
   presets            AssemblyPreset[]
   defaultForProducts Product[]              @relation("ProductDefaultTemplate")
+  usedItemBuilds     UsedItemBuild[]
 
   @@map("assembly_templates")
 }
@@ -3137,20 +3138,24 @@ model AssemblyUsedItemConsumption {
 // 중고 조립 (케이스 B) — 여러 중고 + (선택) 신품 부품을 합쳐 새 단품(BUILT)을 만듦.
 // 카탈로그 Product 를 만들지 않아 더미 SKU 가 안 생김. 결과물도 일회성 단품.
 model UsedItemBuild {
-  id               String   @id @default(uuid())
+  id                 String            @id @default(uuid())
   // 결과물 — source=BUILT 인 UsedItem (1:1)
-  resultUsedItemId String   @unique @map("result_used_item_id")
-  resultUsedItem   UsedItem @relation("UsedItemBuildResult", fields: [resultUsedItemId], references: [id], onDelete: Cascade)
-  laborCost        Decimal  @default(0) @map("labor_cost") @db.Decimal(15, 2)
-  builtAt          DateTime @map("built_at")
-  memo             String?
-  createdById      String?  @map("created_by_id")
-  createdAt        DateTime @default(now()) @map("created_at")
+  resultUsedItemId   String            @unique @map("result_used_item_id")
+  resultUsedItem     UsedItem          @relation("UsedItemBuildResult", fields: [resultUsedItemId], references: [id], onDelete: Cascade)
+  // 사용한 조립 템플릿 (선택) — 슬롯 구조를 빌려옴. null 이면 자유 모드 빌드.
+  assemblyTemplateId String?           @map("assembly_template_id")
+  assemblyTemplate   AssemblyTemplate? @relation(fields: [assemblyTemplateId], references: [id], onDelete: SetNull)
+  laborCost          Decimal           @default(0) @map("labor_cost") @db.Decimal(15, 2)
+  builtAt            DateTime          @map("built_at")
+  memo               String?
+  createdById        String?           @map("created_by_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
 
   usedItemSources  UsedItemBuildSource[]
   partConsumptions UsedItemBuildPart[]
 
   @@index([resultUsedItemId])
+  @@index([assemblyTemplateId])
   @@map("used_item_builds")
 }
 
@@ -3163,6 +3168,8 @@ model UsedItemBuildSource {
   usedItem     UsedItem      @relation(fields: [usedItemId], references: [id], onDelete: Restrict)
   // 소진 시점 (acquiredCost + Σ addedCosts) 스냅샷 — 결과물 누적원가 합산에 사용
   costSnapshot Decimal       @map("cost_snapshot") @db.Decimal(15, 2)
+  // 어느 슬롯에 들어갔는지 (템플릿 모드). 자유 모드면 null.
+  slotLabel    String?       @map("slot_label")
 
   @@index([buildId])
   @@map("used_item_build_sources")
@@ -3178,6 +3185,8 @@ model UsedItemBuildPart {
   lotId       String        @map("lot_id")
   quantity    Decimal       @db.Decimal(10, 4)
   unitCost    Decimal       @map("unit_cost") @db.Decimal(15, 4)
+  // 어느 슬롯에 들어갔는지 (템플릿 모드). 자유 모드면 null.
+  slotLabel   String?       @map("slot_label")
 
   @@index([buildId])
   @@index([lotId])

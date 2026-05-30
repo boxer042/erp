@@ -43,7 +43,7 @@ export interface UsedItemListRow {
   internalCode: string;
   displayName: string;
   productId: string | null;
-  product?: { id: string; name: string; sku: string } | null;
+  product?: { id: string; name: string; sku: string; categoryId?: string | null } | null;
   acquiredFrom: UsedItemSource;
   acquiredCost: string;
   isAcquiredTaxable: boolean;
@@ -110,9 +110,11 @@ export interface UsedItemDetail extends UsedItemListRow {
     id: string;
     laborCost: string;
     builtAt: string;
+    assemblyTemplate?: { id: string; name: string } | null;
     usedItemSources: Array<{
       id: string;
       costSnapshot: string;
+      slotLabel: string | null;
       usedItem: {
         id: string;
         internalCode: string;
@@ -124,6 +126,7 @@ export interface UsedItemDetail extends UsedItemListRow {
       id: string;
       quantity: string;
       unitCost: string;
+      slotLabel: string | null;
       component: { id: string; name: string; sku: string };
     }>;
   } | null;

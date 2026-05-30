@@ -15,6 +15,8 @@ export async function GET(
         orderBy: { order: "asc" },
         include: {
           defaultProduct: { select: { id: true, name: true, sku: true } },
+          // 슬롯 카테고리 제약 — 중고 조립 빌드 폼에서 슬롯별 후보 필터링에 사용
+          slotLabel: { select: { name: true, categoryId: true } },
         },
       },
       presets: {

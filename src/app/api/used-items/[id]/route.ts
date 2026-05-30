@@ -41,6 +41,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       // 이 단품이 "중고 조립 결과물" 이면 — 재료 내역 (중고 + 신품 부품)
       buildAsResult: {
         include: {
+          assemblyTemplate: { select: { id: true, name: true } },
           usedItemSources: {
             include: {
               usedItem: {

@@ -27,9 +27,21 @@ export default function UsedItemBuildPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<UsedItemBuildValue>(EMPTY_BUILD);
 
+  // 통일 구성품 → API 입력 형태로 resolve
+  const buildPayload = () => {
+    const sources = form.components
+      .filter((c) => c.kind === "used" && c.usedItemId)
+      .map((c) => ({ usedItemId: c.usedItemId!, slotLabel: c.slotLabel }));
+    const parts = form.components
+      .filter((c) => c.kind === "part" && c.componentId && parseFloat(c.quantity) > 0)
+      .map((c) => ({ componentId: c.componentId!, quantity: c.quantity, slotLabel: c.slotLabel }));
+    return { sources, parts };
+  };
+
   const buildMutation = useMutation({
-    mutationFn: () =>
-      apiMutate<{ id: string; internalCode: string }>("/api/used-items/build", "POST", {
+    mutationFn: () => {
+      const { sources, parts } = buildPayload();
+      return apiMutate<{ id: string; internalCode: string }>("/api/used-items/build", "POST", {
         displayName: form.displayName,
         productId: form.productId,
         spec: form.spec || null,
@@ -37,13 +49,13 @@ export default function UsedItemBuildPage() {
         imageUrls: form.imageUrls.length > 0 ? form.imageUrls : null,
         builtAt: form.builtAt,
         laborCost: parseComma(form.laborCost) || "0",
+        assemblyTemplateId: form.assemblyTemplateId,
         issueSerial: form.issueSerial,
         warrantyMonths: form.issueSerial ? form.warrantyMonths : null,
-        sourceUsedItemIds: form.sourceUsedItemIds,
-        parts: form.parts
-          .filter((p) => p.componentId && parseFloat(p.quantity) > 0)
-          .map((p) => ({ componentId: p.componentId, quantity: p.quantity })),
-      }),
+        sources,
+        parts,
+      });
+    },
     onSuccess: (created) => {
       toast.success(`조립품이 생성되었습니다 (${created.internalCode})`);
       queryClient.invalidateQueries({ queryKey: queryKeys.usedItems.all });
@@ -54,8 +66,9 @@ export default function UsedItemBuildPage() {
   });
 
   const handleSubmit = () => {
-    if (form.sourceUsedItemIds.length === 0) {
-      toast.error("중고 재료를 1개 이상 선택해주세요");
+    const { sources } = buildPayload();
+    if (sources.length === 0) {
+      toast.error("중고 재료를 1개 이상 선택해주세요 (슬롯 또는 추가 재료)");
       return;
     }
     if (!form.displayName.trim()) {

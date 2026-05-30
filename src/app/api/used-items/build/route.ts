@@ -59,13 +59,18 @@ export async function POST(request: NextRequest) {
   const laborCost = parseFloat(data.laborCost) || 0;
 
   try {
+    const slotByUsedId = new Map(
+      data.sources.map((s) => [s.usedItemId, s.slotLabel ?? null]),
+    );
+    const sourceIds = data.sources.map((s) => s.usedItemId);
+
     const result = await prisma.$transaction(async (tx) => {
       // ── 1. 재료 중고 검증 + 누적원가 ─────────────────────────
       const sources = await tx.usedItem.findMany({
-        where: { id: { in: data.sourceUsedItemIds } },
+        where: { id: { in: sourceIds } },
         include: { addedCosts: { select: { amount: true } } },
       });
-      if (sources.length !== data.sourceUsedItemIds.length) {
+      if (sources.length !== sourceIds.length) {
         throw new Error("일부 중고 재료를 찾을 수 없습니다");
       }
       for (const s of sources) {
@@ -82,7 +87,11 @@ export async function POST(request: NextRequest) {
           Number(s.acquiredCost) +
           s.addedCosts.reduce((sum, c) => sum + Number(c.amount), 0);
         totalCost += cost;
-        return { usedItemId: s.id, costSnapshot: cost };
+        return {
+          usedItemId: s.id,
+          costSnapshot: cost,
+          slotLabel: slotByUsedId.get(s.id) ?? null,
+        };
       });
 
       // ── 2. 신품 부품 FIFO 차감 ──────────────────────────────
@@ -100,6 +109,7 @@ export async function POST(request: NextRequest) {
         lotId: string;
         quantity: number;
         unitCost: number;
+        slotLabel: string | null;
       }> = [];
 
       for (const part of data.parts) {
@@ -125,6 +135,7 @@ export async function POST(request: NextRequest) {
             lotId: c.lotId,
             quantity: c.quantity,
             unitCost: c.unitCost,
+            slotLabel: part.slotLabel ?? null,
           });
         }
 
@@ -196,6 +207,7 @@ export async function POST(request: NextRequest) {
       const build = await tx.usedItemBuild.create({
         data: {
           resultUsedItemId: resultUsedItem.id,
+          assemblyTemplateId: data.assemblyTemplateId ?? null,
           laborCost,
           builtAt,
           memo: data.memo ?? null,
@@ -217,6 +229,7 @@ export async function POST(request: NextRequest) {
           buildId: build.id,
           usedItemId: s.usedItemId,
           costSnapshot: s.costSnapshot,
+          slotLabel: s.slotLabel,
         })),
       });
 
@@ -229,6 +242,7 @@ export async function POST(request: NextRequest) {
             lotId: p.lotId,
             quantity: p.quantity,
             unitCost: p.unitCost,
+            slotLabel: p.slotLabel,
           })),
         });
       }
