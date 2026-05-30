@@ -15,62 +15,66 @@ import {
   JmSkeleton,
 } from "@/jm";
 
+// 레거시 호환용으로 export 유지 (타입만). 라이브러리는 이제 버킷 무관 전체 조회.
 export type MediaBucket =
   | "brand-logos"
   | "category-images"
   | "channel-logos"
   | "product-images";
 
-const BUCKET_LABEL: Record<MediaBucket, string> = {
-  "brand-logos": "브랜드 로고",
-  "category-images": "카테고리 이미지",
-  "channel-logos": "채널 로고",
-  "product-images": "상품 이미지",
-};
+interface UsageRef {
+  kind: string;
+  id: string;
+  name: string;
+  label: string;
+}
 
 interface MediaItem {
+  bucket: string;
   path: string;
   name: string;
   url: string;
   size: number | null;
   createdAt: string | null;
-  refs: { kind: string; id: string; name: string }[];
+  usages: UsageRef[];
 }
 
 export interface MediaPickerSelection {
   url: string;
   path: string;
   name: string;
+  /** 이 이미지가 실제 저장된 버킷 (삭제/표시용) */
+  bucket: string;
 }
 
 interface Props {
   open: boolean;
-  bucket: MediaBucket;
   onSelect: (item: MediaPickerSelection) => void;
   onClose: () => void;
+  /** @deprecated 라이브러리는 전 버킷 통합 — 더 이상 조회 범위를 좁히지 않음 */
+  bucket?: MediaBucket;
 }
 
-export function MediaPickerDialog({ open, bucket, onSelect, onClose }: Props) {
+export function MediaPickerDialog({ open, onSelect, onClose }: Props) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "used" | "orphan">("all");
+  const [filter, setFilter] = useState<"all" | "used" | "unused">("all");
 
   const listQuery = useQuery({
-    queryKey: ["media", bucket],
-    queryFn: () =>
-      apiGet<{ items: MediaItem[] }>(`/api/media/list?bucket=${bucket}`),
+    queryKey: ["media", "library"],
+    queryFn: () => apiGet<{ items: MediaItem[] }>(`/api/media/library`),
     enabled: open,
   });
 
   const all = listQuery.data?.items ?? [];
   const items = all.filter((it) => {
-    if (filter === "used" && it.refs.length === 0) return false;
-    if (filter === "orphan" && it.refs.length > 0) return false;
+    if (filter === "used" && it.usages.length === 0) return false;
+    if (filter === "unused" && it.usages.length > 0) return false;
     if (search && !it.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const usedCount = all.filter((it) => it.refs.length > 0).length;
-  const orphanCount = all.length - usedCount;
+  const usedCount = all.filter((it) => it.usages.length > 0).length;
+  const unusedCount = all.length - usedCount;
 
   return (
     <JmDialog
@@ -81,9 +85,9 @@ export function MediaPickerDialog({ open, bucket, onSelect, onClose }: Props) {
     >
       <JmDialogContent size="xl">
         <JmDialogHeader>
-          <JmDialogTitle>{BUCKET_LABEL[bucket]} 라이브러리에서 선택</JmDialogTitle>
+          <JmDialogTitle>라이브러리에서 선택</JmDialogTitle>
           <p className="text-jm-sm text-[var(--jm-text-muted)]">
-            이전에 업로드한 이미지를 선택하면 같은 파일을 재사용합니다.
+            이전에 업로드한 모든 이미지에서 선택하면 같은 파일을 재사용합니다.
           </p>
         </JmDialogHeader>
 
@@ -123,14 +127,14 @@ export function MediaPickerDialog({ open, bucket, onSelect, onClose }: Props) {
               </button>
               <button
                 type="button"
-                onClick={() => setFilter("orphan")}
+                onClick={() => setFilter("unused")}
                 className={`px-3 transition-colors border-l border-[var(--jm-border)] ${
-                  filter === "orphan"
+                  filter === "unused"
                     ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
                     : "text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]/50"
                 }`}
               >
-                고아 {orphanCount}
+                미사용 {unusedCount}
               </button>
             </div>
           </div>
@@ -149,13 +153,18 @@ export function MediaPickerDialog({ open, bucket, onSelect, onClose }: Props) {
               </div>
             ) : (
               items.map((item) => {
-                const isOrphan = item.refs.length === 0;
+                const isUnused = item.usages.length === 0;
                 return (
                   <button
-                    key={item.path}
+                    key={`${item.bucket}/${item.path}`}
                     type="button"
                     onClick={() =>
-                      onSelect({ url: item.url, path: item.path, name: item.name })
+                      onSelect({
+                        url: item.url,
+                        path: item.path,
+                        name: item.name,
+                        bucket: item.bucket,
+                      })
                     }
                     className="group relative aspect-square rounded-md overflow-hidden border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] hover:ring-2 hover:ring-[var(--jm-info-fg)] transition-all"
                   >
@@ -167,14 +176,14 @@ export function MediaPickerDialog({ open, bucket, onSelect, onClose }: Props) {
                       loading="lazy"
                     />
                     <div className="absolute top-1 left-1">
-                      {isOrphan ? (
+                      {isUnused ? (
                         <JmBadge
                           variant="default"
                           size="sm"
                           shape="square"
                           className="bg-[var(--jm-bg)]/90 text-jm-2xs h-4 px-1"
                         >
-                          고아
+                          미사용
                         </JmBadge>
                       ) : (
                         <JmBadge
@@ -182,8 +191,10 @@ export function MediaPickerDialog({ open, bucket, onSelect, onClose }: Props) {
                           size="sm"
                           shape="square"
                           className="bg-[var(--jm-bg)]/90 text-jm-2xs h-4 px-1"
+                          title={item.usages.map((u) => `${u.label}: ${u.name}`).join("\n")}
                         >
-                          {item.refs.length}
+                          {item.usages[0].label}
+                          {item.usages.length > 1 ? ` +${item.usages.length - 1}` : ""}
                         </JmBadge>
                       )}
                     </div>
