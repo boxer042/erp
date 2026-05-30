@@ -196,7 +196,7 @@ export function ImagePickerDrawer({
           <JmDrawerHeader className="px-5 py-4">
             <JmDrawerTitle>이미지 추가</JmDrawerTitle>
           </JmDrawerHeader>
-          <div className="flex flex-col gap-2 px-5 pb-6">
+          <div className="flex flex-col gap-2 px-5 pb-6 pt-4">
             <SourceButton
               icon={<Square />}
               title="1:1 썸네일"
