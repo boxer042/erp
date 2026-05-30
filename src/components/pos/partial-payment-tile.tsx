@@ -63,7 +63,7 @@ export function PartialPaymentTile({
       >
         <div className="flex items-baseline justify-between">
           <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-            결제 금액
+            즉시 결제액
           </span>
           {isPartial && (
             <span className="rounded-full bg-[var(--jm-warning-fg)] px-2 py-0.5 text-jm-3xs font-semibold text-white">

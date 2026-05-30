@@ -518,79 +518,77 @@ function Body({
       locked={checkoutMutation.isPending}
       onBack={onBack}
       footer={
-        <button
-          type="button"
-          onClick={() => {
-            // 미등록 + 등록필수 아님 + skip 안함 + 등록 유도 prop 있음 → 다이얼로그로 가로채기
-            if (
-              !session.customerId &&
-              !skipCustomerLink &&
-              !hasRentalOrRepair &&
-              method !== "UNPAID" &&
-              onCreateCustomer
-            ) {
-              setRegisterPromptOpen(true);
-              return;
-            }
-            checkoutMutation.mutate();
-          }}
-          disabled={
-            checkoutMutation.isPending ||
-            allItems.length === 0 ||
-            requiresCustomer ||
-            requiresCustomerForUnpaid ||
-            hasUnresolvedVariant
-          }
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
-        >
-          {checkoutMutation.isPending && <Spinner />}₩
-          {totals.total.toLocaleString("ko-KR")} 결제
-        </button>
-      }
-    >
-      <div className="flex flex-col gap-5 pt-2">
-        {/* 다크 합계 카드 */}
-        <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
-          <div className="text-jm-xs font-semibold uppercase tracking-wider text-white/60">
-            결제 금액
-          </div>
-          <div className="mt-1 text-jm-6xl font-bold tabular-nums leading-none">
-            ₩{totals.total.toLocaleString("ko-KR")}
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-jm-2xs">
-            <Pill label="공급가액" value={totals.net} />
-            <Pill label="세액" value={totals.vat} />
-            {totals.sessionDiscountAmount > 0 ? (
-              <Pill
+        <div className="flex flex-col gap-2.5">
+          {/* 내역 — 상단 다크 카드 대체 (공급가액·세액·건수·할인) */}
+          <div
+            className={`grid gap-2 ${
+              totals.sessionDiscountAmount > 0 ? "grid-cols-4" : "grid-cols-3"
+            }`}
+          >
+            <FooterStat label="공급가액" value={totals.net} />
+            <FooterStat label="세액" value={totals.vat} />
+            <FooterStat label="건수" value={allItems.length} suffix="건" />
+            {totals.sessionDiscountAmount > 0 && (
+              <FooterStat
                 label="할인"
                 value={-totals.sessionDiscountAmount}
                 tone="warn"
               />
-            ) : (
-              <Pill label="건수" value={allItems.length} suffix="건" />
             )}
           </div>
-          {/* 항목 구성 */}
-          {(rentalItems.length > 0 || repairItems.length > 0) && (
-            <div className="mt-3 flex flex-wrap gap-1.5 text-jm-2xs">
-              {productItems.length > 0 && (
-                <span className="rounded-full bg-[var(--jm-surface)]/10 px-2.5 py-1">
-                  상품 {productItems.length}
-                </span>
-              )}
-              {rentalItems.length > 0 && (
-                <span className="rounded-full bg-[var(--jm-surface)]/10 px-2.5 py-1">
-                  임대 {rentalItems.length}
-                </span>
-              )}
-              {repairItems.length > 0 && (
-                <span className="rounded-full bg-[var(--jm-surface)]/10 px-2.5 py-1">
-                  수리 {repairItems.length}
-                </span>
-              )}
-            </div>
-          )}
+          {/* CTA — 결제금액은 여기 단 한 곳에만 (다크 카드·PartialPaymentTile 중복 제거) */}
+          <button
+            type="button"
+            onClick={() => {
+              // 미등록 + 등록필수 아님 + skip 안함 + 등록 유도 prop 있음 → 다이얼로그로 가로채기
+              if (
+                !session.customerId &&
+                !skipCustomerLink &&
+                !hasRentalOrRepair &&
+                method !== "UNPAID" &&
+                onCreateCustomer
+              ) {
+                setRegisterPromptOpen(true);
+                return;
+              }
+              checkoutMutation.mutate();
+            }}
+            disabled={
+              checkoutMutation.isPending ||
+              allItems.length === 0 ||
+              requiresCustomer ||
+              requiresCustomerForUnpaid ||
+              hasUnresolvedVariant
+            }
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+          >
+            {checkoutMutation.isPending && <Spinner />}₩
+            {totals.total.toLocaleString("ko-KR")} 결제
+          </button>
         </div>
+      }
+    >
+      <div className="flex flex-col gap-5 pt-2">
+        {/* 항목 구성 — 임대·수리가 섞일 때만 (다크 카드 제거, 금액 내역은 footer 로 이동) */}
+        {(rentalItems.length > 0 || repairItems.length > 0) && (
+          <div className="flex flex-wrap gap-1.5 text-jm-2xs">
+            {productItems.length > 0 && (
+              <span className="rounded-full bg-[var(--jm-surface-muted)] px-2.5 py-1 text-[var(--jm-text-muted)]">
+                상품 {productItems.length}
+              </span>
+            )}
+            {rentalItems.length > 0 && (
+              <span className="rounded-full bg-[var(--jm-surface-muted)] px-2.5 py-1 text-[var(--jm-text-muted)]">
+                임대 {rentalItems.length}
+              </span>
+            )}
+            {repairItems.length > 0 && (
+              <span className="rounded-full bg-[var(--jm-surface-muted)] px-2.5 py-1 text-[var(--jm-text-muted)]">
+                수리 {repairItems.length}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* 고객 + 결제시간 — 임대 시트와 동일 2-grid 패턴. 향후 시간대별 매출 트래픽 분석. */}
         <div className="flex flex-col gap-2">
@@ -980,7 +978,8 @@ function RegisterPromptDialog({
   );
 }
 
-function Pill({
+// 결제 footer 내역 칸 — 라이트 배경 (다크 카드 Pill 대체)
+function FooterStat({
   label,
   value,
   suffix,
@@ -992,19 +991,19 @@ function Pill({
   tone?: "warn";
 }) {
   return (
-    <div
-      className={`flex flex-col rounded-xl px-3 py-2 ${
-        tone === "warn" ? "bg-[var(--jm-warning-solid)]/20" : "bg-[var(--jm-surface)]/10"
-      }`}
-    >
-      <div className="text-jm-3xs uppercase tracking-wider text-white/60">
+    <div className="flex flex-col rounded-xl bg-[var(--jm-surface-muted)] px-2.5 py-1.5">
+      <span className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-muted)]">
         {label}
-      </div>
-      <div className="mt-0.5 text-jm-xs font-semibold tabular-nums">
+      </span>
+      <span
+        className={`mt-0.5 text-jm-sm font-semibold tabular-nums ${
+          tone === "warn" ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]"
+        }`}
+      >
         {suffix
           ? `${value.toLocaleString("ko-KR")}${suffix}`
           : `${value < 0 ? "−" : ""}₩${Math.abs(value).toLocaleString("ko-KR")}`}
-      </div>
+      </span>
     </div>
   );
 }
