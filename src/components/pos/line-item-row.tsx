@@ -16,6 +16,11 @@ export interface PosLineItemRowProps {
   name: string;
   /** 품목명 취소선 (수리 LOST 미청구 등) */
   nameStrikethrough?: boolean;
+  /**
+   * 품목명 영역 전체를 대체하는 슬롯 (예: 주문 등록의 서비스명 인라인 편집 입력).
+   * 지정 시 name/nameStrikethrough 대신 이 노드를 렌더 — flex-1 요소를 넘길 것.
+   */
+  nameSlot?: React.ReactNode;
   /** SKU — 이름 아래 모노스페이스 */
   sku?: string | null;
   /** 이름 우측 영역 — 배지/토글 (수리 USED/LOST 등) */
@@ -73,6 +78,7 @@ export function PosLineItemRow({
   image,
   name,
   nameStrikethrough,
+  nameSlot,
   sku,
   headerEnd,
   headerBelow,
@@ -101,14 +107,16 @@ export function PosLineItemRow({
         {image}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex min-w-0 items-center justify-between gap-2">
-            <span
-              className={cn(
-                "min-w-0 flex-1 line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]",
-                nameStrikethrough && "line-through",
-              )}
-            >
-              {name}
-            </span>
+            {nameSlot ?? (
+              <span
+                className={cn(
+                  "min-w-0 flex-1 line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]",
+                  nameStrikethrough && "line-through",
+                )}
+              >
+                {name}
+              </span>
+            )}
             {headerEnd && (
               <div className="flex shrink-0 items-center gap-1">{headerEnd}</div>
             )}

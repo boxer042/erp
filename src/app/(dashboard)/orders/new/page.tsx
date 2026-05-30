@@ -3,13 +3,12 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Minus, PanelRightClose, PanelRightOpen, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, PanelRightClose, PanelRightOpen, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { calcDiscountPerUnit, formatPhone, genClientId } from "@/lib/utils";
-import { focusCaretEnd } from "@/jm/lib/focus";
 import {
   JmDatePicker,
   JmIconButton,
@@ -38,6 +37,7 @@ import {
 import { CartEmptyState } from "@/components/pos/cart-empty-state";
 import { CustomerSummaryCard } from "@/components/pos/customer-summary-card";
 import { CartActionButton as ActionButton } from "@/components/pos/cart-action-button";
+import { PosLineItemRow } from "@/components/pos/line-item-row";
 import {
   PaymentMethodSelector,
   type PaymentMethod,
@@ -1335,156 +1335,100 @@ function CartLineCard({
   const lineNet = netUnit * item.quantity;
   const lineGross = taxFree ? Math.round(lineNet) : Math.round(lineNet * 1.1);
   const isService = item.itemType === "service";
+  const isBulk = !!item.isBulk;
+  const optionSummary =
+    item.optionSnapshot && Object.keys(item.optionSnapshot).length > 0
+      ? Object.entries(item.optionSnapshot)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(" · ")
+      : null;
 
   return (
-    <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3">
-      {/* 1행: 이미지/배지 + 이름/SKU + 삭제 */}
-      <div className="mb-2.5 flex items-start gap-3">
-        {isService ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
-              기술료
-            </span>
-            <JmInput
-              size="sm"
-              value={item.name}
-              onChange={(e) => onUpdate({ name: e.target.value })}
-              placeholder="기술료 항목명"
+    <div className="overflow-hidden rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-bg)]">
+      <PosLineItemRow
+        image={
+          isService ? undefined : item.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="size-12 shrink-0 rounded-xl bg-[var(--jm-surface-muted)] object-cover"
             />
-          </div>
-        ) : (
-          <>
-            {item.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={item.imageUrl}
-                alt={item.name}
-                className="size-12 shrink-0 rounded-xl bg-[var(--jm-surface-muted)] object-cover"
-              />
-            ) : (
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path
-                    d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-            )}
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="line-clamp-1 text-jm-sm font-semibold text-[var(--jm-text)]">
-                {item.name}
-              </span>
-              {item.sku && (
-                <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">
-                  {item.sku}
-                </span>
-              )}
-              {/* 옵션 스냅샷 — VariantSelectSheet 에서 미리 선택한 옵션 라벨 표시 */}
-              {item.optionSnapshot && Object.keys(item.optionSnapshot).length > 0 && (
-                <span className="mt-0.5 line-clamp-1 text-jm-3xs text-[var(--jm-text-muted)]">
-                  {Object.entries(item.optionSnapshot)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(" · ")}
-                </span>
-              )}
+          ) : (
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
-          </>
+          )
+        }
+        name={item.name}
+        sku={isService ? null : item.sku}
+        nameSlot={
+          isService ? (
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
+                기술료
+              </span>
+              <JmInput
+                size="sm"
+                value={item.name}
+                onChange={(e) => onUpdate({ name: e.target.value })}
+                placeholder="기술료 항목명"
+              />
+            </div>
+          ) : undefined
+        }
+        headerBelow={
+          /* 옵션 스냅샷 — VariantSelectSheet 에서 미리 선택한 옵션 라벨 표시 */
+          !isService && optionSummary ? (
+            <span className="mt-0.5 line-clamp-1 text-jm-3xs text-[var(--jm-text-muted)]">
+              {optionSummary}
+            </span>
+          ) : undefined
+        }
+        onDelete={onRemove}
+        unitPriceLabel="단가 (VAT 포함)"
+        unitPrice={`₩${unitGross.toLocaleString("ko-KR")}`}
+        onUnitPriceClick={onEditPrice}
+        quantity={{
+          value: item.quantity,
+          onChange: (v) => onUpdate({ quantity: v }),
+          min: isBulk ? 0.0001 : 1,
+          step: isBulk ? 0.5 : 1,
+          decimal: isBulk,
+        }}
+        total={`₩${lineGross.toLocaleString("ko-KR")}`}
+      >
+        {/* 라인 할인 안내 — 견적서 로드 등 비-제로 할인이 적용됐을 때 노출 */}
+        {discountPerUnit > 0 && (
+          <div className="flex items-center justify-between rounded-lg bg-[var(--jm-surface-muted)] px-2.5 py-1.5 text-jm-2xs">
+            <span className="text-[var(--jm-text-muted)]">
+              할인 {item.discount.endsWith("%") ? `(${item.discount})` : ""}
+            </span>
+            <span className="font-semibold tabular-nums text-[var(--jm-text)]">
+              −₩
+              {Math.round(
+                (taxFree ? discountPerUnit : discountPerUnit * 1.1) * item.quantity,
+              ).toLocaleString("ko-KR")}
+            </span>
+          </div>
         )}
-        <JmIconButton
-          variant="ghost"
-          size="sm"
-          aria-label="삭제"
-          onClick={onRemove}
-          className="shrink-0 text-[var(--jm-text-disabled)] hover:text-[var(--jm-danger-fg)]"
-        >
-          <Trash2 className="size-3.5" />
-        </JmIconButton>
-      </div>
 
-      {/* 2행: 단가 + 수량 stepper + 라인 합계 */}
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onEditPrice}
-          className="flex flex-col items-start rounded-lg px-2 py-1 text-left hover:bg-[var(--jm-surface-muted)]"
-        >
-          <span className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-subtle)]">
-            단가 (VAT 포함)
-          </span>
-          <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
-            ₩{unitGross.toLocaleString("ko-KR")}
-          </span>
-        </button>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() =>
-              onUpdate({ quantity: Math.max(1, Math.round(item.quantity) - 1) })
-            }
-            disabled={item.quantity <= 1}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text)] hover:bg-[var(--jm-border)] disabled:opacity-30"
-          >
-            <Minus className="size-3.5" />
-          </button>
-          <JmInput
-            size="sm"
-            type="text"
-            inputMode="decimal"
-            value={String(item.quantity)}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (!isNaN(v) && v > 0) onUpdate({ quantity: v });
-              else if (e.target.value === "") onUpdate({ quantity: 1 });
-            }}
-            onFocus={focusCaretEnd}
-            className="w-[48px] text-center"
+        {/* 옵션 — 상품 라인만 */}
+        {!isService && item.productId && (
+          <OrderItemOptionsCard
+            productId={item.productId}
+            selectedIds={item.optionValueIds ?? []}
+            onChange={(ids) => onUpdate({ optionValueIds: ids })}
           />
-          <button
-            type="button"
-            onClick={() =>
-              onUpdate({ quantity: Math.round(item.quantity) + 1 })
-            }
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
-          >
-            <Plus className="size-3.5" />
-          </button>
-        </div>
-        <div className="text-right">
-          <div className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-subtle)]">
-            합계
-          </div>
-          <div className="text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
-            ₩{lineGross.toLocaleString("ko-KR")}
-          </div>
-        </div>
-      </div>
-
-      {/* 라인 할인 안내 — 견적서 로드 등 비-제로 할인이 적용됐을 때 노출 */}
-      {discountPerUnit > 0 && (
-        <div className="mt-2 flex items-center justify-between rounded-lg bg-[var(--jm-surface-muted)] px-2.5 py-1.5 text-jm-2xs">
-          <span className="text-[var(--jm-text-muted)]">
-            할인 {item.discount.endsWith("%") ? `(${item.discount})` : ""}
-          </span>
-          <span className="font-semibold tabular-nums text-[var(--jm-text)]">
-            −₩
-            {Math.round(
-              (taxFree ? discountPerUnit : discountPerUnit * 1.1) * item.quantity,
-            ).toLocaleString("ko-KR")}
-          </span>
-        </div>
-      )}
-
-      {/* 옵션 — 상품 라인만 */}
-      {!isService && item.productId && (
-        <OrderItemOptionsCard
-          productId={item.productId}
-          selectedIds={item.optionValueIds ?? []}
-          onChange={(ids) => onUpdate({ optionValueIds: ids })}
-        />
-      )}
+        )}
+      </PosLineItemRow>
     </div>
   );
 }
