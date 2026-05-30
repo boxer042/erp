@@ -60,12 +60,12 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
   const lineGross = taxApplies ? Math.round(lineNet * 1.1) : lineNet;
   const lineDisplay = display === "net" ? lineNet : lineGross;
 
-  // 정가 비교 — 옵션 가산을 제외한 메인 base 가격으로 비교 (옵션 추가가 "인상" 으로 보이는 사고 방지).
-  // base 가 정가 대비 진짜 인상/할인됐을 때만 표시.
+  // 정가 비교 — 옵션 가산을 제외한 메인 base 가격으로 비교 (옵션 추가가 할인처럼 보이는 사고 방지).
+  // 할인(정가보다 싸게)일 때만 표시. 인상(정가보다 비싸게)은 손님과 함께 보는 화면이라 노출 안 함.
   const optionAdd = item.optionAddPriceSum ?? 0;
   const baseUnitNet = Math.max(0, unitNet - optionAdd);
   const listNet = item.listPrice && item.listPrice > 0 ? item.listPrice : null;
-  const showListDiff = listNet !== null && listNet !== baseUnitNet;
+  const showListDiff = listNet !== null && baseUnitNet < (listNet as number);
   const listDiff = showListDiff ? baseUnitNet - (listNet as number) : 0;
   const listDiffPercent = showListDiff && listNet
     ? Math.round(((baseUnitNet - listNet) / listNet) * 1000) / 10
@@ -200,14 +200,8 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
               <span>₩{unitDisplay.toLocaleString("ko-KR")}</span>
             </div>
             {showListDiff && (
-              <span
-                className={`text-[10px] font-semibold tabular-nums ${
-                  listDiff < 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
-                }`}
-              >
-                {listDiff < 0
-                  ? `−₩${Math.abs(listDiff).toLocaleString("ko-KR")} (${Math.abs(listDiffPercent).toFixed(1)}% 할인)`
-                  : `+₩${listDiff.toLocaleString("ko-KR")} (${listDiffPercent.toFixed(1)}% 인상)`}
+              <span className="text-[10px] font-semibold tabular-nums text-[var(--jm-success-fg)]">
+                −₩{Math.abs(listDiff).toLocaleString("ko-KR")} ({Math.abs(listDiffPercent).toFixed(1)}% 할인)
               </span>
             )}
           </>

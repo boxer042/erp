@@ -1840,7 +1840,8 @@ function ReadView({
                       const listNet = item.listPrice ? Number(item.listPrice) : 0;
                       const discNet = item.discountAmount ? Number(item.discountAmount) : 0;
                       const unitNet = Number(item.unitPrice);
-                      const showDiscount = listNet > 0 && listNet !== unitNet;
+                      // 할인(정가보다 싸게)일 때만 비교 표시. 인상은 손님 노출 우려 + 운영상 문제 아님.
+                      const showDiscount = listNet > 0 && unitNet < listNet;
                       if (!showDiscount) {
                         return formatCurrency(item.unitPrice);
                       }
@@ -1855,16 +1856,8 @@ function ReadView({
                             {formatCurrency(listNet)}
                           </span>
                           <span>{formatCurrency(unitNet)}</span>
-                          <span
-                            className={`text-jm-2xs font-semibold ${
-                              diff < 0
-                                ? "text-[var(--jm-success-fg)]"
-                                : "text-[var(--jm-danger-fg)]"
-                            }`}
-                          >
-                            {diff < 0
-                              ? `−${formatCurrency(perUnitDisc)} (${Math.abs(pct).toFixed(1)}%)`
-                              : `+${formatCurrency(diff)} (${pct.toFixed(1)}%)`}
+                          <span className="text-jm-2xs font-semibold text-[var(--jm-success-fg)]">
+                            −{formatCurrency(perUnitDisc)} ({Math.abs(pct).toFixed(1)}%)
                           </span>
                         </div>
                       );
@@ -1875,7 +1868,7 @@ function ReadView({
                       const listNet = item.listPrice ? Number(item.listPrice) : 0;
                       const unitNet = Number(item.unitPrice);
                       const qty = Number(item.quantity);
-                      const showDiscount = listNet > 0 && listNet !== unitNet;
+                      const showDiscount = listNet > 0 && unitNet < listNet;
                       if (!showDiscount) {
                         return formatCurrency(item.totalPrice);
                       }

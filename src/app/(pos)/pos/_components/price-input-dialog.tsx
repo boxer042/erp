@@ -220,16 +220,13 @@ function Body({
           />
         </Field>
 
-        {/* 정가 비교 — 할인/인상 표시 + 정가복원 버튼 */}
-        {hasOriginal && (
+        {/* 정가 비교 — 할인(정가보다 싸게)·동일일 때만 표시 + 정가복원 버튼.
+            인상(정가보다 비싸게)은 POS 에서 손님과 함께 보는 화면이라 숨김 (더 받는 건 운영상 문제 아님). */}
+        {hasOriginal && diff <= 0 && (
           <div className="flex flex-col gap-2">
             <div
               className={`flex items-center justify-between rounded-2xl px-4 py-3 ${
-                diff < 0
-                  ? "bg-[var(--jm-success-bg)]"
-                  : diff > 0
-                    ? "bg-[var(--jm-danger-bg)]"
-                    : "bg-[var(--jm-bg)]"
+                diff < 0 ? "bg-[var(--jm-success-bg)]" : "bg-[var(--jm-bg)]"
               }`}
             >
               <div className="flex flex-col">
@@ -246,22 +243,11 @@ function Body({
                 </span>
               ) : (
                 <div className="flex flex-col items-end">
-                  <span
-                    className={`text-[14px] font-bold tabular-nums ${
-                      diff < 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
-                    }`}
-                  >
-                    {diff < 0 ? "−" : "+"}₩
-                    {Math.abs(diff).toLocaleString("ko-KR")}
+                  <span className="text-[14px] font-bold tabular-nums text-[var(--jm-success-fg)]">
+                    −₩{Math.abs(diff).toLocaleString("ko-KR")}
                   </span>
-                  <span
-                    className={`text-[11px] font-medium tabular-nums ${
-                      diff < 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
-                    }`}
-                  >
-                    {diff < 0
-                      ? `${Math.abs(diffPercent).toFixed(1)}% 할인`
-                      : `${diffPercent.toFixed(1)}% 인상`}
+                  <span className="text-[11px] font-medium tabular-nums text-[var(--jm-success-fg)]">
+                    {Math.abs(diffPercent).toFixed(1)}% 할인
                   </span>
                 </div>
               )}
