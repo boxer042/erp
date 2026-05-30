@@ -38,10 +38,11 @@ test.describe("통합 이미지 입력", () => {
 
     await expect(page.getByPlaceholder("파일명 검색...")).toBeVisible();
 
-    // 새 통합 필터 (버킷 탭 대신) — 전체/사용중/미사용 카운트 칩
-    await expect(page.getByRole("button", { name: /전체 \d+/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /사용중 \d+/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /미사용 \d+/ })).toBeVisible();
+    // 새 통합 필터 (버킷 탭 대신) — 전체/사용중/미사용 카운트.
+    // 컨트롤 종류(버튼/세그먼트)에 무관하게 라벨 텍스트로 검증 (카드 배지와 중복 가능 → first).
+    await expect(page.getByText(/전체 \d+/).first()).toBeVisible();
+    await expect(page.getByText(/사용중 \d+/).first()).toBeVisible();
+    await expect(page.getByText(/미사용 \d+/).first()).toBeVisible();
 
     // 제거된 버킷 탭("브랜드 로고")이 더 이상 없음
     await expect(page.getByRole("button", { name: "브랜드 로고" })).toHaveCount(0);
