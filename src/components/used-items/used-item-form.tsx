@@ -16,6 +16,7 @@ import {
   JmCardHeader,
   JmCardTitle,
   JmCheckbox,
+  JmDatePicker,
   JmFormField,
   JmInput,
   JmSelect,
@@ -194,10 +195,16 @@ export function UsedItemForm({ value, onChange, editing }: Props) {
               />
             </JmFormField>
             <JmFormField label="매입일" required>
-              <JmInput
-                type="date"
-                value={value.acquiredAt}
-                onChange={(e) => patch({ acquiredAt: e.target.value })}
+              <JmDatePicker
+                value={
+                  value.acquiredAt
+                    ? new Date(value.acquiredAt + "T00:00:00")
+                    : undefined
+                }
+                onChange={(d) =>
+                  patch({ acquiredAt: d ? format(d, "yyyy-MM-dd") : "" })
+                }
+                size="sm"
               />
             </JmFormField>
             <JmFormField label="매입가">

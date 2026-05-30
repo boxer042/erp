@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import {
   JmAlert,
   JmButton,
+  JmContainer,
   JmDialog,
   JmDialogContent,
   JmDialogDescription,
@@ -309,42 +310,49 @@ export default function ProductDetailPage() {
   return (
     <ProductsThemeScope>
       <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6 p-6">
-            <ProductHeaderBar
-              product={product}
-              onSaveName={(name) => saveSingleField({ name })}
-              onSaveSku={(sku) => saveSingleField({ sku })}
-              actions={
-                <>
-                  <JmButton
-                    size="sm"
-                    variant="outline"
-                    onClick={() => router.push(`/products/${product.id}/landing`)}
-                  >
-                    <Layout className="size-3.5" />
-                    상세페이지
-                  </JmButton>
-                  <JmButton
-                    size="sm"
-                    variant="outline"
-                    onClick={() => router.push(`/products/${product.id}/manual`)}
-                  >
-                    <BookOpen className="size-3.5" />
-                    사용설명서
-                  </JmButton>
-                  <JmButton
-                    size="sm"
-                    variant="danger"
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    <Archive className="size-3.5" />
-                    비활성
-                  </JmButton>
-                </>
-              }
-            />
+        {/* 스티키 헤더 — 페이지 폭 제한 없음 (액션 버튼 다 보이도록) */}
+        <div className="sticky top-0 z-10 shrink-0 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+          <ProductHeaderBar
+            product={product}
+            onSaveName={(name) => saveSingleField({ name })}
+            onSaveSku={(sku) => saveSingleField({ sku })}
+            actions={
+              <>
+                <JmButton
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/products/${product.id}/landing`)}
+                >
+                  <Layout className="size-3.5" />
+                  상세페이지
+                </JmButton>
+                <JmButton
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/products/${product.id}/manual`)}
+                >
+                  <BookOpen className="size-3.5" />
+                  사용설명서
+                </JmButton>
+                <JmButton
+                  size="sm"
+                  variant="danger"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Archive className="size-3.5" />
+                  비활성
+                </JmButton>
+              </>
+            }
+          />
+        </div>
 
+        <div className="flex-1 overflow-y-auto">
+          <JmContainer
+            width="default"
+            padded={false}
+            className="space-y-6 p-6"
+          >
             <SectionNav groups={navGroups} />
 
             {product.autoMapped && (
@@ -672,7 +680,7 @@ export default function ProductDetailPage() {
             >
               <ProductRepairUsageTable usages={product.repairUsages ?? []} />
             </ProductSection>
-          </div>
+          </JmContainer>
         </div>
       </div>
 

@@ -21,13 +21,16 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   JmButton,
   JmCard,
+  JmCheckbox,
   JmComboboxModal,
   JmDateRangePicker,
   JmEmpty,
   JmIconButton,
   JmPill,
   JmSearchInput,
+  JmSegmentedControl,
   JmSelect,
+  JmSkeleton,
   JmSpinner,
   JmStat,
   JmTable,
@@ -303,43 +306,87 @@ export default function SalesHistoryPage() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <JmStat
             label="총 거래액"
-            value={isPending ? "—" : formatKrw(summary?.totalAmount ?? 0)}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-20" />
+              ) : (
+                formatKrw(summary?.totalAmount ?? 0)
+              )
+            }
             icon={<ShoppingBag className="size-4" />}
             hint={
-              isPending
-                ? ""
-                : `${(summary?.totalCount ?? 0).toLocaleString("ko-KR")}건`
+              isPending ? (
+                <JmSkeleton className="h-3 w-12" />
+              ) : (
+                `${(summary?.totalCount ?? 0).toLocaleString("ko-KR")}건`
+              )
             }
             size="sm"
           />
           <JmStat
             label="순 매출"
-            value={isPending ? "—" : formatKrw(summary?.netAmount ?? 0)}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-20" />
+              ) : (
+                formatKrw(summary?.netAmount ?? 0)
+              )
+            }
             icon={<TrendingUp className="size-4" />}
-            hint={isPending ? "" : "환불·취소 제외"}
+            hint={
+              isPending ? <JmSkeleton className="h-3 w-20" /> : "환불·취소 제외"
+            }
             size="sm"
           />
           <JmStat
             label="미수 (외상)"
-            value={isPending ? "—" : formatKrw(summary?.unpaidAmount ?? 0)}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-20" />
+              ) : (
+                formatKrw(summary?.unpaidAmount ?? 0)
+              )
+            }
             icon={<Coins className="size-4" />}
-            hint={isPending ? "" : "결제완료 전"}
+            hint={
+              isPending ? <JmSkeleton className="h-3 w-16" /> : "결제완료 전"
+            }
             positiveIsGood={false}
             size="sm"
           />
           <JmStat
             label="환불·취소"
-            value={isPending ? "—" : formatKrw(summary?.refundedAmount ?? 0)}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-20" />
+              ) : (
+                formatKrw(summary?.refundedAmount ?? 0)
+              )
+            }
             icon={<RotateCcw className="size-4" />}
-            hint={isPending ? "" : "환불완료 + 매출취소"}
+            hint={
+              isPending ? (
+                <JmSkeleton className="h-3 w-24" />
+              ) : (
+                "환불완료 + 매출취소"
+              )
+            }
             positiveIsGood={false}
             size="sm"
           />
           <JmStat
             label="진행중 클레임"
-            value={isPending ? "—" : (summary?.claimInProgressCount ?? 0)}
+            value={
+              isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                (summary?.claimInProgressCount ?? 0)
+              )
+            }
             icon={<AlertCircle className="size-4" />}
-            hint={isPending ? "" : "회수·검수 진행"}
+            hint={
+              isPending ? <JmSkeleton className="h-3 w-20" /> : "회수·검수 진행"
+            }
             positiveIsGood={false}
             size="sm"
           />
@@ -367,22 +414,16 @@ export default function SalesHistoryPage() {
             </JmTableToolbarSearch>
             <JmTableToolbarFilters>
               {/* 기간 프리셋 */}
-              <div className="flex h-8 items-center gap-1 rounded-lg bg-[var(--jm-surface-muted)] px-1">
-                {RANGE_PRESETS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setPreset(p.value)}
-                    className={`rounded-md px-2 py-0.5 text-jm-xs font-medium transition-colors ${
-                      preset === p.value
-                        ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
-                        : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+              <JmSegmentedControl<RangePreset>
+                size="sm"
+                ariaLabel="기간 선택"
+                options={RANGE_PRESETS.map((p) => ({
+                  value: p.value,
+                  label: p.label,
+                }))}
+                value={preset}
+                onChange={setPreset}
+              />
               {preset === "CUSTOM" && (
                 <JmDateRangePicker
                   size="sm"
@@ -500,13 +541,12 @@ export default function SalesHistoryPage() {
                   </span>
                 </button>
                 <label className="flex items-center gap-1.5 text-jm-xs text-[var(--jm-text)] whitespace-nowrap">
-                  <input
-                    type="checkbox"
+                  <JmCheckbox
+                    size="sm"
                     checked={includeExchangeReplacement}
-                    onChange={(e) =>
-                      setIncludeExchangeReplacement(e.target.checked)
+                    onCheckedChange={(checked) =>
+                      setIncludeExchangeReplacement(checked === true)
                     }
-                    className="size-3.5 rounded border-[var(--jm-border)]"
                   />
                   교환 -EX 포함
                 </label>

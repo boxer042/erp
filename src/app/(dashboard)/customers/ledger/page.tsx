@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
-import { Plus, Search, SlidersHorizontal, FileEdit, PanelLeftClose, PanelLeftOpen, Printer } from "lucide-react";
+import { Plus, SlidersHorizontal, FileEdit, PanelLeftClose, PanelLeftOpen, Printer } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   JmBadge,
@@ -14,6 +14,7 @@ import {
   JmDateRangePicker,
   JmScope,
   JmScrollArea,
+  JmSearchInput,
   JmSkeleton,
   JmSpinner,
   JmTable,
@@ -216,7 +217,7 @@ export default function CustomerLedgerPage() {
         {panelOpen && (
         <div className="w-[320px] max-md:w-[280px] shrink-0 border-r border-[var(--jm-border)] flex flex-col bg-[var(--jm-bg)]">
           <div className="h-10 px-3 border-b border-[var(--jm-border)] flex items-center shrink-0">
-            <h2 className="text-sm font-medium">고객 원장</h2>
+            <h2 className="text-jm-sm font-medium">고객 원장</h2>
           </div>
 
           <div className="px-3 pt-2 shrink-0 space-y-1.5">
@@ -302,19 +303,18 @@ export default function CustomerLedgerPage() {
           </div>
 
           <div className="px-3 pb-2 flex items-center gap-2 shrink-0">
-            <div className="flex-1 flex items-center gap-1.5 h-8 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2.5">
-              <Search className="size-3.5 text-[var(--jm-text-muted)] shrink-0" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="고객 검색..."
-                className="flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--jm-text-muted)]"
-              />
-            </div>
+            <JmSearchInput
+              size="sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClear={() => setSearch("")}
+              placeholder="고객 검색..."
+              className="flex-1"
+            />
             <PopoverPrimitive.Root open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
               <PopoverPrimitive.Trigger
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-md border border-[var(--jm-border)] shrink-0 transition-colors",
+                  "flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--jm-border)] shrink-0 transition-colors",
                   types.length < ALL_TYPES.length
                     ? "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)] border-[var(--jm-info-fg)]/30"
                     : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
@@ -503,14 +503,14 @@ export default function CustomerLedgerPage() {
                   <col style={{ width: "120px" }} />
                 </colgroup>
                 <JmTableHeader className="sticky top-0 z-10">
-                  <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-                    {!selectedCustomerId && <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">고객</JmTableHead>}
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">유형</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">설명</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">참조</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">차변 (매출)</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">대변 (수금)</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">미수 잔액</JmTableHead>
+                  <JmTableRow>
+                    {!selectedCustomerId && <JmTableHead>고객</JmTableHead>}
+                    <JmTableHead className="text-center">유형</JmTableHead>
+                    <JmTableHead>설명</JmTableHead>
+                    <JmTableHead className="text-center">참조</JmTableHead>
+                    <JmTableHead className="text-right">차변 (매출)</JmTableHead>
+                    <JmTableHead className="text-right">대변 (수금)</JmTableHead>
+                    <JmTableHead className="text-right">미수 잔액</JmTableHead>
                   </JmTableRow>
                 </JmTableHeader>
                 <JmTableBody>

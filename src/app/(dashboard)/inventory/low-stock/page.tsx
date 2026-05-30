@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, PackageX, Package, Search, PackagePlus, ExternalLink, ClipboardSignature } from "lucide-react";
+import { AlertTriangle, PackageX, Package, PackagePlus, ExternalLink, ClipboardSignature } from "lucide-react";
 import { toast } from "sonner";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
@@ -11,11 +11,10 @@ import { apiGet } from "@/lib/api-client";
 import {
   JmCard,
   JmCardContent,
-  JmCardHeader,
-  JmCardTitle,
   JmBadge,
   JmButton,
-  JmInput,
+  JmStat,
+  JmSearchInput,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -117,57 +116,78 @@ export default function LowStockPage() {
 
       <div className="flex-1 overflow-y-auto p-5">
         <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <SummaryCard
-            icon={<AlertTriangle className="size-4" />}
+          <JmStat
             label="전체"
-            value={summary?.totalCount ?? 0}
-            tone="default"
+            value={
+              dataQuery.isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                summary?.totalCount ?? 0
+              )
+            }
+            icon={<AlertTriangle className="size-4" />}
+            size="sm"
+            interactive
             active={filter === "all"}
             onClick={() => setFilter("all")}
-            loading={dataQuery.isPending}
           />
           {/* 음수 재고 — 적자 출고. 결품보다 더 시급. */}
-          <SummaryCard
-            icon={<AlertTriangle className="size-4" />}
+          <JmStat
             label="음수 (적자)"
-            value={summary?.negativeStockCount ?? 0}
-            tone="danger"
+            value={
+              dataQuery.isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                summary?.negativeStockCount ?? 0
+              )
+            }
+            icon={<AlertTriangle className="size-4" />}
+            size="sm"
+            interactive
             active={filter === "negative"}
             onClick={() => setFilter("negative")}
-            loading={dataQuery.isPending}
           />
-          <SummaryCard
-            icon={<PackageX className="size-4" />}
+          <JmStat
             label="결품 (재고 0)"
-            value={summary?.outOfStockCount ?? 0}
-            tone="danger"
+            value={
+              dataQuery.isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                summary?.outOfStockCount ?? 0
+              )
+            }
+            icon={<PackageX className="size-4" />}
+            size="sm"
+            interactive
             active={filter === "out"}
             onClick={() => setFilter("out")}
-            loading={dataQuery.isPending}
           />
-          <SummaryCard
-            icon={<Package className="size-4" />}
+          <JmStat
             label="부족"
-            value={summary?.lowStockCount ?? 0}
-            tone="warn"
+            value={
+              dataQuery.isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                summary?.lowStockCount ?? 0
+              )
+            }
+            icon={<Package className="size-4" />}
+            size="sm"
+            interactive
             active={filter === "low"}
             onClick={() => setFilter("low")}
-            loading={dataQuery.isPending}
           />
         </div>
 
         <div className="mb-3 flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--jm-text-muted)]" />
-            <JmInput
-              type="search"
-              size="sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="상품명·SKU·브랜드"
-              className="h-[30px] w-[280px] pl-8 text-jm-sm"
-            />
-          </div>
+          <JmSearchInput
+            size="sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onClear={() => setSearch("")}
+            placeholder="상품명·SKU·브랜드"
+            className="w-[280px]"
+          />
         </div>
 
         <JmCard>
@@ -270,65 +290,6 @@ export default function LowStockPage() {
         </JmCard>
       </div>
     </div>
-  );
-}
-
-function SummaryCard({
-  icon,
-  label,
-  value,
-  tone,
-  active,
-  onClick,
-  loading,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  tone: "default" | "warn" | "danger";
-  active: boolean;
-  onClick: () => void;
-  loading: boolean;
-}) {
-  const ringClass = active
-    ? tone === "danger"
-      ? "ring-2 ring-[var(--jm-danger-solid)]"
-      : tone === "warn"
-        ? "ring-2 ring-[var(--jm-warning-solid)]"
-        : "ring-2 ring-[var(--jm-border-strong)]"
-    : "";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-left transition-shadow ${ringClass} rounded-2xl`}
-    >
-      <JmCard>
-        <JmCardHeader className="flex flex-row items-center justify-between border-b-0 space-y-0 pb-1">
-          <JmCardTitle className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
-            {label}
-          </JmCardTitle>
-          <span
-            className={
-              tone === "danger"
-                ? "text-[var(--jm-danger-fg)]"
-                : tone === "warn"
-                  ? "text-[var(--jm-warning-fg)]"
-                  : "text-[var(--jm-text-muted)]"
-            }
-          >
-            {icon}
-          </span>
-        </JmCardHeader>
-        <JmCardContent>
-          {loading ? (
-            <JmSkeleton className="h-7 w-16" />
-          ) : (
-            <div className="text-jm-3xl font-bold tabular-nums text-[var(--jm-text)]">{value}</div>
-          )}
-        </JmCardContent>
-      </JmCard>
-    </button>
   );
 }
 

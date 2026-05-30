@@ -41,6 +41,7 @@ import {
   JmInput,
   JmPill,
   JmSearchInput,
+  JmSegmentedControl,
   JmSelect,
   JmSkeleton,
   JmSpinner,
@@ -635,6 +636,9 @@ export default function ExpensesPage() {
     { value: "last3", label: "최근3개월" },
     { value: "all", label: "전체" },
   ] as const;
+  type PeriodPreset = (typeof periodPresets)[number]["value"];
+  const activePeriodPreset =
+    (periodPresets.find((p) => p.label === currentPresetLabel)?.value ?? "") as PeriodPreset | "";
 
   return (
     <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
@@ -696,25 +700,13 @@ export default function ExpensesPage() {
             </JmTableToolbarSearch>
             <JmTableToolbarFilters>
               {/* 기간 프리셋 — 세그먼티드 */}
-              <div className="flex h-8 items-center gap-1 rounded-lg bg-[var(--jm-surface-muted)] px-1">
-                {periodPresets.map((p) => {
-                  const active = currentPresetLabel === p.label;
-                  return (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => applyPreset(p.value)}
-                      className={`rounded-md px-2 py-0.5 text-jm-xs font-medium transition-colors ${
-                        active
-                          ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
-                          : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <JmSegmentedControl<PeriodPreset>
+                size="sm"
+                ariaLabel="기간 선택"
+                options={periodPresets.map((p) => ({ value: p.value, label: p.label }))}
+                value={activePeriodPreset as PeriodPreset}
+                onChange={applyPreset}
+              />
               <JmDateRangePicker
                 size="sm"
                 value={{ from, to }}
@@ -1031,7 +1023,8 @@ export default function ExpensesPage() {
                     <p className="text-jm-xs text-[var(--jm-text-muted)]">
                       대상 <span className="text-[var(--jm-danger-fg)]">*</span>
                     </p>
-                    <ToggleSegment
+                    <JmSegmentedControl
+                      size="sm"
                       value={usageTargetType}
                       onChange={(v) => {
                         if (v === "supplier") {
@@ -1188,7 +1181,8 @@ export default function ExpensesPage() {
                   />
                 </div>
                 <div className="flex items-center gap-4">
-                  <ToggleSegment
+                  <JmSegmentedControl
+                    size="sm"
                     value={shippingIsTaxable ? "taxable" : "free"}
                     onChange={(v) => setShippingIsTaxable(v === "taxable")}
                     options={[
@@ -1262,7 +1256,8 @@ export default function ExpensesPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-jm-xs text-[var(--jm-text-muted)]">부가세</p>
-                  <ToggleSegment
+                  <JmSegmentedControl
+                    size="sm"
                     value={form.isTaxable ? "taxable" : "free"}
                     onChange={(v) => setForm({ ...form, isTaxable: v === "taxable" })}
                     options={[
@@ -1273,7 +1268,8 @@ export default function ExpensesPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-jm-xs text-[var(--jm-text-muted)]">결제수단</p>
-                  <ToggleSegment
+                  <JmSegmentedControl
+                    size="sm"
                     value={form.paymentMethod || "_none"}
                     onChange={(v) => setForm({ ...form, paymentMethod: v === "_none" ? "" : v })}
                     options={[
@@ -1579,38 +1575,6 @@ export default function ExpensesPage() {
           fetchSuppliers();
         }}
       />
-    </div>
-  );
-}
-
-/** 작은 segmented toggle — 다이얼로그 폼 전용 */
-function ToggleSegment<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (v: T) => void;
-  options: { value: T; label: string }[];
-}) {
-  return (
-    <div className="inline-flex h-[30px] rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-jm-xs overflow-hidden">
-      {options.map((opt, i) => (
-        <button
-          key={opt.value}
-          type="button"
-          className={cn(
-            "px-3 transition-colors",
-            i > 0 && "border-l border-[var(--jm-border)]",
-            value === opt.value
-              ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] font-medium"
-              : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]",
-          )}
-          onClick={() => onChange(opt.value)}
-        >
-          {opt.label}
-        </button>
-      ))}
     </div>
   );
 }

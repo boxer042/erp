@@ -7,7 +7,7 @@ import { queryKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
-import { Plus, Search, SlidersHorizontal, Printer, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, SlidersHorizontal, Printer, FileEdit, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   JmBadge,
@@ -16,6 +16,7 @@ import {
   JmDateRangePicker,
   JmScope,
   JmScrollArea,
+  JmSearchInput,
   JmSegmentedControl,
   JmSkeleton,
   JmSpinner,
@@ -378,7 +379,7 @@ export default function SupplierLedgerPage() {
         <div className="w-[320px] max-md:w-[280px] shrink-0 border-r border-[var(--jm-border)] flex flex-col bg-[var(--jm-bg)]">
           {/* 헤더 */}
           <div className="h-10 px-3 border-b border-[var(--jm-border)] flex items-center shrink-0">
-            <h2 className="text-sm font-medium">거래처 원장</h2>
+            <h2 className="text-jm-sm font-medium">거래처 원장</h2>
           </div>
 
           {/* 등록 버튼들 */}
@@ -499,19 +500,18 @@ export default function SupplierLedgerPage() {
 
           {/* 검색 + 유형 필터 */}
           <div className="px-3 pb-2 flex items-center gap-2 shrink-0">
-            <div className="flex-1 flex items-center gap-1.5 h-8 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2.5">
-              <Search className="size-3.5 text-[var(--jm-text-muted)] shrink-0" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="거래처 검색..."
-                className="flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--jm-text-muted)]"
-              />
-            </div>
+            <JmSearchInput
+              size="sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClear={() => setSearch("")}
+              placeholder="거래처 검색..."
+              className="flex-1"
+            />
             <PopoverPrimitive.Root open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
               <PopoverPrimitive.Trigger
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-md border border-[var(--jm-border)] shrink-0 transition-colors",
+                  "flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--jm-border)] shrink-0 transition-colors",
                   types.length < ALL_TYPES.length
                     ? "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)] border-[var(--jm-info-fg)]/30"
                     : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
@@ -711,14 +711,14 @@ export default function SupplierLedgerPage() {
                   <col style={{ width: "120px" }} />
                 </colgroup>
                 <JmTableHeader className="sticky top-0 z-10">
-                  <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-                    {!selectedSupplierId && <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">거래처</JmTableHead>}
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">유형</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">설명</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">참조</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">차변 (매입)</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">대변 (결제)</JmTableHead>
-                    <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">잔액</JmTableHead>
+                  <JmTableRow>
+                    {!selectedSupplierId && <JmTableHead>거래처</JmTableHead>}
+                    <JmTableHead className="text-center">유형</JmTableHead>
+                    <JmTableHead>설명</JmTableHead>
+                    <JmTableHead className="text-center">참조</JmTableHead>
+                    <JmTableHead className="text-right">차변 (매입)</JmTableHead>
+                    <JmTableHead className="text-right">대변 (결제)</JmTableHead>
+                    <JmTableHead className="text-right">잔액</JmTableHead>
                   </JmTableRow>
                 </JmTableHeader>
                 <JmTableBody>

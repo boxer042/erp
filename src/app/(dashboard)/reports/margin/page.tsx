@@ -10,6 +10,7 @@ import {
   JmTable, JmTableBody, JmTableCell, JmTableHead, JmTableHeader, JmTableRow,
   JmButton,
   JmSkeleton,
+  JmStat,
   JmAlert,
 } from "@/jm";
 import { Download } from "lucide-react";
@@ -140,22 +141,9 @@ function fmt(n: number) {
   return n.toLocaleString("ko-KR");
 }
 
-function deltaPct(curr: number, prev: number): { value: number; sign: "up" | "down" | "flat" } {
-  if (prev === 0) return { value: 0, sign: "flat" };
-  const v = ((curr - prev) / Math.abs(prev)) * 100;
-  return { value: Math.abs(v), sign: v > 0 ? "up" : v < 0 ? "down" : "flat" };
-}
-
-function DeltaBadge({ curr, prev }: { curr: number; prev: number }) {
-  const { value, sign } = deltaPct(curr, prev);
-  if (sign === "flat") return <span className="text-jm-2xs text-[var(--jm-text-muted)]">— vs 이전</span>;
-  const color = sign === "up" ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]";
-  const arrow = sign === "up" ? "▲" : "▼";
-  return (
-    <span className={`text-jm-2xs tabular-nums ${color}`}>
-      {arrow} {value.toFixed(1)}% vs 이전
-    </span>
-  );
+function deltaPct(curr: number, prev: number): number | undefined {
+  if (prev === 0) return undefined;
+  return ((curr - prev) / Math.abs(prev)) * 100;
 }
 
 type TopProductSort = "revenue" | "netProfit";
@@ -304,9 +292,9 @@ export default function MarginReportPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3 space-y-2">
+                <div key={i} className="flex flex-col gap-2 rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-5">
                   <JmSkeleton className="h-3 w-16" />
-                  <JmSkeleton className="h-6 w-24" />
+                  <JmSkeleton className="h-7 w-24" />
                 </div>
               ))}
             </div>
@@ -353,40 +341,49 @@ export default function MarginReportPage() {
 
             {/* 요약 카드 그리드 */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-              <SummaryCard
-                title="매출 (VAT포함)"
+              <JmStat
+                size="sm"
+                label="매출 (VAT포함)"
                 value={`₩${fmt(data.summary.revenue)}`}
-                delta={<DeltaBadge curr={data.summary.revenue} prev={data.prevSummary.revenue} />}
+                delta={deltaPct(data.summary.revenue, data.prevSummary.revenue)}
+                compareLabel="vs 이전"
               />
-              <SummaryCard
-                title="매출원가"
+              <JmStat
+                size="sm"
+                label="매출원가"
                 value={`₩${fmt(data.summary.costAmount)}`}
-                delta={<DeltaBadge curr={data.summary.costAmount} prev={data.prevSummary.costAmount} />}
+                delta={deltaPct(data.summary.costAmount, data.prevSummary.costAmount)}
+                compareLabel="vs 이전"
               />
-              <SummaryCard
-                title="채널 수수료"
+              <JmStat
+                size="sm"
+                label="채널 수수료"
                 value={`₩${fmt(data.summary.commissionAmount)}`}
-                delta={<DeltaBadge curr={data.summary.commissionAmount} prev={data.prevSummary.commissionAmount} />}
+                delta={deltaPct(data.summary.commissionAmount, data.prevSummary.commissionAmount)}
+                compareLabel="vs 이전"
               />
-              <SummaryCard
-                title="카드 수수료"
+              <JmStat
+                size="sm"
+                label="카드 수수료"
                 value={`₩${fmt(data.summary.cardFeeAmount)}`}
-                delta={<DeltaBadge curr={data.summary.cardFeeAmount} prev={data.prevSummary.cardFeeAmount} />}
+                delta={deltaPct(data.summary.cardFeeAmount, data.prevSummary.cardFeeAmount)}
+                compareLabel="vs 이전"
               />
-              <SummaryCard
-                title="운영경비"
+              <JmStat
+                size="sm"
+                label="운영경비"
                 value={`₩${fmt(data.summary.opexAmount ?? 0)}`}
-                sub={data.summary.opexByCategory && data.summary.opexByCategory.length > 0
+                hint={data.summary.opexByCategory && data.summary.opexByCategory.length > 0
                   ? `${data.summary.opexByCategory.length}개 카테고리`
                   : undefined}
-                delta={<DeltaBadge curr={data.summary.opexAmount ?? 0} prev={data.prevSummary.opexAmount ?? 0} />}
+                delta={deltaPct(data.summary.opexAmount ?? 0, data.prevSummary.opexAmount ?? 0)}
               />
-              <SummaryCard
-                title="실순이익"
+              <JmStat
+                size="sm"
+                label="실순이익"
                 value={`₩${fmt(data.summary.netProfit)}`}
-                sub={`마진율 ${data.summary.marginRate.toFixed(1)}%`}
-                delta={<DeltaBadge curr={data.summary.netProfit} prev={data.prevSummary.netProfit} />}
-                highlight
+                hint={`마진율 ${data.summary.marginRate.toFixed(1)}%`}
+                delta={deltaPct(data.summary.netProfit, data.prevSummary.netProfit)}
               />
             </div>
 
@@ -603,25 +600,6 @@ export default function MarginReportPage() {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function SummaryCard({
-  title, value, sub, delta, highlight,
-}: {
-  title: string;
-  value: string;
-  sub?: string;
-  delta?: React.ReactNode;
-  highlight?: boolean;
-}) {
-  return (
-    <div className={`rounded-2xl border p-3 space-y-1 ${highlight ? "border-[var(--jm-success-fg)]/40 bg-[var(--jm-success-bg)]" : "border-[var(--jm-border)] bg-[var(--jm-surface)]"}`}>
-      <div className="text-jm-2xs text-[var(--jm-text-muted)]">{title}</div>
-      <div className={`text-jm-md font-bold tabular-nums ${highlight ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"}`}>{value}</div>
-      {sub && <div className="text-jm-2xs text-[var(--jm-text-muted)] tabular-nums">{sub}</div>}
-      {delta}
     </div>
   );
 }

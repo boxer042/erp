@@ -37,6 +37,7 @@ import {
   JmInput,
   JmScope,
   JmSelect,
+  JmStat,
 } from "@/jm";
 import Loading from "./loading";
 
@@ -409,43 +410,31 @@ export default function SupplierProductDetailPage() {
           {/* 요약 KPI */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {kpis.map((k) => (
-              <JmCard key={k.label}>
-                <JmCardContent className="p-4">
-                  <p className="text-jm-xs text-[var(--jm-text-muted)] mb-1">{k.label}</p>
-                  {k.show && k.total > 0 ? (
-                    <>
-                      <p className="text-jm-md font-bold tabular-nums text-[var(--jm-text)]">
-                        ₩{Math.round(k.total).toLocaleString("ko-KR")}
-                      </p>
-                      <p className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
-                        공급가 ₩{Math.round(k.supply).toLocaleString("ko-KR")}
-                      </p>
-                      <p className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
-                        세액 ₩{Math.round(k.tax).toLocaleString("ko-KR")}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-jm-md font-bold text-[var(--jm-text-muted)]">—</p>
-                  )}
-                </JmCardContent>
-              </JmCard>
+              <JmStat
+                key={k.label}
+                size="sm"
+                label={k.label}
+                value={
+                  k.show && k.total > 0
+                    ? `₩${Math.round(k.total).toLocaleString("ko-KR")}`
+                    : "—"
+                }
+                hint={
+                  k.show && k.total > 0 ? (
+                    <span className="flex flex-col tabular-nums">
+                      <span>공급가 ₩{Math.round(k.supply).toLocaleString("ko-KR")}</span>
+                      <span>세액 ₩{Math.round(k.tax).toLocaleString("ko-KR")}</span>
+                    </span>
+                  ) : undefined
+                }
+              />
             ))}
-            <JmCard>
-              <JmCardContent className="p-4">
-                <p className="text-jm-xs text-[var(--jm-text-muted)] mb-1">총 입고 횟수</p>
-                <p className="text-jm-md font-bold text-[var(--jm-text)]">
-                  {product.incomingItems.length}건
-                </p>
-              </JmCardContent>
-            </JmCard>
-            <JmCard>
-              <JmCardContent className="p-4">
-                <p className="text-jm-xs text-[var(--jm-text-muted)] mb-1">마지막 입고일</p>
-                <p className="text-jm-md font-bold text-[var(--jm-text)]">
-                  {lastIncomingDate}
-                </p>
-              </JmCardContent>
-            </JmCard>
+            <JmStat
+              size="sm"
+              label="총 입고 횟수"
+              value={`${product.incomingItems.length}건`}
+            />
+            <JmStat size="sm" label="마지막 입고일" value={lastIncomingDate} />
           </div>
 
           {/* 기본 정보 */}
@@ -460,13 +449,13 @@ export default function SupplierProductDetailPage() {
                   { label: "품명", field: "name" },
                   { label: "단위", field: "unitOfMeasure", isSelect: true },
                   { label: "규격", field: "spec" },
-                  { label: "정가 (세전)", field: "listPrice", type: "number" },
-                  { label: "실제 단가 (세전)", field: "unitPrice", type: "number" },
+                  { label: "정가 (세전)", field: "listPrice", money: true },
+                  { label: "실제 단가 (세전)", field: "unitPrice", money: true },
                   { label: "품번", field: "supplierCode" },
                   { label: "부가세", field: "isTaxable", isTaxableToggle: true },
                   { label: "리드타임 (일)", field: "leadTimeDays", type: "number" },
                   { label: "최소발주량", field: "minOrderQty", type: "number" },
-                ].map(({ label, value, field, noEdit, type, isSelect, isTaxableToggle }) => (
+                ].map(({ label, value, field, noEdit, type, money, isSelect, isTaxableToggle }) => (
                   <div key={label} className="flex items-center gap-2">
                     <span className="text-[var(--jm-text-muted)] w-28 shrink-0">{label}</span>
                     {editing && !noEdit ? (
@@ -508,6 +497,23 @@ export default function SupplierProductDetailPage() {
                           onChange={(v) =>
                             setEditForm((p) => ({ ...p, unitOfMeasure: v }))
                           }
+                        />
+                      ) : money ? (
+                        <JmInput
+                          size="sm"
+                          type="text"
+                          inputMode="numeric"
+                          value={formatComma(
+                            (editForm[field as keyof typeof editForm] as string) ?? "",
+                          )}
+                          onChange={(e) =>
+                            setEditForm((p) => ({
+                              ...p,
+                              [field!]: parseComma(e.target.value),
+                            }))
+                          }
+                          className="w-40"
+                          onFocus={focusCaretEnd}
                         />
                       ) : (
                         <JmInput

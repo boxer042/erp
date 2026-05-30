@@ -16,6 +16,7 @@ import {
   JmCardHeader,
   JmCardTitle,
   JmCheckbox,
+  JmDatePicker,
   JmFormField,
   JmIconButton,
   JmInput,
@@ -422,10 +423,9 @@ export function UsedItemBuildForm({ value, onChange }: Props) {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <JmFormField label="조립일" required>
-              <JmInput
-                type="date"
-                value={value.builtAt}
-                onChange={(e) => patch({ builtAt: e.target.value })}
+              <JmDatePicker
+                value={value.builtAt ? new Date(value.builtAt + "T00:00:00") : undefined}
+                onChange={(d) => patch({ builtAt: d ? format(d, "yyyy-MM-dd") : "" })}
               />
             </JmFormField>
             <JmFormField label="공임">

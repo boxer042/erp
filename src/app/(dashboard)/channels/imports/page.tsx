@@ -28,7 +28,10 @@ import {
   JmIconButton,
   JmInput,
   JmBadge,
+  JmCheckbox,
+  JmEmpty,
   JmSkeleton,
+  JmStat,
   JmTabs,
   JmTabsList,
   JmTabsTrigger,
@@ -455,13 +458,11 @@ function ChannelConfigDialog({
                   ERP [발송] 시 채널에 송장 자동 통보
                 </span>
               </div>
-              <input
-                type="checkbox"
+              <JmCheckbox
                 checked={form.autoTrackingPush ?? true}
-                onChange={(e) =>
-                  setForm({ ...form, autoTrackingPush: e.target.checked })
+                onCheckedChange={(v) =>
+                  setForm({ ...form, autoTrackingPush: !!v })
                 }
-                className="size-4"
               />
             </label>
             <label className="flex cursor-pointer items-center justify-between gap-2 border-t border-[var(--jm-border)] pt-2">
@@ -473,13 +474,11 @@ function ChannelConfigDialog({
                   Inventory 변동 시 채널에 가용 재고 push (Phase 2 필요)
                 </span>
               </div>
-              <input
-                type="checkbox"
+              <JmCheckbox
                 checked={form.autoStockSync ?? false}
-                onChange={(e) =>
-                  setForm({ ...form, autoStockSync: e.target.checked })
+                onCheckedChange={(v) =>
+                  setForm({ ...form, autoStockSync: !!v })
                 }
-                className="size-4"
               />
             </label>
           </div>
@@ -626,9 +625,13 @@ function PendingSection({ channels }: { channels: Channel[] }) {
               </JmTableRow>
             ))
           ) : (pendingQuery.data ?? []).length === 0 ? (
-            <JmTableRow>
-              <JmTableCell colSpan={7} className="text-center py-8 text-jm-sm">
-                보류 항목이 없습니다
+            <JmTableRow className="hover:bg-transparent">
+              <JmTableCell colSpan={7} className="py-12">
+                <JmEmpty
+                  icon={<Inbox className="size-6" />}
+                  title="보류 항목이 없습니다"
+                  description="외부 채널에서 가져온 주문 중 매핑 누락·검증 실패 등으로 보류된 항목이 여기에 표시됩니다."
+                />
               </JmTableCell>
             </JmTableRow>
           ) : (
@@ -907,37 +910,57 @@ function StatsBar() {
   return (
     <div className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-5 py-2.5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard
-          icon={<AlertCircle className="h-3.5 w-3.5" />}
+        <JmStat
+          size="sm"
+          icon={<AlertCircle className="size-4" />}
           label="매핑 누락 보류"
-          value={data?.pendingByStatus.UNMAPPED_SKU ?? 0}
-          loading={statsQuery.isPending}
-          tone={
-            (data?.pendingByStatus.UNMAPPED_SKU ?? 0) > 0
-              ? "warning"
-              : "default"
+          value={
+            statsQuery.isPending ? (
+              <JmSkeleton className="h-7 w-12" />
+            ) : (
+              (data?.pendingByStatus.UNMAPPED_SKU ?? 0).toLocaleString("ko-KR")
+            )
+          }
+          positiveIsGood={false}
+        />
+        <JmStat
+          size="sm"
+          icon={<Inbox className="size-4" />}
+          label="최근 7일 import"
+          value={
+            statsQuery.isPending ? (
+              <JmSkeleton className="h-7 w-12" />
+            ) : (
+              (data?.last7Days.imported ?? 0).toLocaleString("ko-KR")
+            )
           }
         />
-        <StatCard
-          icon={<Inbox className="h-3.5 w-3.5" />}
-          label="최근 7일 import"
-          value={data?.last7Days.imported ?? 0}
-          loading={statsQuery.isPending}
-        />
-        <StatCard
-          icon={<Sparkles className="h-3.5 w-3.5" />}
+        <JmStat
+          size="sm"
+          icon={<Sparkles className="size-4" />}
           label="최근 7일 변환됨"
-          value={data?.last7Days.resolved ?? 0}
-          loading={statsQuery.isPending}
+          value={
+            statsQuery.isPending ? (
+              <JmSkeleton className="h-7 w-12" />
+            ) : (
+              (data?.last7Days.resolved ?? 0).toLocaleString("ko-KR")
+            )
+          }
         />
-        <StatCard
-          icon={<Package className="h-3.5 w-3.5" />}
+        <JmStat
+          size="sm"
+          icon={<Package className="size-4" />}
           label="전체 보류"
           value={
-            (data?.pendingByStatus.UNMAPPED_SKU ?? 0) +
-            (data?.pendingByStatus.VALIDATION_FAILED ?? 0)
+            statsQuery.isPending ? (
+              <JmSkeleton className="h-7 w-12" />
+            ) : (
+              (
+                (data?.pendingByStatus.UNMAPPED_SKU ?? 0) +
+                (data?.pendingByStatus.VALIDATION_FAILED ?? 0)
+              ).toLocaleString("ko-KR")
+            )
           }
-          loading={statsQuery.isPending}
         />
       </div>
       {data && data.missingSkuTop.length > 0 && (
@@ -955,46 +978,6 @@ function StatsBar() {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  loading,
-  tone = "default",
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  loading: boolean;
-  tone?: "default" | "warning";
-}) {
-  return (
-    <div
-      className={`rounded-md border bg-[var(--jm-surface)] p-2.5 ${
-        tone === "warning"
-          ? "border-[var(--jm-warning-solid)]"
-          : "border-[var(--jm-border)]"
-      }`}
-    >
-      <div className="flex items-center gap-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
-        {icon}
-        {label}
-      </div>
-      <div
-        className={`mt-1 text-jm-xl font-semibold tabular-nums ${
-          tone === "warning" ? "text-[var(--jm-warning-fg)]" : "text-[var(--jm-text)]"
-        }`}
-      >
-        {loading ? (
-          <JmSkeleton className="h-5 w-12" />
-        ) : (
-          value.toLocaleString("ko-KR")
-        )}
-      </div>
     </div>
   );
 }
@@ -1096,9 +1079,13 @@ function MappingSection({ channels }: { channels: Channel[] }) {
               </JmTableRow>
             ))
           ) : (mappingsQuery.data ?? []).length === 0 ? (
-            <JmTableRow>
-              <JmTableCell colSpan={5} className="text-center py-8 text-jm-sm">
-                등록된 매핑이 없습니다
+            <JmTableRow className="hover:bg-transparent">
+              <JmTableCell colSpan={5} className="py-12">
+                <JmEmpty
+                  icon={<Package className="size-6" />}
+                  title="등록된 매핑이 없습니다"
+                  description="채널 SKU 를 ERP 상품에 연결하면 import 시 자동으로 주문 항목이 매칭됩니다. [매핑 추가] 로 시작하세요."
+                />
               </JmTableCell>
             </JmTableRow>
           ) : (
@@ -1413,22 +1400,22 @@ function AddMappingDialog({
                   }
                   hint="선택 시 import 된 OrderItem 의 productId 가 옵션값의 매핑된 SKU 로 적용됨 (SWAP 모드). optionSnapshot 도 자동 채움. entryProductId = 위 ERP 상품 (funnel)."
                 >
-                  <select
+                  <JmSelect
+                    size="sm"
                     value={productOptionValueId}
-                    onChange={(e) => setProductOptionValueId(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] px-2 text-jm-sm text-[var(--jm-text)]"
-                  >
-                    <option value="">— 매핑 안 함 (대표 상품 그대로) —</option>
-                    {optionSlots.flatMap((slot) =>
-                      slot.values.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {slot.name}: {v.label}
-                          {v.mappedProduct ? ` → ${v.mappedProduct.name}` : ""}
-                          {v.mappedMode ? ` [${v.mappedMode}]` : ""}
-                        </option>
-                      )),
-                    )}
-                  </select>
+                    onChange={(v) => setProductOptionValueId(v)}
+                    options={[
+                      { value: "", label: "— 매핑 안 함 (대표 상품 그대로) —" },
+                      ...optionSlots.flatMap((slot) =>
+                        slot.values.map((v) => ({
+                          value: v.id,
+                          label: `${slot.name}: ${v.label}${
+                            v.mappedProduct ? ` → ${v.mappedProduct.name}` : ""
+                          }${v.mappedMode ? ` [${v.mappedMode}]` : ""}`,
+                        })),
+                      ),
+                    ]}
+                  />
                 </JmFormField>
               )}
             </>
@@ -1441,23 +1428,24 @@ function AddMappingDialog({
                 {components.map((c, idx) => (
                   <div key={idx} className="flex items-start gap-2">
                     <div className="w-[78px]">
-                      <select
+                      <JmSelect<ComponentRole>
+                        size="sm"
+                        className="w-full"
                         value={c.lineRole}
-                        onChange={(e) => {
+                        onChange={(v) => {
                           const next = [...components];
                           next[idx] = {
                             ...next[idx],
-                            lineRole: e.target.value as ComponentRole,
+                            lineRole: v,
                           };
                           setComponents(next);
                         }}
-                        className="h-9 w-full rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] px-1.5 text-jm-xs text-[var(--jm-text)]"
-                        title="MAIN: 기본 라인 / OPTION: 옵션 매핑 / ADDON: 추가구매·사은품"
-                      >
-                        <option value="MAIN">메인</option>
-                        <option value="OPTION">옵션</option>
-                        <option value="ADDON">추가</option>
-                      </select>
+                        options={[
+                          { value: "MAIN", label: "메인" },
+                          { value: "OPTION", label: "옵션" },
+                          { value: "ADDON", label: "추가" },
+                        ]}
+                      />
                     </div>
                     <div className="flex-1">
                       <ProductCombobox

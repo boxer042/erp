@@ -7,7 +7,7 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { BookOpen, Loader2, Pencil, Printer, QrCode, Recycle, Trash2 } from "lucide-react";
+import { BookOpen, Loader2, Package, Pencil, Plus, Printer, QrCode, Recycle, RefreshCw, Trash2 } from "lucide-react";
 import {
   jmToast,
   JmBadge,
@@ -24,13 +24,17 @@ import {
   JmDrawerContent,
   JmDrawerHeader,
   JmDrawerTitle,
+  JmEmpty,
   JmFormField,
   JmIconButton,
   JmInput,
+  JmSearchInput,
   JmSelect,
   JmSkeleton,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarSearch,
 } from "@/jm";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import { QuickBrandSheet } from "@/components/quick-register-sheets";
 import { ImageInput } from "@/components/image-input";
@@ -354,13 +358,32 @@ export default function RentalAssetsPage() {
 
   return (
     <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-      <DataTableToolbar
-        search={{ value: search, onChange: setSearch, onSearch: () => {}, placeholder: "자산명, 브랜드, 자산번호 검색..." }}
-        onRefresh={refresh}
-        onAdd={openCreate}
-        addLabel="자산 추가"
-        loading={loading}
-      />
+      <JmTableToolbar>
+        <JmTableToolbarSearch>
+          <JmSearchInput
+            size="sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onClear={() => setSearch("")}
+            placeholder="자산명, 브랜드, 자산번호 검색..."
+          />
+        </JmTableToolbarSearch>
+        <JmTableToolbarActions>
+          <JmIconButton
+            variant="ghost"
+            size="sm"
+            aria-label="새로고침"
+            onClick={refresh}
+            disabled={loading}
+          >
+            <RefreshCw className={loading ? "animate-spin" : ""} />
+          </JmIconButton>
+          <JmButton size="sm" variant="cta" onClick={openCreate}>
+            <Plus />
+            <span>자산 추가</span>
+          </JmButton>
+        </JmTableToolbarActions>
+      </JmTableToolbar>
 
       <div className="flex-1 overflow-y-auto min-h-0">
         {loading ? (
@@ -368,9 +391,16 @@ export default function RentalAssetsPage() {
             <RentalAssetsSkeletonCards />
           </div>
         ) : assets.length === 0 ? (
-          <div className="py-16 text-center text-jm-sm text-[var(--jm-text-muted)]">
-            등록된 임대 자산이 없습니다
-          </div>
+          <JmEmpty
+            className="py-16"
+            icon={<Package className="size-8" />}
+            title={search.trim() ? "검색 결과가 없습니다" : "등록된 임대 자산이 없습니다"}
+            description={
+              search.trim()
+                ? "다른 검색어로 다시 시도해보세요"
+                : "자산 추가 버튼으로 임대 자산을 등록하세요"
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {assets.map((a) => (
@@ -485,14 +515,14 @@ export default function RentalAssetsPage() {
                   disabled={submitting}
                 />
                 <div className="flex-1 min-w-0 space-y-3">
-                  <Field label="자산명" required>
+                  <JmFormField label="자산명" required>
                     <JmInput
                       size="sm"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       placeholder="예: 카메라 본체 A세트"
                     />
-                  </Field>
+                  </JmFormField>
                 </div>
               </div>
 
@@ -500,7 +530,7 @@ export default function RentalAssetsPage() {
               <section className="space-y-3">
                 <SectionTitle>식별 정보</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="브랜드">
+                  <JmFormField label="브랜드">
                     <BrandCombobox
                       brands={brandOptions}
                       value={selectedBrandId}
@@ -510,14 +540,14 @@ export default function RentalAssetsPage() {
                         setQuickBrandOpen(true);
                       }}
                     />
-                  </Field>
-                  <Field label="모델번호">
+                  </JmFormField>
+                  <JmFormField label="모델번호">
                     <JmInput
                       size="sm"
                       value={form.modelNo}
                       onChange={(e) => setForm({ ...form, modelNo: e.target.value })}
                     />
-                  </Field>
+                  </JmFormField>
                 </div>
               </section>
 
@@ -525,19 +555,19 @@ export default function RentalAssetsPage() {
               <section className="space-y-3">
                 <SectionTitle>요율 · 보증금</SectionTitle>
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="일 요율 (VAT 포함)">
+                  <JmFormField label="일 요율 (VAT 포함)">
                     <RateButton
                       net={parseFloat(parseComma(form.dailyRate)) || 0}
                       onClick={() => setPriceEdit("daily")}
                     />
-                  </Field>
-                  <Field label="월 요율 (VAT 포함)">
+                  </JmFormField>
+                  <JmFormField label="월 요율 (VAT 포함)">
                     <RateButton
                       net={parseFloat(parseComma(form.monthlyRate)) || 0}
                       onClick={() => setPriceEdit("monthly")}
                     />
-                  </Field>
-                  <Field label="보증금">
+                  </JmFormField>
+                  <JmFormField label="보증금">
                     <JmInput
                       size="sm"
                       type="text"
@@ -547,7 +577,7 @@ export default function RentalAssetsPage() {
                       onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })}
                       onFocus={focusCaretEnd}
                     />
-                  </Field>
+                  </JmFormField>
                 </div>
                 <p className="text-jm-2xs text-[var(--jm-text-muted)]">
                   요율은 VAT 포함 금액으로 표시·입력됩니다. 보증금은 부가세 대상이 아닙니다.
@@ -558,31 +588,31 @@ export default function RentalAssetsPage() {
               <section className="space-y-3">
                 <SectionTitle>관리</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="취득일">
+                  <JmFormField label="취득일">
                     <JmDatePicker
                       size="sm"
                       value={form.acquiredAt ? new Date(`${form.acquiredAt}T00:00:00`) : undefined}
                       onChange={(d) => setForm({ ...form, acquiredAt: d ? toYmd(d) : "" })}
                       placeholder="취득일 선택"
                     />
-                  </Field>
-                  <Field label="상태">
+                  </JmFormField>
+                  <JmFormField label="상태">
                     <JmSelect
                       size="sm"
                       value={form.status}
                       onChange={(v) => setForm({ ...form, status: v as AssetStatus })}
                       options={Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))}
                     />
-                  </Field>
+                  </JmFormField>
                 </div>
-                <Field label="메모">
+                <JmFormField label="메모">
                   <JmInput
                     size="sm"
                     value={form.memo}
                     onChange={(e) => setForm({ ...form, memo: e.target.value })}
                     placeholder="특이사항 (선택)"
                   />
-                </Field>
+                </JmFormField>
               </section>
             </div>
           </div>
@@ -786,22 +816,3 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1">
-      <label className="text-jm-xs text-[var(--jm-text-muted)]">
-        {label}
-        {required ? <span className="ml-0.5 text-[var(--jm-danger-fg)]">*</span> : null}
-      </label>
-      {children}
-    </div>
-  );
-}

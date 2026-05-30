@@ -7,18 +7,25 @@ import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import {
   JmScope,
   JmButton,
+  JmIconButton,
   JmBadge,
+  JmCard,
   JmTable,
   JmTableBody,
   JmTableCell,
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarFilters,
+  JmTableToolbarActions,
   JmSelect,
   JmScrollArea,
   JmSkeleton,
   JmInput,
-  JmCalendar,
+  JmCheckbox,
+  JmDatePicker,
+  JmEmpty,
   JmDrawer,
   JmDrawerContent,
   JmDrawerHeader,
@@ -30,12 +37,10 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { InlineCellProductSearch } from "@/components/inline-cell-product-search";
 import {
-  Plus, X, CalendarIcon, Loader2, ArrowUpRight, ChevronsUpDown,
+  Plus, X, RefreshCw, Loader2, ArrowUpRight, ChevronsUpDown, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
-import { ko } from "date-fns/locale";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { QuickSupplierSheet, QuickSupplierProductSheet } from "@/components/quick-register-sheets";
 import { formatComma, parseComma } from "@/lib/utils";
 
@@ -165,78 +170,14 @@ function ReturnsSkeletonRows({ rows = 8 }: { rows?: number }) {
   );
 }
 
-// 날짜 입력 컴포넌트
+// 날짜 입력 컴포넌트 — JmDatePicker 표준 래퍼 (값은 yyyy-MM-dd 문자열)
 function DateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState("");
-  const [editing, setEditing] = useState(false);
-
-  const display = value
-    ? format(parse(value, "yyyy-MM-dd", new Date()), "yyyy년 M월 d일", { locale: ko })
-    : "";
-
-  const tryParse = (input: string) => {
-    const digits = input.replace(/\D/g, "");
-    if (digits.length === 8) {
-      const y = digits.slice(0, 4);
-      const m = digits.slice(4, 6);
-      const d = digits.slice(6, 8);
-      const date = new Date(`${y}-${m}-${d}`);
-      if (!isNaN(date.getTime())) {
-        onChange(`${y}-${m}-${d}`);
-        setEditing(false);
-        return;
-      }
-    }
-    setEditing(false);
-  };
-
   return (
-    <div className="flex items-center gap-1">
-      {editing ? (
-        <input
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => tryParse(text)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) tryParse(text); }}
-          placeholder="20260329"
-          className="h-9 flex-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => { setText(""); setEditing(true); }}
-          className="h-9 flex-1 text-left rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:border-[var(--jm-border-strong)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
-        >
-          {display || <span className="text-[var(--jm-text-subtle)]">날짜 입력...</span>}
-        </button>
-      )}
-      <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
-        <PopoverPrimitive.Trigger className="h-9 w-9 flex items-center justify-center rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] hover:bg-[var(--jm-surface-muted)] shrink-0">
-          <CalendarIcon className="size-3.5 text-[var(--jm-text-muted)]" />
-        </PopoverPrimitive.Trigger>
-        <PopoverPrimitive.Portal>
-          <PopoverPrimitive.Positioner align="end" sideOffset={6} className="isolate z-50">
-            <PopoverPrimitive.Popup
-              data-jm-scope
-              className="rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
-            >
-              <JmCalendar
-                value={value ? parse(value, "yyyy-MM-dd", new Date()) : undefined}
-                onChange={(date) => {
-                  if (date) {
-                    onChange(format(date, "yyyy-MM-dd"));
-                    setOpen(false);
-                    setEditing(false);
-                  }
-                }}
-              />
-            </PopoverPrimitive.Popup>
-          </PopoverPrimitive.Positioner>
-        </PopoverPrimitive.Portal>
-      </PopoverPrimitive.Root>
-    </div>
+    <JmDatePicker
+      size="sm"
+      value={value ? parse(value, "yyyy-MM-dd", new Date()) : undefined}
+      onChange={(date) => { if (date) onChange(format(date, "yyyy-MM-dd")); }}
+    />
   );
 }
 
@@ -580,89 +521,106 @@ export default function SupplierReturnsPage() {
 
   return (
     <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
-      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-        <DataTableToolbar
-          onRefresh={fetchReturns}
-          loading={loading}
-          onAdd={() => { resetForm(); setCreateOpen(true); }}
-          addLabel="반품 등록"
-          filters={
-            <div className="flex items-center gap-1.5">
-              <JmSelect
-                variant="pill"
-                size="sm"
-                label="거래처"
-                value={selectedSupplier}
-                onChange={(v) => setSelectedSupplier(v ?? "all")}
-                options={[
-                  { value: "all", label: "전체 거래처" },
-                  ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
-              <JmSelect
-                variant="pill"
-                size="sm"
-                label="상태"
-                value={statusFilter}
-                onChange={(v) => setStatusFilter(v ?? "all")}
-                options={[
-                  { value: "all", label: "전체 상태" },
-                  { value: "PENDING", label: "대기" },
-                  { value: "CONFIRMED", label: "확정" },
-                  { value: "CANCELLED", label: "취소" },
-                ]}
-              />
-            </div>
-          }
-        />
+      <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+        <div className="flex w-full flex-col gap-6 p-4">
+          <JmCard className="overflow-hidden p-0">
+            <JmTableToolbar>
+              <JmTableToolbarFilters>
+                <JmSelect
+                  variant="pill"
+                  size="sm"
+                  label="거래처"
+                  value={selectedSupplier}
+                  onChange={(v) => setSelectedSupplier(v ?? "all")}
+                  options={[
+                    { value: "all", label: "전체 거래처" },
+                    ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                />
+                <JmSelect
+                  variant="pill"
+                  size="sm"
+                  label="상태"
+                  value={statusFilter}
+                  onChange={(v) => setStatusFilter(v ?? "all")}
+                  options={[
+                    { value: "all", label: "전체 상태" },
+                    { value: "PENDING", label: "대기" },
+                    { value: "CONFIRMED", label: "확정" },
+                    { value: "CANCELLED", label: "취소" },
+                  ]}
+                />
+              </JmTableToolbarFilters>
+              <JmTableToolbarActions>
+                <JmIconButton
+                  variant="ghost"
+                  size="sm"
+                  aria-label="새로고침"
+                  onClick={fetchReturns}
+                  disabled={loading}
+                >
+                  <RefreshCw className={loading ? "animate-spin" : ""} />
+                </JmIconButton>
+                <JmButton size="sm" onClick={() => { resetForm(); setCreateOpen(true); }}>
+                  <Plus className="size-4" />
+                  반품 등록
+                </JmButton>
+              </JmTableToolbarActions>
+            </JmTableToolbar>
 
-        <JmScrollArea className="flex-1 min-h-0">
-          <JmTable>
-            <JmTableHeader>
-              <JmTableRow>
-                <JmTableHead>반품번호</JmTableHead>
-                <JmTableHead>거래처</JmTableHead>
-                <JmTableHead>반품일</JmTableHead>
-                <JmTableHead className="text-right">품목수</JmTableHead>
-                <JmTableHead className="text-right">환불액</JmTableHead>
-                <JmTableHead>상태</JmTableHead>
-                <JmTableHead>교환 입고</JmTableHead>
-              </JmTableRow>
-            </JmTableHeader>
-            <JmTableBody>
-              {loading ? (
-                <ReturnsSkeletonRows />
-              ) : returns.length === 0 ? (
+            <JmTable>
+              <JmTableHeader>
                 <JmTableRow>
-                  <JmTableCell colSpan={7} className="text-center py-8 text-[var(--jm-text-muted)]">반품 내역이 없습니다</JmTableCell>
+                  <JmTableHead>반품번호</JmTableHead>
+                  <JmTableHead>거래처</JmTableHead>
+                  <JmTableHead>반품일</JmTableHead>
+                  <JmTableHead className="text-right">품목수</JmTableHead>
+                  <JmTableHead className="text-right">환불액</JmTableHead>
+                  <JmTableHead>상태</JmTableHead>
+                  <JmTableHead>교환 입고</JmTableHead>
                 </JmTableRow>
-              ) : (
-                returns.map((r) => (
-                  <JmTableRow key={r.id} className="cursor-pointer" onClick={() => openDetail(r.id)}>
-                    <JmTableCell className="font-mono text-jm-xs">{r.returnNo}</JmTableCell>
-                    <JmTableCell>{r.supplier.name}</JmTableCell>
-                    <JmTableCell>{format(new Date(r.returnDate), "yyyy-MM-dd")}</JmTableCell>
-                    <JmTableCell className="text-right tabular-nums">{r._count.items}</JmTableCell>
-                    <JmTableCell className="text-right tabular-nums">₩{r.refundAmount.toLocaleString("ko-KR")}</JmTableCell>
-                    <JmTableCell>
-                      <JmBadge variant={statusVariant[r.status]}>{statusLabels[r.status]}</JmBadge>
-                    </JmTableCell>
-                    <JmTableCell onClick={(e) => e.stopPropagation()}>
-                      {r.exchangeIncoming ? (
-                        <Link href="/inventory/incoming" className="flex items-center gap-1 text-jm-xs text-[var(--jm-action)] hover:underline">
-                          {r.exchangeIncoming.incomingNo}
-                          <ArrowUpRight className="size-3" />
-                        </Link>
-                      ) : (
-                        <span className="text-[var(--jm-text-muted)] text-jm-xs">-</span>
-                      )}
+              </JmTableHeader>
+              <JmTableBody>
+                {loading ? (
+                  <ReturnsSkeletonRows />
+                ) : returns.length === 0 ? (
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell colSpan={7} className="py-12">
+                      <JmEmpty
+                        icon={<RotateCcw className="size-8" />}
+                        title="반품 내역이 없습니다"
+                        description="거래처 반품을 등록하면 여기에 표시됩니다"
+                      />
                     </JmTableCell>
                   </JmTableRow>
-                ))
-              )}
-            </JmTableBody>
-          </JmTable>
-        </JmScrollArea>
+                ) : (
+                  returns.map((r) => (
+                    <JmTableRow key={r.id} className="cursor-pointer" onClick={() => openDetail(r.id)}>
+                      <JmTableCell className="font-mono text-jm-xs">{r.returnNo}</JmTableCell>
+                      <JmTableCell>{r.supplier.name}</JmTableCell>
+                      <JmTableCell>{format(new Date(r.returnDate), "yyyy-MM-dd")}</JmTableCell>
+                      <JmTableCell className="text-right tabular-nums">{r._count.items}</JmTableCell>
+                      <JmTableCell className="text-right tabular-nums">₩{r.refundAmount.toLocaleString("ko-KR")}</JmTableCell>
+                      <JmTableCell>
+                        <JmBadge variant={statusVariant[r.status]}>{statusLabels[r.status]}</JmBadge>
+                      </JmTableCell>
+                      <JmTableCell onClick={(e) => e.stopPropagation()}>
+                        {r.exchangeIncoming ? (
+                          <Link href="/inventory/incoming" className="flex items-center gap-1 text-jm-xs text-[var(--jm-action)] hover:underline">
+                            {r.exchangeIncoming.incomingNo}
+                            <ArrowUpRight className="size-3" />
+                          </Link>
+                        ) : (
+                          <span className="text-[var(--jm-text-muted)] text-jm-xs">-</span>
+                        )}
+                      </JmTableCell>
+                    </JmTableRow>
+                  ))
+                )}
+              </JmTableBody>
+            </JmTable>
+          </JmCard>
+        </div>
       </div>
 
       {/* ============================================================ */}
@@ -726,18 +684,12 @@ export default function SupplierReturnsPage() {
                 />
               </div>
               <div className="col-span-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsExchange(!isExchange)}
+                <JmCheckbox
+                  size="sm"
+                  checked={isExchange}
+                  onCheckedChange={(checked) => setIsExchange(checked === true)}
                   disabled={!supplierId}
-                  className={`h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isExchange ? "bg-[var(--jm-action)] border-[var(--jm-action)]" : "border-[var(--jm-border)] bg-[var(--jm-surface)]"}`}
-                >
-                  {isExchange && (
-                    <svg className="size-2.5 text-[var(--jm-action-fg)]" viewBox="0 0 12 12" fill="none">
-                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </button>
+                />
                 <span className={`text-jm-xs text-[var(--jm-text-muted)] ${!supplierId ? "opacity-40" : ""}`}>교환 포함 — 확정 시 교환 입고(대기) 자동 생성</span>
               </div>
 

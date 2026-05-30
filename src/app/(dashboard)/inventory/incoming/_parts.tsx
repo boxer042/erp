@@ -178,7 +178,7 @@ export function DateInput({
                 tryParse(text);
             }}
             placeholder="20260329"
-            className="h-9 flex-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+            className="h-9 flex-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
           />
         ) : (
           <button
@@ -187,7 +187,7 @@ export function DateInput({
               setText("");
               setEditing(true);
             }}
-            className="h-9 flex-1 text-left rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:border-[var(--jm-border-strong)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+            className="h-9 flex-1 text-left rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:border-[var(--jm-border-strong)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
           >
             {display || (
               <span className="text-[var(--jm-text-subtle)]">날짜 입력...</span>

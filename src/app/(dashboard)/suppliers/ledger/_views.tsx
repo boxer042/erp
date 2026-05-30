@@ -65,20 +65,18 @@ export function ItemsView({
         <col style={{ width: "120px" }} />
       </colgroup>
       <JmTableHeader className="sticky top-0 z-10">
-        <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-          {!selectedSupplierId && (
-            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">거래처</JmTableHead>
-          )}
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">입고번호</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">품명</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">규격</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">단위</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">수량</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">단가</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">할인</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">합계 (VAT포함)</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">입금</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 text-center font-medium">잔액</JmTableHead>
+        <JmTableRow>
+          {!selectedSupplierId && <JmTableHead>거래처</JmTableHead>}
+          <JmTableHead>입고번호</JmTableHead>
+          <JmTableHead>품명</JmTableHead>
+          <JmTableHead>규격</JmTableHead>
+          <JmTableHead className="text-center">단위</JmTableHead>
+          <JmTableHead className="text-center">수량</JmTableHead>
+          <JmTableHead className="text-center">단가</JmTableHead>
+          <JmTableHead className="text-center">할인</JmTableHead>
+          <JmTableHead className="text-center">합계 (VAT포함)</JmTableHead>
+          <JmTableHead className="text-center">입금</JmTableHead>
+          <JmTableHead className="text-center">잔액</JmTableHead>
         </JmTableRow>
       </JmTableHeader>
       <JmTableBody>

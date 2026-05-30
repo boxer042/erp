@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -11,6 +12,7 @@ import {
   JmButton,
   JmCombobox,
   type JmComboboxItem,
+  JmDatePicker,
   JmDrawer,
   JmDrawerBody,
   JmDrawerContent,
@@ -244,17 +246,19 @@ export function PurchaseOrderCreateSheet({
                   />
                 </JmFormField>
                 <JmFormField label="발주일" required>
-                  <JmInput
-                    type="date"
-                    value={form.orderDate}
-                    onChange={(e) => setForm((p) => ({ ...p, orderDate: e.target.value }))}
+                  <JmDatePicker
+                    value={form.orderDate ? new Date(form.orderDate + "T00:00:00") : undefined}
+                    onChange={(d) =>
+                      setForm((p) => ({ ...p, orderDate: d ? format(d, "yyyy-MM-dd") : "" }))
+                    }
                   />
                 </JmFormField>
                 <JmFormField label="예상 입고일">
-                  <JmInput
-                    type="date"
-                    value={form.expectedDate}
-                    onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))}
+                  <JmDatePicker
+                    value={form.expectedDate ? new Date(form.expectedDate + "T00:00:00") : undefined}
+                    onChange={(d) =>
+                      setForm((p) => ({ ...p, expectedDate: d ? format(d, "yyyy-MM-dd") : "" }))
+                    }
                   />
                 </JmFormField>
                 <JmFormField

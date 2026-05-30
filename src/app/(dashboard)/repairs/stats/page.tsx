@@ -39,11 +39,12 @@ import {
   JmCardContent,
   JmCardHeader,
   JmCardTitle,
+  JmDatePicker,
   JmIconButton,
-  JmInput,
   JmSegmentedControl,
   JmSelect,
   JmSkeleton,
+  JmStat,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -57,7 +58,6 @@ const CardContent = JmCardContent;
 const CardHeader = JmCardHeader;
 const CardTitle = JmCardTitle;
 const Skeleton = JmSkeleton;
-const Input = JmInput;
 const Table = JmTable;
 const TableBody = JmTableBody;
 const TableCell = JmTableCell;
@@ -364,20 +364,20 @@ export default function RepairStatsPage() {
           />
           {preset === "CUSTOM" && (
             <div className="flex items-center gap-1">
-              <Input
-                type="date"
+              <JmDatePicker
                 size="sm"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="w-[140px]"
+                value={customFrom ? new Date(customFrom + "T00:00:00") : undefined}
+                onChange={(d) => setCustomFrom(d ? format(d, "yyyy-MM-dd") : "")}
+                placeholder="시작일"
+                className="w-[150px]"
               />
               <span className="text-jm-xs text-[var(--jm-text-muted)]">~</span>
-              <Input
-                type="date"
+              <JmDatePicker
                 size="sm"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="w-[140px]"
+                value={customTo ? new Date(customTo + "T00:00:00") : undefined}
+                onChange={(d) => setCustomTo(d ? format(d, "yyyy-MM-dd") : "")}
+                placeholder="종료일"
+                className="w-[150px]"
               />
             </div>
           )}
@@ -405,40 +405,41 @@ export default function RepairStatsPage() {
           <div className="flex flex-col gap-5">
             {/* KPI 카드 */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-              <KpiCard
+              <JmStat
                 icon={<Wrench className="size-4" />}
                 label="총 수리"
                 value={stats.total.toLocaleString("ko-KR")}
                 hint="기간 내"
+                size="sm"
               />
-              <KpiCard
+              <JmStat
                 icon={<Activity className="size-4" />}
                 label="진행중"
                 value={stats.active.toLocaleString("ko-KR")}
-                tone="active"
+                size="sm"
               />
-              <KpiCard
+              <JmStat
                 icon={<CheckCircle className="size-4" />}
                 label="완료"
                 value={stats.completed.toLocaleString("ko-KR")}
                 hint={`완료율 ${completionRate}%`}
-                tone="success"
+                size="sm"
               />
-              <KpiCard
+              <JmStat
                 icon={<XCircle className="size-4" />}
                 label="취소"
                 value={stats.cancelled.toLocaleString("ko-KR")}
                 hint={`취소율 ${cancelRate}%`}
-                tone="danger"
+                size="sm"
               />
-              <KpiCard
+              <JmStat
                 icon={<TrendingUp className="size-4" />}
                 label="상품 전환"
                 value={soldAsProductCount.toLocaleString("ko-KR")}
                 hint={`취소 중 ${conversionRate}%`}
-                tone="info"
+                size="sm"
               />
-              <KpiCard
+              <JmStat
                 icon={<Clock className="size-4" />}
                 label="평균 수리 기간"
                 value={
@@ -447,13 +448,14 @@ export default function RepairStatsPage() {
                     : "—"
                 }
                 hint={`완료 ${stats.avgRepairDays.completedCount.toLocaleString("ko-KR")}건`}
+                size="sm"
               />
-              <KpiCard
+              <JmStat
                 icon={<PackageX className="size-4" />}
                 label="LOST 회사 부담"
                 value={`₩${stats.lostParts.totalCost.toLocaleString("ko-KR")}`}
                 hint={`${stats.lostParts.count.toLocaleString("ko-KR")}개 부속`}
-                tone="danger"
+                size="sm"
               />
             </div>
 
@@ -977,47 +979,6 @@ export default function RepairStatsPage() {
         )}
       </div>
     </div>
-  );
-}
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "success" | "danger" | "info" | "active";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-[var(--jm-success-fg)]"
-      : tone === "danger"
-        ? "text-[var(--jm-danger-fg)]"
-        : tone === "info"
-          ? "text-[var(--jm-warning-fg)]"
-          : tone === "active"
-            ? "text-[var(--jm-info-fg)]"
-            : "text-[var(--jm-text)]";
-  return (
-    <Card className="stats-print-card">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-1.5 text-jm-xs text-[var(--jm-text-muted)]">
-          {icon}
-          <span>{label}</span>
-        </div>
-      </CardHeader>
-      <CardContent className="pb-3">
-        <div className={`text-jm-2xl font-bold tabular-nums ${toneClass}`}>{value}</div>
-        {hint && (
-          <div className="mt-0.5 text-jm-2xs text-[var(--jm-text-muted)]">{hint}</div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { Check, Loader2, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { Check, Loader2, Plus, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
@@ -14,12 +15,14 @@ import { formatComma, parseComma } from "@/lib/utils";
 import {
   JmBadge,
   JmButton,
+  JmDatePicker,
   JmDialog,
   JmDialogBody,
   JmDialogContent,
   JmDialogFooter,
   JmDialogHeader,
   JmDialogTitle,
+  JmEmpty,
   JmIconButton,
   JmScope,
   JmScrollArea,
@@ -312,11 +315,19 @@ export default function InitialBalancePage() {
                         />
                       </td>
                       <td className="border-r border-[var(--jm-border)] p-0.5">
-                        <input
-                          type="date"
-                          value={entry.date}
-                          onChange={(e) => setEntry(idx, { date: e.target.value })}
-                          className="w-full h-7 bg-transparent text-jm-sm px-2 outline-none focus:bg-[var(--jm-surface-muted)] rounded text-[var(--jm-text)]"
+                        <JmDatePicker
+                          size="sm"
+                          className="w-full"
+                          value={
+                            entry.date
+                              ? new Date(entry.date + "T00:00:00")
+                              : undefined
+                          }
+                          onChange={(d) =>
+                            setEntry(idx, {
+                              date: d ? format(d, "yyyy-MM-dd") : "",
+                            })
+                          }
                         />
                       </td>
                       <td className="p-0.5">
@@ -365,22 +376,14 @@ export default function InitialBalancePage() {
           <div className="flex-1 overflow-y-auto min-h-0">
             <JmTable>
               <JmTableHeader className="sticky top-0 z-10">
-                <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-                  <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
-                    등록일
-                  </JmTableHead>
-                  <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
-                    거래처
-                  </JmTableHead>
-                  <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
-                    결제방식
-                  </JmTableHead>
-                  <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">
+                <JmTableRow className="hover:bg-transparent">
+                  <JmTableHead>등록일</JmTableHead>
+                  <JmTableHead>거래처</JmTableHead>
+                  <JmTableHead>결제방식</JmTableHead>
+                  <JmTableHead className="text-right">
                     기초 잔액 (VAT 포함)
                   </JmTableHead>
-                  <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">
-                    설명
-                  </JmTableHead>
+                  <JmTableHead>설명</JmTableHead>
                 </JmTableRow>
               </JmTableHeader>
               <JmTableBody>
@@ -388,11 +391,12 @@ export default function InitialBalancePage() {
                   <HistorySkeletonRows />
                 ) : historyItems.length === 0 ? (
                   <JmTableRow className="hover:bg-transparent">
-                    <JmTableCell
-                      colSpan={5}
-                      className="text-center py-10 text-[var(--jm-text-muted)] text-sm"
-                    >
-                      기초 미지급금 이력이 없습니다
+                    <JmTableCell colSpan={5} className="py-12">
+                      <JmEmpty
+                        icon={<Wallet className="size-8" />}
+                        title="기초 미지급금 이력이 없습니다"
+                        description="등록 탭에서 거래처별 기초 미지급금을 일괄 등록하세요"
+                      />
                     </JmTableCell>
                   </JmTableRow>
                 ) : (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 
 import { apiGet } from "@/lib/api-client";
@@ -19,6 +20,7 @@ import { QuickCustomerSheet } from "@/components/quick-register-sheets";
 import {
   JmButton,
   JmCheckbox,
+  JmDatePicker,
   JmDrawer,
   JmDrawerContent,
   JmDrawerDescription,
@@ -345,12 +347,18 @@ export function StatementSheet({
 
                 <div className="space-y-3">
                   <FieldRow label="발행일자" required>
-                    <JmInput
+                    <JmDatePicker
                       size="sm"
-                      type="date"
-                      value={form.issueDate}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, issueDate: e.target.value }))
+                      value={
+                        form.issueDate
+                          ? new Date(form.issueDate + "T00:00:00")
+                          : undefined
+                      }
+                      onChange={(d) =>
+                        setForm((p) => ({
+                          ...p,
+                          issueDate: d ? format(d, "yyyy-MM-dd") : "",
+                        }))
                       }
                     />
                   </FieldRow>

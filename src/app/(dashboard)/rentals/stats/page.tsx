@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { AlertTriangle, Clock, Container, TrendingUp } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
@@ -13,8 +14,9 @@ import {
   JmCardContent,
   JmCardHeader,
   JmCardTitle,
-  JmInput,
+  JmDatePicker,
   JmSkeleton,
+  JmStat,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -72,19 +74,17 @@ export default function RentalsStatsPage() {
       <div className="flex items-center gap-3 border-b border-[var(--jm-border)] px-5 py-3">
         <h1 className="text-jm-lg font-semibold text-[var(--jm-text)]">임대 통계</h1>
         <div className="ml-auto flex items-center gap-2">
-          <JmInput
-            type="date"
+          <JmDatePicker
             size="sm"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            value={from ? new Date(from + "T00:00:00") : undefined}
+            onChange={(d) => setFrom(d ? format(d, "yyyy-MM-dd") : "")}
             className="w-[150px]"
           />
           <span className="text-[var(--jm-text-muted)]">~</span>
-          <JmInput
-            type="date"
+          <JmDatePicker
             size="sm"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
+            value={to ? new Date(to + "T00:00:00") : undefined}
+            onChange={(d) => setTo(d ? format(d, "yyyy-MM-dd") : "")}
             className="w-[150px]"
           />
         </div>
@@ -93,34 +93,61 @@ export default function RentalsStatsPage() {
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
         {/* KPI 카드 */}
         <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-          <KpiCard
+          <JmStat
             label="기간 매출"
-            value={data ? `₩${data.revenue.total.toLocaleString("ko-KR")}` : ""}
-            sub={data ? `완료 ${data.revenue.completedCount}건` : undefined}
+            value={
+              statsQuery.isPending ? (
+                <JmSkeleton className="h-7 w-24" />
+              ) : (
+                `₩${(data?.revenue.total ?? 0).toLocaleString("ko-KR")}`
+              )
+            }
             icon={<TrendingUp className="size-4" />}
-            tone="primary"
-            loading={statsQuery.isPending}
+            hint={
+              statsQuery.isPending ? (
+                <JmSkeleton className="h-3 w-16" />
+              ) : (
+                `완료 ${data?.revenue.completedCount ?? 0}건`
+              )
+            }
+            size="sm"
           />
-          <KpiCard
+          <JmStat
             label="진행 중"
-            value={data ? String(data.statusCounts["ACTIVE"] ?? 0) : ""}
+            value={
+              statsQuery.isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                String(data?.statusCounts["ACTIVE"] ?? 0)
+              )
+            }
             icon={<Container className="size-4" />}
-            tone="info"
-            loading={statsQuery.isPending}
+            size="sm"
           />
-          <KpiCard
+          <JmStat
             label="연체"
-            value={data ? String(data.statusCounts["OVERDUE"] ?? 0) : ""}
+            value={
+              statsQuery.isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                String(data?.statusCounts["OVERDUE"] ?? 0)
+              )
+            }
             icon={<AlertTriangle className="size-4" />}
-            tone="danger"
-            loading={statsQuery.isPending}
+            positiveIsGood={false}
+            size="sm"
           />
-          <KpiCard
+          <JmStat
             label="예약"
-            value={data ? String(data.statusCounts["RESERVED"] ?? 0) : ""}
+            value={
+              statsQuery.isPending ? (
+                <JmSkeleton className="h-7 w-12" />
+              ) : (
+                String(data?.statusCounts["RESERVED"] ?? 0)
+              )
+            }
             icon={<Clock className="size-4" />}
-            tone="default"
-            loading={statsQuery.isPending}
+            size="sm"
           />
         </div>
 
@@ -243,47 +270,6 @@ export default function RentalsStatsPage() {
         )}
       </div>
     </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  sub,
-  icon,
-  tone,
-  loading,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  tone: "default" | "primary" | "info" | "danger";
-  loading: boolean;
-}) {
-  const toneClass = {
-    default: "text-[var(--jm-text-muted)]",
-    primary: "text-[var(--jm-accent-fg)]",
-    info: "text-[var(--jm-info-fg)]",
-    danger: "text-[var(--jm-danger-fg)]",
-  }[tone];
-  return (
-    <JmCard>
-      <JmCardHeader className="flex flex-row items-center justify-between space-y-0 border-b-0 pb-1">
-        <JmCardTitle className="text-jm-xs font-medium text-[var(--jm-text-muted)]">{label}</JmCardTitle>
-        <span className={toneClass}>{icon}</span>
-      </JmCardHeader>
-      <JmCardContent>
-        {loading ? (
-          <JmSkeleton className="h-7 w-20" />
-        ) : (
-          <>
-            <div className="text-jm-2xl font-bold tabular-nums text-[var(--jm-text)]">{value}</div>
-            {sub && <div className="text-jm-2xs text-[var(--jm-text-muted)] mt-0.5">{sub}</div>}
-          </>
-        )}
-      </JmCardContent>
-    </JmCard>
   );
 }
 

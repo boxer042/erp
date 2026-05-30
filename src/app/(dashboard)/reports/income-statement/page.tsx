@@ -22,8 +22,22 @@ import {
   JmDrawerTitle,
   JmDrawerBody,
   JmDrawerClose,
+  JmTable,
+  JmTableHeader,
+  JmTableBody,
+  JmTableRow,
+  JmTableHead,
+  JmTableCell,
+  JmEmpty,
 } from "@/jm";
-import { Info, FileSpreadsheet, Download, TrendingUp, HelpCircle } from "lucide-react";
+import {
+  Info,
+  FileSpreadsheet,
+  Download,
+  TrendingUp,
+  HelpCircle,
+  Receipt,
+} from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import {
@@ -343,7 +357,7 @@ export default function IncomeStatementPage() {
         </JmAlert>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {isPending || !cur || !prev ? (
             <>
               <KpiSkeleton />
@@ -671,46 +685,49 @@ function DeductionDrawer({
                   </div>
                 ))}
               </div>
-            ) : rows.length === 0 ? (
-              <div className="py-12 text-center text-jm-sm text-[var(--jm-text-muted)]">
-                해당하는 차감 내역이 없습니다.
-              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-jm-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--jm-border)] text-jm-xs text-[var(--jm-text-muted)]">
-                      <th className="px-2 py-2 text-left font-medium">주문번호</th>
-                      <th className="px-2 py-2 text-left font-medium">날짜</th>
-                      <th className="px-2 py-2 text-left font-medium">고객</th>
-                      <th className="px-2 py-2 text-left font-medium">유형</th>
-                      <th className="px-2 py-2 text-right font-medium">차감액</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <tr
-                        key={r.orderId}
-                        className="border-b border-[var(--jm-border)] last:border-b-0"
-                      >
-                        <td className="px-2 py-2 font-mono text-jm-xs">{r.orderNo}</td>
-                        <td className="px-2 py-2 tabular-nums text-jm-xs">
+              <JmTable>
+                <JmTableHeader>
+                  <JmTableRow>
+                    <JmTableHead>주문번호</JmTableHead>
+                    <JmTableHead>날짜</JmTableHead>
+                    <JmTableHead>고객</JmTableHead>
+                    <JmTableHead>유형</JmTableHead>
+                    <JmTableHead className="text-right">차감액</JmTableHead>
+                  </JmTableRow>
+                </JmTableHeader>
+                <JmTableBody>
+                  {rows.length === 0 ? (
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell colSpan={5} className="py-12">
+                        <JmEmpty
+                          icon={<Receipt className="size-8" />}
+                          title="차감 내역이 없습니다"
+                          description="해당 기간·유형에 해당하는 차감 내역이 없습니다."
+                        />
+                      </JmTableCell>
+                    </JmTableRow>
+                  ) : (
+                    rows.map((r) => (
+                      <JmTableRow key={r.orderId}>
+                        <JmTableCell className="font-mono text-jm-xs">{r.orderNo}</JmTableCell>
+                        <JmTableCell className="tabular-nums text-jm-xs">
                           {format(new Date(r.orderDate), "yyyy.MM.dd")}
-                        </td>
-                        <td className="px-2 py-2 text-jm-xs">{r.customerName ?? "—"}</td>
-                        <td className="px-2 py-2">
+                        </JmTableCell>
+                        <JmTableCell className="text-jm-xs">{r.customerName ?? "—"}</JmTableCell>
+                        <JmTableCell>
                           <JmBadge variant={DEDUCTION_KIND_VARIANTS[r.kind]} size="sm">
                             {DEDUCTION_KIND_LABELS[r.kind]}
                           </JmBadge>
-                        </td>
-                        <td className="px-2 py-2 text-right tabular-nums text-[var(--jm-text)]">
+                        </JmTableCell>
+                        <JmTableCell className="text-right tabular-nums text-[var(--jm-text)]">
                           ({formatWon(r.amount)})
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </JmTableCell>
+                      </JmTableRow>
+                    ))
+                  )}
+                </JmTableBody>
+              </JmTable>
             )}
           </div>
         </JmDrawerBody>

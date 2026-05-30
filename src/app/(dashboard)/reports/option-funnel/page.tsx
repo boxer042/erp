@@ -10,9 +10,10 @@ import {
   JmCardContent,
   JmCardHeader,
   JmCardTitle,
-  JmInput,
+  JmDatePicker,
   JmBadge,
   JmSkeleton,
+  JmStat,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -112,21 +113,19 @@ export default function OptionFunnelPage() {
         <div className="flex items-end gap-2 ml-auto">
           <div>
             <label className="text-jm-2xs text-[var(--jm-text-muted)]">From</label>
-            <JmInput
+            <JmDatePicker
               size="sm"
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              value={from ? new Date(from + "T00:00:00") : undefined}
+              onChange={(d) => setFrom(d ? format(d, "yyyy-MM-dd") : "")}
               className="w-[140px]"
             />
           </div>
           <div>
             <label className="text-jm-2xs text-[var(--jm-text-muted)]">To</label>
-            <JmInput
+            <JmDatePicker
               size="sm"
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
+              value={to ? new Date(to + "T00:00:00") : undefined}
+              onChange={(d) => setTo(d ? format(d, "yyyy-MM-dd") : "")}
               className="w-[140px]"
             />
           </div>
@@ -136,42 +135,50 @@ export default function OptionFunnelPage() {
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {/* 전체 요약 KPI */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KpiCard
+          <JmStat
             label="진입 → 결제 주문"
             value={
-              query.isPending
-                ? null
-                : `${(data?.total.orderCount ?? 0).toLocaleString("ko-KR")}건`
+              query.isPending ? (
+                <JmSkeleton className="h-7 w-24" />
+              ) : (
+                `${(data?.total.orderCount ?? 0).toLocaleString("ko-KR")}건`
+              )
             }
+            size="sm"
           />
-          <KpiCard
+          <JmStat
             label="합계 매출"
             value={
-              query.isPending
-                ? null
-                : `₩${(data?.total.revenue ?? 0).toLocaleString("ko-KR")}`
+              query.isPending ? (
+                <JmSkeleton className="h-7 w-24" />
+              ) : (
+                `₩${(data?.total.revenue ?? 0).toLocaleString("ko-KR")}`
+              )
             }
+            size="sm"
           />
-          <KpiCard
+          <JmStat
             label="SWAP 발생"
             value={
-              query.isPending
-                ? null
-                : `${(data?.total.swapCount ?? 0).toLocaleString("ko-KR")}건`
+              query.isPending ? (
+                <JmSkeleton className="h-7 w-24" />
+              ) : (
+                `${(data?.total.swapCount ?? 0).toLocaleString("ko-KR")}건`
+              )
             }
-            hint={
-              query.isPending
-                ? undefined
-                : `진입 SKU ≠ 결제 SKU 인 케이스`
-            }
+            hint={query.isPending ? undefined : `진입 SKU ≠ 결제 SKU 인 케이스`}
+            size="sm"
           />
-          <KpiCard
+          <JmStat
             label="SWAP 비율"
             value={
-              query.isPending
-                ? null
-                : `${((data?.total.swapRate ?? 0) * 100).toFixed(1)}%`
+              query.isPending ? (
+                <JmSkeleton className="h-7 w-24" />
+              ) : (
+                `${((data?.total.swapRate ?? 0) * 100).toFixed(1)}%`
+              )
             }
+            size="sm"
           />
         </div>
 
@@ -312,36 +319,6 @@ export default function OptionFunnelPage() {
         </JmCard>
       </div>
     </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string | null;
-  hint?: string;
-}) {
-  return (
-    <JmCard>
-      <JmCardHeader className="pb-1.5">
-        <span className="text-jm-2xs text-[var(--jm-text-muted)] uppercase tracking-wider">
-          {label}
-        </span>
-      </JmCardHeader>
-      <JmCardContent>
-        {value === null ? (
-          <JmSkeleton className="h-7 w-24" />
-        ) : (
-          <div className="text-jm-xl font-bold tabular-nums text-[var(--jm-text)]">{value}</div>
-        )}
-        {hint && (
-          <div className="text-jm-2xs text-[var(--jm-text-muted)] mt-0.5">{hint}</div>
-        )}
-      </JmCardContent>
-    </JmCard>
   );
 }
 

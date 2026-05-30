@@ -80,26 +80,6 @@ export function TableRowSkeleton({ cols }: { cols: number }) {
   );
 }
 
-/** 빈 상태 메시지 셀 */
-export function EmptyTableCell({
-  colSpan,
-  message,
-}: {
-  colSpan: number;
-  message: string;
-}) {
-  return (
-    <JmTableRow className="hover:bg-transparent">
-      <JmTableCell
-        colSpan={colSpan}
-        className="py-12 text-center text-jm-sm text-[var(--jm-text-muted)]"
-      >
-        {message}
-      </JmTableCell>
-    </JmTableRow>
-  );
-}
-
 /** 상태 필터 칩 옵션 */
 export const FILTER_STATUSES: Array<{ value: "all" | PurchaseOrderStatus; label: string }> = [
   { value: "all", label: "전체" },

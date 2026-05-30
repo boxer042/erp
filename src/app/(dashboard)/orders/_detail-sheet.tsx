@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import {
   ArrowLeftRight,
   Banknote,
@@ -40,6 +41,7 @@ import {
   JmCardHeader,
   JmCardTitle,
   JmCombobox,
+  JmDatePicker,
   JmDialog,
   JmDialogBody,
   JmDialogContent,
@@ -2187,10 +2189,18 @@ function EditView({
             <>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <JmFormField label="출고 예정일">
-                  <JmInput
-                    type="date"
-                    value={form.expectedShipDate}
-                    onChange={(e) => set("expectedShipDate", e.target.value)}
+                  <JmDatePicker
+                    value={
+                      form.expectedShipDate
+                        ? new Date(form.expectedShipDate + "T00:00:00")
+                        : undefined
+                    }
+                    onChange={(d) =>
+                      set(
+                        "expectedShipDate",
+                        d ? format(d, "yyyy-MM-dd") : "",
+                      )
+                    }
                   />
                 </JmFormField>
                 <JmFormField label="배송지">

@@ -6,10 +6,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
-import { Loader2, Pencil, Trash2, Plus, X, RefreshCw } from "lucide-react";
+import { Loader2, Pencil, Trash2, Plus, X, RefreshCw, Wrench, Package } from "lucide-react";
 import {
   JmButton,
   JmCard,
+  JmEmpty,
   JmInput,
   JmIconButton,
   JmSearchInput,
@@ -403,7 +404,15 @@ export default function RepairServicesPage() {
                   {presetLoading ? (
                     <RepairPresetsSkeletonRows />
                   ) : presets.length === 0 ? (
-                    <JmTableRow className="hover:bg-transparent"><JmTableCell colSpan={5} className="py-8 text-center text-[var(--jm-text-muted)]">등록된 공임 프리셋이 없습니다</JmTableCell></JmTableRow>
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell colSpan={5} className="py-12">
+                        <JmEmpty
+                          icon={<Wrench className="size-8" />}
+                          title="등록된 공임 프리셋이 없습니다"
+                          description="자주 쓰는 작업을 공임 프리셋으로 등록하면 수리 견적에 빠르게 추가할 수 있습니다."
+                        />
+                      </JmTableCell>
+                    </JmTableRow>
                   ) : presets.map((p) => (
                     <JmTableRow key={p.id} className="cursor-pointer" onClick={() => openPresetEdit(p)}>
                       <JmTableCell className="font-medium">{p.name}</JmTableCell>
@@ -473,7 +482,15 @@ export default function RepairServicesPage() {
                   {pkgLoading ? (
                     <RepairPackagesSkeletonRows />
                   ) : packages.length === 0 ? (
-                    <JmTableRow className="hover:bg-transparent"><JmTableCell colSpan={5} className="py-8 text-center text-[var(--jm-text-muted)]">등록된 수리 패키지가 없습니다</JmTableCell></JmTableRow>
+                    <JmTableRow className="hover:bg-transparent">
+                      <JmTableCell colSpan={5} className="py-12">
+                        <JmEmpty
+                          icon={<Package className="size-8" />}
+                          title="등록된 수리 패키지가 없습니다"
+                          description="공임과 부품을 묶은 수리 패키지를 등록하면 반복 수리 견적을 한 번에 불러올 수 있습니다."
+                        />
+                      </JmTableCell>
+                    </JmTableRow>
                   ) : packages.map((pkg) => (
                     <JmTableRow key={pkg.id} className="cursor-pointer" onClick={() => openPkgEdit(pkg)}>
                       <JmTableCell className="font-medium">{pkg.name}</JmTableCell>

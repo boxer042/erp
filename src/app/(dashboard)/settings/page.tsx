@@ -6,7 +6,7 @@ import {
   JmCard, JmCardContent, JmCardDescription, JmCardHeader, JmCardTitle,
 } from "@/jm";
 import {
-  JmBadge, JmButton, JmIconButton, JmInput, JmSwitch, JmSkeleton, JmSelect,
+  JmBadge, JmButton, JmIconButton, JmInput, JmSwitch, JmSkeleton, JmSelect, JmFormField,
 } from "@/jm";
 import {
   JmTable, JmTableBody, JmTableCell, JmTableHead, JmTableHeader, JmTableRow,
@@ -214,7 +214,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
-      <div className="flex w-full flex-col gap-6 p-6">
+      <div className="flex w-full flex-col gap-6 p-4">
         <h2 className="text-jm-lg font-semibold text-[var(--jm-text)]">설정</h2>
 
         <JmCard>
@@ -704,10 +704,7 @@ function ServiceFeePresetSection() {
             <JmDialogTitle>{editingId ? "기술료 수정" : "기술료 추가"}</JmDialogTitle>
           </JmDialogHeader>
           <JmDialogBody className="space-y-3 text-jm-sm">
-            <div className="space-y-1">
-              <label className="text-jm-2xs text-[var(--jm-text-muted)]">
-                이름<span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>
-              </label>
+            <JmFormField label="이름" required>
               <JmInput
                 size="sm"
                 value={form.name}
@@ -715,11 +712,8 @@ function ServiceFeePresetSection() {
                 placeholder="예: 장착비, 출장 설치비"
                 className="h-8"
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-jm-2xs text-[var(--jm-text-muted)]">
-                금액 (세전)<span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>
-              </label>
+            </JmFormField>
+            <JmFormField label="금액 (세전)" required>
               <JmInput
                 type="text"
                 inputMode="numeric"
@@ -732,9 +726,8 @@ function ServiceFeePresetSection() {
                 placeholder="예: 20,000"
                 className="h-8"
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-jm-2xs text-[var(--jm-text-muted)]">메모</label>
+            </JmFormField>
+            <JmFormField label="메모">
               <JmInput
                 size="sm"
                 value={form.memo}
@@ -742,7 +735,7 @@ function ServiceFeePresetSection() {
                 placeholder="선택"
                 className="h-8"
               />
-            </div>
+            </JmFormField>
           </JmDialogBody>
           <JmDialogFooter>
             <JmButton variant="outline" size="xs" onClick={() => setDialogOpen(false)}>
@@ -809,11 +802,7 @@ function CompanyField({
   placeholder?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="text-jm-2xs text-[var(--jm-text-muted)]">
-        {label}
-        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
-      </label>
+    <JmFormField label={label} required={required}>
       <JmInput
         size="sm"
         value={value}
@@ -821,7 +810,7 @@ function CompanyField({
         placeholder={placeholder}
         className="h-8"
       />
-    </div>
+    </JmFormField>
   );
 }
 
@@ -835,11 +824,7 @@ function BankField({
   placeholder?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="text-jm-2xs text-[var(--jm-text-muted)]">
-        {label}
-        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
-      </label>
+    <JmFormField label={label} required={required}>
       <JmInput
         size="sm"
         value={value}
@@ -847,7 +832,7 @@ function BankField({
         placeholder={placeholder}
         className="h-8"
       />
-    </div>
+    </JmFormField>
   );
 }
 
@@ -1243,11 +1228,7 @@ function FeeField({
   type?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="text-jm-2xs text-[var(--jm-text-muted)]">
-        {label}
-        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
-      </label>
+    <JmFormField label={label} required={required}>
       <JmInput
         type={type ?? "text"}
         size="sm"
@@ -1256,7 +1237,7 @@ function FeeField({
         placeholder={placeholder}
         className="h-8"
       />
-    </div>
+    </JmFormField>
   );
 }
 

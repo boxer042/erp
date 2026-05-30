@@ -309,7 +309,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      <JmContainer width="default" padded={false} className="space-y-5 p-6">
+      <JmContainer width="default" padded={false} className="space-y-6 p-6">
         {/* 정보 카드 */}
         <JmCard>
           <JmCardHeader>

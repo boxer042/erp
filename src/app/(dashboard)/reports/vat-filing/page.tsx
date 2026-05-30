@@ -14,6 +14,12 @@ import {
   JmBadge,
   JmButton,
   jmButtonVariants,
+  JmTable,
+  JmTableHeader,
+  JmTableBody,
+  JmTableRow,
+  JmTableHead,
+  JmTableCell,
 } from "@/jm";
 import { Info, FileText, Download, Building2, User, HelpCircle } from "lucide-react";
 import Link from "next/link";
@@ -655,113 +661,96 @@ function SummaryMiniCard({
 
 function CustomerTable({ rows }: { rows: CustomerVatRow[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-jm-sm">
-        <thead>
-          <tr className="border-b border-[var(--jm-border)] text-jm-xs text-[var(--jm-text-muted)]">
-            <th className="px-2 py-2 text-left font-medium">고객</th>
-            <th className="px-2 py-2 text-left font-medium">사업자번호</th>
-            <th className="px-2 py-2 text-left font-medium">구분</th>
-            <th className="px-2 py-2 text-right font-medium">공급가액</th>
-            <th className="px-2 py-2 text-right font-medium">부가세</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((c) => (
-            <tr
-              key={c.customerId || c.customerName}
-              className="border-b border-[var(--jm-border)] last:border-b-0"
-            >
-              <td className="px-2 py-2 text-[var(--jm-text)]">{c.customerName}</td>
-              <td className="px-2 py-2 font-mono text-jm-xs text-[var(--jm-text-muted)]">
-                {formatBusinessNumber(c.businessNumber)}
-              </td>
-              <td className="px-2 py-2">
-                <JmBadge variant={c.type === "BUSINESS" ? "info" : "default"} size="sm">
-                  {c.type === "BUSINESS" ? "사업자" : "개인"}
-                </JmBadge>
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
-                {formatWon(c.supplyAmount)}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums font-medium text-[var(--jm-text)]">
-                {formatWon(c.vatAmount)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <JmTable>
+      <JmTableHeader>
+        <JmTableRow>
+          <JmTableHead>고객</JmTableHead>
+          <JmTableHead>사업자번호</JmTableHead>
+          <JmTableHead>구분</JmTableHead>
+          <JmTableHead className="text-right">공급가액</JmTableHead>
+          <JmTableHead className="text-right">부가세</JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
+        {rows.map((c) => (
+          <JmTableRow key={c.customerId || c.customerName}>
+            <JmTableCell>{c.customerName}</JmTableCell>
+            <JmTableCell className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
+              {formatBusinessNumber(c.businessNumber)}
+            </JmTableCell>
+            <JmTableCell>
+              <JmBadge variant={c.type === "BUSINESS" ? "info" : "default"} size="sm">
+                {c.type === "BUSINESS" ? "사업자" : "개인"}
+              </JmBadge>
+            </JmTableCell>
+            <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
+              {formatWon(c.supplyAmount)}
+            </JmTableCell>
+            <JmTableCell className="text-right tabular-nums font-medium">
+              {formatWon(c.vatAmount)}
+            </JmTableCell>
+          </JmTableRow>
+        ))}
+      </JmTableBody>
+    </JmTable>
   );
 }
 
 function SupplierTable({ rows }: { rows: SupplierVatRow[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-jm-sm">
-        <thead>
-          <tr className="border-b border-[var(--jm-border)] text-jm-xs text-[var(--jm-text-muted)]">
-            <th className="px-2 py-2 text-left font-medium">거래처</th>
-            <th className="px-2 py-2 text-left font-medium">사업자번호</th>
-            <th className="px-2 py-2 text-right font-medium">공급가액</th>
-            <th className="px-2 py-2 text-right font-medium">부가세</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((s) => (
-            <tr
-              key={s.supplierId}
-              className="border-b border-[var(--jm-border)] last:border-b-0"
-            >
-              <td className="px-2 py-2 text-[var(--jm-text)]">{s.supplierName}</td>
-              <td className="px-2 py-2 font-mono text-jm-xs text-[var(--jm-text-muted)]">
-                {formatBusinessNumber(s.businessNumber)}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
-                {formatWon(s.supplyAmount)}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums font-medium text-[var(--jm-text)]">
-                {formatWon(s.vatAmount)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <JmTable>
+      <JmTableHeader>
+        <JmTableRow>
+          <JmTableHead>거래처</JmTableHead>
+          <JmTableHead>사업자번호</JmTableHead>
+          <JmTableHead className="text-right">공급가액</JmTableHead>
+          <JmTableHead className="text-right">부가세</JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
+        {rows.map((s) => (
+          <JmTableRow key={s.supplierId}>
+            <JmTableCell>{s.supplierName}</JmTableCell>
+            <JmTableCell className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
+              {formatBusinessNumber(s.businessNumber)}
+            </JmTableCell>
+            <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
+              {formatWon(s.supplyAmount)}
+            </JmTableCell>
+            <JmTableCell className="text-right tabular-nums font-medium">
+              {formatWon(s.vatAmount)}
+            </JmTableCell>
+          </JmTableRow>
+        ))}
+      </JmTableBody>
+    </JmTable>
   );
 }
 
 function ExpenseTable({ rows }: { rows: ExpenseVatRow[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-jm-sm">
-        <thead>
-          <tr className="border-b border-[var(--jm-border)] text-jm-xs text-[var(--jm-text-muted)]">
-            <th className="px-2 py-2 text-left font-medium">카테고리</th>
-            <th className="px-2 py-2 text-right font-medium">공급가액</th>
-            <th className="px-2 py-2 text-right font-medium">부가세</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((e) => (
-            <tr
-              key={e.category}
-              className="border-b border-[var(--jm-border)] last:border-b-0"
-            >
-              <td className="px-2 py-2 text-[var(--jm-text)]">
-                {CATEGORY_LABELS[e.category] ?? e.category}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums text-[var(--jm-text-muted)]">
-                {formatWon(e.supplyAmount)}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums font-medium text-[var(--jm-text)]">
-                {formatWon(e.vatAmount)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <JmTable>
+      <JmTableHeader>
+        <JmTableRow>
+          <JmTableHead>카테고리</JmTableHead>
+          <JmTableHead className="text-right">공급가액</JmTableHead>
+          <JmTableHead className="text-right">부가세</JmTableHead>
+        </JmTableRow>
+      </JmTableHeader>
+      <JmTableBody>
+        {rows.map((e) => (
+          <JmTableRow key={e.category}>
+            <JmTableCell>{CATEGORY_LABELS[e.category] ?? e.category}</JmTableCell>
+            <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
+              {formatWon(e.supplyAmount)}
+            </JmTableCell>
+            <JmTableCell className="text-right tabular-nums font-medium">
+              {formatWon(e.vatAmount)}
+            </JmTableCell>
+          </JmTableRow>
+        ))}
+      </JmTableBody>
+    </JmTable>
   );
 }
 

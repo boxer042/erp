@@ -43,6 +43,7 @@ import {
   JmDialogFooter,
   JmDialogHeader,
   JmDialogTitle,
+  JmFormField,
   JmIconButton,
   JmInput,
   JmScope,
@@ -401,11 +402,11 @@ export default function SupplierDetailPage() {
               <JmCardContent className="px-0 pb-0">
                 <JmTable>
                   <JmTableHeader>
-                    <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">이름</JmTableHead>
-                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">휴대폰</JmTableHead>
-                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">직책</JmTableHead>
-                      <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">이메일</JmTableHead>
+                    <JmTableRow>
+                      <JmTableHead>이름</JmTableHead>
+                      <JmTableHead>휴대폰</JmTableHead>
+                      <JmTableHead>직책</JmTableHead>
+                      <JmTableHead>이메일</JmTableHead>
                     </JmTableRow>
                   </JmTableHeader>
                   <JmTableBody>
@@ -454,14 +455,14 @@ export default function SupplierDetailPage() {
                 <JmCardContent className="px-0 pb-0">
                   <JmTable>
                     <JmTableHeader>
-                      <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">상품명</JmTableHead>
-                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">품번</JmTableHead>
-                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">단위</JmTableHead>
-                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">단가</JmTableHead>
-                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">리드타임</JmTableHead>
-                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">최소주문</JmTableHead>
-                        <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[100px]">관리</JmTableHead>
+                      <JmTableRow>
+                        <JmTableHead>상품명</JmTableHead>
+                        <JmTableHead>품번</JmTableHead>
+                        <JmTableHead>단위</JmTableHead>
+                        <JmTableHead className="text-right">단가</JmTableHead>
+                        <JmTableHead>리드타임</JmTableHead>
+                        <JmTableHead>최소주문</JmTableHead>
+                        <JmTableHead className="w-[100px]">관리</JmTableHead>
                       </JmTableRow>
                     </JmTableHeader>
                     <JmTableBody>
@@ -587,7 +588,7 @@ export default function SupplierDetailPage() {
           <form onSubmit={handleProductSubmit}>
             <JmDialogBody>
               <div className="space-y-4 text-jm-sm">
-                <Field label="상품명" required>
+                <JmFormField label="상품명" required>
                   <NameAutocomplete
                     value={productForm.name}
                     onChange={(name) => setProductForm({ ...productForm, name })}
@@ -596,9 +597,9 @@ export default function SupplierDetailPage() {
                     warningLabel="이미 등록된 공급상품"
                     inputClassName=""
                   />
-                </Field>
+                </JmFormField>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="품번 (공급자 코드)">
+                  <JmFormField label="품번 (공급자 코드)">
                     <JmInput
                       size="sm"
                       value={productForm.supplierCode}
@@ -607,8 +608,8 @@ export default function SupplierDetailPage() {
                       }
                       onFocus={focusCaretEnd}
                     />
-                  </Field>
-                  <Field label="단위">
+                  </JmFormField>
+                  <JmFormField label="단위">
                     <JmSelect
                       size="sm"
                       options={UNIT_OPTIONS}
@@ -617,7 +618,7 @@ export default function SupplierDetailPage() {
                         setProductForm({ ...productForm, unitOfMeasure: v })
                       }
                     />
-                  </Field>
+                  </JmFormField>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -696,15 +697,15 @@ export default function SupplierDetailPage() {
                   )}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="통화">
+                  <JmFormField label="통화">
                     <JmSelect
                       size="sm"
                       options={CURRENCY_OPTIONS}
                       value={productForm.currency}
                       onChange={(v) => setProductForm({ ...productForm, currency: v })}
                     />
-                  </Field>
-                  <Field label="리드타임 (일)">
+                  </JmFormField>
+                  <JmFormField label="리드타임 (일)">
                     <JmInput
                       size="sm"
                       type="number"
@@ -713,8 +714,8 @@ export default function SupplierDetailPage() {
                         setProductForm({ ...productForm, leadTimeDays: e.target.value })
                       }
                     />
-                  </Field>
-                  <Field label="최소 주문 수량">
+                  </JmFormField>
+                  <JmFormField label="최소 주문 수량">
                     <JmInput
                       size="sm"
                       type="number"
@@ -723,9 +724,9 @@ export default function SupplierDetailPage() {
                         setProductForm({ ...productForm, minOrderQty: e.target.value })
                       }
                     />
-                  </Field>
+                  </JmFormField>
                 </div>
-                <Field label="메모">
+                <JmFormField label="메모">
                   <JmTextarea
                     value={productForm.memo}
                     onChange={(e) =>
@@ -733,7 +734,7 @@ export default function SupplierDetailPage() {
                     }
                     rows={3}
                   />
-                </Field>
+                </JmFormField>
               </div>
             </JmDialogBody>
             <JmDialogFooter>
@@ -777,26 +778,6 @@ function InfoRow({
     <div className={className}>
       <dt className="text-[var(--jm-text-muted)] text-jm-xs">{label}</dt>
       <dd className="text-[var(--jm-text)] mt-0.5">{value || "-"}</dd>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="block text-jm-xs font-medium text-[var(--jm-text-muted)]">
-        {label}
-        {required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
-      </label>
-      {children}
     </div>
   );
 }

@@ -18,10 +18,12 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { toast } from "sonner";
 
 import {
   JmButton,
+  JmDatePicker,
   JmDialog,
   JmDialogContent,
   JmDialogFooter,
@@ -379,11 +381,10 @@ export function RefundDialog({
                   />
                 </JmFormField>
                 <JmFormField label="환불 일자">
-                  <JmInput
+                  <JmDatePicker
                     size="sm"
-                    type="date"
-                    value={refundedAtDate}
-                    onChange={(e) => setRefundedAtDate(e.target.value)}
+                    value={refundedAtDate ? new Date(refundedAtDate + "T00:00:00") : undefined}
+                    onChange={(d) => setRefundedAtDate(d ? format(d, "yyyy-MM-dd") : "")}
                   />
                 </JmFormField>
                 <JmFormField label="메모 (선택)">

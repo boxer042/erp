@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, RefreshCw } from "lucide-react";
+import { Inbox, Plus, RefreshCw } from "lucide-react";
 
 import { apiGet, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -11,6 +11,7 @@ import {
   jmToast as toast,
   JmButton,
   JmCard,
+  JmEmpty,
   JmIconButton,
   JmPill,
   JmSearchInput,
@@ -28,7 +29,6 @@ import {
 
 import { PurchaseOrderCreateSheet } from "./_create-sheet";
 import {
-  EmptyTableCell,
   FILTER_STATUSES,
   PoStatusBadge,
   ProgressMini,
@@ -275,14 +275,23 @@ function PurchaseOrdersPageInner() {
                 {listQuery.isPending ? (
                   Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} cols={9} />)
                 ) : filtered.length === 0 ? (
-                  <EmptyTableCell
-                    colSpan={9}
-                    message={
-                      search || statusFilter !== "all"
-                        ? "조건에 맞는 발주가 없습니다"
-                        : "등록된 발주가 없습니다"
-                    }
-                  />
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell colSpan={9} className="py-12">
+                      <JmEmpty
+                        icon={<Inbox className="size-8" />}
+                        title={
+                          search || statusFilter !== "all"
+                            ? "조건에 맞는 발주가 없습니다"
+                            : "등록된 발주가 없습니다"
+                        }
+                        description={
+                          search || statusFilter !== "all"
+                            ? "다른 검색어나 필터를 선택해보세요"
+                            : "발주 등록 버튼으로 첫 발주를 만들어보세요"
+                        }
+                      />
+                    </JmTableCell>
+                  </JmTableRow>
                 ) : (
                   filtered.map((row) => {
                     const progress = calcReceiveProgress(row);

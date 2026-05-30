@@ -22,6 +22,8 @@ import {
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarSearch,
 } from "@/jm";
 import { RepairsThemeScope } from "../_theme-scope";
 
@@ -211,17 +213,17 @@ export default function RepairWarrantyPage() {
 
           {/* 검색 + 테이블 카드 */}
           <JmCard className="overflow-hidden p-0">
-            {/* 검색 인라인 헤더 */}
-            <div className="flex items-center gap-3 border-b border-[var(--jm-border)] px-4 py-2">
-              <JmSearchInput
-                size="sm"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onClear={() => setSearch("")}
-                placeholder="번호 / 고객명 / 상품명"
-                className="w-[280px]"
-              />
-            </div>
+            <JmTableToolbar>
+              <JmTableToolbarSearch>
+                <JmSearchInput
+                  size="sm"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onClear={() => setSearch("")}
+                  placeholder="번호 / 고객명 / 상품명"
+                />
+              </JmTableToolbarSearch>
+            </JmTableToolbar>
 
             <JmTable className="min-w-[1100px]">
               <JmTableHeader>

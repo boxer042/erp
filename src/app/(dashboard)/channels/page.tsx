@@ -13,12 +13,16 @@ import {
   JmSwitch,
   JmSkeleton,
   JmFormField,
+  JmCard,
   JmTable,
   JmTableHeader,
   JmTableBody,
   JmTableRow,
   JmTableHead,
   JmTableCell,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmEmpty,
   JmDialog,
   JmDialogContent,
   JmDialogHeader,
@@ -27,7 +31,7 @@ import {
   JmDialogFooter,
   JmSpinner,
 } from "@/jm";
-import { Pencil, Settings2, Store, Trash2 } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Settings2, Store, Trash2 } from "lucide-react";
 import { ImageInput } from "@/components/image-input";
 
 function ChannelsSkeletonRows({ rows = 6 }: { rows?: number }) {
@@ -48,7 +52,6 @@ function ChannelsSkeletonRows({ rows = 6 }: { rows?: number }) {
   );
 }
 import { toast } from "sonner";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 
 interface SalesChannel {
   id: string;
@@ -140,37 +143,53 @@ export default function ChannelsPage() {
 
   return (
     <>
-      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-        <DataTableToolbar
-          onRefresh={refresh}
-          onAdd={() => setDialogOpen(true)}
-          addLabel="채널 추가"
-          loading={loading}
-        />
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <JmTable>
-            <JmTableHeader>
-              <JmTableRow>
-                <JmTableHead className="w-[60px]">로고</JmTableHead>
-                <JmTableHead>채널명</JmTableHead>
-                <JmTableHead>코드</JmTableHead>
-                <JmTableHead>수수료율</JmTableHead>
-                <JmTableHead>상태</JmTableHead>
-                <JmTableHead>메모</JmTableHead>
-                <JmTableHead className="w-[100px]">관리</JmTableHead>
-              </JmTableRow>
-            </JmTableHeader>
-            <JmTableBody>
-              {loading ? (
-                <ChannelsSkeletonRows />
-              ) : channels.length === 0 ? (
+      <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+        <div className="flex w-full flex-col gap-6 p-4">
+          <JmCard className="overflow-hidden p-0">
+            <JmTableToolbar>
+              <JmTableToolbarActions>
+                <JmIconButton
+                  variant="ghost"
+                  size="sm"
+                  aria-label="새로고침"
+                  onClick={refresh}
+                  disabled={loading}
+                >
+                  <RefreshCw className={loading ? "animate-spin" : ""} />
+                </JmIconButton>
+                <JmButton size="sm" variant="cta" onClick={() => setDialogOpen(true)}>
+                  <Plus />
+                  <span>채널 추가</span>
+                </JmButton>
+              </JmTableToolbarActions>
+            </JmTableToolbar>
+            <JmTable className="min-w-[900px]">
+              <JmTableHeader>
                 <JmTableRow>
-                  <JmTableCell colSpan={7} className="text-center py-8 text-[var(--jm-text-muted)]">
-                    등록된 채널이 없습니다
-                  </JmTableCell>
+                  <JmTableHead className="w-[60px]">로고</JmTableHead>
+                  <JmTableHead>채널명</JmTableHead>
+                  <JmTableHead>코드</JmTableHead>
+                  <JmTableHead>수수료율</JmTableHead>
+                  <JmTableHead>상태</JmTableHead>
+                  <JmTableHead>메모</JmTableHead>
+                  <JmTableHead className="w-[100px]">관리</JmTableHead>
                 </JmTableRow>
-              ) : (
-                channels.map((channel) => (
+              </JmTableHeader>
+              <JmTableBody>
+                {loading ? (
+                  <ChannelsSkeletonRows />
+                ) : channels.length === 0 ? (
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell colSpan={7} className="py-12">
+                      <JmEmpty
+                        icon={<Store className="size-6" />}
+                        title="등록된 채널이 없습니다"
+                        description="쿠팡·네이버 등 외부 판매채널을 추가하세요."
+                      />
+                    </JmTableCell>
+                  </JmTableRow>
+                ) : (
+                  channels.map((channel) => (
                   <JmTableRow key={channel.id}>
                     <JmTableCell>
                       {channel.logoUrl ? (
@@ -235,6 +254,7 @@ export default function ChannelsPage() {
               )}
             </JmTableBody>
           </JmTable>
+          </JmCard>
         </div>
       </div>
 

@@ -398,36 +398,72 @@ export default function ProductsPage() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <JmStat
                 label="전체 상품"
-                value={isPending ? "—" : stats.total.toLocaleString("ko-KR")}
+                value={
+                  isPending ? (
+                    <JmSkeleton className="h-7 w-12" />
+                  ) : (
+                    stats.total.toLocaleString("ko-KR")
+                  )
+                }
                 icon={<Package className="size-4" />}
-                hint={isPending ? "" : "변형 제외 기준"}
+                hint={
+                  isPending ? (
+                    <JmSkeleton className="h-3 w-20" />
+                  ) : (
+                    "변형 제외 기준"
+                  )
+                }
                 size="sm"
               />
               <JmStat
                 label="낮은 재고"
                 value={
-                  isPending ? "—" : stats.lowStock.toLocaleString("ko-KR")
+                  isPending ? (
+                    <JmSkeleton className="h-7 w-12" />
+                  ) : (
+                    stats.lowStock.toLocaleString("ko-KR")
+                  )
                 }
                 icon={<TriangleAlert className="size-4" />}
-                hint={isPending ? "" : "안전재고 미달"}
+                hint={
+                  isPending ? (
+                    <JmSkeleton className="h-3 w-20" />
+                  ) : (
+                    "안전재고 미달"
+                  )
+                }
                 positiveIsGood={false}
                 size="sm"
               />
               <JmStat
                 label="판매가 미설정"
                 value={
-                  isPending ? "—" : stats.priceUnset.toLocaleString("ko-KR")
+                  isPending ? (
+                    <JmSkeleton className="h-7 w-12" />
+                  ) : (
+                    stats.priceUnset.toLocaleString("ko-KR")
+                  )
                 }
                 icon={<Coins className="size-4" />}
-                hint={isPending ? "" : "판매가 0원"}
+                hint={
+                  isPending ? <JmSkeleton className="h-3 w-16" /> : "판매가 0원"
+                }
                 positiveIsGood={false}
                 size="sm"
               />
               <JmStat
                 label="재고 자산"
-                value={isPending ? "—" : won(stats.assetValue)}
+                value={
+                  isPending ? (
+                    <JmSkeleton className="h-7 w-20" />
+                  ) : (
+                    won(stats.assetValue)
+                  )
+                }
                 icon={<Boxes className="size-4" />}
-                hint={isPending ? "" : "원가 × 재고"}
+                hint={
+                  isPending ? <JmSkeleton className="h-3 w-16" /> : "원가 × 재고"
+                }
                 size="sm"
               />
             </div>

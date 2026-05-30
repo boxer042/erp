@@ -8,13 +8,20 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   JmScope,
   JmButton,
+  JmIconButton,
+  JmCard,
   JmInput,
+  JmSearchInput,
   JmTable,
   JmTableBody,
   JmTableCell,
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarSearch,
+  JmTableToolbarFilters,
+  JmTableToolbarActions,
   JmDialog,
   JmDialogContent,
   JmDialogHeader,
@@ -22,12 +29,12 @@ import {
   JmDialogFooter,
   JmSelect,
   JmBadge,
+  JmEmpty,
   JmScrollArea,
   JmSkeleton,
 } from "@/jm";
-import { Loader2 } from "lucide-react";
+import { ClipboardList, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { STOCKTAKE_REASONS, STOCKTAKE_REASON_LABELS } from "@/lib/validators/stocktake";
 
 function StocktakeSkeletonRows({ rows = 8 }: { rows?: number }) {
@@ -175,22 +182,22 @@ export default function StocktakePage() {
 
   return (
     <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
-      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-        <DataTableToolbar
-          search={{
-            value: search,
-            onChange: setSearch,
-            onSearch: () => {},
-            placeholder: "상품명 또는 SKU 검색",
-          }}
-          onRefresh={fetchInventories}
-          loading={loading}
-          filters={
-            <div className="flex items-center gap-1.5">
+      <div className="flex h-full flex-col bg-[var(--jm-bg)] p-4">
+        <JmCard className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+          <JmTableToolbar>
+            <JmTableToolbarSearch>
+              <JmSearchInput
+                size="sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClear={() => setSearch("")}
+                placeholder="상품명 또는 SKU 검색"
+              />
+            </JmTableToolbarSearch>
+            <JmTableToolbarFilters>
               <JmButton
                 variant={showDiffOnly ? "cta" : "outline"}
                 size="sm"
-                className="h-[30px] text-jm-sm"
                 onClick={() => setShowDiffOnly(!showDiffOnly)}
               >
                 차이만
@@ -198,39 +205,60 @@ export default function StocktakePage() {
               {changedRows.length > 0 && (
                 <span className="text-jm-xs text-[var(--jm-text-muted)]">{changedRows.length}건 변경</span>
               )}
+            </JmTableToolbarFilters>
+            <JmTableToolbarActions>
+              <JmIconButton
+                variant="ghost"
+                size="sm"
+                aria-label="새로고침"
+                onClick={fetchInventories}
+                disabled={loading}
+              >
+                <RefreshCw className={loading ? "animate-spin" : ""} />
+              </JmIconButton>
               <JmButton
                 size="sm"
-                className="h-[30px] text-jm-sm"
                 disabled={changedRows.length === 0}
                 onClick={() => setConfirmOpen(true)}
               >
                 보정 적용
               </JmButton>
-            </div>
-          }
-        />
+            </JmTableToolbarActions>
+          </JmTableToolbar>
 
-        <JmScrollArea className="flex-1 min-h-0">
-          <JmTable>
-            <JmTableHeader>
-              <JmTableRow>
-                <JmTableHead>상품명</JmTableHead>
-                <JmTableHead>SKU</JmTableHead>
-                <JmTableHead>단위</JmTableHead>
-                <JmTableHead className="text-right">시스템 재고</JmTableHead>
-                <JmTableHead className="text-right w-[120px]">실사 수량</JmTableHead>
-                <JmTableHead className="text-right w-[90px]">차이</JmTableHead>
-                <JmTableHead className="w-[130px]">보정 사유</JmTableHead>
-                <JmTableHead className="w-[160px]">공급상품 (증가 시)</JmTableHead>
-                <JmTableHead className="w-[140px]">메모</JmTableHead>
-              </JmTableRow>
-            </JmTableHeader>
-            <JmTableBody>
-              {loading ? (
-                <StocktakeSkeletonRows />
-              ) : filteredRows.length === 0 ? (
-                <JmTableRow><JmTableCell colSpan={9} className="text-center py-8 text-[var(--jm-text-muted)]">재고 데이터가 없습니다</JmTableCell></JmTableRow>
-              ) : (
+          <JmScrollArea className="flex-1 min-h-0">
+            <JmTable>
+              <JmTableHeader>
+                <JmTableRow>
+                  <JmTableHead>상품명</JmTableHead>
+                  <JmTableHead>SKU</JmTableHead>
+                  <JmTableHead>단위</JmTableHead>
+                  <JmTableHead className="text-right">시스템 재고</JmTableHead>
+                  <JmTableHead className="text-right w-[120px]">실사 수량</JmTableHead>
+                  <JmTableHead className="text-right w-[90px]">차이</JmTableHead>
+                  <JmTableHead className="w-[130px]">보정 사유</JmTableHead>
+                  <JmTableHead className="w-[160px]">공급상품 (증가 시)</JmTableHead>
+                  <JmTableHead className="w-[140px]">메모</JmTableHead>
+                </JmTableRow>
+              </JmTableHeader>
+              <JmTableBody>
+                {loading ? (
+                  <StocktakeSkeletonRows />
+                ) : filteredRows.length === 0 ? (
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell colSpan={9} className="py-12">
+                      <JmEmpty
+                        icon={<ClipboardList className="size-8" />}
+                        title="재고 데이터가 없습니다"
+                        description={
+                          search || showDiffOnly
+                            ? "검색어나 필터를 바꿔보세요"
+                            : "입고·기초등록 후 재고가 생기면 실사 보정 대상이 표시됩니다"
+                        }
+                      />
+                    </JmTableCell>
+                  </JmTableRow>
+                ) : (
                 filteredRows.map((row) => {
                   const rowIndex = rows.findIndex((r) => r.productId === row.productId);
                   const diff = parseFloat(row.actualQty) - row.systemQty;
@@ -307,9 +335,10 @@ export default function StocktakePage() {
                   );
                 })
               )}
-            </JmTableBody>
-          </JmTable>
-        </JmScrollArea>
+              </JmTableBody>
+            </JmTable>
+          </JmScrollArea>
+        </JmCard>
       </div>
 
       <JmDialog open={confirmOpen} onOpenChange={setConfirmOpen}>

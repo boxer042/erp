@@ -1629,7 +1629,7 @@ function IncomingPageInner() {
                     <div className="grid grid-cols-[80px_1fr] items-center gap-2">
                       <p className="text-jm-xs text-[var(--jm-text-muted)]">공급가액</p>
                       <input
-                        className="flex h-9 w-full rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-1 text-jm-sm text-[var(--jm-text)] tabular-nums text-right outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+                        className="flex h-9 w-full rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-1 text-jm-sm text-[var(--jm-text)] tabular-nums text-right outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
                         type="text"
                         inputMode="numeric"
                         placeholder="0"
@@ -1650,7 +1650,7 @@ function IncomingPageInner() {
                       />
                       <p className="text-jm-xs text-[var(--jm-text-muted)]">합계금액</p>
                       <input
-                        className="flex h-9 w-full rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-1 text-jm-sm text-[var(--jm-text)] tabular-nums text-right outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+                        className="flex h-9 w-full rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-1 text-jm-sm text-[var(--jm-text)] tabular-nums text-right outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
                         type="text"
                         inputMode="numeric"
                         placeholder="0"
@@ -1718,7 +1718,7 @@ function IncomingPageInner() {
                                   }))
                                 }
                                 onFocus={focusCaretEnd}
-                                className="h-8 px-2 text-right tabular-nums text-jm-xs rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+                                className="h-8 px-2 text-right tabular-nums text-jm-xs rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
                               />
                               <button
                                 type="button"
@@ -2186,7 +2186,7 @@ function IncomingPageInner() {
                           setShippingCost(shippingToTotal(v, shippingIsTaxable));
                         }}
                         onFocus={focusCaretEnd}
-                        className="w-full h-8 pl-5 pr-2 text-right text-jm-sm bg-[var(--jm-surface)] border border-[var(--jm-border)] rounded-md text-[var(--jm-text)] tabular-nums outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+                        className="w-full h-8 pl-5 pr-2 text-right text-jm-sm bg-[var(--jm-surface)] border border-[var(--jm-border)] rounded-md text-[var(--jm-text)] tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
                       />
                     </div>
                     <span className="text-jm-2xs text-[var(--jm-text-muted)]">세액</span>
@@ -2213,7 +2213,7 @@ function IncomingPageInner() {
                           setShippingSupply(shippingToSupply(v, shippingIsTaxable));
                         }}
                         onFocus={focusCaretEnd}
-                        className="w-full h-8 pl-5 pr-2 text-right text-jm-sm bg-[var(--jm-surface)] border border-[var(--jm-border)] rounded-md text-[var(--jm-text)] tabular-nums outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+                        className="w-full h-8 pl-5 pr-2 text-right text-jm-sm bg-[var(--jm-surface)] border border-[var(--jm-border)] rounded-md text-[var(--jm-text)] tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
                       />
                     </div>
                   </div>

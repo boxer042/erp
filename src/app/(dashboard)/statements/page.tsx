@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { FileText, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { FileText, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
@@ -13,8 +13,11 @@ import { DocumentPrintDialog } from "@/components/document-print-dialog";
 import {
   JmBadge,
   JmButton,
+  JmCard,
+  JmEmpty,
   JmIconButton,
   JmScope,
+  JmSearchInput,
   JmSkeleton,
   JmTable,
   JmTableBody,
@@ -22,6 +25,9 @@ import {
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarSearch,
 } from "@/jm";
 
 type StatementStatus = "DRAFT" | "ISSUED" | "CANCELLED";
@@ -191,73 +197,79 @@ export default function StatementsPage() {
 
   return (
     <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
-      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-        {/* 툴바 */}
-        <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2 shrink-0">
-          <div className="flex flex-1 items-center gap-1.5 h-8 max-w-[320px] rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2.5">
-            <Search className="size-3.5 text-[var(--jm-text-muted)] shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  setAppliedSearch(search);
-                }
-              }}
-              placeholder="명세표번호 / 고객 검색"
-              className="flex-1 bg-transparent text-jm-sm outline-none placeholder:text-[var(--jm-text-muted)] text-[var(--jm-text)]"
-            />
-          </div>
-          <JmIconButton
-            aria-label="새로고침"
-            onClick={refresh}
-            disabled={loading}
-            size="sm"
-            variant="ghost"
-          >
-            <RefreshCw className={refreshing ? "animate-spin" : ""} />
-          </JmIconButton>
-          <div className="ml-auto">
-            <JmButton size="sm" variant="cta" onClick={openCreate}>
-              <Plus />
-              <span>거래명세표 작성</span>
-            </JmButton>
-          </div>
-        </div>
+      <div className="flex h-full flex-col bg-[var(--jm-bg)] p-4">
+        <JmCard className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+          <JmTableToolbar>
+            <JmTableToolbarSearch>
+              <JmSearchInput
+                size="sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClear={() => {
+                  setSearch("");
+                  setAppliedSearch("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    setAppliedSearch(search);
+                  }
+                }}
+                placeholder="명세표번호 / 고객 검색"
+              />
+            </JmTableToolbarSearch>
+            <JmTableToolbarActions>
+              <JmIconButton
+                aria-label="새로고침"
+                onClick={refresh}
+                disabled={loading}
+                size="sm"
+                variant="ghost"
+              >
+                <RefreshCw className={refreshing ? "animate-spin" : ""} />
+              </JmIconButton>
+              <JmButton size="sm" variant="cta" onClick={openCreate}>
+                <Plus />
+                <span>거래명세표 작성</span>
+              </JmButton>
+            </JmTableToolbarActions>
+          </JmTableToolbar>
 
-        {/* 테이블 */}
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <JmTable className="min-w-[900px]">
-            <JmTableHeader className="sticky top-0 z-10">
-              <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">명세표번호</JmTableHead>
-                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">고객</JmTableHead>
-                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">발행일자</JmTableHead>
-                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">원본</JmTableHead>
-                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium">상태</JmTableHead>
-                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 text-right font-medium">합계</JmTableHead>
-                <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-1.5 px-3 font-medium w-[130px]">관리</JmTableHead>
-              </JmTableRow>
-            </JmTableHeader>
-            <JmTableBody>
-              {loading ? (
-                <StatementsSkeletonRows />
-              ) : statements.length === 0 ? (
-                <JmTableRow className="hover:bg-transparent">
-                  <JmTableCell colSpan={7} className="text-center py-10 text-[var(--jm-text-muted)] text-sm">
-                    {appliedSearch ? (
-                      <>
-                        <span className="text-[var(--jm-text)] font-medium">
-                          &ldquo;{appliedSearch}&rdquo;
-                        </span>{" "}
-                        검색 결과가 없습니다
-                      </>
-                    ) : (
-                      "등록된 거래명세표가 없습니다"
-                    )}
-                  </JmTableCell>
+          {/* 테이블 */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <JmTable className="min-w-[900px]">
+              <JmTableHeader className="sticky top-0 z-10">
+                <JmTableRow>
+                  <JmTableHead>명세표번호</JmTableHead>
+                  <JmTableHead>고객</JmTableHead>
+                  <JmTableHead>발행일자</JmTableHead>
+                  <JmTableHead>원본</JmTableHead>
+                  <JmTableHead>상태</JmTableHead>
+                  <JmTableHead className="text-right">합계</JmTableHead>
+                  <JmTableHead className="w-[130px]">관리</JmTableHead>
                 </JmTableRow>
-              ) : (
+              </JmTableHeader>
+              <JmTableBody>
+                {loading ? (
+                  <StatementsSkeletonRows />
+                ) : statements.length === 0 ? (
+                  <JmTableRow className="hover:bg-transparent">
+                    <JmTableCell colSpan={7} className="py-12">
+                      <JmEmpty
+                        icon={<FileText className="size-6" />}
+                        title={
+                          appliedSearch
+                            ? "검색 결과가 없습니다"
+                            : "등록된 거래명세표가 없습니다"
+                        }
+                        description={
+                          appliedSearch
+                            ? `"${appliedSearch}" 와(과) 일치하는 거래명세표를 찾지 못했습니다`
+                            : "거래명세표를 작성하면 여기에 표시됩니다"
+                        }
+                      />
+                    </JmTableCell>
+                  </JmTableRow>
+                ) : (
                 statements.map((s) => (
                   <JmTableRow key={s.id}>
                     <JmTableCell className="px-3 py-2 font-medium font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text)]">
@@ -330,9 +342,10 @@ export default function StatementsPage() {
                   </JmTableRow>
                 ))
               )}
-            </JmTableBody>
-          </JmTable>
-        </div>
+              </JmTableBody>
+            </JmTable>
+          </div>
+        </JmCard>
       </div>
 
       <StatementSheet

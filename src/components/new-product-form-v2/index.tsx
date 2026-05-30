@@ -24,7 +24,7 @@ import {
   JmTooltipRoot,
   JmTooltipTrigger,
 } from "@/jm";
-import { RefreshCw, Plus, X, Loader2, ChevronLeft, ChevronRight, Calculator, Info } from "lucide-react";
+import { RefreshCw, Plus, X, Loader2, ArrowLeft, ChevronLeft, ChevronRight, Calculator, Info } from "lucide-react";
 import { ComponentIncomingInfoSections } from "@/components/product";
 import { toast } from "sonner";
 import { UNITS_OF_MEASURE } from "@/lib/constants";
@@ -1582,7 +1582,7 @@ export function NewProductForm({
                   }
                 }}
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ArrowLeft className="h-5 w-5" />
               </button>
               <h1 className="text-base font-medium flex-1">새 상품 등록</h1>
               {currentStepIdx > 0 && currentTypeCard && (

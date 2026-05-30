@@ -28,10 +28,13 @@ import {
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarFilters,
+  JmTableToolbarSearch,
 } from "@/jm";
 
 import { OrderDetailSheet } from "../_detail-sheet";
-import { ChannelBadge, ItemPhaseBadge } from "../_parts";
+import { ChannelBadge, ItemPhaseBadge, TableRowSkeleton } from "../_parts";
 import {
   CLAIM_REASON_LABELS,
   CLAIM_TYPE_LABELS,
@@ -215,23 +218,25 @@ export default function ClaimsPage() {
         </div>
 
         <JmCard className="overflow-hidden p-0">
-          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--jm-border)] px-4 py-2.5">
-            <JmSearchInput
-              size="sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onClear={() => {
-                setSearch("");
-                setAppliedSearch("");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  setAppliedSearch(search.trim());
-                }
-              }}
-              placeholder="주문번호 · 채널주문번호 · 고객"
-            />
-            <div className="flex flex-wrap gap-1.5">
+          <JmTableToolbar>
+            <JmTableToolbarSearch>
+              <JmSearchInput
+                size="sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClear={() => {
+                  setSearch("");
+                  setAppliedSearch("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    setAppliedSearch(search.trim());
+                  }
+                }}
+                placeholder="주문번호 · 채널주문번호 · 고객"
+              />
+            </JmTableToolbarSearch>
+            <JmTableToolbarFilters>
               <JmPill
                 size="sm"
                 active={activeGroup === "all"}
@@ -252,38 +257,39 @@ export default function ClaimsPage() {
                   )}
                 </JmPill>
               ))}
-            </div>
-          </div>
+            </JmTableToolbarFilters>
+          </JmTableToolbar>
 
-          {claimsQuery.isPending ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-jm-sm text-[var(--jm-text-muted)]">
-              <JmSpinner />
-              불러오는 중…
-            </div>
-          ) : visible.length === 0 ? (
-            <JmEmpty
-              icon={<PackageX className="size-8" />}
-              title="처리 대기 클레임 없음"
-              description="모두 종결되었거나 아직 접수된 반품·교환이 없습니다"
-            />
-          ) : (
-            <JmTable className="min-w-[1000px]">
-              <JmTableHeader>
-                <JmTableRow>
-                  <JmTableHead className="w-[150px]">주문번호</JmTableHead>
-                  <JmTableHead className="w-[100px]">채널</JmTableHead>
-                  <JmTableHead className="w-[140px]">고객</JmTableHead>
-                  <JmTableHead>품목</JmTableHead>
-                  <JmTableHead className="w-[100px]">유형</JmTableHead>
-                  <JmTableHead className="w-[120px]">사유</JmTableHead>
-                  <JmTableHead className="w-[110px]">단계</JmTableHead>
-                  <JmTableHead className="w-[260px] text-right">
-                    액션
-                  </JmTableHead>
+          <JmTable className="min-w-[1000px]">
+            <JmTableHeader>
+              <JmTableRow>
+                <JmTableHead className="w-[150px]">주문번호</JmTableHead>
+                <JmTableHead className="w-[100px]">채널</JmTableHead>
+                <JmTableHead className="w-[140px]">고객</JmTableHead>
+                <JmTableHead>품목</JmTableHead>
+                <JmTableHead className="w-[100px]">유형</JmTableHead>
+                <JmTableHead className="w-[120px]">사유</JmTableHead>
+                <JmTableHead className="w-[110px]">단계</JmTableHead>
+                <JmTableHead className="w-[260px] text-right">액션</JmTableHead>
+              </JmTableRow>
+            </JmTableHeader>
+            <JmTableBody>
+              {claimsQuery.isPending ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRowSkeleton key={i} cols={8} />
+                ))
+              ) : visible.length === 0 ? (
+                <JmTableRow className="hover:bg-transparent">
+                  <JmTableCell colSpan={8} className="py-12">
+                    <JmEmpty
+                      icon={<PackageX className="size-8" />}
+                      title="처리 대기 클레임 없음"
+                      description="모두 종결되었거나 아직 접수된 반품·교환이 없습니다"
+                    />
+                  </JmTableCell>
                 </JmTableRow>
-              </JmTableHeader>
-              <JmTableBody>
-                {visible.map((order) => (
+              ) : (
+                visible.map((order) => (
                   <ClaimRow
                     key={order.id}
                     order={order}
@@ -296,10 +302,10 @@ export default function ClaimsPage() {
                       transitionMutation.variables?.id === order.id
                     }
                   />
-                ))}
-              </JmTableBody>
-            </JmTable>
-          )}
+                ))
+              )}
+            </JmTableBody>
+          </JmTable>
         </JmCard>
       </div>
 

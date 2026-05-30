@@ -49,16 +49,14 @@ export function LedgerView({
         <col style={{ width: "120px" }} />
       </colgroup>
       <JmTableHeader className="sticky top-0 z-10">
-        <JmTableRow className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-xs hover:bg-[var(--jm-surface-muted)]">
-          {!selectedCustomerId && (
-            <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">고객</JmTableHead>
-          )}
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">유형</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 font-medium">설명</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-center font-medium">참조</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">차변 (매출)</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">대변 (수금)</JmTableHead>
-          <JmTableHead className="border-b border-[var(--jm-border)] h-auto py-2 px-3 text-right font-medium">미수 잔액</JmTableHead>
+        <JmTableRow>
+          {!selectedCustomerId && <JmTableHead>고객</JmTableHead>}
+          <JmTableHead className="text-center">유형</JmTableHead>
+          <JmTableHead>설명</JmTableHead>
+          <JmTableHead className="text-center">참조</JmTableHead>
+          <JmTableHead className="text-right">차변 (매출)</JmTableHead>
+          <JmTableHead className="text-right">대변 (수금)</JmTableHead>
+          <JmTableHead className="text-right">미수 잔액</JmTableHead>
         </JmTableRow>
       </JmTableHeader>
       <JmTableBody>

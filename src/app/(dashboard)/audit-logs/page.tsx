@@ -2,13 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { RefreshCw, ScrollText } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 
 import {
   JmCard,
+  JmEmpty,
+  JmIconButton,
+  JmSearchInput,
   JmSkeleton,
+  JmSpinner,
   JmSelect,
   JmBadge,
   type JmBadgeProps,
@@ -23,8 +28,11 @@ import {
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarFilters,
+  JmTableToolbarSearch,
 } from "@/jm";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 
 interface AuditLog {
   id: string;
@@ -114,38 +122,53 @@ export default function AuditLogsPage() {
   }, [logsQuery.data, search]);
 
   return (
-    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-      <DataTableToolbar
-        search={{
-          value: search,
-          onChange: setSearch,
-          onSearch: () => {},
-          placeholder: "ID·사용자",
-        }}
-        onRefresh={() => logsQuery.refetch()}
-        loading={logsQuery.isFetching}
-        filters={
-          <>
-            <JmSelect
-              variant="pill"
-              size="sm"
-              options={ENTITY_OPTIONS}
-              value={entityFilter}
-              onChange={(v) => setEntityFilter(v ?? "all")}
-            />
-            <JmSelect
-              variant="pill"
-              size="sm"
-              options={ACTION_OPTIONS}
-              value={actionFilter}
-              onChange={(v) => setActionFilter(v ?? "all")}
-            />
-          </>
-        }
-      />
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex w-full flex-col gap-6 p-4">
+        <JmCard className="overflow-hidden p-0">
+          <JmTableToolbar>
+            <JmTableToolbarSearch>
+              <JmSearchInput
+                size="sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClear={() => setSearch("")}
+                placeholder="ID·사용자"
+              />
+            </JmTableToolbarSearch>
+            <JmTableToolbarFilters>
+              <JmSelect
+                variant="pill"
+                size="sm"
+                options={ENTITY_OPTIONS}
+                value={entityFilter}
+                onChange={(v) => setEntityFilter(v ?? "all")}
+              />
+              <JmSelect
+                variant="pill"
+                size="sm"
+                options={ACTION_OPTIONS}
+                value={actionFilter}
+                onChange={(v) => setActionFilter(v ?? "all")}
+              />
+            </JmTableToolbarFilters>
+            <JmTableToolbarActions>
+              <JmIconButton
+                variant="ghost"
+                size="sm"
+                aria-label="새로고침"
+                onClick={() => logsQuery.refetch()}
+                disabled={logsQuery.isFetching}
+              >
+                {logsQuery.isFetching ? (
+                  <JmSpinner size="sm" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+              </JmIconButton>
+            </JmTableToolbarActions>
+          </JmTableToolbar>
 
-      <div className="flex-1 overflow-y-auto">
-        <JmTable className="min-w-[1000px]">
+          <JmTable className="min-w-[1000px]">
           <JmTableHeader>
             <JmTableRow>
               <JmTableHead className="w-[160px]">시각</JmTableHead>
@@ -169,9 +192,17 @@ export default function AuditLogsPage() {
                 </JmTableRow>
               ))
             ) : filtered.length === 0 ? (
-              <JmTableRow>
-                <JmTableCell colSpan={6} className="py-12 text-center text-[var(--jm-text-muted)]">
-                  로그가 없습니다
+              <JmTableRow className="hover:bg-transparent">
+                <JmTableCell colSpan={6} className="py-12">
+                  <JmEmpty
+                    icon={<ScrollText className="size-8" />}
+                    title="활동 로그가 없습니다"
+                    description={
+                      search.trim()
+                        ? "검색어와 일치하는 로그가 없습니다"
+                        : "주요 변경이 발생하면 활동 로그가 기록됩니다"
+                    }
+                  />
                 </JmTableCell>
               </JmTableRow>
             ) : (
@@ -205,7 +236,8 @@ export default function AuditLogsPage() {
               ))
             )}
           </JmTableBody>
-        </JmTable>
+          </JmTable>
+        </JmCard>
       </div>
 
       <JmDialog open={detailRow !== null} onOpenChange={(v) => !v && setDetailRow(null)}>

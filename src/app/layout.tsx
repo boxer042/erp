@@ -37,6 +37,10 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  // 가상 키보드가 레이아웃을 위로 밀지 않고 드로워/시트 위에 그대로 올라오도록.
+  // 이게 없으면 바텀 드로워(JmComboboxDrawer 등) 검색 input 포커스 시 브라우저가
+  // 페이지 전체를 스크롤해 영역이 위로 튀어 오른다 (모바일/태블릿).
+  interactiveWidget: "overlays-content",
 };
 
 export default function RootLayout({

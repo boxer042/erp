@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
 import {
@@ -143,7 +143,7 @@ export default function RentalDetailPage({
           size="sm"
           onClick={() => router.back()}
         >
-          <ChevronLeft />
+          <ArrowLeft />
         </JmIconButton>
         <h1 className="text-jm-xl font-semibold font-mono text-[var(--jm-text)]">
           {r.rentalNo}
@@ -399,7 +399,7 @@ function DetailSkeleton({ onBack }: { onBack: () => void }) {
     <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
         <JmIconButton aria-label="뒤로" size="sm" onClick={onBack}>
-          <ChevronLeft />
+          <ArrowLeft />
         </JmIconButton>
         <JmSkeleton className="h-5 w-40" />
       </div>

@@ -18,6 +18,7 @@ import {
   JmDialogTitle,
   JmInput,
   JmSearchInput,
+  JmSelect,
   JmSkeleton,
   JmTable,
   JmTableBody,
@@ -25,6 +26,10 @@ import {
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarFilters,
+  JmTableToolbarSearch,
   JmTabs,
   JmTabsList,
   JmTabsPanel,
@@ -137,33 +142,43 @@ export default function RepairTemplatesPage() {
 
           {(["symptom", "diagnosis"] as const).map((k) => (
             <JmTabsPanel key={k} value={k}>
-              <JmCard className="overflow-hidden">
-                <div className="flex flex-wrap items-center gap-2 border-b border-[var(--jm-border)] p-3">
-                  <JmSearchInput
-                    placeholder={
-                      k === "symptom" ? "증상 텍스트 검색" : "진단 텍스트 검색"
-                    }
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full sm:w-72"
-                  />
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="h-10 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
-                  >
-                    <option value="all">전체 카테고리</option>
-                    <option value="uncategorized">미지정 (공통)</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="ml-auto text-jm-2xs text-[var(--jm-text-subtle)]">
-                    {filtered.length} / {templates.length} 개
-                  </span>
-                </div>
+              <JmCard className="overflow-hidden p-0">
+                <JmTableToolbar>
+                  <JmTableToolbarSearch>
+                    <JmSearchInput
+                      size="sm"
+                      placeholder={
+                        k === "symptom"
+                          ? "증상 텍스트 검색"
+                          : "진단 텍스트 검색"
+                      }
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      onClear={() => setSearch("")}
+                    />
+                  </JmTableToolbarSearch>
+                  <JmTableToolbarActions>
+                    <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
+                      {filtered.length} / {templates.length} 개
+                    </span>
+                  </JmTableToolbarActions>
+                  <JmTableToolbarFilters>
+                    <JmSelect
+                      value={categoryFilter}
+                      onChange={setCategoryFilter}
+                      size="sm"
+                      className="w-auto min-w-44"
+                      options={[
+                        { value: "all", label: "전체 카테고리" },
+                        { value: "uncategorized", label: "미지정 (공통)" },
+                        ...categories.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                        })),
+                      ]}
+                    />
+                  </JmTableToolbarFilters>
+                </JmTableToolbar>
 
                 <JmTable>
                   <JmTableHeader>

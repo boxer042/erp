@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 
 import { apiGet } from "@/lib/api-client";
@@ -25,6 +26,7 @@ import {
 import {
   JmButton,
   JmCheckbox,
+  JmDatePicker,
   JmDrawer,
   JmDrawerContent,
   JmDrawerDescription,
@@ -410,12 +412,15 @@ export function QuotationSheet({
 
                 <div className="space-y-3">
                   <FieldRow label="견적일자" required>
-                    <JmInput
+                    <JmDatePicker
                       size="sm"
-                      type="date"
-                      value={form.issueDate}
-                      onChange={(e) => {
-                        const newIssue = e.target.value;
+                      value={
+                        form.issueDate
+                          ? new Date(form.issueDate + "T00:00:00")
+                          : undefined
+                      }
+                      onChange={(d) => {
+                        const newIssue = d ? format(d, "yyyy-MM-dd") : "";
                         setForm((p) => {
                           const autoPrev = p.issueDate ? addOneMonth(p.issueDate) : "";
                           const shouldAutoUpdate = !p.validUntil || p.validUntil === autoPrev;
@@ -432,12 +437,18 @@ export function QuotationSheet({
                     />
                   </FieldRow>
                   <FieldRow label="유효기간">
-                    <JmInput
+                    <JmDatePicker
                       size="sm"
-                      type="date"
-                      value={form.validUntil}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, validUntil: e.target.value }))
+                      value={
+                        form.validUntil
+                          ? new Date(form.validUntil + "T00:00:00")
+                          : undefined
+                      }
+                      onChange={(d) =>
+                        setForm((p) => ({
+                          ...p,
+                          validUntil: d ? format(d, "yyyy-MM-dd") : "",
+                        }))
                       }
                     />
                   </FieldRow>

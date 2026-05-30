@@ -311,7 +311,7 @@ export default function BalanceSheetPage() {
         )}
 
         {/* KPI */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {isPending || !data ? (
             <>
               <KpiSkeleton />

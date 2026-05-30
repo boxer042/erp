@@ -6,10 +6,18 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { toast } from "sonner";
 import {
   JmButton,
+  JmIconButton,
   JmBadge,
   JmSkeleton,
+  JmSpinner,
   JmCard,
   JmCardContent,
+  JmSearchInput,
+  JmSegmentedControl,
+  JmTableToolbar,
+  JmTableToolbarSearch,
+  JmTableToolbarFilters,
+  JmTableToolbarActions,
   JmDialog,
   JmDialogContent,
   JmDialogHeader,
@@ -17,8 +25,7 @@ import {
   JmDialogDescription,
   JmDialogFooter,
 } from "@/jm";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { Loader2, Trash2, ExternalLink, ImageOff, AlertTriangle } from "lucide-react";
+import { Loader2, Trash2, ExternalLink, ImageOff, AlertTriangle, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 
 interface UsageRef {
@@ -110,38 +117,44 @@ export default function MediaLibraryPage() {
 
   return (
     <div className="flex h-full flex-col bg-[var(--jm-bg)]">
-      <DataTableToolbar
-        search={{
-          value: search,
-          onChange: setSearch,
-          onSearch: () => {},
-          placeholder: "파일명 검색...",
-        }}
-        loading={listQuery.isFetching}
-        onRefresh={() => qc.invalidateQueries({ queryKey: MEDIA_KEY })}
-        filters={
-          <div className="flex h-[30px] rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-jm-sm overflow-hidden">
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-3 ${filter === "all" ? "bg-[var(--jm-surface-muted)]" : "text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]/50"}`}
-            >
-              전체 {all.length}
-            </button>
-            <button
-              onClick={() => setFilter("used")}
-              className={`px-3 ${filter === "used" ? "bg-[var(--jm-surface-muted)]" : "text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]/50"}`}
-            >
-              사용중 {usedCount}
-            </button>
-            <button
-              onClick={() => setFilter("unused")}
-              className={`px-3 ${filter === "unused" ? "bg-[var(--jm-surface-muted)]" : "text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]/50"}`}
-            >
-              미사용 {unusedCount}
-            </button>
-          </div>
-        }
-      />
+      <JmTableToolbar>
+        <JmTableToolbarSearch>
+          <JmSearchInput
+            size="sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onClear={() => setSearch("")}
+            placeholder="파일명 검색..."
+          />
+        </JmTableToolbarSearch>
+        <JmTableToolbarFilters>
+          <JmSegmentedControl
+            value={filter}
+            onChange={setFilter}
+            size="sm"
+            options={[
+              { value: "all", label: `전체 ${all.length}` },
+              { value: "used", label: `사용중 ${usedCount}` },
+              { value: "unused", label: `미사용 ${unusedCount}` },
+            ]}
+          />
+        </JmTableToolbarFilters>
+        <JmTableToolbarActions>
+          <JmIconButton
+            variant="ghost"
+            size="sm"
+            aria-label="새로고침"
+            onClick={() => qc.invalidateQueries({ queryKey: MEDIA_KEY })}
+            disabled={listQuery.isFetching}
+          >
+            {listQuery.isFetching ? (
+              <JmSpinner size="sm" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+          </JmIconButton>
+        </JmTableToolbarActions>
+      </JmTableToolbar>
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">

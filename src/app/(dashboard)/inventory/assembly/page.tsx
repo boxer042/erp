@@ -7,26 +7,31 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Loader2, Undo2 } from "lucide-react";
+import { Loader2, Package, Plus, RefreshCw, Undo2 } from "lucide-react";
 import {
   JmBadge,
   JmButton,
+  JmCard,
   JmDialog,
   JmDialogContent,
   JmDialogFooter,
   JmDialogHeader,
   JmDialogTitle,
   JmDialogDescription,
+  JmEmpty,
+  JmIconButton,
+  JmSpinner,
   JmTable,
   JmTableBody,
   JmTableCell,
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
   JmSkeleton,
   JmTextarea,
 } from "@/jm";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { AssemblyRegisterSheet } from "@/components/assembly/assembly-register-sheet";
 import { AssemblyDetailSheet } from "@/components/assembly/assembly-detail-sheet";
 
@@ -132,38 +137,58 @@ export default function AssemblyPage() {
   const confirmDisassemble = () => disassembleMutation.mutate();
 
   return (
-    <div className="flex h-full flex-col">
-      <DataTableToolbar
-        onRefresh={fetchAssemblies}
-        onAdd={openRegister}
-        addLabel="조립 실적 등록"
-        loading={loading}
-      />
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex w-full flex-col gap-6 p-4">
+        <JmCard className="overflow-hidden p-0">
+          <JmTableToolbar>
+            <JmTableToolbarActions>
+              <JmIconButton
+                variant="ghost"
+                size="sm"
+                aria-label="새로고침"
+                onClick={fetchAssemblies}
+                disabled={assembliesQuery.isFetching}
+              >
+                {assembliesQuery.isFetching ? (
+                  <JmSpinner size="sm" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+              </JmIconButton>
+              <JmButton size="sm" onClick={openRegister}>
+                <Plus className="size-4" />
+                조립 실적 등록
+              </JmButton>
+            </JmTableToolbarActions>
+          </JmTableToolbar>
 
-      <div className="flex-1 overflow-auto">
-        <JmTable>
-          <JmTableHeader>
-            <JmTableRow>
-              <JmTableHead>조립번호</JmTableHead>
-              <JmTableHead>조립상품</JmTableHead>
-              <JmTableHead className="text-right">수량</JmTableHead>
-              <JmTableHead>유형</JmTableHead>
-              <JmTableHead className="text-right">조립비</JmTableHead>
-              <JmTableHead>조립일</JmTableHead>
-              <JmTableHead>메모</JmTableHead>
-              <JmTableHead className="w-28"></JmTableHead>
-            </JmTableRow>
-          </JmTableHeader>
-          <JmTableBody>
-            {loading ? (
-              <AssembliesSkeletonRows />
-            ) : rows.length === 0 ? (
+          <JmTable>
+            <JmTableHeader>
               <JmTableRow>
-                <JmTableCell colSpan={8} className="text-center py-8 text-[var(--jm-text-muted)]">
-                  등록된 조립 실적이 없습니다
-                </JmTableCell>
+                <JmTableHead>조립번호</JmTableHead>
+                <JmTableHead>조립상품</JmTableHead>
+                <JmTableHead className="text-right">수량</JmTableHead>
+                <JmTableHead>유형</JmTableHead>
+                <JmTableHead className="text-right">조립비</JmTableHead>
+                <JmTableHead>조립일</JmTableHead>
+                <JmTableHead>메모</JmTableHead>
+                <JmTableHead className="w-28"></JmTableHead>
               </JmTableRow>
-            ) : (
+            </JmTableHeader>
+            <JmTableBody>
+              {loading ? (
+                <AssembliesSkeletonRows />
+              ) : rows.length === 0 ? (
+                <JmTableRow className="hover:bg-transparent">
+                  <JmTableCell colSpan={8} className="py-12">
+                    <JmEmpty
+                      icon={<Package className="size-8" />}
+                      title="등록된 조립 실적이 없습니다"
+                      description="조립 실적을 등록하면 완제품 재고가 늘고 구성품 재고가 차감됩니다"
+                    />
+                  </JmTableCell>
+                </JmTableRow>
+              ) : (
               rows.map((r) => (
                 <JmTableRow key={r.id}>
                   <JmTableCell className="font-mono text-jm-xs">
@@ -219,8 +244,9 @@ export default function AssemblyPage() {
                 </JmTableRow>
               ))
             )}
-          </JmTableBody>
-        </JmTable>
+            </JmTableBody>
+          </JmTable>
+        </JmCard>
       </div>
 
       <AssemblyRegisterSheet
