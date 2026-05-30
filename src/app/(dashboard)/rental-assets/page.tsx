@@ -33,7 +33,7 @@ import {
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { BrandCombobox, type BrandOption } from "@/components/brand-combobox";
 import { QuickBrandSheet } from "@/components/quick-register-sheets";
-import { ThumbnailUpload } from "@/components/thumbnail-upload";
+import { ImageInput } from "@/components/image-input";
 import { formatComma, parseComma } from "@/lib/utils";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 
@@ -477,9 +477,11 @@ export default function RentalAssetsPage() {
 
               {/* ── 사진 + 자산명 (헤더 블록) ── */}
               <div className="flex items-start gap-4">
-                <ThumbnailUpload
+                <ImageInput
                   value={form.imageUrl || null}
                   onChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url ?? "" }))}
+                  context="rental"
+                  allowFree={false}
                   disabled={submitting}
                 />
                 <div className="flex-1 min-w-0 space-y-3">

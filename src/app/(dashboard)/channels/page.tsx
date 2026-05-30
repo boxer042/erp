@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -24,9 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Pencil, Settings2, Store, Trash2, Upload, X, Library } from "lucide-react";
-import { MediaPickerDialog } from "@/components/media-picker-dialog";
-import { ImageEditDialog } from "@/components/image-edit-dialog";
+import { Loader2, Pencil, Settings2, Store, Trash2 } from "lucide-react";
+import { ImageInput } from "@/components/image-input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function ChannelsSkeletonRows({ rows = 6 }: { rows?: number }) {
@@ -75,11 +74,7 @@ export default function ChannelsPage() {
     logoUrl: null as string | null,
     logoPath: null as string | null,
   });
-  const [uploading, setUploading] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [configChannel, setConfigChannel] = useState<SalesChannel | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const channelsQuery = useQuery({
     queryKey: queryKeys.channels.list(),
@@ -106,40 +101,6 @@ export default function ChannelsPage() {
       logoPath: channel.logoPath,
     });
     setDialogOpen(true);
-  };
-
-  const uploadBlob = async (data: Blob | File, name: string) => {
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", data, name);
-      const res = await fetch("/api/channels/upload", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) {
-        toast.error(json.error || "업로드 실패");
-        return;
-      }
-      // 기존 로고 스토리지 삭제 X — /settings/media 에서 일괄 관리
-      setForm((prev) => ({ ...prev, logoUrl: json.url, logoPath: json.path }));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (!file) return;
-    if (file.type === "image/svg+xml") {
-      uploadBlob(file, file.name);
-      return;
-    }
-    setPendingFile(file);
-  };
-
-  const handleRemoveLogo = () => {
-    // 스토리지 삭제는 /settings/media 에서 — 여기서는 분리만
-    setForm((prev) => ({ ...prev, logoUrl: null, logoPath: null }));
   };
 
   const saveMutation = useMutation({
@@ -298,62 +259,14 @@ export default function ChannelsPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>로고</Label>
-              <div className="flex items-center gap-3">
-                {form.logoUrl ? (
-                  <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={form.logoUrl}
-                      alt=""
-                      className="h-16 w-16 rounded object-contain bg-card border border-border"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveLogo}
-                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground inline-flex items-center justify-center"
-                      aria-label="로고 제거"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="h-16 w-16 rounded border-2 border-dashed border-border flex items-center justify-center text-muted-foreground">
-                    <Store className="h-5 w-5" />
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <div className="flex flex-col gap-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    {uploading ? (
-                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                    ) : (
-                      <Upload className="h-3.5 w-3.5 mr-1" />
-                    )}
-                    {form.logoUrl ? "교체" : "업로드"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPickerOpen(true)}
-                    disabled={uploading}
-                  >
-                    <Library className="h-3.5 w-3.5 mr-1" /> 라이브러리
-                  </Button>
-                </div>
-              </div>
+              <ImageInput
+                value={form.logoUrl}
+                onChange={(url) => setForm((prev) => ({ ...prev, logoUrl: url }))}
+                onPathChange={(path) => setForm((prev) => ({ ...prev, logoPath: path }))}
+                context="channel"
+                allowSvgRaw
+                size={64}
+              />
               <p className="text-[11px] text-muted-foreground">JPG/PNG/WebP/SVG · 최대 5MB</p>
             </div>
             <div className="space-y-2">
@@ -411,25 +324,6 @@ export default function ChannelsPage() {
           </form>
         </DialogContent>
       </Dialog>
-      <MediaPickerDialog
-        open={pickerOpen}
-        bucket="channel-logos"
-        onSelect={({ url, path }) => {
-          setForm((prev) => ({ ...prev, logoUrl: url, logoPath: path }));
-          setPickerOpen(false);
-        }}
-        onClose={() => setPickerOpen(false)}
-      />
-      <ImageEditDialog
-        open={pendingFile !== null}
-        file={pendingFile}
-        defaultAspect={16 / 9}
-        onConfirm={async (blob, name) => {
-          setPendingFile(null);
-          await uploadBlob(blob, name);
-        }}
-        onCancel={() => setPendingFile(null)}
-      />
       <ChannelConfigDialog
         channel={configChannel}
         onClose={() => setConfigChannel(null)}

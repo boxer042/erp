@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { toast } from "sonner";
-import { Library, Pencil, Tag, Trash2, Upload, X } from "lucide-react";
+import { Pencil, Tag, Trash2 } from "lucide-react";
 import {
   JmBadge,
   JmButton,
@@ -42,8 +42,7 @@ import {
   JmTooltip,
   JmTooltipProvider,
 } from "@/jm";
-import { ImageEditDialog } from "@/components/image-edit-dialog";
-import { MediaPickerDialog } from "@/components/media-picker-dialog";
+import { ImageInput } from "@/components/image-input";
 import { ProductsThemeScope } from "../_theme-scope";
 
 interface Brand {
@@ -427,15 +426,11 @@ function BrandEditSheet({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [memo, setMemo] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
 
   const open = brand !== null;
@@ -488,43 +483,6 @@ function BrandEditSheet({
     onClose();
   };
 
-  const uploadBlob = async (data: Blob | File, fileName: string) => {
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", data, fileName);
-      const res = await fetch("/api/brands/upload", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) {
-        toast.error(json.error || "업로드 실패");
-        return;
-      }
-      // 기존 로고 스토리지 삭제 X — /settings/media 에서 일괄 관리
-      setLogoUrl(json.url);
-      setLogoPath(json.path);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (!file) return;
-    // SVG는 편집 불가 → 그대로 업로드
-    if (file.type === "image/svg+xml") {
-      uploadBlob(file, file.name);
-      return;
-    }
-    setPendingFile(file);
-  };
-
-  const handleRemoveLogo = () => {
-    // 스토리지 삭제는 /settings/media 에서 — 여기서는 분리만
-    setLogoUrl(null);
-    setLogoPath(null);
-  };
-
   return (
     <>
       <JmDrawer open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
@@ -538,63 +496,14 @@ function BrandEditSheet({
               <p className="text-jm-sm font-medium text-[var(--jm-text)]">
                 로고
               </p>
-              <div className="flex items-center gap-3">
-                {logoUrl ? (
-                  <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={logoUrl}
-                      alt=""
-                      className="h-20 w-20 rounded object-contain bg-[var(--jm-surface)] border border-[var(--jm-border)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveLogo}
-                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-[var(--jm-danger)] text-white inline-flex items-center justify-center"
-                      aria-label="로고 제거"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="h-20 w-20 rounded border border-[var(--jm-border)] bg-[var(--jm-bg-subtle)] flex items-center justify-center text-[10px] text-[var(--jm-text-subtle)]">
-                    로고 없음
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <div className="flex flex-col gap-1.5">
-                  <JmButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    {uploading ? (
-                      <JmSpinner size="sm" />
-                    ) : (
-                      <Upload className="size-3.5" />
-                    )}
-                    {logoUrl ? "교체" : "업로드"}
-                  </JmButton>
-                  <JmButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPickerOpen(true)}
-                    disabled={uploading}
-                  >
-                    <Library className="size-3.5" />
-                    라이브러리
-                  </JmButton>
-                </div>
-              </div>
+              <ImageInput
+                value={logoUrl}
+                onChange={setLogoUrl}
+                onPathChange={setLogoPath}
+                context="brand"
+                allowSvgRaw
+                size={80}
+              />
               <p className="text-[11px] text-[var(--jm-text-subtle)]">
                 JPG / PNG / WebP / SVG · 최대 5MB
               </p>
@@ -652,27 +561,6 @@ function BrandEditSheet({
           </JmDrawerFooter>
         </JmDrawerContent>
       </JmDrawer>
-
-      <ImageEditDialog
-        open={pendingFile !== null}
-        file={pendingFile}
-        defaultAspect={16 / 9}
-        onConfirm={async (blob, fileName) => {
-          setPendingFile(null);
-          await uploadBlob(blob, fileName);
-        }}
-        onCancel={() => setPendingFile(null)}
-      />
-      <MediaPickerDialog
-        open={pickerOpen}
-        bucket="brand-logos"
-        onSelect={({ url, path }) => {
-          setLogoUrl(url);
-          setLogoPath(path);
-          setPickerOpen(false);
-        }}
-        onClose={() => setPickerOpen(false)}
-      />
 
       {/* 비활성화 확인 Dialog */}
       <JmDialog

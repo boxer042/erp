@@ -1,19 +1,16 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronRight,
   FolderOpen,
   FolderTree,
-  Library,
   Pencil,
   Plus,
   RefreshCw,
   Trash2,
-  Upload,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -55,8 +52,7 @@ import {
   JmTooltip,
   JmTooltipProvider,
 } from "@/jm";
-import { ImageEditDialog } from "@/components/image-edit-dialog";
-import { MediaPickerDialog } from "@/components/media-picker-dialog";
+import { ImageInput } from "@/components/image-input";
 import { ProductsThemeScope } from "../_theme-scope";
 
 interface CategoryChild {
@@ -146,10 +142,6 @@ export default function CategoriesPage() {
   const [editTarget, setEditTarget] = useState<EditTarget>({ type: "root" });
   const [form, setForm] = useState<FormState>(emptyForm());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categoriesQuery = useQuery({
     queryKey: queryKeys.categories.list(),
@@ -247,34 +239,6 @@ export default function CategoriesPage() {
       imagePath: cat.imagePath ?? null,
     });
     setDrawerOpen(true);
-  };
-
-  const uploadBlob = async (data: Blob | File, name: string) => {
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", data, name);
-      const res = await fetch("/api/categories/upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error((await res.json()).error ?? "업로드 실패");
-      const json = (await res.json()) as { url: string; path: string };
-      setForm((f) => ({ ...f, imageUrl: json.url, imagePath: json.path }));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "업로드 실패");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handlePickFile = (file: File) => {
-    if (file.type === "image/svg+xml") {
-      uploadBlob(file, file.name);
-      return;
-    }
-    setPendingFile(file);
-  };
-
-  const handleRemoveImage = () => {
-    setForm((f) => ({ ...f, imageUrl: null, imagePath: null }));
   };
 
   const toggleExpand = (id: string) => {
@@ -637,71 +601,14 @@ export default function CategoriesPage() {
               </JmFormField>
 
               <JmFormField label="이미지">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handlePickFile(file);
-                    e.target.value = "";
-                  }}
+                <ImageInput
+                  value={form.imageUrl ?? null}
+                  onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+                  onPathChange={(path) => setForm((f) => ({ ...f, imagePath: path }))}
+                  context="category"
+                  allowFree={false}
+                  allowSvgRaw
                 />
-                <div className="flex items-start gap-3">
-                  {form.imageUrl ? (
-                    <div className="relative h-24 w-24 overflow-hidden rounded-lg border border-[var(--jm-border)]">
-                      <img
-                        src={form.imageUrl}
-                        alt="미리보기"
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        onClick={handleRemoveImage}
-                        className="absolute right-1 top-1 rounded-md bg-[var(--jm-bg)]/80 p-0.5 hover:bg-[var(--jm-bg)] transition-colors"
-                      >
-                        <X className="size-3.5 text-[var(--jm-text)]" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="flex h-24 w-24 flex-col items-center justify-center gap-1.5 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface)] transition-colors disabled:opacity-50"
-                    >
-                      {uploading ? (
-                        <JmSpinner size="sm" />
-                      ) : (
-                        <>
-                          <Upload className="size-5" />
-                          <span className="text-xs">업로드</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                  <div className="flex flex-col gap-2">
-                    {form.imageUrl && (
-                      <JmButton
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                      >
-                        <Upload className="size-3.5" />
-                        교체
-                      </JmButton>
-                    )}
-                    <JmButton
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPickerOpen(true)}
-                      disabled={uploading}
-                    >
-                      <Library className="size-3.5" />
-                      라이브러리
-                    </JmButton>
-                  </div>
-                </div>
               </JmFormField>
             </JmDrawerBody>
 
@@ -763,29 +670,6 @@ export default function CategoriesPage() {
           </JmDialogContent>
         </JmDialog>
 
-        {/* 이미지 편집 Dialog */}
-        <ImageEditDialog
-          open={pendingFile !== null}
-          file={pendingFile}
-          defaultAspect={1}
-          lockAspect
-          onConfirm={async (blob, name) => {
-            setPendingFile(null);
-            await uploadBlob(blob, name);
-          }}
-          onCancel={() => setPendingFile(null)}
-        />
-
-        {/* 미디어 라이브러리 Dialog */}
-        <MediaPickerDialog
-          open={pickerOpen}
-          bucket="category-images"
-          onSelect={({ url, path }) => {
-            setForm((f) => ({ ...f, imageUrl: url, imagePath: path }));
-            setPickerOpen(false);
-          }}
-          onClose={() => setPickerOpen(false)}
-        />
       </JmTooltipProvider>
     </ProductsThemeScope>
   );
