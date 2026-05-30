@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   Film,
   Image as ImageIcon,
-  Library,
   Link as LinkIcon,
   Loader2,
   Plus,
@@ -18,8 +17,11 @@ import { toast } from "sonner";
 
 import { apiGet, apiMutate } from "@/lib/api-client";
 import { extractYoutubeId } from "@/lib/utils";
-import { ImageEditDialog } from "@/components/image-edit-dialog";
-import { MediaPickerDialog } from "@/components/media-picker-dialog";
+import {
+  ImagePickerDrawer,
+  type ImageChoice,
+  type PickResult,
+} from "@/components/image-input";
 import {
   JmButton,
   JmDialog,
@@ -95,18 +97,8 @@ export function ProductMediaManager({
   const [loading, setLoading] = useState(true);
   const [urlInput, setUrlInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
   const [previewItem, setPreviewItem] = useState<ProductMedia | null>(null);
-  const [editQueue, setEditQueue] = useState<File[]>([]);
-  const [editIndex, setEditIndex] = useState(0);
-  const [batchSuccess, setBatchSuccess] = useState(0);
-  const [editKind, setEditKind] = useState<MediaKind>("THUMBNAIL");
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerKind, setPickerKind] = useState<MediaKind>("THUMBNAIL");
-  const [picking, setPicking] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const currentEditFile = editQueue[editIndex] ?? null;
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,88 +149,29 @@ export function ProductMediaManager({
     }
   };
 
-  const handleFiles = (files: FileList | null, kind: MediaKind) => {
-    if (!files || files.length === 0) return;
-    setEditKind(kind);
-    setEditQueue(Array.from(files));
-    setEditIndex(0);
-    setBatchSuccess(0);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const uploadOne = async (data: Blob | File, name: string) => {
-    setUploading(true);
+  // 드로워 결과 → ProductMedia 행 생성. [1:1 썸네일]=THUMBNAIL, [자유]/[라이브러리]=DETAIL.
+  const handleDrawerResult = async (results: PickResult[], choice: ImageChoice) => {
+    if (results.length === 0) return;
+    const kind: MediaKind = choice === "thumbnail" ? "THUMBNAIL" : "DETAIL";
+    setSubmitting(true);
     try {
-      const fd = new FormData();
-      fd.append("file", data, name);
-      const upRes = await fetch("/api/products/upload", { method: "POST", body: fd });
-      if (!upRes.ok) {
-        const err = await upRes.json().catch(() => ({}));
-        toast.error(err.error || `${name}: 업로드 실패`);
-        return false;
-      }
-      const { url } = (await upRes.json()) as { url: string };
-      try {
-        await create({
+      for (let i = 0; i < results.length; i++) {
+        await apiMutate("/api/product-media", "POST", {
+          productId,
           type: "IMAGE",
-          kind: editKind,
-          url,
-          title: name.replace(/\.[^.]+$/, "") || null,
+          kind,
+          url: results[i].url,
+          title: null,
+          sortOrder: items.length + i,
         });
-        return true;
-      } catch {
-        toast.error(`${name}: 미디어 등록 실패`);
-        return false;
       }
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const advanceQueue = async (incrementSuccess: boolean) => {
-    const nextSuccess = batchSuccess + (incrementSuccess ? 1 : 0);
-    const next = editIndex + 1;
-    if (next >= editQueue.length) {
-      if (nextSuccess > 0) {
-        toast.success(`${nextSuccess}개 이미지를 추가했습니다`);
-        await load();
-        onImageUrlChange?.();
-      }
-      setEditQueue([]);
-      setEditIndex(0);
-      setBatchSuccess(0);
-    } else {
-      setBatchSuccess(nextSuccess);
-      setEditIndex(next);
-    }
-  };
-
-  const handleEditConfirm = async (edited: Blob, name: string) => {
-    const ok = await uploadOne(edited, name);
-    await advanceQueue(ok);
-  };
-
-  const handleEditCancel = async () => {
-    await advanceQueue(false);
-  };
-
-  const handlePickFromLibrary = async ({ url, name }: { url: string; name: string }) => {
-    setPicking(true);
-    try {
-      await create({
-        type: "IMAGE",
-        kind: pickerKind,
-        url,
-        title: name.replace(/\.[^.]+$/, "") || null,
-      });
       await load();
       onImageUrlChange?.();
-      toast.success("이미지가 추가되었습니다");
-      setPickerOpen(false);
+      toast.success(`${results.length}개 이미지를 추가했습니다`);
     } catch {
       toast.error("추가에 실패했습니다");
     } finally {
-      setPicking(false);
+      setSubmitting(false);
     }
   };
 
@@ -294,100 +227,38 @@ export function ProductMediaManager({
   return (
     <div>
       {/* 통합 추가 패널 — 파일 업로드 + URL */}
-      <div
-        className={`px-4 py-4 transition-colors ${
-          dragActive ? "bg-[var(--jm-info-bg)]/30" : ""
-        }`}
-        onDragEnter={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setDragActive(true);
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setDragActive(false);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setDragActive(false);
-          handleFiles(e.dataTransfer.files, "THUMBNAIL");
-        }}
-      >
-        {/* 상단: 파일 업로드 */}
+      <div className="px-4 py-4">
+        {/* 상단: 이미지 추가 (하단 드로워) */}
         <div className="flex items-start gap-3">
           <ImageIcon className="size-5 text-[var(--jm-text-muted)] shrink-0 mt-1" />
           <div className="flex-1 min-w-0">
             <p className="text-jm-sm font-medium text-[var(--jm-text)]">
-              이미지 파일 업로드
+              이미지 추가
             </p>
             <p className="text-jm-xs text-[var(--jm-text-muted)]">
               <span className="font-medium text-[var(--jm-text)]">썸네일</span>은 1:1
               정사각 (카드/리스트),{" "}
-              <span className="font-medium text-[var(--jm-text)]">상세 이미지</span>는
-              자유 비율 (상세 페이지)
+              <span className="font-medium text-[var(--jm-text)]">상세</span>는 자유
+              비율 (상세 페이지)
             </p>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap justify-end">
-            <JmButton
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setEditKind("THUMBNAIL");
-                fileInputRef.current?.click();
-              }}
-              disabled={uploading || editQueue.length > 0}
-            >
-              {uploading || editQueue.length > 0 ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Upload />
-              )}
-              <span>
-                {editQueue.length > 0
-                  ? `편집 중 (${editIndex + 1}/${editQueue.length})`
-                  : "썸네일 (1:1)"}
-              </span>
-            </JmButton>
-            <JmButton
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setEditKind("DETAIL");
-                fileInputRef.current?.click();
-              }}
-              disabled={uploading || editQueue.length > 0}
-            >
-              <Upload />
-              <span>상세 이미지 (자유)</span>
-            </JmButton>
-            <JmButton
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setPickerKind("THUMBNAIL");
-                setPickerOpen(true);
-              }}
-              disabled={uploading || picking || editQueue.length > 0}
-            >
-              {picking ? <Loader2 className="animate-spin" /> : <Library />}
-              <span>라이브러리</span>
-            </JmButton>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files, editKind)}
-          />
+          <JmButton
+            size="sm"
+            variant="outline"
+            onClick={() => setDrawerOpen(true)}
+            disabled={submitting}
+          >
+            {submitting ? <Loader2 className="animate-spin" /> : <Upload />}
+            <span>이미지 추가</span>
+          </JmButton>
         </div>
+        <ImagePickerDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          context="product"
+          multiple
+          onResult={handleDrawerResult}
+        />
 
         {/* 구분선 + 안내 */}
         <div className="my-3 flex items-center gap-3">
@@ -612,24 +483,6 @@ export function ProductMediaManager({
           )}
         </JmTableBody>
       </JmTable>
-
-      {/* 업로드 직전 편집 다이얼로그 */}
-      <ImageEditDialog
-        open={currentEditFile !== null}
-        file={currentEditFile}
-        defaultAspect={editKind === "THUMBNAIL" ? 1 : 16 / 9}
-        lockAspect={editKind === "THUMBNAIL"}
-        onConfirm={handleEditConfirm}
-        onCancel={handleEditCancel}
-      />
-
-      {/* 라이브러리에서 이미지 선택 */}
-      <MediaPickerDialog
-        open={pickerOpen}
-        bucket="product-images"
-        onSelect={handlePickFromLibrary}
-        onClose={() => setPickerOpen(false)}
-      />
 
       {/* 라이트박스 */}
       <JmDialog
