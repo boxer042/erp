@@ -56,6 +56,21 @@ export function parseManualBlocks(raw: unknown): ManualBlock[] {
   );
 }
 
+// 매뉴얼 블록(Json)에서 "이미지" URL 만 추출 (video/pdf 제외). 미디어 사용처 인덱스용.
+export function extractManualBlockUrls(raw: unknown): string[] {
+  const out: string[] = [];
+  for (const b of parseManualBlocks(raw)) {
+    if (b.type === "image") {
+      if (b.url.trim()) out.push(b.url);
+    } else if (b.type === "gallery") {
+      for (const it of b.items) if (it.url?.trim()) out.push(it.url);
+    } else if (b.type === "steps") {
+      for (const it of b.items) if (it.imageUrl?.trim()) out.push(it.imageUrl);
+    }
+  }
+  return out;
+}
+
 // 새 블록 팩토리 — 에디터에서 블록 추가 시 사용.
 export function createManualBlock(type: ManualBlockType): ManualBlock {
   const id = `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
