@@ -15,42 +15,32 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Loader2, Trash2, ExternalLink, ImageOff, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 
-const BUCKETS = [
-  { key: "brand-logos", label: "브랜드 로고" },
-  { key: "category-images", label: "카테고리 이미지" },
-  { key: "channel-logos", label: "채널 로고" },
-  { key: "product-images", label: "상품 이미지" },
-] as const;
-type BucketKey = (typeof BUCKETS)[number]["key"];
-
-interface RefInfo {
-  kind: "brand" | "category" | "channel" | "product" | "product-media";
+interface UsageRef {
+  kind: string;
   id: string;
   name: string;
+  label: string;
 }
 
 interface MediaItem {
+  bucket: string;
   path: string;
   name: string;
   url: string;
   size: number | null;
   createdAt: string | null;
-  refs: RefInfo[];
+  usages: UsageRef[];
 }
-
-const REF_KIND_LABEL: Record<RefInfo["kind"], string> = {
-  brand: "브랜드",
-  category: "카테고리",
-  channel: "채널",
-  product: "상품(대표)",
-  "product-media": "상품 미디어",
-};
 
 function formatSize(bytes: number | null): string {
   if (!bytes) return "-";
   if (bytes < 1024) return `${bytes}B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
   return `${(bytes / 1024 / 1024).toFixed(2)}MB`;
+}
+
+function usageLabels(item: MediaItem): string[] {
+  return Array.from(new Set(item.usages.map((u) => u.label)));
 }
 
 function MediaSkeleton({ count = 12 }: { count?: number }) {
@@ -69,25 +59,26 @@ function MediaSkeleton({ count = 12 }: { count?: number }) {
   );
 }
 
+const MEDIA_KEY = ["media", "library"] as const;
+
 export default function MediaLibraryPage() {
   const qc = useQueryClient();
-  const [bucket, setBucket] = useState<BucketKey>("brand-logos");
-  const [filter, setFilter] = useState<"all" | "used" | "orphan">("all");
+  const [filter, setFilter] = useState<"all" | "used" | "unused">("all");
   const [search, setSearch] = useState("");
   const [refsTarget, setRefsTarget] = useState<MediaItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MediaItem | null>(null);
 
   const listQuery = useQuery({
-    queryKey: ["media", bucket],
-    queryFn: () => apiGet<{ bucket: string; items: MediaItem[] }>(`/api/media/list?bucket=${bucket}`),
+    queryKey: MEDIA_KEY,
+    queryFn: () => apiGet<{ items: MediaItem[] }>(`/api/media/library`),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (item: MediaItem) =>
-      apiMutate("/api/media/purge", "DELETE", { bucket, path: item.path }),
+      apiMutate("/api/media/purge", "DELETE", { bucket: item.bucket, path: item.path }),
     onSuccess: () => {
       toast.success("스토리지에서 삭제되었습니다");
-      qc.invalidateQueries({ queryKey: ["media", bucket] });
+      qc.invalidateQueries({ queryKey: MEDIA_KEY });
       setDeleteTarget(null);
     },
     onError: (err) => {
@@ -102,14 +93,14 @@ export default function MediaLibraryPage() {
 
   const all = listQuery.data?.items ?? [];
   const filtered = all.filter((it) => {
-    if (filter === "used" && it.refs.length === 0) return false;
-    if (filter === "orphan" && it.refs.length > 0) return false;
+    if (filter === "used" && it.usages.length === 0) return false;
+    if (filter === "unused" && it.usages.length > 0) return false;
     if (search && !it.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const usedCount = all.filter((it) => it.refs.length > 0).length;
-  const orphanCount = all.length - usedCount;
+  const usedCount = all.filter((it) => it.usages.length > 0).length;
+  const unusedCount = all.length - usedCount;
 
   return (
     <div className="flex h-full flex-col">
@@ -121,47 +112,27 @@ export default function MediaLibraryPage() {
           placeholder: "파일명 검색...",
         }}
         loading={listQuery.isFetching}
-        onRefresh={() => qc.invalidateQueries({ queryKey: ["media", bucket] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: MEDIA_KEY })}
         filters={
-          <div className="flex items-center gap-2">
-            {/* 버킷 선택 */}
-            <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px] overflow-hidden">
-              {BUCKETS.map((b) => (
-                <button
-                  key={b.key}
-                  onClick={() => setBucket(b.key)}
-                  className={`px-3 transition-colors ${
-                    bucket === b.key
-                      ? "bg-secondary text-foreground"
-                      : "text-muted-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
-            <div className="w-px h-5 bg-border" />
-            {/* 사용 상태 필터 */}
-            <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px] overflow-hidden">
-              <button
-                onClick={() => setFilter("all")}
-                className={`px-3 ${filter === "all" ? "bg-secondary" : "text-muted-foreground hover:bg-muted/50"}`}
-              >
-                전체 {all.length}
-              </button>
-              <button
-                onClick={() => setFilter("used")}
-                className={`px-3 ${filter === "used" ? "bg-secondary" : "text-muted-foreground hover:bg-muted/50"}`}
-              >
-                사용중 {usedCount}
-              </button>
-              <button
-                onClick={() => setFilter("orphan")}
-                className={`px-3 ${filter === "orphan" ? "bg-secondary" : "text-muted-foreground hover:bg-muted/50"}`}
-              >
-                고아 {orphanCount}
-              </button>
-            </div>
+          <div className="flex h-[30px] rounded-md border border-border bg-card text-[13px] overflow-hidden">
+            <button
+              onClick={() => setFilter("all")}
+              className={`px-3 ${filter === "all" ? "bg-secondary" : "text-muted-foreground hover:bg-muted/50"}`}
+            >
+              전체 {all.length}
+            </button>
+            <button
+              onClick={() => setFilter("used")}
+              className={`px-3 ${filter === "used" ? "bg-secondary" : "text-muted-foreground hover:bg-muted/50"}`}
+            >
+              사용중 {usedCount}
+            </button>
+            <button
+              onClick={() => setFilter("unused")}
+              className={`px-3 ${filter === "unused" ? "bg-secondary" : "text-muted-foreground hover:bg-muted/50"}`}
+            >
+              미사용 {unusedCount}
+            </button>
           </div>
         }
       />
@@ -177,9 +148,10 @@ export default function MediaLibraryPage() {
             </div>
           ) : (
             filtered.map((item) => {
-              const isOrphan = item.refs.length === 0;
+              const isUnused = item.usages.length === 0;
+              const labels = usageLabels(item);
               return (
-                <Card key={item.path} className="overflow-hidden p-0 group">
+                <Card key={`${item.bucket}/${item.path}`} className="overflow-hidden p-0 group">
                   <div className="relative aspect-square bg-muted">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -190,13 +162,13 @@ export default function MediaLibraryPage() {
                     />
                     {/* 상태 배지 */}
                     <div className="absolute top-1.5 left-1.5">
-                      {isOrphan ? (
+                      {isUnused ? (
                         <Badge variant="outline" className="bg-background/90 text-[10px] h-5">
-                          고아
+                          미사용
                         </Badge>
                       ) : (
                         <Badge variant="success" className="bg-background/90 text-[10px] h-5">
-                          사용중 {item.refs.length}
+                          사용중 {item.usages.length}
                         </Badge>
                       )}
                     </div>
@@ -224,8 +196,8 @@ export default function MediaLibraryPage() {
                         variant="destructive"
                         className="h-8"
                         onClick={() => setDeleteTarget(item)}
-                        disabled={!isOrphan}
-                        title={isOrphan ? "영구 삭제" : "사용 중이라 삭제 불가"}
+                        disabled={!isUnused}
+                        title={isUnused ? "영구 삭제" : "사용 중이라 삭제 불가"}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -234,6 +206,13 @@ export default function MediaLibraryPage() {
                   <CardContent className="p-2 text-[11px] space-y-0.5">
                     <div className="truncate font-mono text-foreground" title={item.name}>
                       {item.name}
+                    </div>
+                    {/* 사용처 — 어디어디 쓰는지 / 미사용 */}
+                    <div
+                      className={`truncate ${isUnused ? "text-muted-foreground italic" : "text-foreground"}`}
+                      title={labels.join(", ")}
+                    >
+                      {isUnused ? "미사용" : labels.join(", ")}
                     </div>
                     <div className="flex justify-between text-muted-foreground">
                       <span>{formatSize(item.size)}</span>
@@ -258,17 +237,17 @@ export default function MediaLibraryPage() {
               {refsTarget?.name}
             </DialogDescription>
           </DialogHeader>
-          {refsTarget?.refs.length === 0 ? (
+          {refsTarget?.usages.length === 0 ? (
             <div className="py-6 text-center text-muted-foreground text-sm">
-              어디에서도 사용되지 않는 고아 파일입니다.
+              어디에서도 사용되지 않는 미사용 파일입니다.
             </div>
           ) : (
             <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
-              {refsTarget?.refs.map((ref, i) => (
+              {refsTarget?.usages.map((ref, i) => (
                 <div key={i} className="py-2 flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-[10px]">
-                      {REF_KIND_LABEL[ref.kind]}
+                      {ref.label}
                     </Badge>
                     <span>{ref.name}</span>
                   </div>
