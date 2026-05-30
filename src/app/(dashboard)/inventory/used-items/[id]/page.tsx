@@ -457,7 +457,7 @@ export default function UsedItemDetailPage({ params }: PageProps) {
       <JmDialog open={scrapOpen} onOpenChange={setScrapOpen}>
         <JmDialogContent size="sm">
           <JmDialogHeader>
-            <JmDialogTitle>중고 단품 폐기</JmDialogTitle>
+            <JmDialogTitle>중고 상품 폐기</JmDialogTitle>
           </JmDialogHeader>
           <JmDialogBody>
             <p className="text-jm-sm text-[var(--jm-text-muted)]">

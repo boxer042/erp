@@ -120,7 +120,7 @@ test.describe("Phase 3 — POS UsedItem 통합", () => {
 
   test("Reconcile 페이지 로드 + 알림 텍스트", async ({ page }) => {
     await page.goto("/inventory/used-items/reconcile");
-    await expect(page.getByText("중고 단품 사후 정리")).toBeVisible({
+    await expect(page.getByText("중고 상품 사후 정리")).toBeVisible({
       timeout: 30_000,
     });
     await expect(
@@ -135,11 +135,11 @@ test.describe("Phase 3 — POS UsedItem 통합", () => {
 
   test("사이드바 '중고 단품' 메뉴 → 목록 → [사후 정리] 진입", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "중고 단품" }).click();
+    await page.getByRole("link", { name: "중고 상품" }).click();
     await page.waitForURL(/\/inventory\/used-items$/);
 
     await page.getByRole("button", { name: "사후 정리" }).click();
     await page.waitForURL(/\/inventory\/used-items\/reconcile/);
-    await expect(page.getByText("중고 단품 사후 정리")).toBeVisible();
+    await expect(page.getByText("중고 상품 사후 정리")).toBeVisible();
   });
 });

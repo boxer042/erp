@@ -270,7 +270,7 @@ export default function RentalAssetsPage() {
       );
     },
     onSuccess: (created) => {
-      jmToast.success(`중고 단품으로 전환되었습니다 (${created.internalCode})`);
+      jmToast.success(`중고 상품으로 전환되었습니다 (${created.internalCode})`);
       setConvertTarget(null);
       refresh();
       router.push(`/inventory/used-items/${created.id}`);

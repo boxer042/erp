@@ -133,7 +133,7 @@ const navGroups: NavGroup[] = [
       { id: "lots", label: "로트 현황", href: "/inventory/lots", icon: Boxes },
       { id: "low-stock", label: "재고 부족", href: "/inventory/low-stock", icon: AlertTriangle },
       { id: "assembly", label: "조립 실적", href: "/inventory/assembly", icon: Factory },
-      { id: "used-items", label: "중고 단품", href: "/inventory/used-items", icon: Recycle },
+      { id: "used-items", label: "중고 상품", href: "/inventory/used-items", icon: Recycle },
       { id: "stocktake", label: "실사 보정", href: "/inventory/stocktake", icon: ClipboardCheck },
       { id: "initial-inventory", label: "초기 등록", href: "/inventory/initial", icon: ClipboardList },
     ],

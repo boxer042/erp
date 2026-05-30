@@ -145,10 +145,10 @@ export function UsedItemBuildForm({ value, onChange }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* 재료 ① 중고 단품 */}
+      {/* 재료 ① 중고 상품 */}
       <JmCard>
         <JmCardHeader>
-          <JmCardTitle>재료 ① 중고 단품 (필수)</JmCardTitle>
+          <JmCardTitle>재료 ① 중고 상품 (필수)</JmCardTitle>
         </JmCardHeader>
         <JmCardContent className="space-y-3">
           {/* 선택된 재료 */}

@@ -23,10 +23,10 @@ test.describe("중고 단품 — Phase 1 lifecycle", () => {
     const addedCostAmount = "60000";
     const scrapReason = `테스트 폐기 ${ts}`;
 
-    // 1) 목록 페이지 진입
+    // 1) 목록 페이지 진입 (in-body h1 없음 — 등록 버튼으로 로드 확인)
     await page.goto("/inventory/used-items");
     await expect(
-      page.getByRole("heading", { name: "중고 단품" }),
+      page.getByRole("button", { name: "중고 상품 등록" }),
     ).toBeVisible();
 
     // KPI 라벨 — strict mode 회피하려고 first() 사용 (탭에도 같은 텍스트 있음)
@@ -41,7 +41,7 @@ test.describe("중고 단품 — Phase 1 lifecycle", () => {
     await expect(page.getByRole("tab", { name: "폐기" })).toBeVisible();
 
     // 2) 매입 등록 페이지로 이동 — Link 안 JmButton 이라 button role 로 잡힘
-    await page.getByRole("button", { name: /중고 매입 등록/ }).click();
+    await page.getByRole("button", { name: /중고 상품 등록/ }).click();
     await page.waitForURL(/\/inventory\/used-items\/new/);
     await expect(
       page.getByRole("heading", { name: "기본 정보" }),
@@ -112,18 +112,18 @@ test.describe("중고 단품 — Phase 1 lifecycle", () => {
   test("목록 페이지 — 사이드바 메뉴 + 빈 상태 → 등록 진입", async ({ page }) => {
     await page.goto("/");
 
-    // 사이드바에서 "중고 단품" 메뉴 클릭
-    await page.getByRole("link", { name: "중고 단품" }).click();
+    // 사이드바에서 "중고 상품" 메뉴 클릭
+    await page.getByRole("link", { name: "중고 상품" }).click();
     await page.waitForURL(/\/inventory\/used-items/);
 
-    // 페이지 제목
+    // 로드 확인 — 등록 버튼 (in-body h1 없음)
     await expect(
-      page.getByRole("heading", { name: "중고 단품" }),
+      page.getByRole("button", { name: "중고 상품 등록" }),
     ).toBeVisible();
 
-    // [+ 중고 매입 등록] 버튼 클릭 → /new 진입
-    await page.getByRole("button", { name: /중고 매입 등록/ }).click();
+    // [+ 중고 상품 등록] 버튼 클릭 → /new 진입
+    await page.getByRole("button", { name: /중고 상품 등록/ }).click();
     await page.waitForURL(/\/inventory\/used-items\/new/);
-    await expect(page.getByText("중고 단품 매입 등록")).toBeVisible();
+    await expect(page.getByText("중고 상품 매입 등록")).toBeVisible();
   });
 });

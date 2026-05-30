@@ -170,12 +170,13 @@ test.describe("케이스 B — 중고 조립", () => {
 
   test("빌드 화면 로드 + 목록 [조립품 만들기] 진입", async ({ page }) => {
     await page.goto("/inventory/used-items");
+    // 목록 페이지엔 in-body h1 없음(orders/sales 패턴) — 등록 버튼으로 로드 확인
     await expect(
-      page.getByRole("heading", { name: "중고 단품" }),
+      page.getByRole("button", { name: "중고 상품 등록" }),
     ).toBeVisible({ timeout: 30_000 });
     await page.getByRole("button", { name: "조립품 만들기" }).click();
     await page.waitForURL(/\/inventory\/used-items\/build/);
     await expect(page.getByText("중고 조립품 만들기")).toBeVisible();
-    await expect(page.getByText("재료 ① 중고 단품 (필수)")).toBeVisible();
+    await expect(page.getByText("재료 ① 중고 상품 (필수)")).toBeVisible();
   });
 });

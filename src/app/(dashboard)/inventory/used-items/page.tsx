@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, RefreshCw, Search } from "lucide-react";
+import { Boxes, Coins, Layers, Plus, Recycle, RefreshCw, Tag } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
   JmButton,
   JmCard,
-  JmInput,
+  JmIconButton,
+  JmSearchInput,
   JmSegmentedControl,
   JmSkeleton,
   JmStat,
@@ -20,6 +21,10 @@ import {
   JmTableHead,
   JmTableHeader,
   JmTableRow,
+  JmTableToolbar,
+  JmTableToolbarActions,
+  JmTableToolbarFilters,
+  JmTableToolbarSearch,
 } from "@/jm";
 
 import {
@@ -63,14 +68,15 @@ function SkeletonRows({ rows = 8 }: { rows?: number }) {
 
 export default function UsedItemsPage() {
   const [statusTab, setStatusTab] = useState<UsedItemStatus | "ALL">("IN_STOCK");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
 
   const listQuery = useQuery<UsedItemListRow[]>({
-    queryKey: queryKeys.usedItems.list({ statusTab, search }),
+    queryKey: queryKeys.usedItems.list({ statusTab, search: appliedSearch }),
     queryFn: () => {
       const sp = new URLSearchParams();
       if (statusTab !== "ALL") sp.set("status", statusTab);
-      if (search.trim()) sp.set("search", search.trim());
+      if (appliedSearch.trim()) sp.set("search", appliedSearch.trim());
       sp.set("includeProduct", "true");
       sp.set("includeCosts", "true");
       return apiGet<UsedItemListRow[]>(`/api/used-items?${sp}`);
@@ -97,75 +103,107 @@ export default function UsedItemsPage() {
   return (
     <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
       <div className="flex w-full flex-col gap-6 p-4">
-        {/* 헤더 + 액션 */}
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-jm-xl font-semibold text-[var(--jm-text)]">중고 단품</h1>
-            <p className="mt-0.5 text-jm-sm text-[var(--jm-text-muted)]">
-              매입한 중고 단품 관리 — 보관·비용 가산·조립 활용·단품 판매
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/inventory/used-items/reconcile">
-              <JmButton variant="outline" size="sm">
-                사후 정리
-              </JmButton>
-            </Link>
-            <Link href="/inventory/used-items/build">
-              <JmButton variant="outline" size="sm">
-                조립품 만들기
-              </JmButton>
-            </Link>
-            <Link href="/inventory/used-items/new">
-              <JmButton variant="cta">
-                <Plus className="size-4" />
-                중고 매입 등록
-              </JmButton>
-            </Link>
-          </div>
-        </div>
-
         {/* KPI */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <JmStat label="보관 중" value={`${summary.count}대`} />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <JmStat
+            label="보관 중"
+            value={
+              listQuery.isPending ? <JmSkeleton className="h-7 w-12" /> : `${summary.count}개`
+            }
+            icon={<Boxes className="size-4" />}
+            hint="판매·조립 가능"
+            size="sm"
+          />
           <JmStat
             label="누적 매입가치"
-            value={`₩${Math.round(summary.totalCost).toLocaleString("ko-KR")}`}
+            value={
+              listQuery.isPending ? (
+                <JmSkeleton className="h-7 w-20" />
+              ) : (
+                `₩${Math.round(summary.totalCost).toLocaleString("ko-KR")}`
+              )
+            }
+            icon={<Coins className="size-4" />}
+            hint="보관 중 원가 합"
+            size="sm"
           />
-          <JmStat label="비카탈로그" value={`${summary.noProduct}대`} />
-          <JmStat label="시리얼 발번" value={`${summary.withSerial}대`} />
+          <JmStat
+            label="비카탈로그"
+            value={
+              listQuery.isPending ? <JmSkeleton className="h-7 w-12" /> : `${summary.noProduct}개`
+            }
+            icon={<Layers className="size-4" />}
+            hint="카탈로그 미매칭"
+            size="sm"
+          />
+          <JmStat
+            label="시리얼 발번"
+            value={
+              listQuery.isPending ? <JmSkeleton className="h-7 w-12" /> : `${summary.withSerial}개`
+            }
+            icon={<Tag className="size-4" />}
+            hint="라벨 출력됨"
+            size="sm"
+          />
         </div>
 
-        {/* 필터 + 검색 */}
-        <JmCard className="space-y-3 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <JmSegmentedControl
-              value={statusTab}
-              onChange={(v) => setStatusTab(v as UsedItemStatus | "ALL")}
-              options={STATUS_TABS}
-            />
-            <div className="relative max-w-[320px] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--jm-text-muted)]" />
-              <JmInput
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+        {/* 메인 카드 — 툴바 + 테이블 */}
+        <JmCard className="overflow-hidden p-0">
+          <JmTableToolbar>
+            <JmTableToolbarSearch>
+              <JmSearchInput
+                size="sm"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onClear={() => {
+                  setSearchInput("");
+                  setAppliedSearch("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    setAppliedSearch(searchInput);
+                  }
+                }}
                 placeholder="품명·코드 검색"
-                className="pl-9"
               />
-            </div>
-            <JmButton
-              variant="ghost"
-              size="sm"
-              onClick={() => listQuery.refetch()}
-              aria-label="새로고침"
-            >
-              <RefreshCw className={listQuery.isFetching ? "size-4 animate-spin" : "size-4"} />
-            </JmButton>
-          </div>
-        </JmCard>
-
-        {/* 테이블 */}
-        <JmCard className="overflow-hidden">
+            </JmTableToolbarSearch>
+            <JmTableToolbarFilters>
+              <JmSegmentedControl
+                value={statusTab}
+                onChange={(v) => setStatusTab(v as UsedItemStatus | "ALL")}
+                options={STATUS_TABS}
+              />
+            </JmTableToolbarFilters>
+            <JmTableToolbarActions>
+              <Link href="/inventory/used-items/reconcile">
+                <JmButton variant="ghost" size="sm">
+                  <Recycle className="size-4" />
+                  사후 정리
+                </JmButton>
+              </Link>
+              <Link href="/inventory/used-items/build">
+                <JmButton variant="ghost" size="sm">
+                  <Layers className="size-4" />
+                  조립품 만들기
+                </JmButton>
+              </Link>
+              <Link href="/inventory/used-items/new">
+                <JmButton variant="cta" size="sm">
+                  <Plus className="size-4" />
+                  중고 상품 등록
+                </JmButton>
+              </Link>
+              <JmIconButton
+                variant="ghost"
+                size="sm"
+                aria-label="새로고침"
+                onClick={() => listQuery.refetch()}
+                disabled={listQuery.isFetching}
+              >
+                <RefreshCw className={listQuery.isFetching ? "size-4 animate-spin" : "size-4"} />
+              </JmIconButton>
+            </JmTableToolbarActions>
+          </JmTableToolbar>
           <JmTable>
             <JmTableHeader>
               <JmTableRow>
@@ -184,7 +222,7 @@ export default function UsedItemsPage() {
               ) : rows.length === 0 ? (
                 <JmTableRow>
                   <JmTableCell colSpan={7} className="text-center py-8 text-jm-sm text-[var(--jm-text-muted)]">
-                    조건에 맞는 중고 단품이 없습니다
+                    조건에 맞는 중고 상품이 없습니다
                   </JmTableCell>
                 </JmTableRow>
               ) : (

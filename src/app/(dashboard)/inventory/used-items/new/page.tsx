@@ -44,7 +44,7 @@ export default function NewUsedItemPage() {
         warrantyMonths: form.issueSerial ? form.warrantyMonths : null,
       }),
     onSuccess: (created) => {
-      toast.success(`중고 단품이 등록되었습니다 (${created.internalCode})`);
+      toast.success(`중고 상품이 등록되었습니다 (${created.internalCode})`);
       queryClient.invalidateQueries({ queryKey: queryKeys.usedItems.all });
       router.push(`/inventory/used-items/${created.id}`);
     },
@@ -73,7 +73,7 @@ export default function NewUsedItemPage() {
             <ArrowLeft />
           </JmIconButton>
         </Link>
-        <span className="text-jm-base font-semibold">중고 단품 매입 등록</span>
+        <span className="text-jm-base font-semibold">중고 상품 매입 등록</span>
         <div className="ml-auto flex items-center gap-1.5">
           <Link href="/inventory/used-items">
             <JmButton variant="ghost" size="sm">취소</JmButton>
