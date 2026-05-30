@@ -312,7 +312,8 @@ function ItemCell({
 
 function PdfContent(props: DocumentPdfProps) {
   const totalDiscount = props.items.reduce((sum, it) => {
-    const disc = parseFloat(String(it.discountAmount ?? "0")) || 0;
+    // 인상(음수 할인)은 합계에서 제외 — 손님 문서에 마크업이 드러나지 않도록
+    const disc = Math.max(0, parseFloat(String(it.discountAmount ?? "0")) || 0);
     const qty = parseFloat(String(it.quantity));
     return sum + disc * qty;
   }, 0);
@@ -504,7 +505,10 @@ function PdfContent(props: DocumentPdfProps) {
                 <ItemCell widthPct={cols[4]} align="right">
                   {qty.toLocaleString("ko-KR")}
                 </ItemCell>
-                <ItemCell widthPct={cols[5]} align="right">{fmt(list)}</ItemCell>
+                {/* 인상(실제 > 정가)이면 단가에 실제단가를 노출 — 손님 문서에 마크업이 드러나지 않도록 */}
+                <ItemCell widthPct={cols[5]} align="right">
+                  {fmt(actual > list ? actual : list)}
+                </ItemCell>
                 <ItemCell widthPct={cols[6]} align="right">
                   {disc > 0 ? fmt(disc) : ""}
                 </ItemCell>

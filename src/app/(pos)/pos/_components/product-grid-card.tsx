@@ -30,12 +30,12 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
     : parseFloat(product.sellingPrice) || 0;
   const displayPrice = taxFree ? sellingNet : Math.round(sellingNet * 1.1);
 
-  // 정가 비교 — listPrice 가 sellingPrice 와 다르면 할인/인상 표시 (카트 라인과 동일 패턴).
+  // 정가 비교 — 할인(정가보다 싸게)일 때만 표시. 인상은 손님과 함께 보는 화면이라 노출 안 함 (카트 라인과 동일 패턴).
   // OPTION_PARENT 는 minOptionPrice 가 표시 기준이라 정가 비교 의미 없음 → 미적용.
   const listNet = !isOptionParent && product.listPrice
     ? parseFloat(product.listPrice) || 0
     : 0;
-  const showListDiff = listNet > 0 && listNet !== sellingNet;
+  const showListDiff = listNet > 0 && sellingNet < listNet;
   const listDisplay = showListDiff ? (taxFree ? listNet : Math.round(listNet * 1.1)) : 0;
   const listDiff = showListDiff ? sellingNet - listNet : 0;
   const listDiffPercent = showListDiff && listNet
@@ -150,14 +150,8 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
               )}
             </div>
             {showListDiff && (
-              <span
-                className={`text-[10px] font-semibold tabular-nums ${
-                  listDiff < 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
-                }`}
-              >
-                {listDiff < 0
-                  ? `−₩${Math.abs(listDiff).toLocaleString("ko-KR")} (${Math.abs(listDiffPercent).toFixed(1)}% 할인)`
-                  : `+₩${listDiff.toLocaleString("ko-KR")} (${listDiffPercent.toFixed(1)}% 인상)`}
+              <span className="text-[10px] font-semibold tabular-nums text-[var(--jm-success-fg)]">
+                −₩{Math.abs(listDiff).toLocaleString("ko-KR")} ({Math.abs(listDiffPercent).toFixed(1)}% 할인)
               </span>
             )}
           </div>
