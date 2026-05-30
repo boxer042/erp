@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ImagePlus, X, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { ImagePlus, X } from "lucide-react";
 import Image from "next/image";
 
 import { jmToast as toast, JmIconButton } from "@/jm";
+import { ImagePickerDrawer, type PickResult } from "@/components/image-input";
 
 interface Props {
   value: string[];
@@ -15,9 +16,8 @@ interface Props {
 }
 
 /**
- * UsedItem 사진 업로드 컴포넌트.
- * 단순화: URL 배열만 관리. Supabase 업로드는 /api/used-items/upload 위임.
- * 삭제는 UI 에서만 제거 (Supabase 파일 삭제는 옵션 — 우선 누락).
+ * UsedItem 사진 업로드 — URL 배열 관리.
+ * 추가는 공용 ImagePickerDrawer([1:1]/[자유]/[라이브러리]) 위임.
  */
 export function UsedItemImageUpload({
   value,
@@ -25,41 +25,14 @@ export function UsedItemImageUpload({
   disabled,
   max = 8,
 }: Props) {
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const handleFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    if (value.length + files.length > max) {
-      toast.error(`최대 ${max}장까지 업로드 가능합니다`);
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const newUrls: string[] = [];
-      for (const file of Array.from(files)) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch("/api/used-items/upload", {
-          method: "POST",
-          body: fd,
-        });
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
-          throw new Error(j.error ?? "업로드 실패");
-        }
-        const data = await res.json();
-        newUrls.push(data.url);
-      }
-      onChange([...value, ...newUrls]);
-      toast.success(`${newUrls.length}장 업로드 완료`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "업로드에 실패했습니다");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+  const handleResult = (results: PickResult[]) => {
+    const room = max - value.length;
+    if (room <= 0) return;
+    if (results.length > room) toast.error(`최대 ${max}장까지 업로드 가능합니다`);
+    const urls = results.slice(0, room).map((r) => r.url);
+    if (urls.length) onChange([...value, ...urls]);
   };
 
   const removeAt = (idx: number) => {
@@ -100,32 +73,24 @@ export function UsedItemImageUpload({
         {!disabled && value.length < max && (
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-xs text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface)] disabled:opacity-50"
+            onClick={() => setDrawerOpen(true)}
+            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-xs text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface)]"
           >
-            {uploading ? (
-              <Loader2 className="size-5 animate-spin" />
-            ) : (
-              <>
-                <ImagePlus className="size-5" />
-                <span>추가</span>
-              </>
-            )}
+            <ImagePlus className="size-5" />
+            <span>추가</span>
           </button>
         )}
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
+      <ImagePickerDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        context="used-item"
         multiple
-        className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onResult={handleResult}
       />
 
-      {value.length === 0 && !uploading && (
+      {value.length === 0 && (
         <p className="text-jm-xs text-[var(--jm-text-muted)]">
           최대 {max}장. JPG/PNG/WebP/GIF 10MB 이하.
         </p>
