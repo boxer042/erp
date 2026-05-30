@@ -10,10 +10,10 @@ import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { calcDiscountPerUnit, formatPhone, genClientId } from "@/lib/utils";
 import {
+  JmButton,
   JmDatePicker,
   JmIconButton,
   JmInput,
-  JmSelect,
   JmSpinner,
   JmSwitch,
   JmTextarea,
@@ -38,6 +38,7 @@ import { CartEmptyState } from "@/components/pos/cart-empty-state";
 import { CustomerSummaryCard } from "@/components/pos/customer-summary-card";
 import { CartActionButton as ActionButton } from "@/components/pos/cart-action-button";
 import { PosLineItemRow } from "@/components/pos/line-item-row";
+import { OrderContextBar } from "./_context-bar";
 import {
   PaymentMethodSelector,
   type PaymentMethod,
@@ -521,46 +522,59 @@ export default function NewOrderPage() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--jm-bg)]">
       {/* ─── 스티키 헤더 ─── */}
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-3 sm:px-6">
-        <JmIconButton
-          aria-label="뒤로"
-          onClick={() => router.push("/orders")}
-          variant="ghost"
-        >
-          <ArrowLeft className="size-4" />
-        </JmIconButton>
-        <div className="hidden min-w-0 flex-col md:flex">
-          <span className="text-jm-base font-semibold text-[var(--jm-text)]">
-            신규 주문 등록
-          </span>
-          <span className="text-jm-2xs text-[var(--jm-text-muted)]">
-            상품을 담고 우측 정보를 채워 등록하세요
-          </span>
-        </div>
-        {/* 상품 검색바 — 헤더 중앙. 입력 시 좌측 카탈로그가 카테고리 무관 전체에서 검색 */}
-        <div className="relative mx-2 max-w-[480px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--jm-text-subtle)]" />
-          <JmInput
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="상품명·SKU 검색"
-            className="pl-9"
-          />
-        </div>
-        {/* 우측 패널 토글 — 카트/폼 패널을 열고 닫아 카탈로그 전체화면 모드 */}
-        <JmIconButton
-          aria-label={panelOpen ? "우측 패널 닫기" : "우측 패널 열기"}
-          variant="ghost"
-          onClick={() => setPanelOpen((v) => !v)}
-          className="ml-auto"
-        >
-          {panelOpen ? (
-            <PanelRightClose className="size-4" />
-          ) : (
-            <PanelRightOpen className="size-4" />
-          )}
-        </JmIconButton>
-      </header>
+      <div className="sticky top-0 z-20 border-b border-[var(--jm-border)] bg-[var(--jm-bg)]">
+        <header className="flex items-center gap-3 px-4 py-3 sm:px-6">
+          <JmIconButton
+            aria-label="뒤로"
+            onClick={() => router.push("/orders")}
+            variant="ghost"
+          >
+            <ArrowLeft className="size-4" />
+          </JmIconButton>
+          <div className="hidden min-w-0 flex-col md:flex">
+            <span className="text-jm-base font-semibold text-[var(--jm-text)]">
+              신규 주문 등록
+            </span>
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+              채널·거래일을 확인하고 상품을 담아 등록하세요
+            </span>
+          </div>
+          {/* 상품 검색바 — 헤더 중앙. 입력 시 좌측 카탈로그가 카테고리 무관 전체에서 검색 */}
+          <div className="relative mx-2 max-w-[480px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--jm-text-subtle)]" />
+            <JmInput
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="상품명·SKU 검색"
+              className="pl-9"
+            />
+          </div>
+          {/* 우측 패널 토글 — 카트/폼 패널을 열고 닫아 카탈로그 전체화면 모드 */}
+          <JmIconButton
+            aria-label={panelOpen ? "우측 패널 닫기" : "우측 패널 열기"}
+            variant="ghost"
+            onClick={() => setPanelOpen((v) => !v)}
+            className="ml-auto"
+          >
+            {panelOpen ? (
+              <PanelRightClose className="size-4" />
+            ) : (
+              <PanelRightOpen className="size-4" />
+            )}
+          </JmIconButton>
+        </header>
+
+        {/* 맥락 바 — 채널·거래일(ERP 전용). 기본값이면 멈추지 않고 진행 */}
+        <OrderContextBar
+          channelOptions={channelOptions}
+          channelId={channelId}
+          onChannelChange={setChannelId}
+          orderDate={parseYmd(orderDate)}
+          onOrderDateChange={(d) => setOrderDate(formatYmd(d))}
+          channelOrderNo={channelOrderNo}
+          onChannelOrderNoChange={setChannelOrderNo}
+        />
+      </div>
 
       {/* ─── 본문 ─── */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -633,38 +647,6 @@ export default function NewOrderPage() {
                     <Pill label="건수" value={cartCount} suffix="건" />
                   )}
                 </div>
-              </div>
-
-              {/* 채널 / 주문일 — ERP-only */}
-              <div className="flex flex-col gap-2.5">
-                <SectionLabel>주문 정보 (ERP)</SectionLabel>
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <Field label="채널">
-                    <JmSelect
-                      options={channelOptions}
-                      value={channelId}
-                      onChange={setChannelId}
-                      placeholder="오프라인 / 직접"
-                    />
-                  </Field>
-                  <Field label="주문일">
-                    <JmDatePicker
-                      size="sm"
-                      value={parseYmd(orderDate)}
-                      onChange={(d) => setOrderDate(formatYmd(d))}
-                      toDate={new Date()}
-                    />
-                  </Field>
-                </div>
-                {channelId && (
-                  <Field label="채널 주문번호">
-                    <JmInput
-                      value={channelOrderNo}
-                      onChange={(e) => setChannelOrderNo(e.target.value)}
-                      placeholder="외부 채널 주문번호 (선택)"
-                    />
-                  </Field>
-                )}
               </div>
 
               {/* 고객 — POS 와 동일 패턴: 카드 클릭 → LinkCustomerSheet (검색 + [+ 새 고객 등록] 인라인) */}
@@ -827,21 +809,23 @@ export default function NewOrderPage() {
                         </button>
                       )}
                     </div>
-                    <input
+                    <JmInput
+                      size="sm"
                       type="text"
                       value={recipientName}
                       onChange={(e) => setRecipientName(e.target.value)}
                       placeholder="받는 사람 이름 (선택)"
-                      className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
+                      className="bg-[var(--jm-surface)]"
                     />
-                    <input
+                    <JmInput
+                      size="sm"
                       type="tel"
                       value={recipientPhone}
                       onChange={(e) =>
                         setRecipientPhone(formatPhone(e.target.value))
                       }
                       placeholder="받는 사람 연락처 *"
-                      className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
+                      className="bg-[var(--jm-surface)]"
                     />
                     <textarea
                       value={shippingAddress}
@@ -991,25 +975,27 @@ export default function NewOrderPage() {
           {/* Sticky bottom bar — POS 결제시트 풋터 패턴. 항상 노출 (모바일·데스크탑 공통). */}
           <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] p-3">
             <div className="flex items-stretch gap-2">
-              <button
-                type="button"
+              <JmButton
+                variant="outline"
+                size="lg"
                 onClick={() => router.push("/orders")}
                 disabled={createMutation.isPending}
-                className="flex h-14 shrink-0 items-center justify-center rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-jm-base font-semibold text-[var(--jm-text)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
+                className="shrink-0"
               >
                 취소
-              </button>
-              <button
-                type="button"
+              </JmButton>
+              <JmButton
+                variant="cta"
+                size="lg"
                 onClick={() => createMutation.mutate()}
                 disabled={!canSubmit}
-                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+                className="flex-1"
               >
                 {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
                 {createMutation.isPending
                   ? "등록 중..."
                   : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
-              </button>
+              </JmButton>
             </div>
           </div>
         </aside>
@@ -1245,23 +1231,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
       {children}
     </span>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-        {label}
-      </span>
-      {children}
-    </div>
   );
 }
 
