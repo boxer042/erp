@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Package } from "lucide-react";
 import { useSessions, type CartItem } from "@/components/pos/sessions-context";
-import { PosLineItemRow } from "./_components/line-item-row";
+import { PosLineItemRow } from "@/components/pos/line-item-row";
 import { PriceInputDialog } from "./_components/price-input-dialog";
 import { VariantSelectSheet } from "./_variant-select-sheet";
 import { AddonRecommendSheet, type AddonSelection } from "./_addon-recommend-sheet";

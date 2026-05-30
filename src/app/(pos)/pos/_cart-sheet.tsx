@@ -8,6 +8,7 @@ import { ApiError, apiMutate } from "@/lib/api-client";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
 import { calcCartTotals } from "@/components/pos/cart-helpers";
 import { CartEmptyState } from "@/components/pos/cart-empty-state";
+import { CartActionButton as ActionButton } from "@/components/pos/cart-action-button";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { CartLineRow } from "./_cart-line-row";
 import { issueQuotation, openPrintTab, calcCartFingerprint } from "./_issue-document";
@@ -474,50 +475,6 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
         />
       )}
     </>
-  );
-}
-
-function ActionButton({
-  label,
-  sub,
-  active,
-  disabled,
-  pending,
-  onClick,
-}: {
-  label: string;
-  sub?: string;
-  active?: boolean;
-  disabled?: boolean;
-  pending?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-center transition-colors ${
-        active
-          ? "bg-[var(--jm-success-bg)] ring-1 ring-[var(--jm-success-solid)]"
-          : "bg-[var(--jm-surface)] border border-[var(--jm-border)] active:bg-[var(--jm-bg)]"
-      } disabled:opacity-40`}
-    >
-      <span
-        className={`text-jm-2xs font-semibold ${
-          active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"
-        }`}
-      >
-        {label}
-      </span>
-      <span
-        className={`max-w-full truncate px-1 text-jm-3xs tabular-nums ${
-          active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text-muted)]"
-        }`}
-      >
-        {pending ? "진행중…" : sub}
-      </span>
-    </button>
   );
 }
 

@@ -37,6 +37,7 @@ import {
 } from "@/components/pos/cart-helpers";
 import { CartEmptyState } from "@/components/pos/cart-empty-state";
 import { CustomerSummaryCard } from "@/components/pos/customer-summary-card";
+import { CartActionButton as ActionButton } from "@/components/pos/cart-action-button";
 import {
   PaymentMethodSelector,
   type PaymentMethod,
@@ -1290,52 +1291,6 @@ function Pill({
           : `${value < 0 ? "−" : ""}₩${Math.abs(value).toLocaleString("ko-KR")}`}
       </span>
     </div>
-  );
-}
-
-/**
- * 액션 그리드 버튼 — POS `_cart-sheet.tsx` ActionButton 와 동일 시각.
- * active=true 면 success bg + ring (예: 할인/배송비 적용 상태).
- */
-function ActionButton({
-  label,
-  sub,
-  active,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  sub: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-center transition-colors ${
-        active
-          ? "bg-[var(--jm-success-bg)] ring-1 ring-[var(--jm-success-solid)]"
-          : "border border-[var(--jm-border)] bg-[var(--jm-surface)] active:bg-[var(--jm-bg)]"
-      } disabled:opacity-40`}
-    >
-      <span
-        className={`text-jm-2xs font-semibold ${
-          active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"
-        }`}
-      >
-        {label}
-      </span>
-      <span
-        className={`max-w-full truncate px-1 text-jm-3xs tabular-nums ${
-          active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text-muted)]"
-        }`}
-      >
-        {sub}
-      </span>
-    </button>
   );
 }
 

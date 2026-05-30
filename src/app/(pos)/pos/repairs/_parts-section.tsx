@@ -8,7 +8,7 @@ import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import { JmBadge, JmButton, JmCard, JmComboboxDrawer } from "@/jm";
 import { fmtKRWInc } from "./_helpers";
 import type { RepairPart } from "./_types";
-import { PosLineItemRow } from "@/app/(pos)/pos/_components/line-item-row";
+import { PosLineItemRow } from "@/components/pos/line-item-row";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 
 interface ProductOption {
