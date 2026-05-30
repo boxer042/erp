@@ -1,17 +1,5 @@
 import type { LandingBlock } from "@/lib/validators/landing-block";
 
-export async function uploadImage(file: File): Promise<string> {
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch("/api/products/upload", { method: "POST", body: fd });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "업로드 실패");
-  }
-  const { url } = (await res.json()) as { url: string };
-  return url;
-}
-
 export async function uploadHtml(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
