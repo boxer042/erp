@@ -1962,7 +1962,7 @@ export default function JmShowcasePage() {
         {/* TIME PICKER */}
         <Section
           title="시간 선택 (TimePicker)"
-          subtitle="JmTimePicker — native <input type='time'> 위에 jm 토큰 입힌 24시간제 입력. 모바일은 wheel, 데스크톱은 hh:mm spinner."
+          subtitle="JmTimePicker — JmDatePicker 와 동일한 popover 패턴. trigger 클릭 → [시][분] 스크롤 컬럼 + [지금] 단축. 24시간제, minuteStep 조절 가능."
         >
           <div className="grid gap-4 sm:max-w-md">
             <div className="grid gap-3 sm:grid-cols-3">
