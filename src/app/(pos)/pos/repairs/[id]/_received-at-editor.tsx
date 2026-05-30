@@ -22,7 +22,7 @@ interface Props {
  *
  * UI:
  *   - 읽기: yyyy-MM-dd HH:mm 텍스트. readonly 면 클릭 비활성.
- *   - 편집: 공용 DateTimePickerSheet 안에서 JmCalendar(인라인) + native time 입력.
+ *   - 편집: 공용 DateTimePickerSheet 안에서 JmCalendar(인라인) + JmTimePicker(시/분 컬럼).
  */
 export function ReceivedAtEditor({ ticketId, receivedAt, readonly, onSaved }: Props) {
   const qc = useQueryClient();
