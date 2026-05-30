@@ -3,7 +3,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, PanelRightClose, PanelRightOpen, Search } from "lucide-react";
+import { ArrowLeft, PanelRightClose, PanelRightOpen, Search, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -164,6 +164,8 @@ export default function NewOrderPage() {
   const [draftId] = useState(() => genClientId());
   // 우측 패널(카트+폼) 표시 여부 — 토글로 카탈로그 전체 화면 모드 가능
   const [panelOpen, setPanelOpen] = useState(true);
+  // 모바일 카트/결제 하단 시트 — PC 는 측면 패널 유지, 모바일은 우상단 카트 버튼으로 열기
+  const [cartOpen, setCartOpen] = useState(false);
 
   const isDelivery =
     fulfillmentType !== "IN_STORE" && fulfillmentType !== "PICKUP";
@@ -549,12 +551,26 @@ export default function NewOrderPage() {
               className="pl-9"
             />
           </div>
-          {/* 우측 패널 토글 — 카트/폼 패널을 열고 닫아 카탈로그 전체화면 모드 */}
+          {/* 모바일 카트 버튼 — 카트/결제 하단 시트 열기 (배지=건수). POS 우상단 카트와 동일 흐름 */}
+          <button
+            type="button"
+            aria-label="카트 열기"
+            onClick={() => setCartOpen(true)}
+            className="relative ml-auto inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] lg:hidden"
+          >
+            <ShoppingCart className="size-5" />
+            {cartCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--jm-action)] px-1 text-jm-3xs font-bold leading-none text-white">
+                {cartCount}
+              </span>
+            )}
+          </button>
+          {/* 우측 패널 토글 (PC) — 카탈로그 전체화면 모드 */}
           <JmIconButton
             aria-label={panelOpen ? "우측 패널 닫기" : "우측 패널 열기"}
             variant="ghost"
             onClick={() => setPanelOpen((v) => !v)}
-            className="ml-auto"
+            className="ml-auto hidden lg:inline-flex"
           >
             {panelOpen ? (
               <PanelRightClose className="size-4" />
@@ -620,9 +636,24 @@ export default function NewOrderPage() {
           </div>
         </section>
 
-        {/* ── 우측: 카트 + 폼 (POS 결제시트 스타일). panelOpen=false 면 비노출 → 카탈로그 전체화면 ── */}
-        {panelOpen && (
-        <aside className="flex min-h-0 flex-col bg-[var(--jm-surface)] lg:w-[440px] lg:shrink-0 xl:w-[480px]">
+        {/* ── 우측: 카트 + 폼 — PC 측면 패널 / 모바일 하단 시트(우상단 카트 버튼으로 열기) ── */}
+        {/* 모바일 백드롭 */}
+        <div
+          className={`fixed inset-0 z-30 bg-black/40 transition-opacity lg:hidden ${
+            cartOpen ? "" : "pointer-events-none opacity-0"
+          }`}
+          onClick={() => setCartOpen(false)}
+          aria-hidden
+        />
+        <aside
+          className={`flex min-h-0 flex-col bg-[var(--jm-surface)] fixed inset-x-0 bottom-0 z-40 max-h-[88vh] rounded-t-3xl shadow-[var(--jm-shadow-lg)] transition-transform duration-300 lg:static lg:z-auto lg:max-h-none lg:translate-y-0 lg:rounded-none lg:shadow-none lg:transition-none lg:w-[440px] lg:shrink-0 xl:w-[480px] ${
+            cartOpen ? "translate-y-0" : "translate-y-full"
+          } ${panelOpen ? "lg:flex" : "lg:hidden"}`}
+        >
+          {/* 모바일 드래그 핸들 */}
+          <div className="flex shrink-0 items-center justify-center pt-2 lg:hidden">
+            <div className="h-1 w-10 rounded-full bg-[var(--jm-border-strong)]" />
+          </div>
           {/* 본문 — 스크롤 */}
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="flex flex-col gap-5">
@@ -999,7 +1030,6 @@ export default function NewOrderPage() {
             </div>
           </div>
         </aside>
-        )}
       </div>
 
       {/* ─── Dialogs ─── */}
