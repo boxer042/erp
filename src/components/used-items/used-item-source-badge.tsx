@@ -5,12 +5,13 @@ import { USED_ITEM_SOURCE_LABEL, type UsedItemSource } from "./_types";
 
 const VARIANT_BY_SOURCE: Record<
   UsedItemSource,
-  "default" | "info" | "warning"
+  "default" | "info" | "warning" | "success"
 > = {
   PURCHASED: "default",
   SCAVENGED: "info",
   RENTAL_RETIREMENT: "info",
   EMERGENCY_USE: "warning",
+  BUILT: "success",
 };
 
 export function UsedItemSourceBadge({ source }: { source: UsedItemSource }) {

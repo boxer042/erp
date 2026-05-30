@@ -70,9 +70,12 @@ export const EMPTY_USED_ITEM_FORM: UsedItemFormValue = {
   warrantyMonths: 0,
 };
 
+// BUILT 은 조립 흐름(/inventory/used-items/build) 전용 — 수동 매입 등록에선 선택 불가
 const SOURCE_OPTIONS = (
   Object.keys(USED_ITEM_SOURCE_LABEL) as UsedItemSource[]
-).map((v) => ({ value: v, label: USED_ITEM_SOURCE_LABEL[v] }));
+)
+  .filter((v) => v !== "BUILT")
+  .map((v) => ({ value: v, label: USED_ITEM_SOURCE_LABEL[v] }));
 
 interface Props {
   value: UsedItemFormValue;

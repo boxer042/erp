@@ -5,7 +5,8 @@ export type UsedItemSource =
   | "PURCHASED"
   | "SCAVENGED"
   | "RENTAL_RETIREMENT"
-  | "EMERGENCY_USE";
+  | "EMERGENCY_USE"
+  | "BUILT";
 
 export type UsedItemStatus =
   | "IN_STOCK"
@@ -20,6 +21,7 @@ export const USED_ITEM_SOURCE_LABEL: Record<UsedItemSource, string> = {
   SCAVENGED: "버려진 부속",
   RENTAL_RETIREMENT: "임대 종료",
   EMERGENCY_USE: "급매(사후 정리)",
+  BUILT: "중고 조립",
 };
 
 export const USED_ITEM_STATUS_LABEL: Record<UsedItemStatus, string> = {
