@@ -59,31 +59,27 @@ src/jm/
 ## 3. 빠른 시작
 
 ### 3.1 새 페이지에서 사용
+jm 토큰은 전역 `:root` 에 깔리므로 페이지를 wrapper 로 감쌀 필요가 없다 — shadcn/Radix 처럼 그냥 컴포넌트를 쓰면 된다.
 ```tsx
-import "@/jm/tokens.css"; // 한 번만 로드 (보통 layout)
-import { JmScope, JmButton, JmCard, JmCardContent } from "@/jm";
+import { JmButton, JmCard, JmCardContent } from "@/jm";
 
 export default function Page() {
   return (
-    <JmScope theme="light"> {/* "light" | "dark" | "auto" */}
-      <JmCard>
-        <JmCardContent>
-          <JmButton>저장</JmButton>
-        </JmCardContent>
-      </JmCard>
-    </JmScope>
+    <JmCard>
+      <JmCardContent>
+        <JmButton>저장</JmButton>
+      </JmCardContent>
+    </JmCard>
   );
 }
 ```
+다크 모드는 host 가 `<html>` 에 `.dark` 클래스를 토글하면(next-themes 등) 앱 전체가 자동 전환된다. 특정 영역만 전역과 다른 테마로 고정하려면 `<JmScope theme="light|dark|auto">` 로 감싼다(island).
 
 ### 3.2 다른 프로젝트로 이식
 1. `src/jm/` 폴더 통째로 복사
-2. `package.json` 에 peer 추가:
-   ```
-   @base-ui/react, lucide-react, clsx, tailwind-merge, class-variance-authority
-   ```
-3. Tailwind 4 설정 OK (특별 설정 불필요 — 임의값만 씀)
-4. 호스트 layout 에서 `import "@/jm/tokens.css"` + `<JmScope>` wrap
+2. peer deps 추가: `@base-ui/react, lucide-react, clsx, tailwind-merge, class-variance-authority`
+3. host 의 전역 CSS 에서 `@import ".../jm/tokens.css";` 한 번 — 토큰이 `:root` 에 깔린다 (Tailwind 4, 특별 설정 불필요)
+4. 다크: host 가 `<html class="dark">` 를 토글 (next-themes `attribute="class"` 또는 직접). 끝 — 페이지 wrapper 불필요.
 
 ---
 
@@ -326,25 +322,18 @@ font-weight 는 Tailwind 기본 유틸리티(`font-medium/semibold/bold`)를 그
 
 ## 7. 테마
 
-### 7.1 모드
-```tsx
-<JmScope theme="light" />  {/* 기본 */}
-<JmScope theme="dark" />
-<JmScope theme="auto" />   {/* prefers-color-scheme */}
-```
+### 7.1 전역 (기본)
+jm 토큰은 `:root`(light) / `.dark`(dark) 에 정의된다. host 가 `<html>` 의 `.dark` 클래스를 토글하면(next-themes `attribute="class"` 등) **앱 전체 + Portal 까지 자동 전환**된다. 페이지를 감쌀 필요 없음.
 
-### 7.2 토글 컴포넌트
+### 7.2 부분 고정 (island)
+전역과 무관하게 특정 영역만 테마 고정 — POS 처럼 독립 테마가 필요한 곳에만:
 ```tsx
-const [theme, setTheme] = useState<JmTheme>("light");
-
-<JmScope theme={theme}>
-  <JmThemeToggle value={theme} onChange={setTheme} />
-  ...
-</JmScope>
+<JmScope theme="dark">…</JmScope>   {/* "light" | "dark" | "auto"; 생략 시 전역 상속 */}
+<JmThemeToggle value={theme} onChange={setTheme} />
 ```
 
 ### 7.3 다크 토큰 커스터마이징
-`tokens.css` 의 `[data-jm-scope][data-jm-theme="dark"]` 블록 수정.
+`tokens.css` 의 `.dark` 블록 수정 (`[data-jm-scope][data-jm-theme="dark"]` 도 같은 블록에 묶여 island 까지 일괄 반영).
 
 ### 7.4 시스템 다크 영구 저장
 `localStorage` 또는 cookie 와 결합:
@@ -363,8 +352,8 @@ useEffect(() => localStorage.setItem("jm-theme", theme), [theme]);
 2. **위치** — `src/jm/ui/<name>.tsx`
 3. **import 제한** — `@/jm/...`, `react`, `@base-ui/react`, `lucide-react`, `clsx`, `tailwind-merge`, `cva` 만. 프로젝트 코드 0
 4. **토큰 사용** — 모든 색·shadow·radius 는 `var(--jm-*)`. 하드코딩 금지
-5. **`data-jm-scope`** — Portal 로 빠지는 컴포넌트(Popover/Dialog popup) 는 root element 에 `data-jm-scope` 속성 필수 — 그래야 토큰 cascade 안 끊김
-6. **font** — Portal popup 은 `font-[family-name:var(--jm-font-sans)]` 도 명시 (cascade 끊김 대비)
+5. **토큰 cascade** — 토큰이 전역 `:root` 라 Portal popup 도 자동 상속 (예전의 `data-jm-scope` 재부착 불필요). 폰트만 끊기는 환경이면 popup 에 `font-[family-name:var(--jm-font-sans)]` 정도만 명시
+6. **island** — 컴포넌트가 전역과 다른 고정 테마가 필요할 때만 `<JmScope theme>` 사용
 7. **`forwardRef`** — DOM 요소를 wrap 하면 ref 전달
 8. **`displayName`** — devtools 가독성
 9. **export 추가** — `src/jm/ui/index.ts`
@@ -373,19 +362,14 @@ useEffect(() => localStorage.setItem("jm-theme", theme), [theme]);
 
 ---
 
-## 9. Common pitfall — Portal 토큰 cascade
+## 9. Portal 토큰 — 자동 cascade (해결됨)
 
-base-ui Popover/Dialog 의 Popup 은 Portal 로 `document.body` 직속에 렌더된다. 그러면 `[data-jm-scope]` 의 자손이 아니므로 `--jm-*` 변수가 cascade 되지 않는다 (= 색·폰트 안 먹음).
+> 예전엔 토큰이 `[data-jm-scope]` 에 스코프돼서, Portal 로 `document.body` 직속에 렌더되는 Popup(Popover/Dialog)이 토큰을 못 받는 문제가 있었다. **이제 토큰이 전역 `:root` 라 Portal 도 자동 상속** — 별도 처리 불필요.
 
-**해결**: Popup 자체에 `data-jm-scope` 속성을 다시 부착.
+기존 코드의 Popup 에 남아있는 `data-jm-scope` 속성은 무해(no-op marker)하므로 그대로 둬도 된다. 새 컴포넌트는 붙일 필요 없음. 폰트 fallback 만 신경 쓰면 됨:
 ```tsx
-<DialogPrimitive.Popup
-  data-jm-scope
-  className="bg-[var(--jm-surface)] font-[family-name:var(--jm-font-sans)]"
->
+<DialogPrimitive.Popup className="bg-[var(--jm-surface)] font-[family-name:var(--jm-font-sans)]">
 ```
-
-신규 컴포넌트가 Portal 을 쓴다면 반드시 이 패턴을 적용.
 
 ---
 
@@ -423,6 +407,60 @@ base-ui Popover/Dialog 의 Popup 은 Portal 로 `document.body` 직속에 렌더
 | `<Tabs>` | `<JmTabs>` | line/pill variant |
 | `<Skeleton>` | `<JmSkeleton>` | 동일 |
 | `<Toaster>` (sonner) | `<JmToaster>` | jm 토큰 자동 적용 |
+
+---
+
+## 11.5 Canonical decisions (lint-enforced)
+
+> 아래 결정은 `eslint.config.mjs` 의 `DESIGN_DRIFT_SYNTAX` 규칙과 `scripts/check-drift.sh` 가 강제한다.
+> 흩어진 임의값(px·hex·팔레트) 대신 **이 표만 따른다.** 위반 시 lint warn(점진 정리) / 경계는 error.
+
+### A. 폰트 사이즈 — `text-[NNpx]` 금지, `text-jm-*` 토큰만
+
+| px | 토큰 | px | 토큰 |
+|---|---|---|---|
+| 9 | `text-jm-4xs` | 18 | `text-jm-xl` |
+| 10 | `text-jm-3xs` | 20 | `text-jm-2xl` |
+| 11 | `text-jm-2xs` | 22 | `text-jm-3xl` |
+| 12 | `text-jm-xs` | 26 | `text-jm-4xl` |
+| 13 | `text-jm-sm` | 32 | `text-jm-5xl` |
+| 14 | `text-jm-base` | 40 | `text-jm-6xl` |
+| 15 | `text-jm-md` | | |
+| 16 | `text-jm-lg` | | |
+
+일괄 변환: `node scripts/codemod-text-tokens.mjs` (sm:/hover:/md: prefix 자동 보존, print·*-pdf 제외).
+
+### B. 상태 색상 — raw 팔레트(`bg-amber-50`) 금지, jm 시맨틱 토큰만
+
+| 의미 | raw 팔레트 (금지) | jm 토큰 |
+|---|---|---|
+| 성공/정상 | `emerald-*` / `green-*` | `var(--jm-success-bg/fg/solid)` |
+| 경고/대기 | `amber-*` / `yellow-*` | `var(--jm-warning-bg/fg/solid)` |
+| 위험/오류 | `red-*` / `rose-*` | `var(--jm-danger-bg/fg/solid)` |
+| 정보 | `blue-*` / `sky-*` | `var(--jm-info-bg/fg/solid)` |
+| 중립/뮤트 | `zinc-*` / `gray-*` / `slate-*` | `var(--jm-surface-muted)` / `var(--jm-text-muted/subtle)` |
+
+shadcn 잔존 페이지는 시맨틱 토큰(`bg-muted`/`text-destructive` 등) 유지. hex 하드코딩(`bg-[#…]`)은 **전 영역 금지(error)**.
+
+### C. 컨트롤 크기 — 임의 `h-[30px]` 금지, 컨텍스트별 고정
+
+| 컨텍스트 | 컴포넌트 | 높이 |
+|---|---|---|
+| 폼 CTA·다이얼로그 푸터 | `JmButton size="sm"` | 40px (h-10) |
+| 밀집 툴바·행 액션 | `JmButton size="xs"` | 32px (h-8) |
+| 히어로·모바일 POS | `JmButton size="md"` | 48px (h-12) |
+| 밀집 아이콘 버튼 | `JmIconButton size="sm"` | 32px |
+| 단독·스티키 헤더 아이콘 | `JmIconButton size="md"` | 40px |
+| 세그먼트/탭 | `JmSegmentedControl` / `JmTabs` | (하드코딩 strip 금지) |
+
+### D. variant 명명 (shadcn → jm)
+
+`default → cta` · `destructive → danger` · `outline/secondary/ghost/link` 동일. shadcn `warning`/`success` 는 jm 시맨틱 토큰/`JmBadge` 로 대체.
+
+### E. 경계 (error)
+
+- **shadcn(`@/components/ui`)은 완전히 제거됨** — 전 영역에서 재도입 금지, `@/jm` 사용. (npm `shadcn`/`cmdk`/`vaul` 도 제거)
+- `src/jm` 은 프로젝트 코드(`@/lib`/`@/components`/`@/app`) import 금지(포터빌리티). 허용 외부 의존성: `@base-ui/react`, `lucide-react`, `clsx`, `tailwind-merge`, `cva`.
 
 ---
 

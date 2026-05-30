@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Package } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
 import { BottomSheet } from "./_components/bottom-sheet";
 
@@ -148,7 +149,7 @@ function Body({
               onSkip?.();
               onOpenChange(false);
             }}
-            className="flex h-14 items-center justify-center rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-[14px] font-medium text-[var(--jm-text-muted)]"
+            className="flex h-14 items-center justify-center rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-jm-base font-medium text-[var(--jm-text-muted)]"
           >
             닫기
           </button>
@@ -156,7 +157,7 @@ function Body({
             type="button"
             onClick={confirm}
             disabled={selectedCount === 0}
-            className="flex h-14 flex-1 items-center justify-center gap-1 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white disabled:opacity-40"
+            className="flex h-14 flex-1 items-center justify-center gap-1 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white disabled:opacity-40"
           >
             추가
             {totalAdd > 0 && (
@@ -170,11 +171,11 @@ function Body({
     >
       <div className="flex flex-col gap-2 pt-2">
         {bundlesQuery.isPending ? (
-          <div className="py-8 text-center text-[12px] text-[var(--jm-text-subtle)]">
+          <div className="py-8 text-center text-jm-xs text-[var(--jm-text-subtle)]">
             추천 불러오는 중…
           </div>
         ) : bundles.length === 0 ? (
-          <div className="py-8 text-center text-[12px] text-[var(--jm-text-subtle)]">
+          <div className="py-8 text-center text-jm-xs text-[var(--jm-text-subtle)]">
             추천 상품이 없습니다
           </div>
         ) : (
@@ -211,40 +212,33 @@ function Body({
                   />
                 ) : (
                   <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
-                    <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
-                      <path
-                        d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <Package className="size-[22px]" />
                   </div>
                 )}
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                  <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                     {b.bundleProduct.name}
                   </span>
-                  <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                  <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                     {b.bundleProduct.sku}
                   </span>
                   {b.recommendMessage && (
-                    <span className="mt-0.5 line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">
+                    <span className="mt-0.5 line-clamp-1 text-jm-2xs text-[var(--jm-text-muted)]">
                       {b.recommendMessage}
                     </span>
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-0.5">
                   {discount > 0 && (
-                    <span className="text-[10px] tabular-nums text-[var(--jm-text-subtle)] line-through">
+                    <span className="text-jm-3xs tabular-nums text-[var(--jm-text-subtle)] line-through">
                       ₩{sellingGross.toLocaleString("ko-KR")}
                     </span>
                   )}
-                  <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
+                  <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
                     ₩{finalGross.toLocaleString("ko-KR")}
                   </span>
                   {active && (
-                    <span className="rounded-full bg-[var(--jm-action)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="rounded-full bg-[var(--jm-action)] px-2 py-0.5 text-jm-3xs font-semibold text-white">
                       ×{qty}
                     </span>
                   )}

@@ -194,7 +194,7 @@ function Body({
           type="button"
           onClick={() => onOpenChange(false)}
           disabled={pickingId !== null}
-          className="h-12 w-full rounded-2xl bg-[var(--jm-surface)] text-[14px] font-semibold text-[var(--jm-text)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
+          className="h-12 w-full rounded-2xl bg-[var(--jm-surface)] text-jm-base font-semibold text-[var(--jm-text)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
         >
           닫기
         </button>
@@ -204,7 +204,7 @@ function Body({
         {listQuery.isPending ? (
           <SkeletonList />
         ) : list.length === 0 ? (
-          <div className="px-4 py-12 text-center text-[13px] text-[var(--jm-text-subtle)]">
+          <div className="px-4 py-12 text-center text-jm-sm text-[var(--jm-text-subtle)]">
             이 고객으로 발행된 견적서가 없습니다
           </div>
         ) : (
@@ -218,18 +218,18 @@ function Body({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[13px] font-semibold text-[var(--jm-text)]">
+                  <span className="font-mono text-jm-sm font-semibold text-[var(--jm-text)]">
                     {q.quotationNo}
                   </span>
-                  <span className="rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text-muted)]">
+                  <span className="rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-medium text-[var(--jm-text-muted)]">
                     {STATUS_LABEL[q.status]}
                   </span>
                 </div>
-                <span className="tabular-nums text-[15px] font-bold text-[var(--jm-text)]">
+                <span className="tabular-nums text-jm-md font-bold text-[var(--jm-text)]">
                   ₩{Math.round(Number(q.totalAmount)).toLocaleString("ko-KR")}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-2 text-[12px] text-[var(--jm-text-muted)]">
+              <div className="flex items-center justify-between gap-2 text-jm-xs text-[var(--jm-text-muted)]">
                 <span>
                   {format(new Date(q.issueDate), "yyyy년 M월 d일", {
                     locale: ko,
@@ -242,7 +242,7 @@ function Body({
                 ) : null}
               </div>
               {q.title ? (
-                <span className="line-clamp-1 text-[12px] text-[var(--jm-text-subtle)]">
+                <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-subtle)]">
                   {q.title}
                 </span>
               ) : null}

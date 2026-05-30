@@ -232,7 +232,7 @@ export function VariantPickDialog({
                       )}
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+                      <div className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-subtle)]">
                         VAT 포함
                       </div>
                       <div className="text-jm-sm font-semibold tabular-nums text-[var(--jm-text)]">
@@ -451,18 +451,18 @@ export function QuotationLoadDialog({
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[13px] font-semibold text-[var(--jm-text)]">
+                      <span className="font-mono text-jm-sm font-semibold text-[var(--jm-text)]">
                         {q.quotationNo}
                       </span>
-                      <span className="rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text-muted)]">
+                      <span className="rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-medium text-[var(--jm-text-muted)]">
                         {QUOTATION_STATUS_LABEL[q.status]}
                       </span>
                     </div>
-                    <span className="tabular-nums text-[15px] font-bold text-[var(--jm-text)]">
+                    <span className="tabular-nums text-jm-md font-bold text-[var(--jm-text)]">
                       ₩{Math.round(Number(q.totalAmount)).toLocaleString("ko-KR")}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-2 text-[12px] text-[var(--jm-text-muted)]">
+                  <div className="flex items-center justify-between gap-2 text-jm-xs text-[var(--jm-text-muted)]">
                     <span>
                       {format(new Date(q.issueDate), "yyyy년 M월 d일", {
                         locale: ko,
@@ -475,7 +475,7 @@ export function QuotationLoadDialog({
                     ) : null}
                   </div>
                   {q.title ? (
-                    <span className="line-clamp-1 text-[12px] text-[var(--jm-text-subtle)]">
+                    <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-subtle)]">
                       {q.title}
                     </span>
                   ) : null}

@@ -25,8 +25,8 @@ export function DashboardBreadcrumb() {
 
   if (segments.length === 0) {
     return (
-      <div className="flex items-center gap-1.5 text-[13px]">
-        <span className="text-foreground">대시보드</span>
+      <div className="flex items-center gap-1.5 text-jm-sm">
+        <span className="text-[var(--jm-text)]">대시보드</span>
       </div>
     );
   }
@@ -43,16 +43,16 @@ export function DashboardBreadcrumb() {
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-[13px]">
+    <div className="flex items-center gap-1.5 text-jm-sm">
       {crumbs.map((crumb, i) => {
         const isLast = i === crumbs.length - 1;
         return (
           <span key={crumb.href} className="flex items-center gap-1.5">
-            {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+            {i > 0 && <ChevronRight className="h-3 w-3 text-[var(--jm-text-muted)]" />}
             {isLast ? (
-              <span className="text-foreground">{crumb.label}</span>
+              <span className="text-[var(--jm-text)]">{crumb.label}</span>
             ) : (
-              <Link href={crumb.href} className="text-muted-foreground hover:text-foreground transition-colors">
+              <Link href={crumb.href} className="text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] transition-colors">
                 {crumb.label}
               </Link>
             )}

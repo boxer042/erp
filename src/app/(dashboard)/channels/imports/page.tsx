@@ -23,39 +23,33 @@ import {
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  JmButton,
+  JmIconButton,
+  JmInput,
+  JmBadge,
+  JmSkeleton,
+  JmTabs,
+  JmTabsList,
+  JmTabsTrigger,
+  JmTabsIndicator,
+  JmTabsPanel,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmDialog,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDialogBody,
+  JmSelect,
+  type JmSelectOption,
+  JmFormField,
+} from "@/jm";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
 
 // ─────────── 타입
@@ -139,12 +133,12 @@ const PENDING_STATUS_LABEL: Record<PendingRow["status"], string> = {
 
 const PENDING_STATUS_VARIANT: Record<
   PendingRow["status"],
-  "secondary" | "destructive" | "default" | "outline"
+  "default" | "danger" | "solid" | "outline"
 > = {
-  UNMAPPED_SKU: "destructive",
-  VALIDATION_FAILED: "destructive",
-  DUPLICATE: "secondary",
-  RESOLVED: "default",
+  UNMAPPED_SKU: "danger",
+  VALIDATION_FAILED: "danger",
+  DUPLICATE: "default",
+  RESOLVED: "solid",
   DISCARDED: "outline",
 };
 
@@ -163,10 +157,12 @@ export default function ChannelImportsPage() {
   );
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border px-5 py-3">
-        <h1 className="text-base font-semibold">외부 채널 Import</h1>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+      <div className="border-b border-[var(--jm-border)] px-5 py-3">
+        <h1 className="text-jm-lg font-semibold text-[var(--jm-text)]">
+          외부 채널 Import
+        </h1>
+        <p className="mt-0.5 text-jm-xs text-[var(--jm-text-muted)]">
           외부 채널의 주문을 ERP 로 가져오고, SKU 매핑·보류 큐를 관리합니다. (Phase
           1 — Mock 어댑터로 dev 검증 가능, 실 채널은 가입 후 어댑터 추가)
         </p>
@@ -174,16 +170,17 @@ export default function ChannelImportsPage() {
 
       <StatsBar />
 
-      <Tabs defaultValue="trigger" className="flex flex-1 flex-col">
-        <div className="border-b border-border px-5 py-2">
-          <TabsList>
-            <TabsTrigger value="trigger">Import 트리거</TabsTrigger>
-            <TabsTrigger value="pending">보류 큐</TabsTrigger>
-            <TabsTrigger value="mappings">SKU 매핑</TabsTrigger>
-          </TabsList>
+      <JmTabs defaultValue="trigger" className="flex flex-1 flex-col gap-0">
+        <div className="border-b border-[var(--jm-border)] px-5 py-2">
+          <JmTabsList variant="line" className="border-b-0">
+            <JmTabsTrigger value="trigger">Import 트리거</JmTabsTrigger>
+            <JmTabsTrigger value="pending">보류 큐</JmTabsTrigger>
+            <JmTabsTrigger value="mappings">SKU 매핑</JmTabsTrigger>
+            <JmTabsIndicator />
+          </JmTabsList>
         </div>
 
-        <TabsContent value="trigger" className="flex-1 overflow-auto p-5">
+        <JmTabsPanel value="trigger" className="flex-1 overflow-auto p-5">
           <ImportTriggerSection
             channels={channels}
             loading={channelsQuery.isPending}
@@ -196,16 +193,16 @@ export default function ChannelImportsPage() {
               });
             }}
           />
-        </TabsContent>
+        </JmTabsPanel>
 
-        <TabsContent value="pending" className="flex-1 overflow-auto p-5">
+        <JmTabsPanel value="pending" className="flex-1 overflow-auto p-5">
           <PendingSection channels={channels} />
-        </TabsContent>
+        </JmTabsPanel>
 
-        <TabsContent value="mappings" className="flex-1 overflow-auto p-5">
+        <JmTabsPanel value="mappings" className="flex-1 overflow-auto p-5">
           <MappingSection channels={channels} />
-        </TabsContent>
-      </Tabs>
+        </JmTabsPanel>
+      </JmTabs>
     </div>
   );
 }
@@ -243,7 +240,7 @@ function ImportTriggerSection({
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-20 w-full" />
+          <JmSkeleton key={i} className="h-20 w-full" />
         ))}
       </div>
     );
@@ -251,7 +248,7 @@ function ImportTriggerSection({
 
   if (channels.length === 0) {
     return (
-      <div className="rounded-md border border-border bg-muted/30 p-8 text-center text-[13px] text-muted-foreground">
+      <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-8 text-center text-jm-sm text-[var(--jm-text-muted)]">
         활성 채널이 없습니다. 먼저 채널 페이지에서 채널을 등록하세요.
       </div>
     );
@@ -259,7 +256,7 @@ function ImportTriggerSection({
 
   return (
     <div className="space-y-2">
-      <p className="text-[12px] text-muted-foreground">
+      <p className="text-jm-xs text-[var(--jm-text-muted)]">
         각 채널의 어댑터를 호출해 신규 주문을 가져옵니다. Mock 채널(채널 코드
         &quot;MOCK&quot;) 만 Phase 1 에서 동작 — 실 채널은 가입·API 키 후 어댑터를
         registry 에 추가하면 자동 활성화됩니다.
@@ -271,26 +268,28 @@ function ImportTriggerSection({
           return (
             <div
               key={c.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-border p-3"
+              className="flex items-center justify-between gap-3 rounded-md border border-[var(--jm-border)] p-3"
             >
               <div className="flex flex-col">
-                <span className="text-[14px] font-medium">{c.name}</span>
-                <span className="font-mono text-[11px] text-muted-foreground">
+                <span className="text-jm-base font-medium text-[var(--jm-text)]">
+                  {c.name}
+                </span>
+                <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                   {c.code}
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <Button
+                <JmIconButton
                   size="sm"
                   variant="ghost"
-                  className="h-8 w-8 p-0"
+                  aria-label="설정"
                   onClick={() => setConfigChannelId(c.id)}
                   title="설정"
                 >
                   <Settings className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="sm"
+                </JmIconButton>
+                <JmButton
+                  size="xs"
                   onClick={() => importMutation.mutate(c.id)}
                   disabled={isPending}
                 >
@@ -300,7 +299,7 @@ function ImportTriggerSection({
                     <Download className="mr-1 h-3 w-3" />
                   )}
                   Import 실행
-                </Button>
+                </JmButton>
               </div>
             </div>
           );
@@ -369,21 +368,24 @@ function ChannelConfigDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>
+    <JmDialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <JmDialogContent size="md">
+        <JmDialogHeader>
+          <JmDialogTitle>
             채널 설정 {configQuery.data ? `· ${configQuery.data.name}` : ""}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 px-1 py-2">
-          <p className="text-[12px] text-muted-foreground">
+          </JmDialogTitle>
+        </JmDialogHeader>
+        <JmDialogBody className="space-y-4">
+          <p className="text-jm-xs text-[var(--jm-text-muted)]">
             운영 정책 (credentials 는 보안상 환경변수에서 관리)
           </p>
 
-          <div className="space-y-1.5">
-            <Label className="text-[12px]">Polling 간격 (분)</Label>
-            <Input
+          <JmFormField
+            label="Polling 간격 (분)"
+            hint="cron 라우트 호출 간격. 채널 rate limit 고려해 설정"
+          >
+            <JmInput
+              size="sm"
               type="number"
               min={1}
               max={1440}
@@ -398,14 +400,14 @@ function ChannelConfigDialog({
               }
               placeholder="기본 10분"
             />
-            <p className="text-[11px] text-muted-foreground">
-              cron 라우트 호출 간격. 채널 rate limit 고려해 설정
-            </p>
-          </div>
+          </JmFormField>
 
-          <div className="space-y-1.5">
-            <Label className="text-[12px]">출고 예정일 offset (일)</Label>
-            <Input
+          <JmFormField
+            label="출고 예정일 offset (일)"
+            hint="채널 정책상 주문일 기준 출고 시한"
+          >
+            <JmInput
+              size="sm"
               type="number"
               min={0}
               max={30}
@@ -420,14 +422,14 @@ function ChannelConfigDialog({
               }
               placeholder="기본 1일 (D+1)"
             />
-            <p className="text-[11px] text-muted-foreground">
-              채널 정책상 주문일 기준 출고 시한
-            </p>
-          </div>
+          </JmFormField>
 
-          <div className="space-y-1.5">
-            <Label className="text-[12px]">보류 큐 알림 임계값</Label>
-            <Input
+          <JmFormField
+            label="보류 큐 알림 임계값"
+            hint="매핑 누락 보류가 이 수 초과 시 매장에 알림"
+          >
+            <JmInput
+              size="sm"
               type="number"
               min={0}
               value={form.pendingThreshold ?? ""}
@@ -441,16 +443,15 @@ function ChannelConfigDialog({
               }
               placeholder="예: 10"
             />
-            <p className="text-[11px] text-muted-foreground">
-              매핑 누락 보류가 이 수 초과 시 매장에 알림
-            </p>
-          </div>
+          </JmFormField>
 
-          <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5">
+          <div className="space-y-2 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-2.5">
             <label className="flex cursor-pointer items-center justify-between gap-2">
               <div className="flex flex-col">
-                <span className="text-[13px] font-medium">자동 송장 push</span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-jm-sm font-medium text-[var(--jm-text)]">
+                  자동 송장 push
+                </span>
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   ERP [발송] 시 채널에 송장 자동 통보
                 </span>
               </div>
@@ -463,10 +464,12 @@ function ChannelConfigDialog({
                 className="size-4"
               />
             </label>
-            <label className="flex cursor-pointer items-center justify-between gap-2 border-t border-border pt-2">
+            <label className="flex cursor-pointer items-center justify-between gap-2 border-t border-[var(--jm-border)] pt-2">
               <div className="flex flex-col">
-                <span className="text-[13px] font-medium">자동 재고 sync</span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-jm-sm font-medium text-[var(--jm-text)]">
+                  자동 재고 sync
+                </span>
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   Inventory 변동 시 채널에 가용 재고 push (Phase 2 필요)
                 </span>
               </div>
@@ -480,12 +483,13 @@ function ChannelConfigDialog({
               />
             </label>
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        </JmDialogBody>
+        <JmDialogFooter>
+          <JmButton variant="outline" size="sm" onClick={onClose}>
             취소
-          </Button>
-          <Button
+          </JmButton>
+          <JmButton
+            size="sm"
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
           >
@@ -493,10 +497,10 @@ function ChannelConfigDialog({
               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
             )}
             저장
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </JmButton>
+        </JmDialogFooter>
+      </JmDialogContent>
+    </JmDialog>
   );
 }
 
@@ -552,85 +556,81 @@ function PendingSection({ channels }: { channels: Channel[] }) {
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
+  const statusOptions: JmSelectOption[] = [
+    { value: "all", label: "전체 상태" },
+    { value: "UNMAPPED_SKU", label: "매핑 누락" },
+    { value: "DUPLICATE", label: "중복" },
+    { value: "RESOLVED", label: "변환됨" },
+    { value: "DISCARDED", label: "버림" },
+  ];
+  const channelOptions: JmSelectOption[] = [
+    { value: "all", label: "전체 채널" },
+    ...channels.map((c) => ({ value: c.id, label: c.name })),
+  ];
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Select
+        <JmSelect
+          size="sm"
+          className="w-[180px]"
+          placeholder="상태"
+          options={statusOptions}
           value={statusFilter || "all"}
-          onValueChange={(v) => {
+          onChange={(v) => {
             if (!v || v === "all") setStatusFilter("");
             else setStatusFilter(v as PendingRow["status"]);
           }}
-        >
-          <SelectTrigger className="h-8 w-[180px] text-[12px]">
-            <SelectValue placeholder="상태" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 상태</SelectItem>
-            <SelectItem value="UNMAPPED_SKU">매핑 누락</SelectItem>
-            <SelectItem value="DUPLICATE">중복</SelectItem>
-            <SelectItem value="RESOLVED">변환됨</SelectItem>
-            <SelectItem value="DISCARDED">버림</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={channelFilter || "all"}
-          onValueChange={(v) => setChannelFilter(!v || v === "all" ? "" : v)}
-        >
-          <SelectTrigger className="h-8 w-[180px] text-[12px]">
-            <SelectValue placeholder="채널" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 채널</SelectItem>
-            {channels.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          variant="ghost"
+        />
+        <JmSelect
           size="sm"
+          className="w-[180px]"
+          placeholder="채널"
+          options={channelOptions}
+          value={channelFilter || "all"}
+          onChange={(v) => setChannelFilter(!v || v === "all" ? "" : v)}
+        />
+        <JmButton
+          variant="ghost"
+          size="xs"
           onClick={() => pendingQuery.refetch()}
           disabled={pendingQuery.isFetching}
-          className="h-8"
         >
           <RefreshCw
             className={`h-3 w-3 ${pendingQuery.isFetching ? "animate-spin" : ""}`}
           />
-        </Button>
+        </JmButton>
       </div>
 
-      <Table className="min-w-[1000px]">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[120px]">상태</TableHead>
-            <TableHead className="w-[140px]">채널</TableHead>
-            <TableHead className="w-[180px]">채널주문번호</TableHead>
-            <TableHead>손님 / 항목</TableHead>
-            <TableHead>사유</TableHead>
-            <TableHead className="w-[110px]">접수일</TableHead>
-            <TableHead className="w-[200px]" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <JmTable className="min-w-[1000px]">
+        <JmTableHeader>
+          <JmTableRow>
+            <JmTableHead className="w-[120px]">상태</JmTableHead>
+            <JmTableHead className="w-[140px]">채널</JmTableHead>
+            <JmTableHead className="w-[180px]">채널주문번호</JmTableHead>
+            <JmTableHead>손님 / 항목</JmTableHead>
+            <JmTableHead>사유</JmTableHead>
+            <JmTableHead className="w-[110px]">접수일</JmTableHead>
+            <JmTableHead className="w-[200px]" />
+          </JmTableRow>
+        </JmTableHeader>
+        <JmTableBody>
           {pendingQuery.isPending ? (
             Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>
+              <JmTableRow key={i}>
                 {Array.from({ length: 7 }).map((_, j) => (
-                  <TableCell key={j}>
-                    <Skeleton className="h-4 w-full" />
-                  </TableCell>
+                  <JmTableCell key={j}>
+                    <JmSkeleton className="h-4 w-full" />
+                  </JmTableCell>
                 ))}
-              </TableRow>
+              </JmTableRow>
             ))
           ) : (pendingQuery.data ?? []).length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-[13px]">
+            <JmTableRow>
+              <JmTableCell colSpan={7} className="text-center py-8 text-jm-sm">
                 보류 항목이 없습니다
-              </TableCell>
-            </TableRow>
+              </JmTableCell>
+            </JmTableRow>
           ) : (
             (pendingQuery.data ?? []).map((p) => {
               const buyer = p.rawPayload.buyer?.name ?? "—";
@@ -646,48 +646,46 @@ function PendingSection({ channels }: { channels: Channel[] }) {
                 discardMutation.isPending &&
                 discardMutation.variables === p.id;
               return (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <Badge variant={PENDING_STATUS_VARIANT[p.status]}>
+                <JmTableRow key={p.id}>
+                  <JmTableCell>
+                    <JmBadge variant={PENDING_STATUS_VARIANT[p.status]}>
                       {PENDING_STATUS_LABEL[p.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-[13px]">{p.channel.name}</TableCell>
-                  <TableCell className="font-mono text-[12px]">
+                    </JmBadge>
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-sm">{p.channel.name}</JmTableCell>
+                  <JmTableCell className="font-mono text-jm-xs">
                     {p.channelOrderNo}
-                  </TableCell>
-                  <TableCell className="text-[12px]">
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-xs">
                     <div className="flex flex-col">
                       <span>{buyer}</span>
-                      <span className="text-muted-foreground">
+                      <span className="text-[var(--jm-text-muted)]">
                         {itemSummary}
                       </span>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-[12px] text-muted-foreground">
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
                     {p.reason ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-[12px] text-muted-foreground">
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
                     {new Date(p.createdAt).toLocaleDateString("ko-KR")}
-                  </TableCell>
-                  <TableCell>
+                  </JmTableCell>
+                  <JmTableCell>
                     {isOpen ? (
                       <div className="flex justify-end gap-1">
                         {p.status === "UNMAPPED_SKU" && (
-                          <Button
-                            size="sm"
+                          <JmButton
+                            size="xs"
                             variant="outline"
-                            className="h-7 text-[12px]"
                             onClick={() => setSuggestionTarget(p)}
                           >
                             <Sparkles className="mr-0.5 h-3 w-3" />
                             추천
-                          </Button>
+                          </JmButton>
                         )}
-                        <Button
-                          size="sm"
+                        <JmButton
+                          size="xs"
                           variant="ghost"
-                          className="h-7 text-[12px]"
                           onClick={() => discardMutation.mutate(p.id)}
                           disabled={isDiscarding || isResolving}
                         >
@@ -695,10 +693,9 @@ function PendingSection({ channels }: { channels: Channel[] }) {
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : null}
                           버림
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-7 text-[12px]"
+                        </JmButton>
+                        <JmButton
+                          size="xs"
                           onClick={() => resolveMutation.mutate(p.id)}
                           disabled={isResolving || isDiscarding}
                         >
@@ -706,25 +703,25 @@ function PendingSection({ channels }: { channels: Channel[] }) {
                             <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                           ) : null}
                           변환
-                        </Button>
+                        </JmButton>
                       </div>
                     ) : p.resolvedOrderId ? (
                       <a
                         href={`/orders?id=${p.resolvedOrderId}`}
-                        className="text-[12px] text-primary underline-offset-2 hover:underline"
+                        className="text-jm-xs text-[var(--jm-action)] underline-offset-2 hover:underline"
                       >
                         주문 보기 →
                       </a>
                     ) : null}
-                  </TableCell>
-                </TableRow>
+                  </JmTableCell>
+                </JmTableRow>
               );
             })
           )}
-        </TableBody>
-      </Table>
+        </JmTableBody>
+      </JmTable>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-jm-2xs text-[var(--jm-text-muted)]">
         매핑 누락 항목은 [추천] 으로 ERP 상품 매칭 후 매핑 → [변환] 클릭. 또는
         SKU 매핑 탭에서 직접 매핑 후 [변환].
       </p>
@@ -751,14 +748,14 @@ function SuggestionDialog({
   const items = target?.rawPayload.items ?? [];
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
+    <JmDialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <JmDialogContent size="xl">
+        <JmDialogHeader>
+          <JmDialogTitle>
             매핑 추천 {target ? `· ${target.channelOrderNo}` : ""}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="max-h-[60vh] space-y-3 overflow-auto px-1">
+          </JmDialogTitle>
+        </JmDialogHeader>
+        <JmDialogBody className="space-y-3">
           {items.map((it, idx) => (
             <SkuSuggestionRow
               key={`${it.channelSku}-${idx}`}
@@ -776,17 +773,17 @@ function SuggestionDialog({
               }}
             />
           ))}
-        </div>
-        <DialogFooter>
-          <p className="mr-auto text-[11px] text-muted-foreground">
+        </JmDialogBody>
+        <JmDialogFooter>
+          <p className="mr-auto text-jm-2xs text-[var(--jm-text-muted)]">
             매핑 등록 후 닫고 [변환] 버튼으로 정식 주문 승격
           </p>
-          <Button variant="outline" onClick={onClose}>
+          <JmButton variant="outline" size="sm" onClick={onClose}>
             닫기
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </JmButton>
+        </JmDialogFooter>
+      </JmDialogContent>
+    </JmDialog>
   );
 }
 
@@ -832,29 +829,31 @@ function SkuSuggestionRow({
   });
 
   return (
-    <div className="rounded-md border border-border p-3">
+    <div className="rounded-md border border-[var(--jm-border)] p-3">
       <div className="flex items-baseline justify-between gap-2">
         <div className="flex flex-col">
-          <span className="font-mono text-[13px] font-medium">{channelSku}</span>
+          <span className="font-mono text-jm-sm font-medium text-[var(--jm-text)]">
+            {channelSku}
+          </span>
           {channelProductName && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
               채널명: {channelProductName} · 수량 {quantity}
             </span>
           )}
         </div>
         {mapped && (
-          <Badge variant="default">
+          <JmBadge variant="solid">
             <CheckCircle2 className="mr-0.5 h-3 w-3" />
             매핑됨
-          </Badge>
+          </JmBadge>
         )}
       </div>
       {!mapped && (
         <div className="mt-2 space-y-1">
           {suggestionsQuery.isPending ? (
-            <Skeleton className="h-12 w-full" />
+            <JmSkeleton className="h-12 w-full" />
           ) : (suggestionsQuery.data ?? []).length === 0 ? (
-            <p className="text-[12px] text-muted-foreground">
+            <p className="text-jm-xs text-[var(--jm-text-muted)]">
               자동 추천 결과 없음 — SKU 매핑 탭에서 직접 등록하세요
             </p>
           ) : (
@@ -864,20 +863,20 @@ function SkuSuggestionRow({
               return (
                 <div
                   key={s.productId}
-                  className="flex items-center justify-between gap-2 rounded border border-border-subtle p-2 text-[12px]"
+                  className="flex items-center justify-between gap-2 rounded border border-[var(--jm-border)] p-2 text-jm-xs"
                 >
                   <div className="flex flex-1 flex-col">
-                    <span className="text-foreground">{s.productName}</span>
-                    <span className="font-mono text-[11px] text-muted-foreground">
+                    <span className="text-[var(--jm-text)]">{s.productName}</span>
+                    <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                       {s.productSku} · {s.reason}
                     </span>
                   </div>
-                  <Badge variant="outline" className="shrink-0">
+                  <JmBadge variant="outline" className="shrink-0">
                     {s.score}점
-                  </Badge>
-                  <Button
-                    size="sm"
-                    className="h-7 shrink-0 text-[12px]"
+                  </JmBadge>
+                  <JmButton
+                    size="xs"
+                    className="shrink-0"
                     onClick={() => mapMutation.mutate(s.productId)}
                     disabled={mapMutation.isPending}
                   >
@@ -885,7 +884,7 @@ function SkuSuggestionRow({
                       <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                     ) : null}
                     매핑
-                  </Button>
+                  </JmButton>
                 </div>
               );
             })
@@ -906,7 +905,7 @@ function StatsBar() {
   const data = statsQuery.data;
 
   return (
-    <div className="border-b border-border bg-muted/30 px-5 py-2.5">
+    <div className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-5 py-2.5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           icon={<AlertCircle className="h-3.5 w-3.5" />}
@@ -942,17 +941,17 @@ function StatsBar() {
         />
       </div>
       {data && data.missingSkuTop.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span className="text-muted-foreground">자주 누락 SKU:</span>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-jm-2xs">
+          <span className="text-[var(--jm-text-muted)]">자주 누락 SKU:</span>
           {data.missingSkuTop.slice(0, 5).map((s) => (
-            <Badge
+            <JmBadge
               key={`${s.channelId}-${s.channelSku}`}
               variant="outline"
               className="font-mono"
             >
               {s.channelSku}
-              <span className="ml-1 text-muted-foreground">×{s.count}</span>
-            </Badge>
+              <span className="ml-1 text-[var(--jm-text-muted)]">×{s.count}</span>
+            </JmBadge>
           ))}
         </div>
       )}
@@ -975,22 +974,26 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-md border bg-card p-2.5 ${
+      className={`rounded-md border bg-[var(--jm-surface)] p-2.5 ${
         tone === "warning"
-          ? "border-[var(--jm-warning-bg, #fef3c7)]"
-          : "border-border"
+          ? "border-[var(--jm-warning-solid)]"
+          : "border-[var(--jm-border)]"
       }`}
     >
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
         {icon}
         {label}
       </div>
       <div
-        className={`mt-1 text-[18px] font-semibold tabular-nums ${
-          tone === "warning" ? "text-amber-600 dark:text-amber-500" : ""
+        className={`mt-1 text-jm-xl font-semibold tabular-nums ${
+          tone === "warning" ? "text-[var(--jm-warning-fg)]" : "text-[var(--jm-text)]"
         }`}
       >
-        {loading ? <Skeleton className="h-5 w-12" /> : value.toLocaleString("ko-KR")}
+        {loading ? (
+          <JmSkeleton className="h-5 w-12" />
+        ) : (
+          value.toLocaleString("ko-KR")
+        )}
       </div>
     </div>
   );
@@ -1039,91 +1042,88 @@ function MappingSection({ channels }: { channels: Channel[] }) {
 
   if (channels.length === 0) {
     return (
-      <div className="rounded-md border border-border bg-muted/30 p-8 text-center text-[13px] text-muted-foreground">
+      <div className="rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-8 text-center text-jm-sm text-[var(--jm-text-muted)]">
         활성 채널이 없습니다.
       </div>
     );
   }
 
+  const channelOptions: JmSelectOption[] = channels.map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Select
-          value={selectedChannel}
-          onValueChange={(v) => v && setSelectedChannel(v)}
-        >
-          <SelectTrigger className="h-8 w-[200px] text-[12px]">
-            <SelectValue placeholder="채널" />
-          </SelectTrigger>
-          <SelectContent>
-            {channels.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
+        <JmSelect
           size="sm"
-          className="h-8 text-[12px]"
+          className="w-[200px]"
+          placeholder="채널"
+          options={channelOptions}
+          value={selectedChannel}
+          onChange={(v) => v && setSelectedChannel(v)}
+        />
+        <JmButton
+          size="xs"
           onClick={() => setAddOpen(true)}
           disabled={!selectedChannel}
         >
           <Plus className="mr-1 h-3 w-3" />
           매핑 추가
-        </Button>
+        </JmButton>
       </div>
 
-      <Table className="min-w-[800px]">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[180px]">채널 SKU</TableHead>
-            <TableHead>채널 상품명 (참고)</TableHead>
-            <TableHead>ERP 상품</TableHead>
-            <TableHead className="w-[140px]">ERP SKU</TableHead>
-            <TableHead className="w-[80px]" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <JmTable className="min-w-[800px]">
+        <JmTableHeader>
+          <JmTableRow>
+            <JmTableHead className="w-[180px]">채널 SKU</JmTableHead>
+            <JmTableHead>채널 상품명 (참고)</JmTableHead>
+            <JmTableHead>ERP 상품</JmTableHead>
+            <JmTableHead className="w-[140px]">ERP SKU</JmTableHead>
+            <JmTableHead className="w-[80px]" />
+          </JmTableRow>
+        </JmTableHeader>
+        <JmTableBody>
           {mappingsQuery.isPending ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <TableRow key={i}>
+              <JmTableRow key={i}>
                 {Array.from({ length: 5 }).map((_, j) => (
-                  <TableCell key={j}>
-                    <Skeleton className="h-4 w-full" />
-                  </TableCell>
+                  <JmTableCell key={j}>
+                    <JmSkeleton className="h-4 w-full" />
+                  </JmTableCell>
                 ))}
-              </TableRow>
+              </JmTableRow>
             ))
           ) : (mappingsQuery.data ?? []).length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center py-8 text-[13px]">
+            <JmTableRow>
+              <JmTableCell colSpan={5} className="text-center py-8 text-jm-sm">
                 등록된 매핑이 없습니다
-              </TableCell>
-            </TableRow>
+              </JmTableCell>
+            </JmTableRow>
           ) : (
             (mappingsQuery.data ?? []).map((m) => {
               const isMulti = m.components.length > 0;
               return (
-                <TableRow key={m.id}>
-                  <TableCell className="font-mono text-[12px]">
+                <JmTableRow key={m.id}>
+                  <JmTableCell className="font-mono text-jm-xs">
                     {m.channelSku}
                     {isMulti && (
-                      <Badge variant="secondary" className="ml-1.5">
+                      <JmBadge variant="default" className="ml-1.5">
                         다중 ×{m.components.length}
-                      </Badge>
+                      </JmBadge>
                     )}
-                  </TableCell>
-                  <TableCell className="text-[12px] text-muted-foreground">
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
                     {m.channelName ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-[13px]">
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-sm">
                     {isMulti ? (
                       <div className="flex flex-col gap-0.5">
                         {m.components.map((c) => (
                           <span key={c.id}>
                             {c.product.name}{" "}
-                            <span className="text-muted-foreground">
+                            <span className="text-[var(--jm-text-muted)]">
                               × {Number(c.quantity).toLocaleString("ko-KR")}
                             </span>
                           </span>
@@ -1132,8 +1132,8 @@ function MappingSection({ channels }: { channels: Channel[] }) {
                     ) : (
                       m.product?.name ?? "—"
                     )}
-                  </TableCell>
-                  <TableCell className="font-mono text-[12px] text-muted-foreground">
+                  </JmTableCell>
+                  <JmTableCell className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                     {isMulti ? (
                       <div className="flex flex-col gap-0.5">
                         {m.components.map((c) => (
@@ -1143,12 +1143,12 @@ function MappingSection({ channels }: { channels: Channel[] }) {
                     ) : (
                       m.product?.sku ?? "—"
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Button
+                  </JmTableCell>
+                  <JmTableCell>
+                    <JmIconButton
                       size="sm"
                       variant="ghost"
-                      className="h-7 w-7 p-0"
+                      aria-label="매핑 삭제"
                       onClick={() => {
                         if (!confirm("이 매핑을 삭제하시겠습니까?")) return;
                         deleteMutation.mutate(m.id);
@@ -1164,14 +1164,14 @@ function MappingSection({ channels }: { channels: Channel[] }) {
                       ) : (
                         <Trash2 className="h-3 w-3" />
                       )}
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                    </JmIconButton>
+                  </JmTableCell>
+                </JmTableRow>
               );
             })
           )}
-        </TableBody>
-      </Table>
+        </JmTableBody>
+      </JmTable>
 
       {selectedChannel && (
         <AddMappingDialog
@@ -1314,74 +1314,81 @@ function AddMappingDialog({
   };
 
   return (
-    <Dialog
+    <JmDialog
       open={open}
       onOpenChange={(v) => {
         if (!v) reset();
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>SKU 매핑 추가</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 px-1">
+      <JmDialogContent size="lg">
+        <JmDialogHeader>
+          <JmDialogTitle>SKU 매핑 추가</JmDialogTitle>
+        </JmDialogHeader>
+        <JmDialogBody className="space-y-3">
           {/* 모드 토글 */}
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setMode("single")}
-              className={`flex-1 rounded-md border px-3 py-2 text-[12px] transition-colors ${
+              className={`flex-1 rounded-md border px-3 py-2 text-jm-xs transition-colors ${
                 mode === "single"
-                  ? "border-primary bg-primary/5 font-medium"
-                  : "border-border bg-background hover:border-foreground/30"
+                  ? "border-[var(--jm-action)] bg-[var(--jm-accent-bg)] font-medium"
+                  : "border-[var(--jm-border)] bg-[var(--jm-bg)] hover:border-[var(--jm-border-strong)]"
               }`}
             >
-              <div className="font-medium">단일 매핑</div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="font-medium text-[var(--jm-text)]">단일 매핑</div>
+              <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                 채널 SKU 1개 → ERP 상품 1개
               </div>
             </button>
             <button
               type="button"
               onClick={() => setMode("multi")}
-              className={`flex-1 rounded-md border px-3 py-2 text-[12px] transition-colors ${
+              className={`flex-1 rounded-md border px-3 py-2 text-jm-xs transition-colors ${
                 mode === "multi"
-                  ? "border-primary bg-primary/5 font-medium"
-                  : "border-border bg-background hover:border-foreground/30"
+                  ? "border-[var(--jm-action)] bg-[var(--jm-accent-bg)] font-medium"
+                  : "border-[var(--jm-border)] bg-[var(--jm-bg)] hover:border-[var(--jm-border-strong)]"
               }`}
             >
-              <div className="font-medium">다중 매핑 (세트)</div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="font-medium text-[var(--jm-text)]">
+                다중 매핑 (세트)
+              </div>
+              <div className="text-jm-2xs text-[var(--jm-text-muted)]">
                 채널 SKU 1개 → ERP 상품 N개
               </div>
             </button>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-[12px]">채널 SKU</Label>
-            <Input
+          <JmFormField label="채널 SKU">
+            <JmInput
+              size="sm"
               value={channelSku}
               onChange={(e) => setChannelSku(e.target.value)}
               placeholder="채널이 보내는 상품 코드"
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-[12px]">
-              채널 상품명{" "}
-              <span className="text-muted-foreground">(참고용, 선택)</span>
-            </Label>
-            <Input
+          </JmFormField>
+          <JmFormField
+            label={
+              <>
+                채널 상품명{" "}
+                <span className="text-[var(--jm-text-subtle)]">
+                  (참고용, 선택)
+                </span>
+              </>
+            }
+          >
+            <JmInput
+              size="sm"
               value={channelName}
               onChange={(e) => setChannelName(e.target.value)}
               placeholder="채널 측 표시명 (안 적어도 됨)"
             />
-          </div>
+          </JmFormField>
 
           {mode === "single" ? (
             <>
-              <div className="space-y-1.5">
-                <Label className="text-[12px]">ERP 상품</Label>
+              <JmFormField label="ERP 상품">
                 <ProductCombobox
                   products={products}
                   value={productId}
@@ -1392,20 +1399,24 @@ function AddMappingDialog({
                   filterType="component"
                   placeholder="ERP 상품 선택..."
                 />
-              </div>
+              </JmFormField>
               {/* 옵션값 매핑 — 선택된 상품에 옵션 슬롯이 있을 때만 노출 */}
               {hasOptions && (
-                <div className="space-y-1.5">
-                  <Label className="text-[12px]">
-                    옵션값 매핑{" "}
-                    <span className="text-muted-foreground">
-                      (선택사항 — 채널 SKU 가 특정 옵션값에 해당할 때)
-                    </span>
-                  </Label>
+                <JmFormField
+                  label={
+                    <>
+                      옵션값 매핑{" "}
+                      <span className="text-[var(--jm-text-subtle)]">
+                        (선택사항 — 채널 SKU 가 특정 옵션값에 해당할 때)
+                      </span>
+                    </>
+                  }
+                  hint="선택 시 import 된 OrderItem 의 productId 가 옵션값의 매핑된 SKU 로 적용됨 (SWAP 모드). optionSnapshot 도 자동 채움. entryProductId = 위 ERP 상품 (funnel)."
+                >
                   <select
                     value={productOptionValueId}
                     onChange={(e) => setProductOptionValueId(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-transparent px-2 text-[13px]"
+                    className="w-full h-9 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] px-2 text-jm-sm text-[var(--jm-text)]"
                   >
                     <option value="">— 매핑 안 함 (대표 상품 그대로) —</option>
                     {optionSlots.flatMap((slot) =>
@@ -1418,18 +1429,14 @@ function AddMappingDialog({
                       )),
                     )}
                   </select>
-                  <p className="text-[11px] text-muted-foreground">
-                    선택 시 import 된 OrderItem 의 productId 가 옵션값의 매핑된 SKU 로 적용됨 (SWAP 모드).
-                    optionSnapshot 도 자동 채움. entryProductId = 위 ERP 상품 (funnel).
-                  </p>
-                </div>
+                </JmFormField>
               )}
             </>
           ) : (
             <div className="space-y-2">
-              <Label className="text-[12px]">
+              <label className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
                 ERP 상품 구성 (채널 SKU 1개당)
-              </Label>
+              </label>
               <div className="space-y-1.5">
                 {components.map((c, idx) => (
                   <div key={idx} className="flex items-start gap-2">
@@ -1444,7 +1451,7 @@ function AddMappingDialog({
                           };
                           setComponents(next);
                         }}
-                        className="h-9 w-full rounded-md border border-input bg-transparent px-1.5 text-[12px]"
+                        className="h-9 w-full rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] px-1.5 text-jm-xs text-[var(--jm-text)]"
                         title="MAIN: 기본 라인 / OPTION: 옵션 매핑 / ADDON: 추가구매·사은품"
                       >
                         <option value="MAIN">메인</option>
@@ -1466,7 +1473,8 @@ function AddMappingDialog({
                       />
                     </div>
                     <div className="w-[60px]">
-                      <Input
+                      <JmInput
+                        size="sm"
                         value={c.quantity}
                         onChange={(e) => {
                           const next = [...components];
@@ -1477,23 +1485,24 @@ function AddMappingDialog({
                         className="text-right"
                       />
                     </div>
-                    <Button
+                    <JmIconButton
                       variant="ghost"
                       size="sm"
-                      className="h-9 w-9 p-0"
+                      aria-label="구성품 삭제"
+                      className="h-9 w-9"
                       onClick={() =>
                         setComponents(components.filter((_, i) => i !== idx))
                       }
                       disabled={components.length === 1}
                     >
                       <Trash2 className="h-3 w-3" />
-                    </Button>
+                    </JmIconButton>
                   </div>
                 ))}
               </div>
-              <Button
+              <JmButton
                 variant="outline"
-                size="sm"
+                size="xs"
                 onClick={() =>
                   setComponents([
                     ...components,
@@ -1503,35 +1512,40 @@ function AddMappingDialog({
               >
                 <Plus className="mr-1 h-3 w-3" />
                 구성품 추가
-              </Button>
-              <p className="text-[11px] text-muted-foreground">
+              </JmButton>
+              <p className="text-jm-2xs text-[var(--jm-text-muted)]">
                 <strong>메인</strong>: 기본 라인 (세트 풀이는 모두 메인) ·{" "}
                 <strong>옵션</strong>: 옵션 매핑된 라인 (OrderItem.lineRole=OPTION_REF) ·{" "}
                 <strong>추가</strong>: 추가구매·사은품 (OrderItem.lineRole=ADDON, 첫 메인의 자식 라인). 채널 raw 단가는 sellingPrice 비례로 분배.
               </p>
             </div>
           )}
-        </div>
-        <DialogFooter>
-          <Button
+        </JmDialogBody>
+        <JmDialogFooter>
+          <JmButton
             variant="outline"
+            size="sm"
             onClick={() => {
               reset();
               onOpenChange(false);
             }}
           >
             취소
-          </Button>
-          <Button onClick={handleSubmit} disabled={createMutation.isPending}>
+          </JmButton>
+          <JmButton
+            size="sm"
+            onClick={handleSubmit}
+            disabled={createMutation.isPending}
+          >
             {createMutation.isPending ? (
               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
             ) : (
               <Package className="mr-1 h-3 w-3" />
             )}
             추가
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </JmButton>
+        </JmDialogFooter>
+      </JmDialogContent>
+    </JmDialog>
   );
 }

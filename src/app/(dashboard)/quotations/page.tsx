@@ -399,7 +399,7 @@ export default function QuotationsPage() {
                     <JmTableRow className="hover:bg-transparent">
                       <JmTableCell
                         colSpan={8}
-                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                        className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                       >
                         견적서 목록을 불러오지 못했습니다
                       </JmTableCell>
@@ -424,7 +424,7 @@ export default function QuotationsPage() {
                     quotations.map((q) => (
                       <JmTableRow key={q.id}>
                         <JmTableCell>
-                          <span className="font-[family-name:var(--jm-font-mono)] text-[12px] text-[var(--jm-text-muted)]">
+                          <span className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
                             {q.quotationNo}
                           </span>
                         </JmTableCell>
@@ -578,33 +578,33 @@ export default function QuotationsPage() {
               <div className="flex flex-col gap-4">
                 {/* 전환 대상 선택 */}
                 <div className="space-y-2">
-                  <p className="text-[13px] font-medium text-[var(--jm-text)]">전환 대상</p>
+                  <p className="text-jm-sm font-medium text-[var(--jm-text)]">전환 대상</p>
                   <div className="grid grid-cols-2 gap-2">
                     {convertDialog?.type === "SALES" ? (
                       <>
                         <button
                           type="button"
                           onClick={() => setConvertTarget("statement")}
-                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                          className={`rounded-lg border p-3 text-left text-jm-sm transition-colors ${
                             convertTarget === "statement"
                               ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                               : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
                           }`}
                         >
                           <div className="font-semibold text-[var(--jm-text)]">거래명세표</div>
-                          <div className="text-[12px] text-[var(--jm-text-muted)]">실제 거래 증빙 (Statement)</div>
+                          <div className="text-jm-xs text-[var(--jm-text-muted)]">실제 거래 증빙 (Statement)</div>
                         </button>
                         <button
                           type="button"
                           onClick={() => setConvertTarget("order")}
-                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                          className={`rounded-lg border p-3 text-left text-jm-sm transition-colors ${
                             convertTarget === "order"
                               ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                               : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
                           }`}
                         >
                           <div className="font-semibold text-[var(--jm-text)]">주문</div>
-                          <div className="text-[12px] text-[var(--jm-text-muted)]">Order 생성 (채널 필수)</div>
+                          <div className="text-jm-xs text-[var(--jm-text-muted)]">Order 생성 (채널 필수)</div>
                         </button>
                       </>
                     ) : (
@@ -612,26 +612,26 @@ export default function QuotationsPage() {
                         <button
                           type="button"
                           onClick={() => setConvertTarget("purchase_order")}
-                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                          className={`rounded-lg border p-3 text-left text-jm-sm transition-colors ${
                             convertTarget === "purchase_order"
                               ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                               : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
                           }`}
                         >
                           <div className="font-semibold text-[var(--jm-text)]">발주 (권장)</div>
-                          <div className="text-[12px] text-[var(--jm-text-muted)]">RFQ → 발주 → 입고 정상 흐름</div>
+                          <div className="text-jm-xs text-[var(--jm-text-muted)]">RFQ → 발주 → 입고 정상 흐름</div>
                         </button>
                         <button
                           type="button"
                           onClick={() => setConvertTarget("incoming")}
-                          className={`rounded-lg border p-3 text-left text-[13px] transition-colors ${
+                          className={`rounded-lg border p-3 text-left text-jm-sm transition-colors ${
                             convertTarget === "incoming"
                               ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                               : "border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]"
                           }`}
                         >
                           <div className="font-semibold text-[var(--jm-text)]">입고 (직접)</div>
-                          <div className="text-[12px] text-[var(--jm-text-muted)]">발주 단계 건너뛰고 즉시 입고</div>
+                          <div className="text-jm-xs text-[var(--jm-text-muted)]">발주 단계 건너뛰고 즉시 입고</div>
                         </button>
                       </>
                     )}
@@ -641,7 +641,7 @@ export default function QuotationsPage() {
                 {/* 주문 전환 시 채널 선택 */}
                 {convertTarget === "order" && (
                   <div className="space-y-2">
-                    <p className="text-[13px] font-medium text-[var(--jm-text)]">채널 (필수)</p>
+                    <p className="text-jm-sm font-medium text-[var(--jm-text)]">채널 (필수)</p>
                     <ChannelCombobox
                       channels={channelsQuery.data ?? []}
                       value={convertChannelId}

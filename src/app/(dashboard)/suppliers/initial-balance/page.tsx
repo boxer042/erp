@@ -245,7 +245,7 @@ export default function InitialBalancePage() {
                   </th>
                   <th className="border-r border-b border-[var(--jm-border)] w-[170px] py-2 text-center font-medium">
                     기초 잔액
-                    <span className="ml-1 text-[10px] text-[var(--jm-text-muted)] font-normal">
+                    <span className="ml-1 text-jm-3xs text-[var(--jm-text-muted)] font-normal">
                       (VAT 포함 총액)
                     </span>
                   </th>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Menu, Search, Plus, X, Package, User } from "lucide-react";
 import { apiMutate, ApiError } from "@/lib/api-client";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
 import { CustomerSummaryCard } from "@/components/pos/customer-summary-card";
@@ -130,19 +130,12 @@ export default function PosV2HomePage() {
             className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="메뉴"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M3 6h14M3 10h14M3 14h14"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
+            <Menu className="size-5" />
           </button>
-          <h1 className="flex-1 text-[20px] font-bold tracking-tight text-[var(--jm-text)]">
+          <h1 className="flex-1 text-jm-2xl font-bold tracking-tight text-[var(--jm-text)]">
             POS
           </h1>
-          <span className="text-[12px] text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">
             {sessions.length === 0 ? "비어있음" : `진행 ${sessions.length}`}
           </span>
         </div>
@@ -162,22 +155,13 @@ export default function PosV2HomePage() {
               {sessions.length >= 8 && (
                 <div className="mb-3 flex flex-col gap-2">
                   <div className="relative">
-                    <svg
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--jm-text-subtle)]"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                    >
-                      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.6" />
-                      <path d="M14 14l3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--jm-text-subtle)]" />
                     <input
                       type="search"
                       value={gridFilter}
                       onChange={(e) => setGridFilter(e.target.value)}
                       placeholder="이름·전화·사업자번호"
-                      className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-9 pr-3 text-[14px] outline-none focus:border-[var(--jm-border-strong)]"
+                      className="h-11 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-9 pr-3 text-jm-base outline-none focus:border-[var(--jm-border-strong)]"
                     />
                   </div>
                   <div className="flex gap-1.5 overflow-x-auto">
@@ -195,7 +179,7 @@ export default function PosV2HomePage() {
                           key={opt.v}
                           type="button"
                           onClick={() => setGridTypeFilter(opt.v)}
-                          className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                          className={`shrink-0 rounded-full px-3 py-1.5 text-jm-xs font-medium transition-colors ${
                             active
                               ? "bg-[var(--jm-action)] text-white"
                               : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] border border-[var(--jm-border)] hover:bg-[var(--jm-bg)]"
@@ -217,7 +201,7 @@ export default function PosV2HomePage() {
                           key={opt.v}
                           type="button"
                           onClick={() => setGridSort(opt.v)}
-                          className={`rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
+                          className={`rounded-full px-3 py-1 text-jm-2xs font-medium transition-colors ${
                             gridSort === opt.v
                               ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
                               : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
@@ -237,14 +221,14 @@ export default function PosV2HomePage() {
                           setGridTypeFilter("ALL");
                           setGridSort("recent");
                         }}
-                        className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
+                        className="shrink-0 rounded-full px-3 py-1.5 text-jm-xs font-medium text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
                       >
                         초기화
                       </button>
                     )}
                   </div>
                   {filteredSessions.length !== sessions.length && (
-                    <p className="text-[11px] text-[var(--jm-text-muted)]">
+                    <p className="text-jm-2xs text-[var(--jm-text-muted)]">
                       {filteredSessions.length} / {sessions.length} 표시
                     </p>
                   )}
@@ -252,7 +236,7 @@ export default function PosV2HomePage() {
               )}
 
               {filteredSessions.length === 0 ? (
-                <div className="py-12 text-center text-[13px] text-[var(--jm-text-muted)]">
+                <div className="py-12 text-center text-jm-sm text-[var(--jm-text-muted)]">
                   조건에 맞는 고객이 없습니다
                 </div>
               ) : (
@@ -318,37 +302,16 @@ export default function PosV2HomePage() {
             onClick={startWithCustomerLink}
             className="flex h-12 items-center gap-2 rounded-full bg-[var(--jm-surface)] px-5 text-[var(--jm-text)] shadow-lg shadow-[var(--jm-shadow-md)] border border-[var(--jm-border)] transition-transform active:scale-95"
           >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <circle
-                cx="9"
-                cy="9"
-                r="6"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              />
-              <path
-                d="M14 14l3 3"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="text-[14px] font-semibold">고객 찾기</span>
+            <Search className="size-[18px]" />
+            <span className="text-jm-base font-semibold">고객 찾기</span>
           </button>
           <button
             type="button"
             onClick={startUnregistered}
             className="flex h-14 items-center gap-2 rounded-full bg-[var(--jm-action)] px-5 text-white shadow-lg shadow-[var(--jm-shadow-lg)] transition-transform active:scale-95"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M10 4v12M4 10h12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="text-[15px] font-semibold">새 고객</span>
+            <Plus className="size-5" />
+            <span className="text-jm-md font-semibold">새 고객</span>
           </button>
         </div>
       )}
@@ -461,14 +424,14 @@ function CloseSessionSheet({
     >
       <div className="flex flex-col gap-3 pb-2">
         <div className="rounded-2xl bg-[var(--jm-bg)] px-4 py-3">
-          <div className="text-[14px] font-semibold text-[var(--jm-text)]">
+          <div className="text-jm-base font-semibold text-[var(--jm-text)]">
             {customerLabel}
           </div>
-          <div className="mt-0.5 text-[12px] text-[var(--jm-text-muted)]">
+          <div className="mt-0.5 text-jm-xs text-[var(--jm-text-muted)]">
             카트에 {itemCount}건 담겨있습니다
           </div>
           {hasOpenRepair && (
-            <div className="mt-2 rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-[11px] text-[var(--jm-warning-fg)]">
+            <div className="mt-2 rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-jm-2xs text-[var(--jm-warning-fg)]">
               이 고객의 진행중 수리 {target.openRepairCount}건은 그대로 진행되며
               수리관리에서 추적됩니다
               {!isRegistered &&
@@ -487,19 +450,12 @@ function CloseSessionSheet({
             {pending === "park" ? (
               <Loader2 className="size-5 animate-spin" />
             ) : (
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M4 7l6-3 6 3v8l-6 3-6-3V7z"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Package className="size-[18px]" />
             )}
           </span>
           <div className="flex flex-col">
-            <span className="text-[14px] font-semibold">장바구니로 저장</span>
-            <span className="text-[11px] text-white/70">
+            <span className="text-jm-base font-semibold">장바구니로 저장</span>
+            <span className="text-jm-2xs text-white/70">
               상담 메모로 보관 — 가격은 부활 시 현재가로 갱신
             </span>
           </div>
@@ -512,18 +468,11 @@ function CloseSessionSheet({
           className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] px-4 py-3.5 text-left text-[var(--jm-danger-fg)] border border-[var(--jm-border)] transition-all active:scale-[0.99] disabled:opacity-50"
         >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M5 5l10 10M15 5L5 15"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
+            <X className="size-[18px]" />
           </span>
           <div className="flex flex-col">
-            <span className="text-[14px] font-semibold">그냥 닫기</span>
-            <span className="text-[11px] text-[var(--jm-text-muted)]">
+            <span className="text-jm-base font-semibold">그냥 닫기</span>
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
               카트 {itemCount}건이 사라집니다 — 되돌릴 수 없음
             </span>
           </div>
@@ -533,7 +482,7 @@ function CloseSessionSheet({
           type="button"
           onClick={onClose}
           disabled={pending !== null}
-          className="rounded-2xl px-4 py-3 text-[13px] font-semibold text-[var(--jm-text-muted)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
+          className="rounded-2xl px-4 py-3 text-jm-sm font-semibold text-[var(--jm-text-muted)] border border-[var(--jm-border)] transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
         >
           취소
         </button>
@@ -552,27 +501,13 @@ function EmptyState({
   return (
     <div className="flex flex-col items-center gap-6 py-20 text-center">
       <div className="flex size-20 items-center justify-center rounded-3xl bg-[var(--jm-surface-muted)]">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-          <circle
-            cx="12"
-            cy="9"
-            r="3"
-            stroke="#71717a"
-            strokeWidth="1.5"
-          />
-          <path
-            d="M5 19c1-3 4-5 7-5s6 2 7 5"
-            stroke="#71717a"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <User className="size-8 text-[var(--jm-text-muted)]" />
       </div>
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-[18px] font-bold text-[var(--jm-text)]">
+        <h2 className="text-jm-xl font-bold text-[var(--jm-text)]">
           진행중인 고객이 없습니다
         </h2>
-        <p className="text-[13px] text-[var(--jm-text-muted)]">
+        <p className="text-jm-sm text-[var(--jm-text-muted)]">
           고객이 매장에 들어오면 시작해주세요
         </p>
       </div>
@@ -580,38 +515,17 @@ function EmptyState({
         <button
           type="button"
           onClick={onUnregistered}
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white"
+          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-md font-semibold text-white"
         >
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M10 4v12M4 10h12"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
+          <Plus className="size-[18px]" />
           새 고객 (미등록)
         </button>
         <button
           type="button"
           onClick={onSearch}
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-surface)] text-[15px] font-semibold text-[var(--jm-text)] border border-[var(--jm-border)]"
+          className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-surface)] text-jm-md font-semibold text-[var(--jm-text)] border border-[var(--jm-border)]"
         >
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-            <circle
-              cx="9"
-              cy="9"
-              r="6"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            />
-            <path
-              d="M14 14l3 3"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
+          <Search className="size-[18px]" />
           기존 고객 찾기
         </button>
       </div>

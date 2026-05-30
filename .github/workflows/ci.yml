@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # 하드 게이트 — 타입 안전성 + 디자인 하드-제로 인바리언트
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Design drift gate
+        run: bash scripts/check-drift.sh
+
+      # 번다운 가시화 — 기존 lint error(69) 정리 전까지 비차단.
+      # 정리 완료 후 continue-on-error 제거 + DESIGN_DRIFT_SYNTAX warn→error 승급.
+      - name: Lint (non-blocking burn-down)
+        run: npm run lint
+        continue-on-error: true

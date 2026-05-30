@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, X, Plus } from "lucide-react";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 interface Props<T> {
@@ -82,15 +83,7 @@ function Body<T>({
             className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="닫기"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M12 4l-6 6 6 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <ChevronLeft className="size-5" />
           </button>
           <input
             ref={inputRef}
@@ -102,7 +95,7 @@ function Body<T>({
               onQueryChange?.(e.target.value);
             }}
             placeholder={placeholder}
-            className="h-11 flex-1 rounded-xl bg-[var(--jm-surface-muted)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:bg-[var(--jm-bg)]"
+            className="h-11 flex-1 rounded-xl bg-[var(--jm-surface-muted)] px-4 text-jm-md outline-none placeholder:text-[var(--jm-text-subtle)] focus:bg-[var(--jm-bg)]"
           />
           {q && (
             <button
@@ -115,19 +108,12 @@ function Body<T>({
               className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)]"
               aria-label="지우기"
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M4 4l8 8M12 4l-8 8"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <X className="size-4" />
             </button>
           )}
         </div>
         {title && (
-          <div className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          <div className="px-4 pb-2 text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
             {title}
           </div>
         )}
@@ -139,21 +125,14 @@ function Body<T>({
           <SkeletonList />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
-            <span className="text-[14px] text-[var(--jm-text-muted)]">{emptyText}</span>
+            <span className="text-jm-base text-[var(--jm-text-muted)]">{emptyText}</span>
             {onCreate && q.trim() && (
               <button
                 type="button"
                 onClick={() => onCreate(q.trim())}
-                className="flex h-11 items-center gap-2 rounded-full bg-[var(--jm-action)] px-5 text-[14px] font-semibold text-white"
+                className="flex h-11 items-center gap-2 rounded-full bg-[var(--jm-action)] px-5 text-jm-base font-semibold text-white"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path
-                    d="M7 3v8M3 7h8"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <Plus className="size-3.5" strokeWidth={1.8} />
                 {createLabel ?? `"${q}" 새로 등록`}
               </button>
             )}
@@ -180,16 +159,9 @@ function Body<T>({
                 <button
                   type="button"
                   onClick={() => onCreate(q.trim())}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--jm-surface-muted)] text-[13px] font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--jm-surface-muted)] text-jm-sm font-semibold text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path
-                      d="M7 3v8M3 7h8"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+                  <Plus className="size-3.5" strokeWidth={1.8} />
                   {createLabel ?? `"${q}" 새로 등록`}
                 </button>
               </li>

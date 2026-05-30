@@ -353,7 +353,7 @@ export default function RepairsPage() {
                   <JmTableRow className="hover:bg-transparent">
                     <JmTableCell
                       colSpan={8}
-                      className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                     >
                       수리 티켓을 불러오지 못했습니다
                     </JmTableCell>
@@ -381,7 +381,7 @@ export default function RepairsPage() {
                         </JmBadge>
                       </JmTableCell>
                       <JmTableCell>
-                        <span className="font-[family-name:var(--jm-font-mono)] text-[12px] text-[var(--jm-text-muted)]">
+                        <span className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
                           {t.ticketNo}
                         </span>
                       </JmTableCell>
@@ -407,26 +407,26 @@ export default function RepairsPage() {
                             {t.repairCategory.name}
                           </JmBadge>
                         ) : (
-                          <span className="text-[12px] text-[var(--jm-text-subtle)]">기타</span>
+                          <span className="text-jm-xs text-[var(--jm-text-subtle)]">기타</span>
                         )}
                       </JmTableCell>
                       <JmTableCell>
                         <div className="flex flex-col">
                           {t.customer ? (
                             <>
-                              <span className="flex items-center gap-1 text-[13px] text-[var(--jm-text)]">
+                              <span className="flex items-center gap-1 text-jm-sm text-[var(--jm-text)]">
                                 <User className="size-3 text-[var(--jm-text-muted)]" />
                                 {t.customer.name}
                               </span>
                               {t.customer.phone && (
-                                <span className="flex items-center gap-1 text-[11px] text-[var(--jm-text-muted)]">
+                                <span className="flex items-center gap-1 text-jm-2xs text-[var(--jm-text-muted)]">
                                   <Phone className="size-3" />
                                   {t.customer.phone}
                                 </span>
                               )}
                             </>
                           ) : (
-                            <span className="flex items-center gap-1 text-[12px] text-[var(--jm-text-subtle)]">
+                            <span className="flex items-center gap-1 text-jm-xs text-[var(--jm-text-subtle)]">
                               <User className="size-3" /> 미등록
                             </span>
                           )}
@@ -435,19 +435,19 @@ export default function RepairsPage() {
                       <JmTableCell>
                         <div className="flex flex-col">
                           {t.customerMachine && (
-                            <span className="text-[11px] text-[var(--jm-text-muted)]">
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                               {t.customerMachine.name}
                             </span>
                           )}
-                          <span className="line-clamp-1 max-w-[280px] text-[13px] text-[var(--jm-text)]">
+                          <span className="line-clamp-1 max-w-[280px] text-jm-sm text-[var(--jm-text)]">
                             {t.symptom ?? <span className="text-[var(--jm-text-subtle)]">-</span>}
                           </span>
                         </div>
                       </JmTableCell>
-                      <JmTableCell className="text-[12px] text-[var(--jm-text-muted)]">
+                      <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
                         {format(new Date(t.receivedAt), "MM-dd HH:mm")}
                       </JmTableCell>
-                      <JmTableCell className="text-[12px] text-[var(--jm-text-muted)]">
+                      <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
                         {t.assignedTo?.name ?? (
                           <span className="text-[var(--jm-text-subtle)]">-</span>
                         )}

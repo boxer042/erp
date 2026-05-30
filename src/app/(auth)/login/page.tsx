@@ -2,18 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  JmScope,
+  JmButton,
+  JmInput,
+  JmFormField,
+  JmCard,
+  JmCardHeader,
+  JmCardTitle,
+  JmCardDescription,
+  JmCardContent,
+  JmCardFooter,
+} from "@/jm";
 import { toast } from "sonner";
 
 export default function LoginPage() {
@@ -46,49 +48,50 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="text-center">
-        <div className="flex justify-center mb-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-            <span className="text-lg font-bold">E</span>
+    <JmScope theme="auto">
+      <JmCard>
+        <JmCardHeader className="items-center text-center">
+          <div className="flex justify-center mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--jm-action)] text-[var(--jm-action-fg)]">
+              <span className="text-jm-lg font-bold">E</span>
+            </div>
           </div>
-        </div>
-        <CardTitle className="text-2xl">JAEWOOMADE ERP</CardTitle>
-        <CardDescription>로그인하여 시작하세요</CardDescription>
-      </CardHeader>
-      <form onSubmit={handleLogin}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">이메일</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="email@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">비밀번호</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3">
-          <Button type="submit" variant="success" size="pill" className="w-full" disabled={loading}>
-            {loading ? "로그인 중..." : "로그인"}
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            계정이 필요하신가요? 관리자에게 문의해 주세요.
-          </p>
-        </CardFooter>
-      </form>
-    </Card>
+          <JmCardTitle className="text-jm-2xl">JAEWOOMADE ERP</JmCardTitle>
+          <JmCardDescription>로그인하여 시작하세요</JmCardDescription>
+        </JmCardHeader>
+        <form onSubmit={handleLogin}>
+          <JmCardContent className="space-y-4">
+            <JmFormField label="이메일" htmlFor="email">
+              <JmInput
+                id="email"
+                type="email"
+                placeholder="email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </JmFormField>
+            <JmFormField label="비밀번호" htmlFor="password">
+              <JmInput
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </JmFormField>
+          </JmCardContent>
+          <JmCardFooter className="flex-col items-stretch gap-3">
+            <JmButton type="submit" variant="cta" className="w-full" disabled={loading}>
+              {loading && <Loader2 className="animate-spin" />}
+              {loading ? "로그인 중..." : "로그인"}
+            </JmButton>
+            <p className="text-jm-sm text-[var(--jm-text-muted)] text-center">
+              계정이 필요하신가요? 관리자에게 문의해 주세요.
+            </p>
+          </JmCardFooter>
+        </form>
+      </JmCard>
+    </JmScope>
   );
 }

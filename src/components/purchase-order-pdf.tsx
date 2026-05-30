@@ -11,7 +11,7 @@ import {
   PDFViewer,
   pdf,
 } from "@react-pdf/renderer";
-import { Button } from "@/components/ui/button";
+import { JmButton } from "@/jm";
 import { Printer, Loader2 } from "lucide-react";
 
 interface Issuer {
@@ -462,10 +462,10 @@ export function PurchaseOrderPdf(props: PurchaseOrderPdfProps) {
           borderBottom: "1px solid #ddd",
         }}
       >
-        <Button
+        <JmButton
+          variant="cta"
           onClick={handleExport}
           disabled={generating}
-          className="bg-black text-white hover:bg-black/80"
         >
           {generating ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -473,7 +473,7 @@ export function PurchaseOrderPdf(props: PurchaseOrderPdfProps) {
             <Printer className="h-4 w-4 mr-2" />
           )}
           {generating ? "PDF 생성 중..." : "PDF 생성"}
-        </Button>
+        </JmButton>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <PDFViewer width="100%" height="100%" showToolbar>

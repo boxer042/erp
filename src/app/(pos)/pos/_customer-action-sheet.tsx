@@ -1,5 +1,6 @@
 "use client";
 
+import { User, MessageCircle, RotateCcw, Search, Plus, ChevronRight } from "lucide-react";
 import { BottomSheet } from "./_components/bottom-sheet";
 
 /** POS·ERP 공용 데이터 — 등록 여부 + 이름만 필요 */
@@ -77,10 +78,7 @@ function Body({
             {onViewProfile && (
               <Action
                 icon={
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                    <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M4 17c1.5-3 3.5-4.5 6-4.5s4.5 1.5 6 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
+                  <User className="size-[18px]" />
                 }
                 label="고객 페이지"
                 desc={`${data.customerName ?? ""} — 구매·수리·임대 이력`}
@@ -92,9 +90,7 @@ function Body({
             )}
             <Action
               icon={
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <path d="M3 10c0-3.5 3-6 7-6s7 2.5 7 6-3 6-7 6c-1 0-2-.2-2.8-.5L4 17l1-3.2C3.7 12.7 3 11.4 3 10z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                </svg>
+                <MessageCircle className="size-[18px]" />
               }
               label="다른 고객으로 변경"
               desc="현재 카트 그대로, 고객만 다시 선택"
@@ -106,15 +102,7 @@ function Body({
             {onReturnExchange && (
               <Action
                 icon={
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                    <path
-                      d="M4 10a6 6 0 1 1 1.76 4.24M4 14v-4h4"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <RotateCcw className="size-[18px]" />
                 }
                 label="반품·교환"
                 desc="이전 주문 선택 후 즉석 환불 또는 교환 시작"
@@ -129,10 +117,7 @@ function Body({
           <>
             <Action
               icon={
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M14 14l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <Search className="size-[18px]" />
               }
               label="기존 고객 연결"
               desc="이름·전화로 검색해 매핑"
@@ -143,9 +128,7 @@ function Body({
             />
             <Action
               icon={
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
+                <Plus className="size-[18px]" />
               }
               label="새 고객 등록"
               desc="이름·전화 입력 후 즉시 매핑"
@@ -189,31 +172,17 @@ function Action({
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <span
-          className={`text-[14px] font-semibold ${
+          className={`text-jm-base font-semibold ${
             danger ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]"
           }`}
         >
           {label}
         </span>
         {desc && (
-          <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">{desc}</span>
+          <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-muted)]">{desc}</span>
         )}
       </div>
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 14 14"
-        fill="none"
-        className="shrink-0 text-[var(--jm-text-disabled)]"
-      >
-        <path
-          d="M5 3l4 4-4 4"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <ChevronRight className="size-3.5 shrink-0 text-[var(--jm-text-disabled)]" />
     </button>
   );
 }

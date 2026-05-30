@@ -443,7 +443,7 @@ export function TemplatesView() {
                   <JmTableRow className="hover:bg-transparent">
                     <JmTableCell
                       colSpan={7}
-                      className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                     >
                       템플릿 목록을 불러오지 못했습니다
                     </JmTableCell>
@@ -1010,7 +1010,7 @@ export function LabelsView() {
                   <JmTableRow className="hover:bg-transparent">
                     <JmTableCell
                       colSpan={5}
-                      className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                     >
                       라벨 목록을 불러오지 못했습니다
                     </JmTableCell>

@@ -92,7 +92,7 @@ export function CustomerSummaryCard({ data, onClick, onClose, hideMeta }: Props)
                 </svg>
               </div>
             ) : (
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[18px] font-bold text-[var(--jm-text)]">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-xl font-bold text-[var(--jm-text)]">
                 {(data.customerName ?? "?").charAt(0)}
               </div>
             )
@@ -100,7 +100,7 @@ export function CustomerSummaryCard({ data, onClick, onClose, hideMeta }: Props)
             <div
               className={`flex size-12 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
             >
-              <span className="font-mono text-[13px] font-bold tracking-wider">
+              <span className="font-mono text-jm-sm font-bold tracking-wider">
                 {code}
               </span>
             </div>
@@ -111,30 +111,30 @@ export function CustomerSummaryCard({ data, onClick, onClose, hideMeta }: Props)
               <>
                 <div className="flex items-center gap-1.5">
                   {data.customerType === "BUSINESS" && (
-                    <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--jm-warning-fg)]">
+                    <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-3xs font-semibold text-[var(--jm-warning-fg)]">
                       기업
                     </span>
                   )}
-                  <span className="line-clamp-1 text-[16px] font-semibold text-[var(--jm-text)]">
+                  <span className="line-clamp-1 text-jm-lg font-semibold text-[var(--jm-text)]">
                     {data.customerName}
                   </span>
                 </div>
                 {data.customerType === "BUSINESS" && data.customerBusinessNumber ? (
-                  <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
+                  <span className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                     {data.customerBusinessNumber}
                   </span>
                 ) : data.customerPhone ? (
-                  <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
+                  <span className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                     {data.customerPhone}
                   </span>
                 ) : null}
               </>
             ) : (
               <>
-                <span className="text-[16px] font-semibold text-[var(--jm-text)]">
+                <span className="text-jm-lg font-semibold text-[var(--jm-text)]">
                   미등록
                 </span>
-                <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
+                <span className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                   #{code}
                 </span>
               </>
@@ -154,12 +154,12 @@ export function CustomerSummaryCard({ data, onClick, onClose, hideMeta }: Props)
                 {rentalCount > 0 && <Pill label="임대" count={rentalCount} />}
               </div>
             ) : (
-              <span className="text-[12px] text-[var(--jm-text-subtle)]">
+              <span className="text-jm-xs text-[var(--jm-text-subtle)]">
                 진행중 없음
               </span>
             )}
             {activityLabel && (
-              <span className="shrink-0 text-[11px] text-[var(--jm-text-subtle)] tabular-nums">
+              <span className="shrink-0 text-jm-2xs text-[var(--jm-text-subtle)] tabular-nums">
                 {activityLabel}
               </span>
             )}
@@ -202,7 +202,7 @@ function Pill({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-jm-2xs font-medium ${
         highlight
           ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
           : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"

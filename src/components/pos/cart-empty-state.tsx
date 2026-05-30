@@ -25,12 +25,12 @@ export function CartEmptyState({
 }: Props) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl bg-[var(--jm-bg)] px-5 py-12 text-center">
-      <span className="text-[13px] text-[var(--jm-text-subtle)]">{hint}</span>
+      <span className="text-jm-sm text-[var(--jm-text-subtle)]">{hint}</span>
       {customerId && onLoadQuotation && (
         <button
           type="button"
           onClick={onLoadQuotation}
-          className="rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 py-2 text-[12px] font-semibold text-[var(--jm-text)] active:bg-[var(--jm-bg)]"
+          className="rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 py-2 text-jm-xs font-semibold text-[var(--jm-text)] active:bg-[var(--jm-bg)]"
         >
           이전 견적서에서 불러오기
         </button>

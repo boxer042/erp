@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiMutate } from "@/lib/api-client";
@@ -153,20 +153,12 @@ export function CancelSheet({
             {parts.length > 0 && (
               <div className="flex flex-col gap-2 rounded-xl border-2 border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] px-4 py-3">
                 <div className="flex items-center gap-1.5">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-[var(--jm-warning-fg)]">
-                    <path
-                      d="M7 2L1 12h12L7 2z"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                      strokeLinejoin="round"
-                    />
-                    <path d="M7 6v3M7 10.5v0.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
+                  <AlertTriangle className="size-3.5 text-[var(--jm-warning-fg)]" />
                   <span className="text-jm-2xs font-semibold text-[var(--jm-warning-fg)]">
                     부속 {parts.length}건 — USED/LOST 상태를 다시 확인하세요
                   </span>
                 </div>
-                <p className="text-[11px] text-[var(--jm-warning-fg)]">
+                <p className="text-jm-2xs text-[var(--jm-warning-fg)]">
                   <span className="font-semibold">USED</span> 는 재고로 복원되고,{" "}
                   <span className="font-semibold">LOST</span> 는 손실로 기록됩니다. 잘못된 상태로 취소하면 재고/회계가 어긋날 수 있습니다.
                 </p>
@@ -192,7 +184,7 @@ export function CancelSheet({
                   type="button"
                   onClick={() => !loading && onOpenChange(false)}
                   disabled={loading}
-                  className="self-start text-[11px] font-semibold text-[var(--jm-warning-fg)] underline-offset-2 hover:underline disabled:opacity-50"
+                  className="self-start text-jm-2xs font-semibold text-[var(--jm-warning-fg)] underline-offset-2 hover:underline disabled:opacity-50"
                 >
                   ← 닫고 부속 카드에서 수정
                 </button>
@@ -238,7 +230,7 @@ export function CancelSheet({
                       <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
                         {r.label}
                       </span>
-                      <span className="text-[11px] text-[var(--jm-text-muted)]">{r.desc}</span>
+                      <span className="text-jm-2xs text-[var(--jm-text-muted)]">{r.desc}</span>
                     </button>
                   );
                 })}

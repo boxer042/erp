@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { JmDatePicker } from "@/jm";
+import { JmDatePicker, JmSpinner } from "@/jm";
+import { Building2, ChevronRight, Clock, Pencil, Info, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
 import { formatComma, parseComma } from "@/lib/utils";
@@ -88,25 +89,17 @@ function CustomerCard({
 
   const inner = (
     <>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+      <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         고객
       </span>
       <div className="flex min-w-0 items-center gap-2.5">
         {isRegistered ? (
           session.customerType === "BUSINESS" ? (
             <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Building2 className="size-[18px]" />
             </div>
           ) : (
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-md font-bold text-[var(--jm-text)]">
               {(session.customerName ?? "?").charAt(0)}
             </div>
           )
@@ -114,7 +107,7 @@ function CustomerCard({
           <div
             className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
           >
-            <span className="font-mono text-[12px] font-bold tracking-wider">
+            <span className="font-mono text-jm-xs font-bold tracking-wider">
               {code}
             </span>
           </div>
@@ -124,33 +117,33 @@ function CustomerCard({
             <>
               <div className="flex items-center gap-1">
                 {session.customerType === "BUSINESS" && (
-                  <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
+                  <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-jm-4xs font-semibold text-[var(--jm-warning-fg)]">
                     기업
                   </span>
                 )}
-                <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                   {session.customerName}
                 </span>
               </div>
               {session.customerType === "BUSINESS" &&
               session.customerBusinessNumber ? (
-                <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
+                <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                   {session.customerBusinessNumber}
                 </span>
               ) : session.customerPhone ? (
-                <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
+                <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                   {session.customerPhone}
                 </span>
               ) : null}
             </>
           ) : (
             <>
-              <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+              <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                 미등록 고객
               </span>
-              <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">#{code}</span>
+              <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">#{code}</span>
               {required && (
-                <span className="line-clamp-1 text-[11px] text-[var(--jm-warning-fg)]">
+                <span className="line-clamp-1 text-jm-2xs text-[var(--jm-warning-fg)]">
                   연결 필요
                 </span>
               )}
@@ -158,22 +151,7 @@ function CustomerCard({
           )}
         </div>
         {onClick && (
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            className="shrink-0 text-[var(--jm-text-disabled)]"
-            aria-hidden
-          >
-            <path
-              d="M5 3l4 4-4 4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <ChevronRight className="size-3.5 shrink-0 text-[var(--jm-text-disabled)]" aria-hidden />
         )}
       </div>
     </>
@@ -217,46 +195,22 @@ function CheckoutAtCard({
         onClick={() => setEditorOpen(true)}
         className="flex w-full flex-col gap-1.5 rounded-2xl bg-[var(--jm-bg)] px-4 py-3 text-left transition-colors active:bg-[var(--jm-surface-muted)] sm:hover:bg-[var(--jm-surface-muted)]"
       >
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+        <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           결제시간
         </span>
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
-              <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
-              <path
-                d="M10 6v4l2.5 2"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Clock className="size-[18px]" aria-hidden />
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
+            <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
               {format(at, "HH:mm")}
             </span>
-            <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+            <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
               {format(at, "M월 d일 (eee)", { locale: ko })}
             </span>
           </div>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            className="shrink-0 text-[var(--jm-text-subtle)]"
-            aria-hidden
-          >
-            <path
-              d="M9 2.5l2.5 2.5L5 11.5H2.5V9L9 2.5z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Pencil className="size-3.5 shrink-0 text-[var(--jm-text-subtle)]" aria-hidden />
         </div>
       </button>
       {editorOpen && (
@@ -587,7 +541,7 @@ function Body({
             requiresCustomerForUnpaid ||
             hasUnresolvedVariant
           }
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
         >
           {checkoutMutation.isPending && <Spinner />}₩
           {totals.total.toLocaleString("ko-KR")} 결제
@@ -597,13 +551,13 @@ function Body({
       <div className="flex flex-col gap-5 pt-2">
         {/* 다크 합계 카드 */}
         <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
-          <div className="text-[12px] font-semibold uppercase tracking-wider text-white/60">
+          <div className="text-jm-xs font-semibold uppercase tracking-wider text-white/60">
             결제 금액
           </div>
-          <div className="mt-1 text-[40px] font-bold tabular-nums leading-none">
+          <div className="mt-1 text-jm-6xl font-bold tabular-nums leading-none">
             ₩{totals.total.toLocaleString("ko-KR")}
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+          <div className="mt-3 grid grid-cols-3 gap-2 text-jm-2xs">
             <Pill label="공급가액" value={totals.net} />
             <Pill label="세액" value={totals.vat} />
             {totals.sessionDiscountAmount > 0 ? (
@@ -618,7 +572,7 @@ function Body({
           </div>
           {/* 항목 구성 */}
           {(rentalItems.length > 0 || repairItems.length > 0) && (
-            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+            <div className="mt-3 flex flex-wrap gap-1.5 text-jm-2xs">
               {productItems.length > 0 && (
                 <span className="rounded-full bg-[var(--jm-surface)]/10 px-2.5 py-1">
                   상품 {productItems.length}
@@ -658,7 +612,7 @@ function Body({
             !skipCustomerLink &&
             (hasRentalOrRepair || method === "UNPAID") && (
               <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--jm-warning-bg)] bg-[var(--jm-warning-bg)] px-3 py-2.5">
-                <span className="text-[11px] text-[var(--jm-warning-fg)]">
+                <span className="text-jm-2xs text-[var(--jm-warning-fg)]">
                   {hasRentalOrRepair
                     ? "임대/수리 기록 추적을 위해 고객 연결을 권장합니다"
                     : "외상은 미수금 추적을 위해 고객 연결이 필요합니다"}
@@ -668,7 +622,7 @@ function Body({
                   <button
                     type="button"
                     onClick={() => setSkipCustomerLink(true)}
-                    className="shrink-0 text-[11px] font-medium text-[var(--jm-warning-fg)] underline-offset-2 hover:underline"
+                    className="shrink-0 text-jm-2xs font-medium text-[var(--jm-warning-fg)] underline-offset-2 hover:underline"
                   >
                     등록 없이 진행
                   </button>
@@ -679,13 +633,13 @@ function Body({
           {/* skip 활성 시 안내 */}
           {skipCustomerLink && (
             <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--jm-bg)] px-3 py-2.5">
-              <span className="text-[11px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                 등록 없이 결제 — 통계/이력 추적 안 됨
               </span>
               <button
                 type="button"
                 onClick={() => setSkipCustomerLink(false)}
-                className="shrink-0 text-[11px] font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
+                className="shrink-0 text-jm-2xs font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
               >
                 취소
               </button>
@@ -696,14 +650,14 @@ function Body({
             !hasRentalOrRepair &&
             method !== "UNPAID" &&
             !skipCustomerLink && (
-              <p className="px-1 text-[11px] text-[var(--jm-text-subtle)]">
+              <p className="px-1 text-jm-2xs text-[var(--jm-text-subtle)]">
                 고객 등록 시 구매 이력·통계가 자동 누적됩니다
               </p>
             )}
 
           {/* 변형 미확정 — 결제 차단 안내 */}
           {hasUnresolvedVariant && (
-            <div className="rounded-xl bg-[var(--jm-warning-bg)] px-4 py-3 text-[12px] text-[var(--jm-warning-fg)]">
+            <div className="rounded-xl bg-[var(--jm-warning-bg)] px-4 py-3 text-jm-xs text-[var(--jm-warning-fg)]">
               ⚠ 변형 미확정 <strong>{unresolvedVariants.length}건</strong> — 카트로 돌아가 변형을 선택해주세요
             </div>
           )}
@@ -715,21 +669,21 @@ function Body({
               onClick={() => setTaxInvoiceRequested((v) => !v)}
               className={`flex items-center justify-between rounded-xl px-4 py-3 text-left transition-colors ${
                 taxInvoiceRequested
-                  ? "bg-[var(--jm-success-bg)] ring-1 ring-emerald-300"
+                  ? "bg-[var(--jm-success-bg)] ring-1 ring-[var(--jm-success-solid)]"
                   : "bg-[var(--jm-bg)] hover:bg-[var(--jm-surface-muted)]"
               }`}
             >
               <div className="flex flex-col">
-                <span className="text-[13px] font-semibold text-[var(--jm-text)]">
+                <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
                   세금계산서 발행 요청
                 </span>
-                <span className="text-[11px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   결제 후 사장님이 별도 발행
                 </span>
               </div>
               <span
                 className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors ${
-                  taxInvoiceRequested ? "bg-[var(--jm-success-bg)]0" : "bg-[var(--jm-border-strong)]"
+                  taxInvoiceRequested ? "bg-[var(--jm-success-solid)]" : "bg-[var(--jm-border-strong)]"
                 }`}
               >
                 <span
@@ -743,11 +697,8 @@ function Body({
         </div>
 
         {method === "UNPAID" && session.customerId && (
-          <div className="flex items-center gap-2 rounded-xl bg-[var(--jm-bg)] px-4 py-3 text-[12px] text-[var(--jm-text)]">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M7 4v3.5M7 9.5v0.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+          <div className="flex items-center gap-2 rounded-xl bg-[var(--jm-bg)] px-4 py-3 text-jm-xs text-[var(--jm-text)]">
+            <Info className="size-3.5 shrink-0" />
             결제 시 <span className="font-semibold">{session.customerName}</span> 님 미수금에 자동 등록됩니다
           </div>
         )}
@@ -755,7 +706,7 @@ function Body({
         {/* 출고 방식 — 수리/임대 라인이 있으면 PICKUP 강제 (토글 숨김) */}
         {!fulfillmentLocked && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               출고 방식
             </span>
             <div className="grid grid-cols-3 gap-2">
@@ -773,13 +724,13 @@ function Body({
                     }`}
                   >
                     <span
-                      className={`text-[14px] font-semibold ${
+                      className={`text-jm-base font-semibold ${
                         active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
                       }`}
                     >
                       {opt.label}
                     </span>
-                    <span className="text-[11px] text-[var(--jm-text-muted)]">{opt.sub}</span>
+                    <span className="text-jm-2xs text-[var(--jm-text-muted)]">{opt.sub}</span>
                   </button>
                 );
               })}
@@ -788,7 +739,7 @@ function Body({
             {needsShippingInfo && (
               <div className="mt-2 flex flex-col gap-2 rounded-2xl bg-[var(--jm-bg)] p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-semibold text-[var(--jm-text)]">
+                  <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
                     {effectiveFulfillment === "SHIPPING"
                       ? "택배 발송지"
                       : "배달지"}
@@ -800,7 +751,7 @@ function Body({
                         setShippingRecipientName(session.customerName ?? "");
                         setShippingRecipientPhone(session.customerPhone ?? "");
                       }}
-                      className="text-[11px] font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
+                      className="text-jm-2xs font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
                     >
                       고객 정보 채우기
                     </button>
@@ -811,25 +762,25 @@ function Body({
                   value={shippingRecipientName}
                   onChange={(e) => setShippingRecipientName(e.target.value)}
                   placeholder="받는 사람 이름 (선택)"
-                  className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
+                  className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm outline-none focus:border-[var(--jm-border-strong)]"
                 />
                 <input
                   type="tel"
                   value={shippingRecipientPhone}
                   onChange={(e) => setShippingRecipientPhone(e.target.value)}
                   placeholder="받는 사람 연락처 *"
-                  className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
+                  className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm outline-none focus:border-[var(--jm-border-strong)]"
                 />
                 <textarea
                   value={shippingAddress}
                   onChange={(e) => setShippingAddress(e.target.value)}
                   placeholder="주소 *"
                   rows={2}
-                  className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-[13px] outline-none focus:border-[var(--jm-border-strong)]"
+                  className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-jm-sm outline-none focus:border-[var(--jm-border-strong)]"
                 />
                 {/* 발송 예정일 — 출고 워크보드 지연/오늘/이번주 분류 기준 */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                  <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                     발송 예정일
                   </span>
                   <JmDatePicker
@@ -852,7 +803,7 @@ function Body({
                 </div>
                 {/* 배송비 결제 방식 — 선불 / 착불 / 매장 부담 */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                  <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                     배송비
                   </span>
                   <div className="grid grid-cols-3 gap-1.5">
@@ -875,10 +826,10 @@ function Body({
                               : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                           }`}
                         >
-                          <span className="text-[12px] font-semibold text-[var(--jm-text)]">
+                          <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
                             {opt.label}
                           </span>
-                          <span className="text-[10px] text-[var(--jm-text-muted)]">
+                          <span className="text-jm-3xs text-[var(--jm-text-muted)]">
                             {opt.sub}
                           </span>
                         </button>
@@ -889,31 +840,31 @@ function Body({
                 {/* 배송 원가 (매장 지불) — 착불 제외 (착불은 매장 회계 무관) */}
                 {shippingPaymentType !== "COD" && (
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                    <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                       배송 원가 (매장 지불)
                     </span>
                     <button
                       type="button"
                       onClick={() => setShipCostDialogOpen(true)}
-                      className="flex h-10 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
+                      className="flex h-10 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
                     >
                       <span className="tabular-nums">
                         {parseFloat(shippingCostBorne || "0") > 0
                           ? `₩${Math.round(parseFloat(shippingCostBorne) * 1.1).toLocaleString("ko-KR")}`
                           : "—"}
                       </span>
-                      <span className="text-[10px] text-[var(--jm-text-muted)]">
+                      <span className="text-jm-3xs text-[var(--jm-text-muted)]">
                         수정
                       </span>
                     </button>
-                    <span className="text-[10px] text-[var(--jm-text-muted)]">
+                    <span className="text-jm-3xs text-[var(--jm-text-muted)]">
                       손님 청구(배송비)와 독립 — 복합 케이스(손님 일부 + 매장
                       일부) 가능. <strong>매장 부담분만</strong> 입력 →
                       마진에서 차감.
                     </span>
                   </div>
                 )}
-                <span className="text-[11px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   결제 후 ERP <strong>출고 워크보드</strong>로 자동 진입합니다
                 </span>
               </div>
@@ -923,7 +874,7 @@ function Body({
 
         {/* 결제수단 — 공용 컴포넌트 (ERP 신규주문과 공유, 한쪽 수정 시 양쪽 적용) */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             결제수단
           </span>
           <PaymentMethodSelector value={method} onChange={setMethod} />
@@ -996,26 +947,12 @@ function RegisterPromptDialog({
       >
         <div className="flex flex-col items-center gap-3 pt-2 text-center">
           <div className="flex size-14 items-center justify-center rounded-full bg-[var(--jm-action)]/10 text-[var(--jm-action)]">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
-              <path
-                d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-              <path
-                d="M18 6h4M20 4v4"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
+            <UserPlus className="size-7" />
           </div>
-          <h3 className="text-[18px] font-bold text-[var(--jm-text)]">
+          <h3 className="text-jm-xl font-bold text-[var(--jm-text)]">
             회원 등록하시겠어요?
           </h3>
-          <p className="text-[13px] leading-relaxed text-[var(--jm-text-muted)]">
+          <p className="text-jm-sm leading-relaxed text-[var(--jm-text-muted)]">
             등록하시면 다음 방문 때 구매·수리·임대 이력을 한눈에 보실 수 있어요.
             <br />
             연락처만 입력해도 충분합니다.
@@ -1026,14 +963,14 @@ function RegisterPromptDialog({
           <button
             type="button"
             onClick={onRegister}
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white transition-transform active:scale-[0.99]"
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-jm-md font-semibold text-white transition-transform active:scale-[0.99]"
           >
             회원 등록하고 결제
           </button>
           <button
             type="button"
             onClick={onSkip}
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-[14px] font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-jm-base font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
           >
             등록 없이 결제
           </button>
@@ -1057,13 +994,13 @@ function Pill({
   return (
     <div
       className={`flex flex-col rounded-xl px-3 py-2 ${
-        tone === "warn" ? "bg-[var(--jm-warning-bg)]0/20" : "bg-[var(--jm-surface)]/10"
+        tone === "warn" ? "bg-[var(--jm-warning-solid)]/20" : "bg-[var(--jm-surface)]/10"
       }`}
     >
-      <div className="text-[10px] uppercase tracking-wider text-white/60">
+      <div className="text-jm-3xs uppercase tracking-wider text-white/60">
         {label}
       </div>
-      <div className="mt-0.5 text-[12px] font-semibold tabular-nums">
+      <div className="mt-0.5 text-jm-xs font-semibold tabular-nums">
         {suffix
           ? `${value.toLocaleString("ko-KR")}${suffix}`
           : `${value < 0 ? "−" : ""}₩${Math.abs(value).toLocaleString("ko-KR")}`}
@@ -1073,27 +1010,5 @@ function Pill({
 }
 
 function Spinner() {
-  return (
-    <svg
-      className="size-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-        opacity="0.25"
-      />
-      <path
-        d="M12 2a10 10 0 0 1 10 10"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
+  return <JmSpinner size="sm" tone="inverted" />;
 }

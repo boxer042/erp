@@ -326,7 +326,7 @@ export default function SupplierLedgerPage() {
       <p>등록된 거래처가 없습니다</p>
       <Link
         href="/suppliers"
-        className="inline-flex items-center gap-1 mt-3 px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-[11px] hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
+        className="inline-flex items-center gap-1 mt-3 px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-jm-2xs hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
       >
         거래처 등록하러 가기
       </Link>
@@ -342,7 +342,7 @@ export default function SupplierLedgerPage() {
       <button
         type="button"
         onClick={() => setSearch("")}
-        className="mt-3 px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-[11px] hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
+        className="mt-3 px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-jm-2xs hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
       >
         검색 지우기
       </button>
@@ -352,13 +352,13 @@ export default function SupplierLedgerPage() {
       거래 내역이 없습니다
       {hasHiddenHistory && (
         <div className="mt-3 flex flex-col items-center gap-2">
-          <p className="text-[11px] text-[var(--jm-text-muted)] max-w-[360px]">
+          <p className="text-jm-2xs text-[var(--jm-text-muted)] max-w-[360px]">
             선택한 기간에 거래가 없습니다. 과거 거래를 보려면 기간을 넓혀보세요.
           </p>
           <button
             type="button"
             onClick={() => applyPreset("all")}
-            className="px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-[11px] hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
+            className="px-3 h-7 rounded-md border border-[var(--jm-border-strong)] bg-[var(--jm-surface-muted)] text-[var(--jm-text)] text-jm-2xs hover:bg-[var(--jm-surface-muted)]/80 transition-colors"
           >
             전체 기간 보기
           </button>
@@ -403,7 +403,7 @@ export default function SupplierLedgerPage() {
             <div className="flex gap-1.5">
               <Link
                 href="/suppliers/initial-balance"
-                className="flex-1 h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] hover:bg-[var(--jm-surface-muted)] text-[11px] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] flex items-center justify-center transition-colors"
+                className="flex-1 h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] hover:bg-[var(--jm-surface-muted)] text-jm-2xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] flex items-center justify-center transition-colors"
               >
                 기초잔액 등록
               </Link>
@@ -429,7 +429,7 @@ export default function SupplierLedgerPage() {
                   setPrintOpen(true);
                 }}
                 className={cn(
-                  "flex-1 h-7 rounded-md border text-[11px] flex items-center justify-center gap-1 transition-colors",
+                  "flex-1 h-7 rounded-md border text-jm-2xs flex items-center justify-center gap-1 transition-colors",
                   selectedSupplierId
                     ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)] hover:bg-[var(--jm-info-bg)]/80"
                     : "border-[var(--jm-border)] bg-[var(--jm-surface)] opacity-40 cursor-not-allowed text-[var(--jm-text-muted)]"
@@ -472,7 +472,7 @@ export default function SupplierLedgerPage() {
                   key={p}
                   onClick={() => applyPreset(p)}
                   className={cn(
-                    "px-2 h-6 rounded text-[11px] border transition-colors",
+                    "px-2 h-6 rounded text-jm-2xs border transition-colors",
                     active
                       ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)]"
                       : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
@@ -661,11 +661,11 @@ export default function SupplierLedgerPage() {
           {selectedSupplierSummary && (
             <div className="border-b border-[var(--jm-border)] px-4 py-3 flex items-center flex-wrap gap-x-6 gap-y-3 shrink-0">
               <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">거래처</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">거래처</p>
                 <p className="text-sm font-medium">{selectedSupplierSummary.supplierName}</p>
               </div>
               <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">현재 잔액</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">현재 잔액</p>
                 <p className={cn("text-sm font-medium tabular-nums",
                   selectedSupplierSummary.currentBalance < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]")}>
                   ₩{formatAmount(selectedSupplierSummary.currentBalance)}
@@ -673,18 +673,18 @@ export default function SupplierLedgerPage() {
               </div>
               {from && (
                 <div>
-                  <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">이월 잔액</p>
+                  <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">이월 잔액</p>
                   <p className="text-sm tabular-nums text-[var(--jm-text)]">
                     ₩{formatAmount(selectedSupplierSummary.openingBalance)}
                   </p>
                 </div>
               )}
               <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 매입</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">기간 매입</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedSupplierSummary.totalPurchase)}</p>
               </div>
               <div title="순수 결제(지급)만 집계 — 조정·환급 제외">
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 결제 (지급만)</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">기간 결제 (지급만)</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedSupplierSummary.totalPayment)}</p>
               </div>
               <div>

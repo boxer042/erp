@@ -1,6 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import {
+  LayoutGrid,
+  Search,
+  Wrench,
+  CalendarDays,
+  Package,
+  Menu,
+  ChevronRight,
+} from "lucide-react";
 import { BottomSheet } from "./bottom-sheet";
 import { JmThemeToggle } from "@/jm";
 import { usePosTheme } from "./pos-theme-wrapper";
@@ -41,25 +50,13 @@ export function MenuSheet({
     <BottomSheet open={open} onOpenChange={onOpenChange} title="메뉴">
       <div className="flex flex-col gap-1.5 pb-2 pt-2">
         <Item
-          icon={
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <rect x="3" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-              <rect x="11" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-              <rect x="3" y="11" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-              <rect x="11" y="11" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          }
+          icon={<LayoutGrid className="size-5" strokeWidth={1.5} />}
           label="고객 그리드"
           desc="POS 메인"
           onClick={() => go("/pos")}
         />
         <Item
-          icon={
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M14 14l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          }
+          icon={<Search className="size-5" strokeWidth={1.5} />}
           label="검색"
           desc="상품·고객·수리 통합"
           onClick={() => {
@@ -70,17 +67,7 @@ export function MenuSheet({
 
         {onRepairManagement && (
           <Item
-            icon={
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M14.7 6.3a4 4 0 1 1-5.4 5.4l-5.6 5.6a1.4 1.4 0 0 0 2 2l5.6-5.6a4 4 0 0 1 5.4-5.4z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            }
+            icon={<Wrench className="size-5" strokeWidth={1.5} />}
             label="수리관리"
             desc="픽업대기·진행중·진단 현황"
             onClick={() => {
@@ -92,25 +79,7 @@ export function MenuSheet({
 
         {onRentalManagement && (
           <Item
-            icon={
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <rect
-                  x="3"
-                  y="5"
-                  width="14"
-                  height="11"
-                  rx="2"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M3 9h14M7 3v3M13 3v3"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            }
+            icon={<CalendarDays className="size-5" strokeWidth={1.5} />}
             label="임대관리"
             desc="현재 임대·예약·자산 관리"
             onClick={() => {
@@ -122,22 +91,7 @@ export function MenuSheet({
 
         {onParkedSessions && (
           <Item
-            icon={
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M4 7l6-3 6 3v8l-6 3-6-3V7z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M10 11v4M10 11l4-2M10 11L6 9"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            }
+            icon={<Package className="size-5" strokeWidth={1.5} />}
             label="저장된 상담"
             desc="장바구니로 저장한 고객들"
             onClick={() => {
@@ -150,16 +104,7 @@ export function MenuSheet({
         <div className="my-2 h-px bg-[var(--jm-surface-muted)]" />
 
         <Item
-          icon={
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M3 5h14M3 10h14M3 15h14"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          }
+          icon={<Menu className="size-5" strokeWidth={1.5} />}
           label="어드민"
           desc="대시보드·설정·리포트"
           onClick={() => go("/")}
@@ -169,8 +114,8 @@ export function MenuSheet({
         {/* 테마 토글 — jm 시스템 라이트/다크/auto */}
         <div className="flex items-center justify-between rounded-2xl px-3 py-2">
           <div className="flex flex-col">
-            <span className="text-[14px] font-semibold text-[var(--jm-text)]">테마</span>
-            <span className="text-[12px] text-[var(--jm-text-muted)]">라이트 / 다크 / 시스템</span>
+            <span className="text-jm-base font-semibold text-[var(--jm-text)]">테마</span>
+            <span className="text-jm-xs text-[var(--jm-text-muted)]">라이트 / 다크 / 시스템</span>
           </div>
           <JmThemeToggle value={theme} onChange={setTheme} />
         </div>
@@ -200,24 +145,13 @@ function Item({
         {icon}
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[14px] font-semibold text-[var(--jm-text)]">{label}</span>
-        {desc && <span className="text-[12px] text-[var(--jm-text-muted)]">{desc}</span>}
+        <span className="text-jm-base font-semibold text-[var(--jm-text)]">{label}</span>
+        {desc && <span className="text-jm-xs text-[var(--jm-text-muted)]">{desc}</span>}
       </div>
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
-        className="shrink-0 text-[var(--jm-text-disabled)]"
-      >
-        <path
-          d="M6 4l4 4-4 4"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <ChevronRight
+        className="size-4 shrink-0 text-[var(--jm-text-disabled)]"
+        strokeWidth={1.5}
+      />
     </button>
   );
 }

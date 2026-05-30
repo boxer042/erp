@@ -124,12 +124,12 @@ function StatementBody({ detail }: { detail: IncomingDetail }) {
                     <div className="flex items-center justify-end gap-1.5">
                       <span>₩{formatPrice(Math.round(shipDisplay.perUnit))}</span>
                       <span
-                        className={`text-[10px] px-1 py-0.5 rounded ${
+                        className={`text-jm-3xs px-1 py-0.5 rounded ${
                           shipDisplay.source === "ITEM"
-                            ? "bg-primary/10 text-primary"
+                            ? "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)]"
                             : shipDisplay.source === "ALLOCATED"
                               ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
-                              : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                              : "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
                         }`}
                       >
                         {shipDisplay.source === "ITEM"
@@ -148,9 +148,9 @@ function StatementBody({ detail }: { detail: IncomingDetail }) {
                 <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)]">{item.memo || ""}</td>
                 <td className="text-center py-1.5">
                   {item.supplierProduct.productMappings && item.supplierProduct.productMappings.length > 0 ? (
-                    <span className="text-xs text-brand">&#10003;</span>
+                    <span className="text-xs text-[var(--jm-success-fg)]">&#10003;</span>
                   ) : (
-                    <span className="text-xs text-yellow-400">&#9888;</span>
+                    <span className="text-xs text-[var(--jm-warning-fg)]">&#9888;</span>
                   )}
                 </td>
               </tr>

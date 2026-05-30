@@ -132,11 +132,11 @@ export default function RepairWarrantyPage() {
         {/* 상단 헤더 */}
         <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
           <span className="text-jm-base font-semibold">수리 보증 만료 알림</span>
-          <span className="text-[12px] text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">
             PICKED_UP 후 보증 임박/만료 건
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-[13px] text-[var(--jm-text-muted)]">조회 범위</span>
+            <span className="text-jm-sm text-[var(--jm-text-muted)]">조회 범위</span>
             <JmSelect
               size="sm"
               value={String(days)}
@@ -241,7 +241,7 @@ export default function RepairWarrantyPage() {
                   <JmTableRow className="hover:bg-transparent">
                     <JmTableCell
                       colSpan={6}
-                      className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                     >
                       보증 목록을 불러오지 못했습니다
                     </JmTableCell>
@@ -264,17 +264,17 @@ export default function RepairWarrantyPage() {
                       onClick={() => router.push(`/repairs/${it.id}`)}
                     >
                       <JmTableCell>
-                        <span className="font-[family-name:var(--jm-font-mono)] text-[13px] text-[var(--jm-text-muted)]">
+                        <span className="font-[family-name:var(--jm-font-mono)] text-jm-sm text-[var(--jm-text-muted)]">
                           {it.ticketNo}
                         </span>
                       </JmTableCell>
                       <JmTableCell>
                         <div className="flex flex-col">
-                          <span className="text-[13px] font-medium text-[var(--jm-text)]">
+                          <span className="text-jm-sm font-medium text-[var(--jm-text)]">
                             {it.customerName ?? "(미등록)"}
                           </span>
                           {it.customerPhone && (
-                            <span className="font-[family-name:var(--jm-font-mono)] text-[11px] text-[var(--jm-text-muted)]">
+                            <span className="font-[family-name:var(--jm-font-mono)] text-jm-2xs text-[var(--jm-text-muted)]">
                               {it.customerPhone}
                             </span>
                           )}
@@ -282,18 +282,18 @@ export default function RepairWarrantyPage() {
                       </JmTableCell>
                       <JmTableCell>
                         <div className="flex flex-col">
-                          <span className="text-[13px] font-medium text-[var(--jm-text)]">
+                          <span className="text-jm-sm font-medium text-[var(--jm-text)]">
                             {it.productName}
                           </span>
                           {it.productSku && (
-                            <span className="font-[family-name:var(--jm-font-mono)] text-[11px] text-[var(--jm-text-muted)]">
+                            <span className="font-[family-name:var(--jm-font-mono)] text-jm-2xs text-[var(--jm-text-muted)]">
                               {it.productSku}
                             </span>
                           )}
                         </div>
                       </JmTableCell>
                       <JmTableCell>
-                        <span className="font-[family-name:var(--jm-font-mono)] text-[12px] text-[var(--jm-text-muted)]">
+                        <span className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
                           {format(new Date(it.warrantyEnds), "yyyy-MM-dd", { locale: ko })}
                         </span>
                       </JmTableCell>
@@ -312,7 +312,7 @@ export default function RepairWarrantyPage() {
                           </JmBadge>
                         )}
                       </JmTableCell>
-                      <JmTableCell className="text-right tabular-nums text-[13px] text-[var(--jm-text)]">
+                      <JmTableCell className="text-right tabular-nums text-jm-sm text-[var(--jm-text)]">
                         ₩{it.finalAmount.toLocaleString("ko-KR")}
                       </JmTableCell>
                     </JmTableRow>

@@ -704,7 +704,7 @@ export default function ExpensesPage() {
                       key={p.value}
                       type="button"
                       onClick={() => applyPreset(p.value)}
-                      className={`rounded-md px-2 py-0.5 text-[12px] font-medium transition-colors ${
+                      className={`rounded-md px-2 py-0.5 text-jm-xs font-medium transition-colors ${
                         active
                           ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
                           : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
@@ -734,7 +734,7 @@ export default function ExpensesPage() {
               >
                 전체
                 {periodTotals.all > 0 && (
-                  <span className="ml-1 tabular-nums text-[10px] opacity-70">
+                  <span className="ml-1 tabular-nums text-jm-3xs opacity-70">
                     ₩{formatPrice(periodTotals.all)}
                   </span>
                 )}
@@ -751,7 +751,7 @@ export default function ExpensesPage() {
                   >
                     {CATEGORY_LABELS[cat]}
                     {t > 0 && (
-                      <span className="ml-1 tabular-nums text-[10px] opacity-70">
+                      <span className="ml-1 tabular-nums text-jm-3xs opacity-70">
                         ₩{formatPrice(t)}
                       </span>
                     )}
@@ -917,7 +917,7 @@ export default function ExpensesPage() {
           {/* 페이지네이션 */}
           {total > PAGE_SIZE && (
             <div className="flex items-center justify-between border-t border-[var(--jm-border)] px-4 py-2.5">
-              <span className="text-[12px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
                 총 {total.toLocaleString("ko-KR")}건 ·{" "}
                 {((page - 1) * PAGE_SIZE + 1).toLocaleString("ko-KR")}–
                 {Math.min(page * PAGE_SIZE, total).toLocaleString("ko-KR")}
@@ -1074,7 +1074,7 @@ export default function ExpensesPage() {
 
                 <div className="space-y-1">
                   <p className="text-jm-xs text-[var(--jm-text-muted)]">
-                    설명 <span className="text-[10px]">(비워두면 자동 생성)</span>
+                    설명 <span className="text-jm-3xs">(비워두면 자동 생성)</span>
                   </p>
                   <JmInput
                     size="sm"
@@ -1116,7 +1116,7 @@ export default function ExpensesPage() {
                           : "—"}
                     </span>
                   </div>
-                  <p className="text-[10px] text-[var(--jm-text-muted)]">
+                  <p className="text-jm-3xs text-[var(--jm-text-muted)]">
                     등록 시 재고 로트 FIFO 차감 + 경비(자동 계산) 기록. 확정 후 수정·삭제 불가.
                   </p>
                 </div>
@@ -1247,7 +1247,7 @@ export default function ExpensesPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-jm-xs text-[var(--jm-text-muted)]">
-                    거래처 <span className="text-[10px]">(선택)</span>
+                    거래처 <span className="text-jm-3xs">(선택)</span>
                   </p>
                   <SupplierCombobox
                     suppliers={suppliers}
@@ -1308,10 +1308,10 @@ export default function ExpensesPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-jm-xs text-[var(--jm-text-muted)]">
-                    영수증 <span className="text-[10px]">(선택, JPG/PNG/WebP/PDF, 최대 10MB · 저장 시 업로드)</span>
+                    영수증 <span className="text-jm-3xs">(선택, JPG/PNG/WebP/PDF, 최대 10MB · 저장 시 업로드)</span>
                   </p>
                   {pendingReceiptFile && pendingPreviewUrl ? (
-                    <div className="flex items-start gap-3 rounded-md border border-dashed border-[var(--jm-border)] px-3 py-2 min-w-0">
+                    <div className="flex items-start gap-3 rounded-md border border-[var(--jm-border)] px-3 py-2 min-w-0">
                       {isImageByMime(pendingReceiptFile.type) ? (
                         <a href={pendingPreviewUrl} target="_blank" rel="noreferrer" className="block shrink-0">
                           <img
@@ -1334,7 +1334,7 @@ export default function ExpensesPage() {
                         <div className="truncate" title={pendingReceiptFile.name}>
                           {pendingReceiptFile.name}
                         </div>
-                        <div className="text-[10px] text-[var(--jm-text-muted)]">저장 시 업로드</div>
+                        <div className="text-jm-3xs text-[var(--jm-text-muted)]">저장 시 업로드</div>
                       </div>
                       <JmIconButton
                         type="button"

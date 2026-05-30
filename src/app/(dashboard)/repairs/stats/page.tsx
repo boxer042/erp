@@ -33,18 +33,37 @@ import {
 } from "recharts";
 
 import { apiGet } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmIconButton,
+  JmInput,
+  JmSegmentedControl,
+  JmSelect,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
+
+const Card = JmCard;
+const CardContent = JmCardContent;
+const CardHeader = JmCardHeader;
+const CardTitle = JmCardTitle;
+const Skeleton = JmSkeleton;
+const Input = JmInput;
+const Table = JmTable;
+const TableBody = JmTableBody;
+const TableCell = JmTableCell;
+const TableHead = JmTableHead;
+const TableHeader = JmTableHeader;
+const TableRow = JmTableRow;
 
 const STATUS_LABEL: Record<string, string> = {
   RECEIVED: "접수",
@@ -78,14 +97,22 @@ const QUOTE_REJECT_REASON_LABEL: Record<string, string> = {
 };
 
 const PIE_COLORS = [
-  "#10b981",
-  "#3b82f6",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-  "#ec4899",
+  "var(--jm-success-solid)",
+  "var(--jm-info-solid)",
+  "var(--jm-warning-solid)",
+  "var(--jm-danger-solid)",
+  "var(--jm-action)",
+  "var(--jm-text-muted)",
+  "var(--jm-text-subtle)",
 ];
+
+const CHART_TOOLTIP_STYLE = {
+  backgroundColor: "var(--jm-surface)",
+  border: "1px solid var(--jm-border)",
+  borderRadius: "0.5rem",
+  fontSize: 12,
+  color: "var(--jm-text)",
+} as const;
 
 interface ProductStat {
   productId: string | null;
@@ -293,85 +320,77 @@ export default function RepairStatsPage() {
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <Button
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex items-center gap-3 border-b border-[var(--jm-border)] px-5 py-3">
+        <JmIconButton
           variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+          size="sm"
           onClick={() => router.push("/repairs")}
           aria-label="뒤로"
         >
           <ChevronLeft className="size-4" />
-        </Button>
-        <h1 className="text-lg font-semibold">수리 통계</h1>
+        </JmIconButton>
+        <h1 className="text-jm-lg font-semibold text-[var(--jm-text)]">수리 통계</h1>
         <div className="ml-auto flex gap-2 print:hidden">
-          <Button
+          <JmButton
             variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
+            size="xs"
+            className="gap-1.5"
             onClick={() => window.print()}
           >
             <Printer className="size-3.5" />
             PDF / 인쇄
-          </Button>
-          <Button
+          </JmButton>
+          <JmButton
             variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
+            size="xs"
+            className="gap-1.5"
             onClick={downloadCsv}
           >
             <Download className="size-3.5" />
             CSV
-          </Button>
+          </JmButton>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
         {/* 기간 필터 — 인쇄 시 숨기고 선택 범위만 표시 */}
         <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
-          <div className="flex h-[30px] items-center gap-1 rounded-md border border-border bg-card px-1 text-[13px]">
-            {RANGE_PRESETS.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => setPreset(p.value)}
-                className={`rounded px-2 py-0.5 transition-colors ${
-                  preset === p.value
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <JmSegmentedControl<RangePreset>
+            options={RANGE_PRESETS}
+            value={preset}
+            onChange={setPreset}
+            ariaLabel="기간 선택"
+          />
           {preset === "CUSTOM" && (
             <div className="flex items-center gap-1">
               <Input
                 type="date"
+                size="sm"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-[30px] w-[140px] text-[13px]"
+                className="w-[140px]"
               />
-              <span className="text-[12px] text-muted-foreground">~</span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">~</span>
               <Input
                 type="date"
+                size="sm"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="h-[30px] w-[140px] text-[13px]"
+                className="w-[140px]"
               />
             </div>
           )}
           {range.from && range.to && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
               {range.from} ~ {range.to}
             </span>
           )}
         </div>
         {/* 인쇄 전용 헤더 — 화면에선 숨김 */}
         <div className="mb-4 hidden print:block">
-          <h2 className="text-xl font-bold">수리 통계 리포트</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-jm-2xl font-bold text-[var(--jm-text)]">수리 통계 리포트</h2>
+          <p className="text-jm-sm text-[var(--jm-text-muted)]">
             기간: {range.from && range.to ? `${range.from} ~ ${range.to}` : "전체"}
             {" · "}
             출력일: {format(new Date(), "yyyy-MM-dd HH:mm")}
@@ -381,7 +400,7 @@ export default function RepairStatsPage() {
         {statsQuery.isPending ? (
           <StatsSkeleton />
         ) : !stats ? (
-          <div className="text-sm text-muted-foreground">통계를 불러올 수 없습니다</div>
+          <div className="text-jm-sm text-[var(--jm-text-muted)]">통계를 불러올 수 없습니다</div>
         ) : (
           <div className="flex flex-col gap-5">
             {/* KPI 카드 */}
@@ -442,7 +461,7 @@ export default function RepairStatsPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Card className="stats-print-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">카테고리별 빈도 (top 10)</CardTitle>
+                  <CardTitle className="text-jm-sm">카테고리별 빈도 (top 10)</CardTitle>
                 </CardHeader>
                 <CardContent className="h-64">
                   {categoryChart.length === 0 ? (
@@ -450,11 +469,11 @@ export default function RepairStatsPage() {
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={categoryChart} layout="vertical" margin={{ left: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" allowDecimals={false} />
-                        <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                        <CartesianGrid stroke="var(--jm-border)" strokeDasharray="3 3" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "var(--jm-text-muted)" }} />
+                        <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 11, fill: "var(--jm-text-muted)" }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                        <Bar dataKey="count" fill="var(--jm-info-solid)" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -462,7 +481,7 @@ export default function RepairStatsPage() {
               </Card>
               <Card className="stats-print-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">취소 사유 분포</CardTitle>
+                  <CardTitle className="text-jm-sm">취소 사유 분포</CardTitle>
                 </CardHeader>
                 <CardContent className="h-64">
                   {cancelReasonChart.length === 0 ? (
@@ -482,7 +501,7 @@ export default function RepairStatsPage() {
                             <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -495,20 +514,20 @@ export default function RepairStatsPage() {
             {stats && stats.quoteRejection.rejectedCount > 0 && (
               <Card className="stats-print-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">
+                  <CardTitle className="text-jm-sm">
                     견적 거절 분석 — 진단비만 청구
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 lg:grid-cols-[260px_1fr]">
                   <div className="flex flex-col gap-2">
-                    <div className="rounded-lg border bg-muted/30 p-3">
-                      <div className="text-xs text-muted-foreground">거절 건수 / 견적 발생</div>
-                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                    <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+                      <div className="text-jm-xs text-[var(--jm-text-muted)]">거절 건수 / 견적 발생</div>
+                      <div className="mt-0.5 text-jm-lg font-bold tabular-nums text-[var(--jm-text)]">
                         {stats.quoteRejection.rejectedCount} / {stats.quoteRejection.quotedCount}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-jm-xs text-[var(--jm-text-muted)]">
                         거절률{" "}
-                        <span className="font-semibold text-foreground">
+                        <span className="font-semibold text-[var(--jm-text)]">
                           {stats.quoteRejection.quotedCount > 0
                             ? (
                                 (stats.quoteRejection.rejectedCount /
@@ -520,31 +539,31 @@ export default function RepairStatsPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="rounded-lg border bg-muted/30 p-3">
-                      <div className="text-xs text-muted-foreground">거절 매출 (진단비)</div>
-                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                    <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+                      <div className="text-jm-xs text-[var(--jm-text-muted)]">거절 매출 (진단비)</div>
+                      <div className="mt-0.5 text-jm-lg font-bold tabular-nums text-[var(--jm-text)]">
                         ₩
                         {Math.round(
                           stats.quoteRejection.rejectedRevenue,
                         ).toLocaleString("ko-KR")}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-jm-xs text-[var(--jm-text-muted)]">
                         결제 완료{" "}
-                        <span className="font-semibold text-foreground">
+                        <span className="font-semibold text-[var(--jm-text)]">
                           {stats.quoteRejection.rejectedPaidCount}
                         </span>
                         건
                       </div>
                     </div>
-                    <div className="rounded-lg border bg-muted/30 p-3">
-                      <div className="text-xs text-muted-foreground">평균 거절 견적가</div>
-                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                    <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] p-3">
+                      <div className="text-jm-xs text-[var(--jm-text-muted)]">평균 거절 견적가</div>
+                      <div className="mt-0.5 text-jm-lg font-bold tabular-nums text-[var(--jm-text)]">
                         ₩
                         {Math.round(
                           stats.quoteRejection.avgQuotedAmount,
                         ).toLocaleString("ko-KR")}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-jm-xs text-[var(--jm-text-muted)]">
                         어느 가격대에서 거절이 자주 나는지 추적
                       </div>
                     </div>
@@ -570,7 +589,7 @@ export default function RepairStatsPage() {
                               />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                           <Legend wrapperStyle={{ fontSize: 11 }} />
                         </PieChart>
                       </ResponsiveContainer>
@@ -583,7 +602,7 @@ export default function RepairStatsPage() {
             {/* 상품 전환 월별 추이 — 라인 */}
             <Card className="stats-print-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
+                <CardTitle className="text-jm-sm">
                   상품 구매로 전환 — 최근 12개월 추이
                 </CardTitle>
               </CardHeader>
@@ -593,14 +612,14 @@ export default function RepairStatsPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={monthlyTrend}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip />
+                      <CartesianGrid stroke="var(--jm-border)" strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--jm-text-muted)" }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--jm-text-muted)" }} />
+                      <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                       <Line
                         type="monotone"
                         dataKey="count"
-                        stroke="#f59e0b"
+                        stroke="var(--jm-warning-solid)"
                         strokeWidth={2}
                         dot={{ r: 4 }}
                       />
@@ -614,7 +633,7 @@ export default function RepairStatsPage() {
             {stats.byCustomerType && stats.byCustomerType.length > 0 && (
               <Card className="stats-print-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">고객 분류별 수리</CardTitle>
+                  <CardTitle className="text-jm-sm">고객 분류별 수리</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -627,10 +646,10 @@ export default function RepairStatsPage() {
                             : "미등록";
                       const tone =
                         g.type === "BUSINESS"
-                          ? "bg-amber-50 text-amber-900 border-amber-200"
+                          ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)] border-[color-mix(in_oklch,var(--jm-warning-solid)_35%,transparent)]"
                           : g.type === "INDIVIDUAL"
-                            ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-                            : "bg-zinc-50 text-zinc-700 border-zinc-200";
+                            ? "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)] border-[color-mix(in_oklch,var(--jm-success-solid)_35%,transparent)]"
+                            : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] border-[var(--jm-border)]";
                       const totalCount = stats.byCustomerType.reduce(
                         (s, x) => s + x.count,
                         0,
@@ -643,18 +662,18 @@ export default function RepairStatsPage() {
                           className={`flex flex-col gap-1 rounded-xl border p-3 ${tone}`}
                         >
                           <div className="flex items-baseline justify-between">
-                            <span className="text-[12px] font-semibold">
+                            <span className="text-jm-xs font-semibold">
                               {label}
                             </span>
-                            <span className="text-[11px] tabular-nums opacity-70">
+                            <span className="text-jm-2xs tabular-nums opacity-70">
                               {pct.toFixed(1)}%
                             </span>
                           </div>
-                          <div className="text-[18px] font-bold tabular-nums">
+                          <div className="text-jm-xl font-bold tabular-nums">
                             {g.count.toLocaleString("ko-KR")}건
                           </div>
                           {g.revenue > 0 && (
-                            <div className="text-[11px] tabular-nums opacity-70">
+                            <div className="text-jm-2xs tabular-nums opacity-70">
                               매출 ₩{g.revenue.toLocaleString("ko-KR")}
                             </div>
                           )}
@@ -669,13 +688,13 @@ export default function RepairStatsPage() {
             {/* 카테고리별 평균 처리 기간 + 건수 ranking */}
             <Card className="stats-print-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
+                <CardTitle className="text-jm-sm">
                   카테고리별 평균 처리 기간 — 어떤 카테고리가 빠르게/느리게 끝나는지
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {stats.byCategory.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
+                  <p className="py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
                     데이터 없음
                   </p>
                 ) : (
@@ -706,7 +725,7 @@ export default function RepairStatsPage() {
                             <TableCell className="text-right tabular-nums">
                               {c.count.toLocaleString("ko-KR")}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                            <TableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                               {c.completedCount.toLocaleString("ko-KR")}
                             </TableCell>
                             <TableCell className="text-right tabular-nums">
@@ -714,16 +733,16 @@ export default function RepairStatsPage() {
                                 <span
                                   className={
                                     c.avgDays >= 7
-                                      ? "font-semibold text-amber-600"
+                                      ? "font-semibold text-[var(--jm-warning-fg)]"
                                       : c.avgDays >= 3
-                                        ? "text-foreground"
-                                        : "text-emerald-700"
+                                        ? "text-[var(--jm-text)]"
+                                        : "text-[var(--jm-success-fg)]"
                                   }
                                 >
                                   {c.avgDays.toFixed(1)}일
                                 </span>
                               ) : (
-                                <span className="text-muted-foreground">—</span>
+                                <span className="text-[var(--jm-text-muted)]">—</span>
                               )}
                             </TableCell>
                           </TableRow>
@@ -737,7 +756,7 @@ export default function RepairStatsPage() {
             {/* 월별 수리 매출 — 막대 차트 */}
             <Card className="stats-print-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
+                <CardTitle className="text-jm-sm">
                   월별 수리 매출 — 총 ₩{totalRevenue.toLocaleString("ko-KR")}
                 </CardTitle>
               </CardHeader>
@@ -747,17 +766,18 @@ export default function RepairStatsPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={revenueChart}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} unit="천" />
+                      <CartesianGrid stroke="var(--jm-border)" strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--jm-text-muted)" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "var(--jm-text-muted)" }} unit="천" />
                       <Tooltip
+                        contentStyle={CHART_TOOLTIP_STYLE}
                         formatter={(value) =>
                           `₩${(Number(value) * 1000).toLocaleString("ko-KR")}`
                         }
                       />
                       <Bar
                         dataKey="revenue"
-                        fill="#10b981"
+                        fill="var(--jm-success-solid)"
                         radius={[4, 4, 0, 0]}
                         name="매출 (천원)"
                       />
@@ -770,13 +790,13 @@ export default function RepairStatsPage() {
             {/* 담당자별 처리 ranking */}
             <Card className="stats-print-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
+                <CardTitle className="text-jm-sm">
                   담당자별 처리 (top 10) — 완료된 수리 기준
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {stats.byAssignee.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
+                  <p className="py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
                     담당자 지정된 완료 수리가 없습니다
                   </p>
                 ) : (
@@ -792,7 +812,7 @@ export default function RepairStatsPage() {
                     <TableBody>
                       {stats.byAssignee.map((a, i) => (
                         <TableRow key={a.assigneeId ?? i}>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-[var(--jm-text-muted)]">
                             {i + 1}
                           </TableCell>
                           <TableCell className="font-medium">
@@ -818,27 +838,30 @@ export default function RepairStatsPage() {
             <Card className="stats-print-card">
               <CardHeader className="pb-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="text-sm">
+                  <CardTitle className="text-jm-sm">
                     상품별 수리 빈도 (top 20) — 실패율 = 매장 포기 + 부속 수급 불가
                   </CardTitle>
-                  <select
+                  <JmSelect
                     value={productCategoryFilter}
-                    onChange={(e) => setProductCategoryFilter(e.target.value)}
-                    className="h-[28px] rounded-md border border-border bg-card px-2 text-[12px]"
-                  >
-                    <option value="">카테고리 전체</option>
-                    <option value="__none__">기타 (미지정)</option>
-                    {(categoriesQuery.data ?? []).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setProductCategoryFilter}
+                    size="sm"
+                    align="end"
+                    className="w-[180px]"
+                    placeholder="카테고리 전체"
+                    options={[
+                      { value: "", label: "카테고리 전체" },
+                      { value: "__none__", label: "기타 (미지정)" },
+                      ...(categoriesQuery.data ?? []).map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                      })),
+                    ]}
+                  />
                 </div>
               </CardHeader>
               <CardContent>
                 {stats.byProduct.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
+                  <p className="py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
                     repairProductId 매핑된 수리 ticket 이 없습니다
                   </p>
                 ) : (
@@ -858,29 +881,29 @@ export default function RepairStatsPage() {
                     <TableBody>
                       {stats.byProduct.map((p, i) => (
                         <TableRow key={p.productId ?? i}>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-[var(--jm-text-muted)]">
                             {i + 1}
                           </TableCell>
                           <TableCell className="font-medium">
                             {p.productName}
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
+                          <TableCell className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                             {p.sku}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {p.count.toLocaleString("ko-KR")}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-rose-600">
+                          <TableCell className="text-right tabular-nums text-[var(--jm-danger-fg)]">
                             {p.failures.toLocaleString("ko-KR")}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             <span
                               className={
                                 p.failureRate >= 30
-                                  ? "font-semibold text-rose-600"
+                                  ? "font-semibold text-[var(--jm-danger-fg)]"
                                   : p.failureRate >= 15
-                                    ? "text-amber-600"
-                                    : "text-muted-foreground"
+                                    ? "text-[var(--jm-warning-fg)]"
+                                    : "text-[var(--jm-text-muted)]"
                               }
                             >
                               {p.failureRate.toFixed(1)}%
@@ -888,11 +911,11 @@ export default function RepairStatsPage() {
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {p.lostCost > 0 ? (
-                              <span className="text-rose-600">
+                              <span className="text-[var(--jm-danger-fg)]">
                                 ₩{p.lostCost.toLocaleString("ko-KR")}
                               </span>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="text-[var(--jm-text-muted)]">—</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
@@ -900,14 +923,14 @@ export default function RepairStatsPage() {
                               <span
                                 className={
                                   p.avgDays >= 7
-                                    ? "font-semibold text-amber-600"
-                                    : "text-muted-foreground"
+                                    ? "font-semibold text-[var(--jm-warning-fg)]"
+                                    : "text-[var(--jm-text-muted)]"
                                 }
                               >
                                 {p.avgDays.toFixed(1)}일
                               </span>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="text-[var(--jm-text-muted)]">—</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -921,7 +944,7 @@ export default function RepairStatsPage() {
             {/* 상태별 분포 — 보조 표 */}
             <Card className="stats-print-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">상태별 분포</CardTitle>
+                <CardTitle className="text-jm-sm">상태별 분포</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -939,7 +962,7 @@ export default function RepairStatsPage() {
                         <TableCell className="text-right tabular-nums">
                           {g.count.toLocaleString("ko-KR")}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                        <TableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                           {stats.total > 0
                             ? ((g.count / stats.total) * 100).toFixed(1)
                             : "0"}%
@@ -972,26 +995,26 @@ function KpiCard({
 }) {
   const toneClass =
     tone === "success"
-      ? "text-emerald-700"
+      ? "text-[var(--jm-success-fg)]"
       : tone === "danger"
-        ? "text-rose-700"
+        ? "text-[var(--jm-danger-fg)]"
         : tone === "info"
-          ? "text-amber-700"
+          ? "text-[var(--jm-warning-fg)]"
           : tone === "active"
-            ? "text-blue-700"
-            : "text-foreground";
+            ? "text-[var(--jm-info-fg)]"
+            : "text-[var(--jm-text)]";
   return (
     <Card className="stats-print-card">
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-jm-xs text-[var(--jm-text-muted)]">
           {icon}
           <span>{label}</span>
         </div>
       </CardHeader>
       <CardContent className="pb-3">
-        <div className={`text-2xl font-bold tabular-nums ${toneClass}`}>{value}</div>
+        <div className={`text-jm-2xl font-bold tabular-nums ${toneClass}`}>{value}</div>
         {hint && (
-          <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>
+          <div className="mt-0.5 text-jm-2xs text-[var(--jm-text-muted)]">{hint}</div>
         )}
       </CardContent>
     </Card>
@@ -1000,7 +1023,7 @@ function KpiCard({
 
 function EmptyChart({ hint }: { hint?: string }) {
   return (
-    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+    <div className="flex h-full items-center justify-center text-jm-xs text-[var(--jm-text-muted)]">
       {hint ?? "데이터 없음"}
     </div>
   );

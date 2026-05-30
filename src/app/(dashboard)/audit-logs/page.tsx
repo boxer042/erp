@@ -5,20 +5,25 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { cn } from "@/lib/utils";
 
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+  JmCard,
+  JmSkeleton,
+  JmSelect,
+  JmBadge,
+  type JmBadgeProps,
+  JmDialog,
+  JmDialogContent,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDialogBody,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 
 interface AuditLog {
@@ -58,14 +63,24 @@ const ACTION_LABELS: Record<string, string> = {
   STATUS_CHANGE: "상태변경",
 };
 
-const ACTION_BADGE: Record<string, string> = {
-  CREATE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  UPDATE: "bg-blue-50 text-blue-700 border-blue-200",
-  DELETE: "bg-rose-50 text-rose-700 border-rose-200",
-  CONFIRM: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  CANCEL: "bg-zinc-100 text-zinc-700 border-zinc-300",
-  STATUS_CHANGE: "bg-amber-50 text-amber-800 border-amber-200",
+const ACTION_BADGE: Record<string, JmBadgeProps["variant"]> = {
+  CREATE: "success",
+  UPDATE: "info",
+  DELETE: "danger",
+  CONFIRM: "info",
+  CANCEL: "default",
+  STATUS_CHANGE: "warning",
 };
+
+const ENTITY_OPTIONS = [
+  { value: "all", label: "전체 엔티티" },
+  ...Object.entries(ENTITY_LABELS).map(([k, v]) => ({ value: k, label: v })),
+];
+
+const ACTION_OPTIONS = [
+  { value: "all", label: "전체 액션" },
+  ...Object.entries(ACTION_LABELS).map(([k, v]) => ({ value: k, label: v })),
+];
 
 export default function AuditLogsPage() {
   const [search, setSearch] = useState("");
@@ -99,7 +114,7 @@ export default function AuditLogsPage() {
   }, [logsQuery.data, search]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
       <DataTableToolbar
         search={{
           value: search,
@@ -111,106 +126,95 @@ export default function AuditLogsPage() {
         loading={logsQuery.isFetching}
         filters={
           <>
-            <Select value={entityFilter} onValueChange={(v) => setEntityFilter(v ?? "all")}>
-              <SelectTrigger className="h-[30px] w-[120px] text-[13px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체 엔티티</SelectItem>
-                {Object.entries(ENTITY_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={actionFilter} onValueChange={(v) => setActionFilter(v ?? "all")}>
-              <SelectTrigger className="h-[30px] w-[110px] text-[13px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체 액션</SelectItem>
-                {Object.entries(ACTION_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <JmSelect
+              variant="pill"
+              size="sm"
+              options={ENTITY_OPTIONS}
+              value={entityFilter}
+              onChange={(v) => setEntityFilter(v ?? "all")}
+            />
+            <JmSelect
+              variant="pill"
+              size="sm"
+              options={ACTION_OPTIONS}
+              value={actionFilter}
+              onChange={(v) => setActionFilter(v ?? "all")}
+            />
           </>
         }
       />
 
       <div className="flex-1 overflow-y-auto">
-        <Table className="min-w-[1000px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[160px]">시각</TableHead>
-              <TableHead className="w-[140px]">사용자</TableHead>
-              <TableHead className="w-[110px]">엔티티</TableHead>
-              <TableHead className="w-[100px]">액션</TableHead>
-              <TableHead className="w-[200px]">대상 ID</TableHead>
-              <TableHead>상세</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <JmTable className="min-w-[1000px]">
+          <JmTableHeader>
+            <JmTableRow>
+              <JmTableHead className="w-[160px]">시각</JmTableHead>
+              <JmTableHead className="w-[140px]">사용자</JmTableHead>
+              <JmTableHead className="w-[110px]">엔티티</JmTableHead>
+              <JmTableHead className="w-[100px]">액션</JmTableHead>
+              <JmTableHead className="w-[200px]">대상 ID</JmTableHead>
+              <JmTableHead>상세</JmTableHead>
+            </JmTableRow>
+          </JmTableHeader>
+          <JmTableBody>
             {logsQuery.isPending ? (
               Array.from({ length: 10 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-14 rounded-md" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                </TableRow>
+                <JmTableRow key={i}>
+                  <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+                  <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+                  <JmTableCell><JmSkeleton className="h-5 w-14 rounded-md" /></JmTableCell>
+                  <JmTableCell><JmSkeleton className="h-5 w-12 rounded-md" /></JmTableCell>
+                  <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+                  <JmTableCell><JmSkeleton className="h-4 w-40" /></JmTableCell>
+                </JmTableRow>
               ))
             ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+              <JmTableRow>
+                <JmTableCell colSpan={6} className="py-12 text-center text-[var(--jm-text-muted)]">
                   로그가 없습니다
-                </TableCell>
-              </TableRow>
+                </JmTableCell>
+              </JmTableRow>
             ) : (
               filtered.map((log) => (
-                <TableRow
+                <JmTableRow
                   key={log.id}
                   className="cursor-pointer"
                   onClick={() => setDetailRow(log)}
                 >
-                  <TableCell className="text-[12px] tabular-nums">
+                  <JmTableCell className="text-jm-xs tabular-nums">
                     {new Date(log.createdAt).toLocaleString("ko-KR")}
-                  </TableCell>
-                  <TableCell className="text-[13px]">
-                    {log.user ? log.user.name : <span className="text-muted-foreground">(시스템)</span>}
-                  </TableCell>
-                  <TableCell className="text-[13px]">
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-sm">
+                    {log.user ? log.user.name : <span className="text-[var(--jm-text-muted)]">(시스템)</span>}
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-sm">
                     {ENTITY_LABELS[log.entity] ?? log.entity}
-                  </TableCell>
-                  <TableCell>
-                    <span className={cn(
-                      "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                      ACTION_BADGE[log.action] ?? "bg-muted text-muted-foreground border-border"
-                    )}>
+                  </JmTableCell>
+                  <JmTableCell>
+                    <JmBadge variant={ACTION_BADGE[log.action] ?? "default"} size="sm" shape="square">
                       {ACTION_LABELS[log.action] ?? log.action}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-[11px] text-muted-foreground truncate">
+                    </JmBadge>
+                  </JmTableCell>
+                  <JmTableCell className="font-mono text-jm-2xs text-[var(--jm-text-muted)] truncate">
                     {log.entityId ?? "-"}
-                  </TableCell>
-                  <TableCell className="text-[12px] text-muted-foreground truncate max-w-[300px]">
+                  </JmTableCell>
+                  <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)] truncate max-w-[300px]">
                     {summarizeMeta(log)}
-                  </TableCell>
-                </TableRow>
+                  </JmTableCell>
+                </JmTableRow>
               ))
             )}
-          </TableBody>
-        </Table>
+          </JmTableBody>
+        </JmTable>
       </div>
 
-      <Dialog open={detailRow !== null} onOpenChange={(v) => !v && setDetailRow(null)}>
-        <DialogContent className="max-w-[700px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>활동 로그 상세</DialogTitle>
-          </DialogHeader>
+      <JmDialog open={detailRow !== null} onOpenChange={(v) => !v && setDetailRow(null)}>
+        <JmDialogContent size="xl" className="max-w-[700px]">
+          <JmDialogHeader>
+            <JmDialogTitle>활동 로그 상세</JmDialogTitle>
+          </JmDialogHeader>
           {detailRow && (
-            <div className="space-y-3 text-[13px]">
+            <JmDialogBody className="space-y-3 text-jm-sm">
               <Row label="시각" value={new Date(detailRow.createdAt).toLocaleString("ko-KR")} />
               <Row label="사용자" value={detailRow.user ? `${detailRow.user.name} (${detailRow.user.email})` : "(시스템)"} />
               <Row label="엔티티" value={`${ENTITY_LABELS[detailRow.entity] ?? detailRow.entity} (${detailRow.entity})`} />
@@ -225,10 +229,10 @@ export default function AuditLogsPage() {
               {detailRow.after != null && (
                 <JsonBlock label="변경 후" value={detailRow.after} />
               )}
-            </div>
+            </JmDialogBody>
           )}
-        </DialogContent>
-      </Dialog>
+        </JmDialogContent>
+      </JmDialog>
     </div>
   );
 }
@@ -236,8 +240,8 @@ export default function AuditLogsPage() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[100px_1fr] gap-3 items-baseline">
-      <span className="text-[12px] text-muted-foreground">{label}</span>
-      <span className="text-[13px]">{value}</span>
+      <span className="text-jm-xs text-[var(--jm-text-muted)]">{label}</span>
+      <span className="text-jm-sm">{value}</span>
     </div>
   );
 }
@@ -245,12 +249,12 @@ function Row({ label, value }: { label: string; value: string }) {
 function JsonBlock({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
-      <div className="text-[12px] text-muted-foreground mb-1">{label}</div>
-      <Card className="p-3">
-        <pre className="text-[11px] font-mono whitespace-pre-wrap break-all">
+      <div className="text-jm-xs text-[var(--jm-text-muted)] mb-1">{label}</div>
+      <JmCard className="p-3">
+        <pre className="text-jm-2xs font-mono whitespace-pre-wrap break-all">
           {JSON.stringify(value, null, 2)}
         </pre>
-      </Card>
+      </JmCard>
     </div>
   );
 }

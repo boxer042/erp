@@ -42,13 +42,13 @@ export function ProductMediaGallery({
   if (bare && !hasMedia) return null;
 
   const body = !hasMedia ? (
-    <p className="text-sm text-muted-foreground">등록된 이미지·영상이 없습니다</p>
+    <p className="text-sm text-[var(--jm-text-muted)]">등록된 이미지·영상이 없습니다</p>
   ) : (
     <div className={compact ? "space-y-2" : "space-y-4"}>
       {allImages.length > 0 && (
         <div className="space-y-2">
           <div
-            className={`overflow-hidden rounded-lg bg-muted border border-border ${
+            className={`overflow-hidden rounded-lg bg-[var(--jm-surface-muted)] border border-[var(--jm-border)] ${
               compact ? "aspect-square max-w-[280px]" : "aspect-[4/3] w-full max-w-2xl"
             }`}
           >
@@ -67,7 +67,7 @@ export function ProductMediaGallery({
                   type="button"
                   onClick={() => setActive(i)}
                   className={`h-12 w-12 overflow-hidden rounded-md border ${
-                    i === active ? "border-primary" : "border-border"
+                    i === active ? "border-[var(--jm-action)]" : "border-[var(--jm-border)]"
                   }`}
                   aria-label={`이미지 ${i + 1}`}
                 >
@@ -81,7 +81,7 @@ export function ProductMediaGallery({
       )}
       {videos.length > 0 && !compact && (
         <div className="space-y-2">
-          <div className="text-xs font-medium text-muted-foreground">영상</div>
+          <div className="text-xs font-medium text-[var(--jm-text-muted)]">영상</div>
           <div className="grid gap-3 sm:grid-cols-2">
             {videos.map((v) => {
               const id = extractYoutubeId(v.url);
@@ -89,7 +89,7 @@ export function ProductMediaGallery({
               return (
                 <div
                   key={v.id}
-                  className="aspect-video overflow-hidden rounded-md bg-muted border border-border"
+                  className="aspect-video overflow-hidden rounded-md bg-[var(--jm-surface-muted)] border border-[var(--jm-border)]"
                 >
                   <iframe
                     title={v.title ?? "youtube"}

@@ -1022,7 +1022,7 @@ function AccessTokenCard({
             </div>
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/50 p-3 text-jm-xs text-[var(--jm-text-muted)]">
+          <div className="rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/50 p-3 text-jm-xs text-[var(--jm-text-muted)]">
             활성 링크가 없습니다. &quot;거래처 발송 (링크 발급)&quot; 버튼으로 새로 발급하세요.
           </div>
         )}

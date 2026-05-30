@@ -255,7 +255,7 @@ export function Field({
   return (
     <div className="space-y-1.5">
       <label htmlFor={targetId} className="block text-jm-xs font-medium text-[var(--jm-text-muted)]">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+        {label}{required && <span className="text-[var(--jm-danger-fg)] ml-0.5">*</span>}
       </label>
       {renderedChildren}
       {hint && <div className="text-jm-2xs text-[var(--jm-warning-fg)]">{hint}</div>}
@@ -268,7 +268,7 @@ export function GroupHeader({ step, title, id }: { step: string; title: string; 
     <div id={id} className="flex items-center gap-2 pt-2 first:pt-0 scroll-mt-4">
       <span className="text-jm-3xs font-bold uppercase tracking-wider text-[var(--jm-text-muted)]">{step}</span>
       <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">{title}</span>
-      <div className="flex-1 h-px bg-secondary" />
+      <div className="flex-1 h-px bg-[var(--jm-border)]" />
     </div>
   );
 }
@@ -309,7 +309,7 @@ export function ToggleGroup<T extends string>({
           onClick={() => onChange(o.value)}
           className={`flex-1 text-sm font-medium transition-colors ${
             value === o.value
-              ? "bg-secondary text-[var(--jm-text)]"
+              ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
               : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
           }`}
         >
@@ -443,7 +443,7 @@ export function CostList({
                     key={type}
                     type="button"
                     onClick={() => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, costType: type } : c))}
-                    className={`flex-1 h-7 text-jm-2xs transition-colors ${cost.costType === type ? "bg-secondary text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"}`}
+                    className={`flex-1 h-7 text-jm-2xs transition-colors ${cost.costType === type ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"}`}
                   >
                     {type === "FIXED" ? "고정" : "비율"}
                   </button>
@@ -477,7 +477,7 @@ export function CostList({
             <td className="text-center">
               <button
                 type="button"
-                className="text-[var(--jm-text-muted)] hover:text-red-400 transition-colors p-1"
+                className="text-[var(--jm-text-muted)] hover:text-[var(--jm-danger-fg)] transition-colors p-1"
                 onClick={() => onChange((prev) => prev.filter((_, i) => i !== idx))}
               >
                 <X className="h-3 w-3" />
@@ -539,7 +539,7 @@ export function CostList({
               />
               <button
                 type="button"
-                className="text-[var(--jm-text-muted)] hover:text-red-400 transition-colors p-1.5 shrink-0"
+                className="text-[var(--jm-text-muted)] hover:text-[var(--jm-danger-fg)] transition-colors p-1.5 shrink-0"
                 onClick={() => onChange((prev) => prev.filter((_, i) => i !== idx))}
               >
                 <X className="h-4 w-4" />
@@ -552,7 +552,7 @@ export function CostList({
                     key={type}
                     type="button"
                     onClick={() => onChange((prev) => prev.map((c, i) => i === idx ? { ...c, costType: type } : c))}
-                    className={`px-3 h-9 text-jm-xs transition-colors ${cost.costType === type ? "bg-secondary text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"}`}
+                    className={`px-3 h-9 text-jm-xs transition-colors ${cost.costType === type ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"}`}
                   >
                     {type === "FIXED" ? "고정" : "비율"}
                   </button>

@@ -39,7 +39,7 @@ export default async function LandingPreviewPage({
   if (product.landingMode === "SINGLE_HTML") {
     if (!product.singleHtmlUrl) {
       return (
-        <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        <main className="flex min-h-screen items-center justify-center text-sm text-[var(--jm-text-muted)]">
           HTML 파일이 아직 업로드되지 않았습니다
         </main>
       );

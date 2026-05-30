@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
+import { Plus, XCircle, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
+import { JmSpinner } from "@/jm";
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
 import {
   useSessions,
@@ -98,7 +100,7 @@ export function RepairMode({ session, onCountChange, onTicketDetail }: Props) {
                     />
                   ))}
                   {closedTickets.length > 3 && (
-                    <div className="px-1 py-1 text-[11px] text-[var(--jm-text-subtle)]">
+                    <div className="px-1 py-1 text-jm-2xs text-[var(--jm-text-subtle)]">
                       외 {closedTickets.length - 3}건
                     </div>
                   )}
@@ -116,16 +118,9 @@ export function RepairMode({ session, onCountChange, onTicketDetail }: Props) {
           <button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white transition-transform active:scale-[0.99]"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-md font-semibold text-white transition-transform active:scale-[0.99]"
           >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M10 4v12M4 10h12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
+            <Plus className="size-[18px]" />
             새 수리 시작
           </button>
         </div>
@@ -171,24 +166,24 @@ function RepairCard({
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <span className={`size-2 rounded-full ${meta.dot}`} />
-          <span className="text-[12px] font-semibold text-[var(--jm-text)]">
+          <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
             {meta.label}
           </span>
           {ticket.type === "ON_SITE" && (
-            <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+            <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-white">
               즉시
             </span>
           )}
           {ticket.workKind === "CUSTOM_BUILD" && (
             <span
-              className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[var(--jm-accent-fg)]"
+              className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-jm-3xs font-bold tracking-wider text-[var(--jm-accent-fg)]"
               title="리빌드 — 손님 부품 + 부속 조합"
             >
               리빌드
             </span>
           )}
         </div>
-        <span className="text-[11px] text-[var(--jm-text-subtle)]">
+        <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
           {formatDistanceToNow(new Date(ticket.receivedAt), {
             addSuffix: true,
             locale: ko,
@@ -198,28 +193,25 @@ function RepairCard({
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex min-w-0 flex-col">
           {device && (
-            <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+            <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
               {device}
             </span>
           )}
           {ticket.symptom && (
-            <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">
+            <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-muted)]">
               {ticket.symptom}
             </span>
           )}
         </div>
-        <span className="shrink-0 font-mono text-[11px] text-[var(--jm-text-subtle)]">
+        <span className="shrink-0 font-mono text-jm-2xs text-[var(--jm-text-subtle)]">
           {ticket.ticketNo}
         </span>
       </div>
       {/* 취소된 ticket — 사유/메모 표시 */}
       {ticket.status === "CANCELLED" && (ticket.cancelReason || ticket.cancelMemo) && (
         <div className="flex items-center gap-1.5 rounded-lg bg-[var(--jm-surface-muted)] px-2 py-1.5">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-[var(--jm-text-muted)]">
-            <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M4 4l4 4M8 4l-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          <span className="line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">
+          <XCircle className="size-3 shrink-0 text-[var(--jm-text-muted)]" />
+          <span className="line-clamp-1 text-jm-2xs text-[var(--jm-text-muted)]">
             {ticket.cancelReason ? cancelReasonLabel(ticket.cancelReason) : null}
             {ticket.cancelReason && ticket.cancelMemo ? " — " : null}
             {ticket.cancelMemo}
@@ -255,7 +247,7 @@ function Section({
   return (
     <section className="flex flex-col gap-2">
       <span
-        className={`text-[11px] font-semibold uppercase tracking-wider ${
+        className={`text-jm-2xs font-semibold uppercase tracking-wider ${
           muted ? "text-[var(--jm-text-subtle)]" : "text-[var(--jm-text-muted)]"
         }`}
       >
@@ -293,23 +285,16 @@ function EmptyState({ onNew }: { onNew: () => void }) {
   return (
     <div className="flex flex-col items-center gap-4 py-16 text-center">
       <div className="flex size-16 items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)]">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M14.7 6.3a4 4 0 1 1-5.4 5.4l-5.6 5.6a1.4 1.4 0 0 0 2 2l5.6-5.6a4 4 0 0 1 5.4-5.4z"
-            stroke="#71717a"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <Wrench className="size-7 text-[var(--jm-text-muted)]" />
       </div>
       <div className="flex flex-col gap-1">
-        <h2 className="text-[15px] font-semibold text-[var(--jm-text)]">진행중인 수리가 없습니다</h2>
-        <p className="text-[12px] text-[var(--jm-text-muted)]">맡김 또는 즉시 수리를 시작하세요</p>
+        <h2 className="text-jm-md font-semibold text-[var(--jm-text)]">진행중인 수리가 없습니다</h2>
+        <p className="text-jm-xs text-[var(--jm-text-muted)]">맡김 또는 즉시 수리를 시작하세요</p>
       </div>
       <button
         type="button"
         onClick={onNew}
-        className="h-11 rounded-full bg-[var(--jm-action)] px-5 text-[14px] font-semibold text-white"
+        className="h-11 rounded-full bg-[var(--jm-action)] px-5 text-jm-base font-semibold text-white"
       >
         새 수리 시작
       </button>
@@ -415,26 +400,9 @@ function NewRepairBody({
           type="button"
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white disabled:opacity-60"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white disabled:opacity-60"
         >
-          {createMutation.isPending && (
-            <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="3"
-                opacity="0.25"
-              />
-              <path
-                d="M12 2a10 10 0 0 1 10 10"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-            </svg>
-          )}
+          {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
           {workKind === "CUSTOM_BUILD"
             ? type === "ON_SITE"
               ? "즉시 리빌드 시작"
@@ -492,7 +460,7 @@ function NewRepairBody({
                   key={c.id}
                   type="button"
                   onClick={() => setCategoryId(c.id)}
-                  className={`h-9 rounded-full px-3.5 text-[13px] font-medium transition-colors ${
+                  className={`h-9 rounded-full px-3.5 text-jm-sm font-medium transition-colors ${
                     active
                       ? "bg-[var(--jm-action)] text-white"
                       : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
@@ -503,7 +471,7 @@ function NewRepairBody({
               );
             })}
           </div>
-          <p className="px-1 pt-1.5 text-[11px] text-[var(--jm-text-subtle)]">
+          <p className="px-1 pt-1.5 text-jm-2xs text-[var(--jm-text-subtle)]">
             가져온 기기 · 증상은 진행 페이지에서 입력합니다
           </p>
         </FieldGroup>
@@ -524,10 +492,10 @@ function FieldGroup({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+        <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           {label}
         </span>
-        {optional && <span className="text-[10px] text-[var(--jm-text-subtle)]">선택</span>}
+        {optional && <span className="text-jm-3xs text-[var(--jm-text-subtle)]">선택</span>}
       </div>
       {children}
     </div>
@@ -556,13 +524,13 @@ function TypeButton({
       }`}
     >
       <span
-        className={`text-[16px] font-semibold ${
+        className={`text-jm-lg font-semibold ${
           active ? "text-[var(--jm-text)]" : "text-[var(--jm-text)]"
         }`}
       >
         {title}
       </span>
-      <span className="text-[12px] text-[var(--jm-text-muted)]">{desc}</span>
+      <span className="text-jm-xs text-[var(--jm-text-muted)]">{desc}</span>
     </button>
   );
 }

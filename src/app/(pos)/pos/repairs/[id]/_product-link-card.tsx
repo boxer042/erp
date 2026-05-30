@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Package, Search } from "lucide-react";
+import { AlignLeft, Package, QrCode, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
@@ -88,7 +88,7 @@ export function ProductLinkCard({
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               가져온 기기
             </span>
             {ticket.repairCategory && (
@@ -102,7 +102,7 @@ export function ProductLinkCard({
               type="button"
               onClick={clearLink}
               disabled={update.isPending}
-              className="text-[11px] font-medium text-[var(--jm-text-muted)] underline-offset-2 hover:underline"
+              className="text-jm-2xs font-medium text-[var(--jm-text-muted)] underline-offset-2 hover:underline"
             >
               초기화
             </button>
@@ -139,7 +139,7 @@ export function ProductLinkCard({
                     onClick={() => !disabled && setMode(b.v)}
                     disabled={disabled}
                     title={disabled ? "등록 고객만 사용 가능" : undefined}
-                    className={`flex h-9 items-center justify-center rounded-lg text-[12px] font-semibold transition-colors ${
+                    className={`flex h-9 items-center justify-center rounded-lg text-jm-xs font-semibold transition-colors ${
                       mode === b.v
                         ? "bg-[var(--jm-action)] text-white"
                         : disabled
@@ -247,7 +247,7 @@ function CategoryModeForm({
   return (
     <>
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-1.5 px-1 text-[11px] text-[var(--jm-text-muted)]">
+        <div className="flex items-center gap-1.5 px-1 text-jm-2xs text-[var(--jm-text-muted)]">
           <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 font-semibold text-[var(--jm-text)]">
             {categoryName}
           </span>
@@ -263,7 +263,7 @@ function CategoryModeForm({
         </button>
         {history.length > 0 && (
           <div className="flex flex-col gap-1">
-            <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+            <span className="px-1 text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
               이 손님 구매·수리 이력
             </span>
             {history.map((p) => (
@@ -347,25 +347,19 @@ function SerialDisplay({
     <div className="flex flex-col gap-2 rounded-xl bg-[var(--jm-action)] p-3 text-white">
       <div className="flex items-center gap-3">
         <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface)]/10">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.4" />
-            <rect x="6" y="6" width="3" height="3" fill="currentColor" />
-            <rect x="11" y="6" width="3" height="3" fill="currentColor" />
-            <rect x="6" y="11" width="3" height="3" fill="currentColor" />
-            <rect x="11" y="11" width="3" height="3" fill="currentColor" />
-          </svg>
+          <QrCode className="size-5" />
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="font-mono text-[11px] font-semibold tracking-wider text-white/60">
+          <span className="font-mono text-jm-2xs font-semibold tracking-wider text-white/60">
             {item.code}
           </span>
-          <span className="line-clamp-1 text-[14px] font-semibold">{displayName}</span>
+          <span className="line-clamp-1 text-jm-base font-semibold">{displayName}</span>
         </div>
-        <span className="rounded-full bg-[var(--jm-surface)]/15 px-2 py-0.5 text-[10px] font-bold">
+        <span className="rounded-full bg-[var(--jm-surface)]/15 px-2 py-0.5 text-jm-3xs font-bold">
           {isRepairLabel ? "수리 라벨" : "우리 판매"}
         </span>
       </div>
-      <div className="flex flex-wrap gap-3 border-t border-white/15 pt-2 text-[11px]">
+      <div className="flex flex-wrap gap-3 border-t border-white/15 pt-2 text-jm-2xs">
         <div>
           <span className="text-white/50">{isRepairLabel ? "접수일" : "구매일"} </span>
           <span className="font-medium">
@@ -375,7 +369,7 @@ function SerialDisplay({
         {item.warrantyEnds && (
           <div>
             <span className="text-white/50">보증 </span>
-            <span className={warrantyActive ? "text-emerald-300" : "text-rose-300"}>
+            <span className={warrantyActive ? "text-[var(--jm-success-solid)]" : "text-[var(--jm-danger-solid)]"}>
               ~{format(new Date(item.warrantyEnds), "yyyy-MM-dd")}
               {warrantyActive ? " (유효)" : " (만료)"}
             </span>
@@ -402,23 +396,16 @@ function SearchProductDisplay({
         />
       ) : (
         <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--jm-surface)] text-[var(--jm-text-subtle)]">
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Package className="size-[18px]" />
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+        <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
           {product.name}
         </span>
-        <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">{product.sku}</span>
+        <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">{product.sku}</span>
       </div>
-      <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text)]">
+      <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 text-jm-3xs font-medium text-[var(--jm-text)]">
         카탈로그
       </span>
     </div>
@@ -429,19 +416,12 @@ function TextDisplay({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl bg-[var(--jm-bg)] p-3">
       <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--jm-surface)] text-[var(--jm-text-subtle)]">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-          <path
-            d="M4 5h12M4 10h12M4 15h8"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <AlignLeft className="size-[18px]" />
       </div>
-      <span className="line-clamp-2 flex-1 text-[14px] font-medium text-[var(--jm-text)]">
+      <span className="line-clamp-2 flex-1 text-jm-base font-medium text-[var(--jm-text)]">
         {text}
       </span>
-      <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text)]">
+      <span className="rounded-full bg-[var(--jm-border)] px-2 py-0.5 text-jm-3xs font-medium text-[var(--jm-text)]">
         외부 기기
       </span>
     </div>

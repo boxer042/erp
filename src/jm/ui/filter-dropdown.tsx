@@ -76,7 +76,7 @@ export function JmFilterDropdown({
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
       <PopoverPrimitive.Trigger
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--jm-border-strong)] px-3 font-medium text-[var(--jm-text)] transition-colors outline-none hover:bg-[var(--jm-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]",
+          "inline-flex items-center gap-1.5 rounded-full border border-[var(--jm-border-strong)] px-3 font-medium text-[var(--jm-text)] transition-colors outline-none hover:bg-[var(--jm-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]",
           heightClass,
           textClass,
           value.length > 0 && "border-solid border-[var(--jm-action)] bg-[var(--jm-surface)]",

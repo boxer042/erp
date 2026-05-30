@@ -373,7 +373,7 @@ export default function SalesHistoryPage() {
                     key={p.value}
                     type="button"
                     onClick={() => setPreset(p.value)}
-                    className={`rounded-md px-2 py-0.5 text-[12px] font-medium transition-colors ${
+                    className={`rounded-md px-2 py-0.5 text-jm-xs font-medium transition-colors ${
                       preset === p.value
                         ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
                         : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]"
@@ -470,7 +470,7 @@ export default function SalesHistoryPage() {
                 <button
                   type="button"
                   onClick={() => setCustomerModalOpen(true)}
-                  className="relative flex h-9 w-[200px] items-center justify-between rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-left text-[13px] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
+                  className="relative flex h-9 w-[200px] items-center justify-between rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-left text-jm-sm outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--jm-ring)]"
                 >
                   <span
                     className={`truncate ${
@@ -499,7 +499,7 @@ export default function SalesHistoryPage() {
                     <Search className="size-3.5" />
                   </span>
                 </button>
-                <label className="flex items-center gap-1.5 text-[12px] text-[var(--jm-text)] whitespace-nowrap">
+                <label className="flex items-center gap-1.5 text-jm-xs text-[var(--jm-text)] whitespace-nowrap">
                   <input
                     type="checkbox"
                     checked={includeExchangeReplacement}
@@ -559,7 +559,7 @@ export default function SalesHistoryPage() {
           )}
 
           {summary?.truncated && (
-            <div className="border-b border-[var(--jm-warning-border)] bg-[var(--jm-warning-bg)] px-4 py-2 text-[12px] text-[var(--jm-warning-fg)]">
+            <div className="border-b border-[var(--jm-warning-border)] bg-[var(--jm-warning-bg)] px-4 py-2 text-jm-xs text-[var(--jm-warning-fg)]">
               결과가 5,000건을 넘었습니다. 기간을 더 좁혀주세요 (CSV 는 10,000건까지 받을 수 있습니다).
             </div>
           )}
@@ -595,7 +595,7 @@ export default function SalesHistoryPage() {
                   <JmTableRow>
                     <JmTableCell
                       colSpan={12}
-                      className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                      className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                     >
                       판매내역을 불러오지 못했습니다
                     </JmTableCell>
@@ -626,7 +626,7 @@ export default function SalesHistoryPage() {
                         }`}
                         onClick={() => onRowClick(row)}
                       >
-                        <JmTableCell className="font-mono text-[12px] text-[var(--jm-text-muted)]">
+                        <JmTableCell className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                           {format(new Date(row.date), "MM-dd HH:mm")}
                         </JmTableCell>
                         <JmTableCell>
@@ -637,12 +637,12 @@ export default function SalesHistoryPage() {
                         </JmTableCell>
                         <JmTableCell>
                           {row.fulfillmentType ? (
-                            <span className="text-[12px] text-[var(--jm-text)]">
+                            <span className="text-jm-xs text-[var(--jm-text)]">
                               {FULFILLMENT_LABEL[row.fulfillmentType] ??
                                 row.fulfillmentType}
                             </span>
                           ) : (
-                            <span className="text-[12px] text-[var(--jm-text-subtle)]">
+                            <span className="text-jm-xs text-[var(--jm-text-subtle)]">
                               —
                             </span>
                           )}
@@ -650,14 +650,14 @@ export default function SalesHistoryPage() {
                         <JmTableCell>
                           <div className="flex flex-col gap-0">
                             <span
-                              className="block truncate font-mono text-[13px] font-medium text-[var(--jm-text)]"
+                              className="block truncate font-mono text-jm-sm font-medium text-[var(--jm-text)]"
                               title={row.refNo}
                             >
                               {row.refNo}
                             </span>
                             {row.channelOrderNo && (
                               <span
-                                className="block truncate font-mono text-[10px] text-[var(--jm-text-subtle)]"
+                                className="block truncate font-mono text-jm-3xs text-[var(--jm-text-subtle)]"
                                 title={row.channelOrderNo}
                               >
                                 {row.channelOrderNo}
@@ -665,7 +665,7 @@ export default function SalesHistoryPage() {
                             )}
                             {row.extraSalesCount > 0 && (
                               <span
-                                className="block truncate text-[11px] text-[var(--jm-text-subtle)] tabular-nums"
+                                className="block truncate text-jm-2xs text-[var(--jm-text-subtle)] tabular-nums"
                                 title={`추가구매 ${row.extraSalesCount}건 ₩${Math.round(row.extraSalesAmount).toLocaleString("ko-KR")} 포함`}
                               >
                                 + 추가구매 {row.extraSalesCount}건 ₩
@@ -705,7 +705,7 @@ export default function SalesHistoryPage() {
                         </JmTableCell>
                         <JmTableCell>
                           <div className="flex flex-col">
-                            <span className="text-[13px] text-[var(--jm-text)]">
+                            <span className="text-jm-sm text-[var(--jm-text)]">
                               {row.customerName ?? (
                                 <span className="text-[var(--jm-text-subtle)]">
                                   (미등록)
@@ -713,20 +713,20 @@ export default function SalesHistoryPage() {
                               )}
                             </span>
                             {row.customerPhone && (
-                              <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                              <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                                 {row.customerPhone}
                               </span>
                             )}
                           </div>
                         </JmTableCell>
-                        <JmTableCell className="text-[12px] text-[var(--jm-text-muted)]">
+                        <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">
                           {row.paymentMethod
                             ? PAYMENT_METHOD_LABEL[row.paymentMethod] ??
                               row.paymentMethod
                             : "—"}
                         </JmTableCell>
                         <JmTableCell
-                          className="text-right text-[12px] tabular-nums"
+                          className="text-right text-jm-xs tabular-nums"
                           title={
                             row.shippingCostBorne > 0
                               ? "매장 부담 배송/퀵 원가 (세전) — 손님 청구와 무관"
@@ -754,7 +754,7 @@ export default function SalesHistoryPage() {
           {/* 페이지네이션 */}
           {pagination && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-[var(--jm-border)] px-4 py-2.5">
-              <span className="text-[12px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
                 총 {pagination.totalCount.toLocaleString("ko-KR")}건 ·{" "}
                 {pagination.page} / {pagination.totalPages} 페이지
               </span>
@@ -815,11 +815,11 @@ export default function SalesHistoryPage() {
               <Search className="size-5" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
+              <span className="line-clamp-1 text-jm-md font-semibold text-[var(--jm-text)]">
                 {c.label}
               </span>
               {c.description && (
-                <span className="text-[12px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-xs text-[var(--jm-text-muted)]">
                   {c.description}
                 </span>
               )}

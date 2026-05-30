@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { ChevronLeft, X } from "lucide-react";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 interface Props {
@@ -81,18 +82,10 @@ function Body({
                 className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] disabled:opacity-50"
                 aria-label="뒤로"
               >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path
-                    d="M12 4l-6 6 6 6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <ChevronLeft className="size-5" />
               </button>
             )}
-            <h2 className="flex-1 text-[18px] font-bold text-[var(--jm-text)]">{title}</h2>
+            <h2 className="flex-1 text-jm-xl font-bold text-[var(--jm-text)]">{title}</h2>
             <button
               type="button"
               onClick={() => !locked && onOpenChange(false)}
@@ -100,14 +93,7 @@ function Body({
               className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)] disabled:opacity-50"
               aria-label="닫기"
             >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M5 5l10 10M15 5l-10 10"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <X className="size-5" />
             </button>
           </div>
         )}

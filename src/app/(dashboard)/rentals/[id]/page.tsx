@@ -8,10 +8,17 @@ import { ko } from "date-fns/locale";
 import { ChevronLeft } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmBadge,
+  JmButton,
+  JmIconButton,
+  JmSkeleton,
+  JmContainer,
+} from "@/jm";
 
 interface RentalDetail {
   id: string;
@@ -69,13 +76,13 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const STATUS_TONE: Record<
   string,
-  "default" | "secondary" | "outline" | "destructive"
+  "solid" | "default" | "outline" | "danger"
 > = {
   RESERVED: "outline",
-  ACTIVE: "default",
-  RETURNED: "secondary",
-  OVERDUE: "destructive",
-  CANCELLED: "destructive",
+  ACTIVE: "solid",
+  RETURNED: "default",
+  OVERDUE: "danger",
+  CANCELLED: "danger",
 };
 const PAYMENT_LABEL: Record<string, string> = {
   CASH: "현금",
@@ -105,13 +112,13 @@ export default function RentalDetailPage({
 
   if (rentalQuery.isError || !rentalQuery.data) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-        <span className="text-[15px] font-semibold">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
+        <span className="text-jm-md font-semibold text-[var(--jm-text)]">
           임대를 찾을 수 없습니다
         </span>
-        <Button variant="outline" onClick={() => router.push("/rentals")}>
+        <JmButton variant="outline" onClick={() => router.push("/rentals")}>
           목록으로
-        </Button>
+        </JmButton>
       </div>
     );
   }
@@ -129,40 +136,41 @@ export default function RentalDetailPage({
     : 0;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+        <JmIconButton
+          aria-label="뒤로"
+          size="sm"
           onClick={() => router.back()}
         >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <h1 className="text-lg font-semibold font-mono">{r.rentalNo}</h1>
-        <Badge variant={STATUS_TONE[r.status]}>
+          <ChevronLeft />
+        </JmIconButton>
+        <h1 className="text-jm-xl font-semibold font-mono text-[var(--jm-text)]">
+          {r.rentalNo}
+        </h1>
+        <JmBadge variant={STATUS_TONE[r.status]}>
           {STATUS_LABEL[r.status] ?? r.status}
-        </Badge>
+        </JmBadge>
         {isOverdue && overdueDays > 0 && (
-          <Badge variant="destructive">{overdueDays}일 경과</Badge>
+          <JmBadge variant="danger">{overdueDays}일 경과</JmBadge>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <JmContainer width="default" padded={false} className="p-6">
         <div className="grid gap-5 md:grid-cols-3">
           {/* 좌측: 임대 자산 + 기간 + 금액 */}
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">임대 자산</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
+          <JmCard className="md:col-span-2">
+            <JmCardHeader className="pb-3">
+              <JmCardTitle className="text-jm-lg">임대 자산</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent className="space-y-2 text-jm-sm">
               <Row
                 label="자산명"
                 value={
                   <div className="flex flex-col">
                     <span className="font-medium">{r.asset.name}</span>
                     {(r.asset.brand || r.asset.modelNo) && (
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                         {[r.asset.brand, r.asset.modelNo]
                           .filter(Boolean)
                           .join(" / ")}
@@ -180,59 +188,54 @@ export default function RentalDetailPage({
                     : `월 ₩${Number(r.asset.monthlyRate).toLocaleString("ko-KR")}`
                 }
               />
-            </CardContent>
-          </Card>
+            </JmCardContent>
+          </JmCard>
 
           {/* 우측 상단: 고객 */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">고객</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5 text-sm">
+          <JmCard>
+            <JmCardHeader className="pb-2">
+              <JmCardTitle className="text-jm-lg">고객</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent className="space-y-1.5 text-jm-sm">
               {r.customer ? (
                 <>
                   <div className="flex items-center gap-1.5">
                     {r.customer.type === "BUSINESS" && (
-                      <Badge
-                        variant="outline"
-                        className="border-amber-300 bg-amber-50 text-amber-800"
-                      >
-                        기업
-                      </Badge>
+                      <JmBadge variant="warning">기업</JmBadge>
                     )}
                     <span className="font-medium">{r.customer.name}</span>
                   </div>
-                  <div className="font-mono text-xs text-muted-foreground">
+                  <div className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                     {r.customer.phone}
                   </div>
                   {r.customer.businessNumber && (
-                    <div className="font-mono text-xs text-muted-foreground">
+                    <div className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
                       {r.customer.businessNumber}
                     </div>
                   )}
-                  <Button
+                  <JmButton
                     variant="ghost"
-                    size="sm"
-                    className="mt-2 h-7 px-2 text-[11px]"
+                    size="xs"
+                    className="mt-2 text-jm-2xs"
                     onClick={() =>
                       router.push(`/pos/customer-profile/${r.customer!.id}`)
                     }
                   >
                     프로필 보기
-                  </Button>
+                  </JmButton>
                 </>
               ) : (
-                <span className="text-muted-foreground">미등록</span>
+                <span className="text-[var(--jm-text-muted)]">미등록</span>
               )}
-            </CardContent>
-          </Card>
+            </JmCardContent>
+          </JmCard>
 
           {/* 기간 */}
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">기간</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-3 text-sm">
+          <JmCard className="md:col-span-2">
+            <JmCardHeader className="pb-2">
+              <JmCardTitle className="text-jm-lg">기간</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent className="grid grid-cols-3 gap-3 text-jm-sm">
               <Block
                 label="시작"
                 value={format(start, "yyyy-MM-dd", { locale: ko })}
@@ -260,15 +263,15 @@ export default function RentalDetailPage({
                 }
                 sub={returned ? format(returned, "HH:mm") : null}
               />
-            </CardContent>
-          </Card>
+            </JmCardContent>
+          </JmCard>
 
           {/* 금액 */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">금액</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5 text-sm">
+          <JmCard>
+            <JmCardHeader className="pb-2">
+              <JmCardTitle className="text-jm-lg">금액</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent className="space-y-1.5 text-jm-sm">
               <Row
                 label="임대료"
                 value={`₩${Number(r.rentalAmount).toLocaleString("ko-KR")}`}
@@ -283,40 +286,40 @@ export default function RentalDetailPage({
                   value={`+₩${Number(r.overdueAmount).toLocaleString("ko-KR")}`}
                 />
               )}
-              <div className="border-t pt-1.5 mt-1.5 flex justify-between text-base font-bold">
+              <div className="border-t border-[var(--jm-border)] pt-1.5 mt-1.5 flex justify-between text-jm-lg font-bold text-[var(--jm-text)]">
                 <span>최종</span>
                 <span className="tabular-nums">
                   ₩{Number(r.finalAmount).toLocaleString("ko-KR")}
                 </span>
               </div>
-              <p className="pt-1 text-[11px] text-muted-foreground">
+              <p className="pt-1 text-jm-2xs text-[var(--jm-text-muted)]">
                 결제수단:{" "}
                 {r.paymentMethod
                   ? PAYMENT_LABEL[r.paymentMethod] ?? r.paymentMethod
                   : "-"}
               </p>
-            </CardContent>
-          </Card>
+            </JmCardContent>
+          </JmCard>
 
           {/* 연결 주문 */}
           {r.orders.length > 0 && (
-            <Card className="md:col-span-3">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">연결 주문</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-1.5 text-sm">
+            <JmCard className="md:col-span-3">
+              <JmCardHeader className="pb-2">
+                <JmCardTitle className="text-jm-lg">연결 주문</JmCardTitle>
+              </JmCardHeader>
+              <JmCardContent className="flex flex-col gap-1.5 text-jm-sm">
                 {r.orders.map((o) => (
                   <button
                     key={o.id}
                     type="button"
                     onClick={() => router.push(`/orders/${o.id}`)}
-                    className="flex items-center justify-between rounded-md px-2 py-1.5 text-left hover:bg-muted/50"
+                    className="flex items-center justify-between rounded-md px-2 py-1.5 text-left hover:bg-[var(--jm-surface-muted)]"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{o.orderNo}</span>
-                      <Badge variant="outline">{o.status}</Badge>
+                      <span className="font-mono text-jm-xs">{o.orderNo}</span>
+                      <JmBadge variant="outline">{o.status}</JmBadge>
                       {o.paymentMethod && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-jm-xs text-[var(--jm-text-muted)]">
                           {PAYMENT_LABEL[o.paymentMethod] ?? o.paymentMethod}
                         </span>
                       )}
@@ -326,22 +329,24 @@ export default function RentalDetailPage({
                     </span>
                   </button>
                 ))}
-              </CardContent>
-            </Card>
+              </JmCardContent>
+            </JmCard>
           )}
 
           {r.memo && (
-            <Card className="md:col-span-3">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">메모</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{r.memo}</p>
-              </CardContent>
-            </Card>
+            <JmCard className="md:col-span-3">
+              <JmCardHeader className="pb-2">
+                <JmCardTitle className="text-jm-lg">메모</JmCardTitle>
+              </JmCardHeader>
+              <JmCardContent>
+                <p className="text-jm-sm whitespace-pre-wrap text-[var(--jm-text)]">
+                  {r.memo}
+                </p>
+              </JmCardContent>
+            </JmCard>
           )}
         </div>
-      </div>
+      </JmContainer>
     </div>
   );
 }
@@ -357,8 +362,8 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={mono ? "font-mono text-xs" : "tabular-nums"}>
+      <span className="text-[var(--jm-text-muted)]">{label}</span>
+      <span className={mono ? "font-mono text-jm-xs" : "tabular-nums"}>
         {value}
       </span>
     </div>
@@ -375,13 +380,15 @@ function Block({
   sub?: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg bg-muted/40 p-2.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="flex flex-col gap-0.5 rounded-lg bg-[var(--jm-surface-muted)] p-2.5">
+      <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {label}
       </span>
-      <span className="tabular-nums font-medium">{value}</span>
+      <span className="tabular-nums font-medium text-[var(--jm-text)]">
+        {value}
+      </span>
       {sub && (
-        <span className="text-[10px] text-muted-foreground">{sub}</span>
+        <span className="text-jm-3xs text-[var(--jm-text-muted)]">{sub}</span>
       )}
     </div>
   );
@@ -389,26 +396,21 @@ function Block({
 
 function DetailSkeleton({ onBack }: { onBack: () => void }) {
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={onBack}
-        >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Skeleton className="h-5 w-40" />
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+        <JmIconButton aria-label="뒤로" size="sm" onClick={onBack}>
+          <ChevronLeft />
+        </JmIconButton>
+        <JmSkeleton className="h-5 w-40" />
       </div>
-      <div className="flex-1 overflow-y-auto p-5">
+      <JmContainer width="default" padded={false} className="p-6">
         <div className="grid gap-5 md:grid-cols-3">
-          <Skeleton className="h-48 md:col-span-2" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32 md:col-span-2" />
-          <Skeleton className="h-40" />
+          <JmSkeleton className="h-48 md:col-span-2" />
+          <JmSkeleton className="h-32" />
+          <JmSkeleton className="h-32 md:col-span-2" />
+          <JmSkeleton className="h-40" />
         </div>
-      </div>
+      </JmContainer>
     </div>
   );
 }

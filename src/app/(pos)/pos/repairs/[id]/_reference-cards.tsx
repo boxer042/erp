@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
@@ -46,12 +46,12 @@ export function SerialHistoryCard({
     return (
       <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
         <div className="mb-1 flex items-baseline gap-2">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             이 기기 수리 이력
           </span>
-          <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">{serialCode}</span>
+          <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">{serialCode}</span>
         </div>
-        <span className="text-[12px] text-[var(--jm-text-subtle)]">이전 수리 이력 없음</span>
+        <span className="text-jm-xs text-[var(--jm-text-subtle)]">이전 수리 이력 없음</span>
       </div>
     );
   }
@@ -59,10 +59,10 @@ export function SerialHistoryCard({
   return (
     <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
       <div className="mb-2 flex items-baseline gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+        <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           이 기기 수리 이력 ({history.length})
         </span>
-        <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">{serialCode}</span>
+        <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">{serialCode}</span>
       </div>
       <div className="flex flex-col gap-1.5">
         {history.map((h) => (
@@ -75,20 +75,20 @@ export function SerialHistoryCard({
             <div className="flex min-w-0 flex-col">
               <div className="flex items-center gap-1.5">
                 <span className={`size-1.5 rounded-full ${STATUS_META[h.status].dot}`} />
-                <span className="text-[11px] font-semibold text-[var(--jm-text)]">
+                <span className="text-jm-2xs font-semibold text-[var(--jm-text)]">
                   {STATUS_META[h.status].label}
                 </span>
-                <span className="font-mono text-[11px] text-[var(--jm-text-subtle)]">
+                <span className="font-mono text-jm-2xs text-[var(--jm-text-subtle)]">
                   {h.ticketNo}
                 </span>
               </div>
               {h.symptom && (
-                <span className="line-clamp-1 mt-0.5 text-[12px] text-[var(--jm-text-muted)]">
+                <span className="line-clamp-1 mt-0.5 text-jm-xs text-[var(--jm-text-muted)]">
                   {h.symptom}
                 </span>
               )}
             </div>
-            <div className="shrink-0 text-right text-[10px] text-[var(--jm-text-subtle)]">
+            <div className="shrink-0 text-right text-jm-3xs text-[var(--jm-text-subtle)]">
               {format(new Date(h.receivedAt), "yyyy-MM-dd")}
               {h.pickedUpAt && (
                 <div className="text-[var(--jm-text-disabled)]">
@@ -118,7 +118,7 @@ export function RevisitCard({
       <div className="flex flex-col gap-2">
         {parent && (
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
+            <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
               재수리 — 원본 티켓
             </span>
             <button
@@ -128,15 +128,15 @@ export function RevisitCard({
             >
               <div className="flex items-center gap-2">
                 <span className={`size-1.5 rounded-full ${STATUS_META[parent.status].dot}`} />
-                <span className="font-mono text-[12px] font-semibold text-[var(--jm-text)]">
+                <span className="font-mono text-jm-xs font-semibold text-[var(--jm-text)]">
                   {parent.ticketNo}
                 </span>
-                <span className="text-[11px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   {STATUS_META[parent.status].label}
                 </span>
               </div>
               {parent.repairWarrantyEnds && (
-                <span className="text-[11px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   보증 ~{format(new Date(parent.repairWarrantyEnds), "yyyy-MM-dd")}
                 </span>
               )}
@@ -145,7 +145,7 @@ export function RevisitCard({
         )}
         {revisits.length > 0 && (
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
+            <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-warning-fg)]">
               연관 재수리 {revisits.length}
             </span>
             <div className="flex flex-col gap-1">
@@ -158,14 +158,14 @@ export function RevisitCard({
                 >
                   <div className="flex items-center gap-2">
                     <span className={`size-1.5 rounded-full ${STATUS_META[r.status].dot}`} />
-                    <span className="font-mono text-[12px] font-semibold text-[var(--jm-text)]">
+                    <span className="font-mono text-jm-xs font-semibold text-[var(--jm-text)]">
                       {r.ticketNo}
                     </span>
-                    <span className="text-[11px] text-[var(--jm-text-muted)]">
+                    <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                       {STATUS_META[r.status].label}
                     </span>
                   </div>
-                  <span className="text-[11px] text-[var(--jm-text-muted)]">
+                  <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                     {format(new Date(r.receivedAt), "MM-dd HH:mm")}
                   </span>
                 </button>
@@ -218,7 +218,7 @@ export function PackagesCard({
     return (
       <Card>
         <div className="flex flex-col gap-2">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             패키지
           </span>
           <div className="flex gap-1.5">
@@ -238,7 +238,7 @@ export function PackagesCard({
   return (
     <Card>
       <div className="flex flex-col gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+        <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
           패키지 빠른 추가
         </span>
         <div className="flex flex-wrap gap-1.5">
@@ -251,11 +251,9 @@ export function PackagesCard({
                 type="button"
                 disabled={apply.isPending}
                 onClick={() => apply.mutate(p.id)}
-                className="flex h-10 items-center gap-1.5 rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-[12px] transition-colors hover:border-[var(--jm-action)] hover:bg-[var(--jm-bg)] active:scale-[0.98] disabled:opacity-50"
+                className="flex h-10 items-center gap-1.5 rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-jm-xs transition-colors hover:border-[var(--jm-action)] hover:bg-[var(--jm-bg)] active:scale-[0.98] disabled:opacity-50"
               >
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                  <path d="M7 3v8M3 7h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
+                <Plus className="size-3" />
                 <span className="font-semibold text-[var(--jm-text)]">{p.name}</span>
                 <span className="text-[var(--jm-text-muted)]">
                   ({partsCount > 0 && `부속 ${partsCount}`}

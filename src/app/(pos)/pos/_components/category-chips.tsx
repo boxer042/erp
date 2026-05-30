@@ -1,5 +1,7 @@
 "use client";
 
+import { LayoutGrid } from "lucide-react";
+
 interface CategoryChip {
   id: string;
   name: string;
@@ -80,18 +82,10 @@ function Chip({
         }`}
       >
         {isAll ? (
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 20 20"
-            fill="none"
-            className={active ? "text-[var(--jm-text)]" : "text-[var(--jm-text-subtle)]"}
-          >
-            <rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-            <rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-            <rect x="3" y="11" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-            <rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-          </svg>
+          <LayoutGrid
+            className={`size-[22px] ${active ? "text-[var(--jm-text)]" : "text-[var(--jm-text-subtle)]"}`}
+            strokeWidth={1.6}
+          />
         ) : imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -102,7 +96,7 @@ function Chip({
           />
         ) : (
           <span
-            className={`text-[15px] font-semibold ${
+            className={`text-jm-md font-semibold ${
               active ? "text-[var(--jm-text)]" : "text-[var(--jm-text-subtle)]"
             }`}
           >
@@ -111,7 +105,7 @@ function Chip({
         )}
       </div>
       <span
-        className={`line-clamp-1 max-w-full text-[11px] ${
+        className={`line-clamp-1 max-w-full text-jm-2xs ${
           active ? "font-semibold text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"
         }`}
       >

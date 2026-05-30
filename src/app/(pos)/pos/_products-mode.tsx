@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet } from "@/lib/api-client";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
@@ -239,10 +240,10 @@ export function ProductsMode({
           {!isSearching && categoryId === "" && (popularQuery.data?.length ?? 0) > 0 && (
             <section className="mb-4 flex flex-col gap-2">
               <div className="flex items-baseline gap-2 px-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   자주 쓰는 상품
                 </span>
-                <span className="text-[10px] text-[var(--jm-text-subtle)]">최근 30일 기준</span>
+                <span className="text-jm-3xs text-[var(--jm-text-subtle)]">최근 30일 기준</span>
               </div>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4">
                 {(popularQuery.data ?? []).map((p) => (
@@ -262,7 +263,7 @@ export function ProductsMode({
             <GridSkeleton />
           ) : products.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <span className="text-[14px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-base text-[var(--jm-text-muted)]">
                 {isSearching
                   ? `"${deferredSearch}" 검색 결과가 없습니다`
                   : "해당 카테고리에 상품이 없습니다"}
@@ -295,25 +296,17 @@ export function ProductsMode({
               className="flex flex-1 items-center gap-2 rounded-2xl bg-[var(--jm-surface-muted)] px-4 py-3 text-left transition-colors active:bg-[var(--jm-border)]"
             >
               <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface)]">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <path
-                    d="M4 7h12l-1.3 9a1.5 1.5 0 0 1-1.5 1.3H6.8a1.5 1.5 0 0 1-1.5-1.3L4 7zM7 7V5a3 3 0 0 1 6 0v2"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <ShoppingBag className="size-[18px]" />
               </div>
               <div className="flex min-w-0 flex-col">
-                <span className="text-[11px] tabular-nums text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs tabular-nums text-[var(--jm-text-muted)]">
                   상품 {productCount}
                   <span className="mx-1.5 text-[var(--jm-text-disabled)]">·</span>
                   수리 {repairCount}
                   <span className="mx-1.5 text-[var(--jm-text-disabled)]">·</span>
                   임대 {rentalCount}
                 </span>
-                <span className="text-[15px] font-bold tabular-nums text-[var(--jm-text)]">
+                <span className="text-jm-md font-bold tabular-nums text-[var(--jm-text)]">
                   ₩{totals.total.toLocaleString("ko-KR")}
                 </span>
               </div>
@@ -321,7 +314,7 @@ export function ProductsMode({
             <button
               type="button"
               onClick={onOpenPayment}
-              className="rounded-2xl bg-[var(--jm-action)] px-5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
+              className="rounded-2xl bg-[var(--jm-action)] px-5 text-jm-base font-semibold text-white transition-transform active:scale-[0.99]"
             >
               결제
             </button>

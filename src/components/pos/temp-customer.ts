@@ -1,6 +1,7 @@
 // 미등록 고객 식별용 — 세션 UUID 에서 짧은 코드 + 색상 추출.
 // 한 세션에 한 번 부여되고 영구 보존(localStorage). 카트/수리/임대 어디서나 같은 색·코드로 표시.
 
+/* eslint-disable no-restricted-syntax -- 고객 식별용 카테고리 색상 팔레트(N개 구분색). jm 시맨틱 토큰으로 환원 불가. */
 const PALETTE: { color: string; bg: string; ring: string }[] = [
   { color: "rose", bg: "bg-rose-500", ring: "ring-rose-300" },
   { color: "amber", bg: "bg-amber-500", ring: "ring-amber-300" },

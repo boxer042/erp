@@ -18,6 +18,7 @@ import {
   JmDialogTitle,
   JmInput,
   JmSearchInput,
+  JmSkeleton,
   JmTable,
   JmTableBody,
   JmTableCell,
@@ -43,6 +44,34 @@ interface Category {
 }
 
 type Kind = "symptom" | "diagnosis";
+
+function TemplatesSkeletonRows({ rows = 6 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <JmTableRow key={i}>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-48" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-5 w-16 rounded-md" />
+          </JmTableCell>
+          <JmTableCell className="text-right">
+            <div className="flex justify-end">
+              <JmSkeleton className="h-4 w-8" />
+            </div>
+          </JmTableCell>
+          <JmTableCell>
+            <div className="flex justify-end gap-1">
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+              <JmSkeleton className="h-8 w-8 rounded-md" />
+            </div>
+          </JmTableCell>
+        </JmTableRow>
+      ))}
+    </>
+  );
+}
 
 export default function RepairTemplatesPage() {
   const [kind, setKind] = useState<Kind>("symptom");
@@ -147,14 +176,7 @@ export default function RepairTemplatesPage() {
                   </JmTableHeader>
                   <JmTableBody>
                     {templatesQuery.isPending ? (
-                      <JmTableRow>
-                        <JmTableCell
-                          colSpan={4}
-                          className="py-8 text-center text-jm-sm text-[var(--jm-text-subtle)]"
-                        >
-                          로딩 중...
-                        </JmTableCell>
-                      </JmTableRow>
+                      <TemplatesSkeletonRows />
                     ) : filtered.length === 0 ? (
                       <JmTableRow>
                         <JmTableCell

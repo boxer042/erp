@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { Package } from "lucide-react";
 import { useSessions, type CartItem } from "@/components/pos/sessions-context";
 import { PosLineItemRow } from "./_components/line-item-row";
 import { PriceInputDialog } from "./_components/price-input-dialog";
@@ -102,14 +103,7 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
             />
           ) : (
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
-                  stroke="currentColor"
-                  strokeWidth="1.3"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Package className="size-5" />
             </div>
           )
         }
@@ -119,29 +113,29 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
           <>
             {/* 옵션 표시 — 옵션 변경 버튼 바로 위 별도 줄 (상품명 부속 텍스트보다 가독성 높음) */}
             {optionSummary && (
-              <span className="mt-0.5 line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">
+              <span className="mt-0.5 line-clamp-1 text-jm-2xs text-[var(--jm-text-muted)]">
                 옵션: <span className="font-medium text-[var(--jm-text)]">{optionSummary}</span>
               </span>
             )}
             <div className="mt-0.5 flex flex-wrap items-center gap-1">
               {item.isAddon && (
-                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)] border border-[var(--jm-border)]">
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)] border border-[var(--jm-border)]">
                   추가구매
                 </span>
               )}
               {item.itemType === "service" && (
-                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)]">
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
                   기술료
                 </span>
               )}
               {/* 서비스로 지급 — 0원 무상 제공 (영수증/명세표에서도 동일 배지) */}
               {item.isService && (
-                <span className="inline-flex items-center rounded-full bg-[var(--jm-success-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-success-fg)]">
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-success-bg)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-success-fg)]">
                   서비스
                 </span>
               )}
               {taxType === "TAX_FREE" && (
-                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text-muted)]">
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-medium text-[var(--jm-text-muted)]">
                   면세
                 </span>
               )}
@@ -150,7 +144,7 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                 <button
                   type="button"
                   onClick={() => toggleZeroRate(item.cartItemId, sessionId)}
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-jm-3xs font-medium transition-colors ${
                     item.isZeroRate
                       ? "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
                       : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-border)]"
@@ -163,9 +157,9 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                 <button
                   type="button"
                   onClick={() => setVariantOpen(true)}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-jm-3xs font-bold transition-colors ${
                     triggerWarn
-                      ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)] hover:bg-amber-200"
+                      ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)] hover:bg-[var(--jm-warning-solid)]/20"
                       : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)] hover:bg-[var(--jm-border)]"
                   }`}
                 >
@@ -177,7 +171,7 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                 <button
                   type="button"
                   onClick={() => setAddonOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-bold text-[var(--jm-text)] transition-colors hover:bg-[var(--jm-border)]"
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-bold text-[var(--jm-text)] transition-colors hover:bg-[var(--jm-border)]"
                   title="이 상품과 함께 사면 좋은 추가구매 추천"
                 >
                   <span>+</span>
@@ -193,14 +187,14 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
           <>
             <div className="flex items-baseline gap-1.5">
               {showListDiff && (
-                <span className="text-[11px] tabular-nums text-[var(--jm-text-subtle)] line-through">
+                <span className="text-jm-2xs tabular-nums text-[var(--jm-text-subtle)] line-through">
                   ₩{listDisplay.toLocaleString("ko-KR")}
                 </span>
               )}
               <span>₩{unitDisplay.toLocaleString("ko-KR")}</span>
             </div>
             {showListDiff && (
-              <span className="text-[10px] font-semibold tabular-nums text-[var(--jm-success-fg)]">
+              <span className="text-jm-3xs font-semibold tabular-nums text-[var(--jm-success-fg)]">
                 −₩{Math.abs(listDiff).toLocaleString("ko-KR")} ({Math.abs(listDiffPercent).toFixed(1)}% 할인)
               </span>
             )}
@@ -234,19 +228,19 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                   className="flex items-center justify-between gap-2 rounded-lg bg-[var(--jm-surface-muted)] px-3 py-1.5"
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface)] px-1.5 py-0.5 text-jm-4xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                       옵션
                     </span>
-                    <span className="line-clamp-1 text-[12px] font-medium text-[var(--jm-text)]">
+                    <span className="line-clamp-1 text-jm-xs font-medium text-[var(--jm-text)]">
                       {ref.name}
                     </span>
                     {ref.sku && (
-                      <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">
+                      <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">
                         {ref.sku}
                       </span>
                     )}
                   </div>
-                  <div className="flex shrink-0 items-baseline gap-2 text-[12px] tabular-nums">
+                  <div className="flex shrink-0 items-baseline gap-2 text-jm-xs tabular-nums">
                     <span className="text-[var(--jm-text-muted)]">
                       ×{item.quantity} · ₩{refUnitDisplay.toLocaleString("ko-KR")}
                     </span>

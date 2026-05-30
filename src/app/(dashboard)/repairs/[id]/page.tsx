@@ -22,30 +22,34 @@ import {
 import { toast } from "sonner";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  JmBadge,
+  JmButton,
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmContainer,
+  JmIconButton,
+  JmInput,
+  JmTextarea,
+  JmSkeleton,
+  JmSwitch,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmDialog,
+  JmDialogBody,
+  JmDialogContent,
+  JmDialogDescription,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+} from "@/jm";
 import { ProductCombobox, type ProductOption } from "@/components/product-combobox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   cn,
   formatComma,
@@ -162,15 +166,18 @@ const STATUS_LABEL: Record<RepairStatus, string> = {
   CANCELLED: "취소",
 };
 
-const STATUS_VARIANT: Record<RepairStatus, "default" | "secondary" | "outline" | "destructive"> = {
-  RECEIVED: "secondary",
-  DIAGNOSING: "secondary",
+const STATUS_VARIANT: Record<
+  RepairStatus,
+  "default" | "outline" | "solid" | "danger"
+> = {
+  RECEIVED: "default",
+  DIAGNOSING: "default",
   QUOTED: "outline",
   APPROVED: "outline",
-  REPAIRING: "default",
-  READY: "default",
-  PICKED_UP: "secondary",
-  CANCELLED: "destructive",
+  REPAIRING: "solid",
+  READY: "solid",
+  PICKED_UP: "default",
+  CANCELLED: "danger",
 };
 
 // USED 부속 + 공임 + 진단비 - 할인 (lib/repair.ts 의 calcRepairTotals 래퍼)
@@ -198,38 +205,38 @@ function RepairStatementDialog({
   const [supplyOnly, setSupplyOnly] = useState(false);
   const src = `/repairs/${ticketId}/print${supplyOnly ? "?supplyOnly=1" : ""}`;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border p-4">
-          <DialogTitle>수리내역서 — {ticketNo}</DialogTitle>
-          <label className="mr-8 flex cursor-pointer items-center gap-2 text-sm">
-            <Switch checked={supplyOnly} onCheckedChange={setSupplyOnly} />
+    <JmDialog open={open} onOpenChange={onOpenChange}>
+      <JmDialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw]! flex-col gap-0 p-0 sm:max-w-[95vw]!">
+        <JmDialogHeader className="flex flex-row items-center justify-between gap-1 border-b border-[var(--jm-border)] p-4">
+          <JmDialogTitle>수리내역서 — {ticketNo}</JmDialogTitle>
+          <label className="mr-8 flex cursor-pointer items-center gap-2 text-jm-sm">
+            <JmSwitch checked={supplyOnly} onCheckedChange={setSupplyOnly} />
             <span>공급가액만 (세액 제외)</span>
           </label>
-        </DialogHeader>
+        </JmDialogHeader>
         <iframe
           key={src}
           src={src}
           className="size-full flex-1 border-0"
           title="수리내역서"
         />
-      </DialogContent>
-    </Dialog>
+      </JmDialogContent>
+    </JmDialog>
   );
 }
 
 // 상태 진행 버튼들 — 현재 상태에서 가능한 액션
 function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
-  const actions: { action: string; label: string; variant?: "default" | "outline" | "destructive" }[] = [];
+  const actions: { action: string; label: string; variant?: "cta" | "outline" | "danger" }[] = [];
   if (status === "RECEIVED") {
     if (type === "DROP_OFF") {
       actions.push({ action: "diagnose", label: "진단 시작" });
     }
     actions.push({ action: "start", label: "수리 시작" });
-    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
+    actions.push({ action: "cancel", label: "취소", variant: "danger" });
   } else if (status === "DIAGNOSING") {
     actions.push({ action: "quote", label: "견적 확정" });
-    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
+    actions.push({ action: "cancel", label: "취소", variant: "danger" });
   } else if (status === "QUOTED") {
     actions.push({ action: "approve", label: "고객 승인" });
     actions.push({
@@ -237,12 +244,12 @@ function nextActions(status: RepairStatus, type: "ON_SITE" | "DROP_OFF") {
       label: "고객 거절 — 진단비만 청구",
       variant: "outline",
     });
-    actions.push({ action: "cancel", label: "거절", variant: "destructive" });
+    actions.push({ action: "cancel", label: "거절", variant: "danger" });
   } else if (status === "APPROVED") {
     actions.push({ action: "start", label: "수리 시작" });
-    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
+    actions.push({ action: "cancel", label: "취소", variant: "danger" });
   } else if (status === "REPAIRING") {
-    actions.push({ action: "cancel", label: "취소", variant: "destructive" });
+    actions.push({ action: "cancel", label: "취소", variant: "danger" });
     actions.push({ action: "ready", label: "수리 완료" });
   } else if (status === "READY") {
     // 인계대기: 작업·부속·공임이 모두 확정된 상태 — 취소 불가, 픽업/결제만 가능
@@ -267,16 +274,16 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
 
   if (ticketQuery.isPending) {
     return (
-      <div className="flex h-full flex-col gap-3 p-4 sm:p-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="flex h-full flex-col gap-3 bg-[var(--jm-bg)] p-4 sm:p-6">
+        <JmSkeleton className="h-8 w-64" />
+        <JmSkeleton className="h-32 w-full" />
+        <JmSkeleton className="h-64 w-full" />
       </div>
     );
   }
   if (ticketQuery.isError || !ticketQuery.data) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-[var(--jm-bg)] text-[var(--jm-text-muted)]">
         수리 티켓을 찾을 수 없습니다
       </div>
     );
@@ -291,54 +298,51 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
       {/* 상단 헤더 */}
-      <div className="flex items-center gap-3 border-b border-border bg-background px-4 py-3 sm:px-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={() => router.push("/repairs")}
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
+        <JmIconButton
           aria-label="목록"
+          size="sm"
+          onClick={() => router.push("/repairs")}
         >
           <ArrowLeft />
-        </Button>
-        <div className="flex flex-1 items-center gap-2">
-          <span className="font-mono text-sm font-semibold">{t.ticketNo}</span>
-          <Badge variant="outline" className="text-[10px]">
+        </JmIconButton>
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <span className="font-mono text-jm-sm font-semibold">{t.ticketNo}</span>
+          <JmBadge variant="outline" size="sm">
             {t.type === "ON_SITE" ? (
               <><MapPin className="size-3" /> 즉시</>
             ) : (
               <><Wrench className="size-3" /> 맡김</>
             )}
-          </Badge>
+          </JmBadge>
           {t.workKind === "CUSTOM_BUILD" && (
-            <Badge variant="default" className="text-[10px]">
+            <JmBadge variant="solid" size="sm">
               리빌드
-            </Badge>
+            </JmBadge>
           )}
-          <Badge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
+          <JmBadge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</JmBadge>
           {t.parentRepairTicket && (
-            <Badge variant="secondary" className="text-[10px]">
+            <JmBadge variant="default" size="sm">
               재수리 (← {t.parentRepairTicket.ticketNo})
-            </Badge>
+            </JmBadge>
           )}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">
             접수 {format(new Date(t.receivedAt), "yyyy-MM-dd HH:mm")}
           </span>
         </div>
-        <Button
+        <JmButton
           variant="outline"
-          size="sm"
-          className="h-8"
+          size="xs"
           onClick={() => setStatementOpen(true)}
         >
           <FileText className="size-3.5" />
           내역서 출력
-        </Button>
+        </JmButton>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+      <JmContainer width="default" padded={false} className="p-4 sm:p-6">
         <div className="flex flex-col gap-4">
           <CustomerSection ticket={t} />
           <SymptomSection ticket={t} readonly={readonly} onSaved={invalidate} />
@@ -348,7 +352,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
           <FeesAndTotalsSection ticket={t} readonly={readonly} onChanged={invalidate} />
           <StatusActionsSection ticket={t} onChanged={invalidate} />
         </div>
-      </div>
+      </JmContainer>
 
       {/* 내역서 출력 모달 */}
       <RepairStatementDialog
@@ -365,112 +369,112 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
 
 function CustomerSection({ ticket }: { ticket: RepairTicketDetail }) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">고객 / 기기</CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
+    <JmCard>
+      <JmCardHeader className="border-b-0 pb-3">
+        <JmCardTitle className="text-jm-sm">고객 / 기기</JmCardTitle>
+      </JmCardHeader>
+      <JmCardContent className="grid grid-cols-1 gap-3 pt-0 text-jm-sm md:grid-cols-4">
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">고객</span>
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">고객</span>
           {ticket.customer ? (
             <>
               <span className="flex items-center gap-1 font-medium">
-                <User className="size-3.5 text-muted-foreground" />
+                <User className="size-3.5 text-[var(--jm-text-muted)]" />
                 {ticket.customer.name}
               </span>
               {ticket.customer.phone && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1 text-jm-xs text-[var(--jm-text-muted)]">
                   <Phone className="size-3" />
                   {ticket.customer.phone}
                 </span>
               )}
             </>
           ) : (
-            <span className="flex items-center gap-1 text-muted-foreground">
+            <span className="flex items-center gap-1 text-[var(--jm-text-muted)]">
               <User className="size-3.5" /> 미등록
             </span>
           )}
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">카테고리</span>
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">카테고리</span>
           <span className="font-medium">
             {ticket.repairCategory?.name ?? (
-              <span className="text-muted-foreground">기타</span>
+              <span className="text-[var(--jm-text-muted)]">기타</span>
             )}
           </span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">기기 / 시리얼</span>
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">기기 / 시리얼</span>
           {ticket.serialItem ? (
             <>
               <span className="flex items-center gap-1 font-medium">
-                <QrCode className="size-3.5 text-muted-foreground" />
+                <QrCode className="size-3.5 text-[var(--jm-text-muted)]" />
                 <span className="font-mono">{ticket.serialItem.code}</span>
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
                 {ticket.serialItem.product?.name ?? ticket.serialItem.displayName ?? "(미상)"}
               </span>
             </>
           ) : ticket.customerMachine ? (
             <span className="font-medium">{ticket.customerMachine.name}</span>
           ) : (
-            <span className="text-muted-foreground">-</span>
+            <span className="text-[var(--jm-text-muted)]">-</span>
           )}
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">담당</span>
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">담당</span>
           <span className="font-medium">
-            {ticket.assignedTo?.name ?? <span className="text-muted-foreground">미지정</span>}
+            {ticket.assignedTo?.name ?? <span className="text-[var(--jm-text-muted)]">미지정</span>}
           </span>
           {ticket.repairWarrantyEnds && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-jm-xs text-[var(--jm-text-muted)]">
               수리 보증 ~{format(new Date(ticket.repairWarrantyEnds), "yyyy-MM-dd")}
             </span>
           )}
         </div>
-      </CardContent>
+      </JmCardContent>
       {/* 취소 정보 — CANCELLED 상태일 때만 */}
       {ticket.status === "CANCELLED" && (ticket.cancelReason || ticket.cancelMemo) && (
-        <CardContent className="border-t pt-3">
-          <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs">
-            <XCircle className="size-3.5 shrink-0 text-rose-600" />
+        <JmCardContent className="border-t border-[var(--jm-border)] pt-3">
+          <div className="flex items-start gap-2 rounded-md bg-[var(--jm-surface-muted)] px-3 py-2 text-jm-xs">
+            <XCircle className="size-3.5 shrink-0 text-[var(--jm-danger-solid)]" />
             <div className="flex flex-col gap-0.5">
               <span className="font-semibold">취소 사유</span>
-              <span className="text-muted-foreground">
+              <span className="text-[var(--jm-text-muted)]">
                 {ticket.cancelReason ? cancelReasonLabel(ticket.cancelReason) : null}
                 {ticket.cancelReason && ticket.cancelMemo ? " — " : null}
                 {ticket.cancelMemo}
                 {ticket.cancelledAt && (
-                  <span className="ml-2 font-mono text-[10px]">
+                  <span className="ml-2 font-mono text-jm-3xs">
                     {format(new Date(ticket.cancelledAt), "yyyy-MM-dd HH:mm")}
                   </span>
                 )}
               </span>
             </div>
           </div>
-        </CardContent>
+        </JmCardContent>
       )}
       {/* 거절 정보 — quoteRejectReason 있으면 (READY 직행 or PICKED_UP 후 진단비만 청구된 케이스) */}
       {ticket.quoteRejectReason && (
-        <CardContent className="border-t pt-3">
-          <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs">
-            <XCircle className="size-3.5 shrink-0 text-amber-600" />
+        <JmCardContent className="border-t border-[var(--jm-border)] pt-3">
+          <div className="flex items-start gap-2 rounded-md bg-[var(--jm-warning-bg)] px-3 py-2 text-jm-xs">
+            <XCircle className="size-3.5 shrink-0 text-[var(--jm-warning-fg)]" />
             <div className="flex flex-col gap-0.5">
-              <span className="font-semibold text-amber-900">거절 · 진단비만 청구</span>
-              <span className="text-amber-800">
+              <span className="font-semibold text-[var(--jm-warning-fg)]">거절 · 진단비만 청구</span>
+              <span className="text-[var(--jm-warning-fg)]">
                 {quoteRejectReasonLabel(ticket.quoteRejectReason)}
                 {ticket.quoteRejectMemo ? ` — ${ticket.quoteRejectMemo}` : null}
                 {ticket.quoteRejectedAt && (
-                  <span className="ml-2 font-mono text-[10px] opacity-70">
+                  <span className="ml-2 font-mono text-jm-3xs opacity-70">
                     {format(new Date(ticket.quoteRejectedAt), "yyyy-MM-dd HH:mm")}
                   </span>
                 )}
               </span>
             </div>
           </div>
-        </CardContent>
+        </JmCardContent>
       )}
-    </Card>
+    </JmCard>
   );
 }
 
@@ -551,54 +555,54 @@ function SymptomSection({
   });
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">증상 · 진단 · 메모</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <JmCard>
+      <JmCardHeader className="border-b-0 pb-3">
+        <JmCardTitle className="text-jm-sm">증상 · 진단 · 메모</JmCardTitle>
+      </JmCardHeader>
+      <JmCardContent className="flex flex-col gap-3 pt-0">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">증상 (고객 호소)</label>
-          <Textarea
+          <label className="text-jm-xs text-[var(--jm-text-muted)]">증상 (고객 호소)</label>
+          <JmTextarea
             value={symptom}
             onChange={(e) => setSymptom(e.target.value)}
             disabled={readonly}
-            className="min-h-[60px] resize-none text-sm"
+            className="min-h-[60px] resize-none text-jm-sm"
             placeholder="예: 누수 발생, 호스 연결부 새는 듯"
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">진단 (직원 확인)</label>
-          <Textarea
+          <label className="text-jm-xs text-[var(--jm-text-muted)]">진단 (직원 확인)</label>
+          <JmTextarea
             value={diagnosis}
             onChange={(e) => setDiagnosis(e.target.value)}
             disabled={readonly}
-            className="min-h-[60px] resize-none text-sm"
+            className="min-h-[60px] resize-none text-jm-sm"
             placeholder="예: 체크밸브 마모 확인"
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">수리 메모 (내부)</label>
-          <Textarea
+          <label className="text-jm-xs text-[var(--jm-text-muted)]">수리 메모 (내부)</label>
+          <JmTextarea
             value={repairNotes}
             onChange={(e) => setRepairNotes(e.target.value)}
             disabled={readonly}
-            className="min-h-[60px] resize-none text-sm"
+            className="min-h-[60px] resize-none text-jm-sm"
           />
         </div>
         {!readonly && dirty && (
           <div className="flex justify-end">
-            <Button
-              size="sm"
+            <JmButton
+              size="xs"
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
             >
               {saveMutation.isPending && <Loader2 className="size-4 animate-spin" />}
               저장
-            </Button>
+            </JmButton>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -641,23 +645,23 @@ function PackagesSection({
   const packages = packagesQuery.data ?? [];
   if (packagesQuery.isPending) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 py-3">
-          <Skeleton className="h-7 w-32 rounded-full" />
-          <Skeleton className="h-7 w-28 rounded-full" />
-          <Skeleton className="h-7 w-36 rounded-full" />
-        </CardContent>
-      </Card>
+      <JmCard>
+        <JmCardContent className="flex items-center gap-2 py-3">
+          <JmSkeleton className="h-7 w-32 rounded-full" />
+          <JmSkeleton className="h-7 w-28 rounded-full" />
+          <JmSkeleton className="h-7 w-36 rounded-full" />
+        </JmCardContent>
+      </JmCard>
     );
   }
   if (packages.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">패키지 빠른 추가</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-1.5">
+    <JmCard>
+      <JmCardHeader className="border-b-0 pb-2">
+        <JmCardTitle className="text-jm-sm">패키지 빠른 추가</JmCardTitle>
+      </JmCardHeader>
+      <JmCardContent className="flex flex-wrap gap-1.5 pt-0">
         {packages.map((p) => {
           const partsCount = p.parts.length;
           const laborsCount = p.labors.length;
@@ -668,14 +672,14 @@ function PackagesSection({
               disabled={applyMutation.isPending}
               onClick={() => applyMutation.mutate(p.id)}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-xs",
-                "transition-colors hover:border-primary hover:bg-primary/5",
+                "inline-flex items-center gap-1 rounded-full border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-1 text-jm-xs",
+                "transition-colors hover:border-[var(--jm-accent-solid)] hover:bg-[var(--jm-accent-bg)]",
                 "disabled:cursor-not-allowed disabled:opacity-50",
               )}
             >
               <Plus className="size-3" />
               <span className="font-medium">{p.name}</span>
-              <span className="text-muted-foreground">
+              <span className="text-[var(--jm-text-muted)]">
                 ({partsCount > 0 && `부속 ${partsCount}`}
                 {partsCount > 0 && laborsCount > 0 && " · "}
                 {laborsCount > 0 && `공임 ${laborsCount}`})
@@ -683,8 +687,8 @@ function PackagesSection({
             </button>
           );
         })}
-      </CardContent>
-    </Card>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -733,22 +737,21 @@ function PartsSection({
     .reduce((s, p) => s + Number(p.totalPrice), 0);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">사용 부속</CardTitle>
+    <JmCard>
+      <JmCardHeader className="flex flex-row items-center justify-between border-b-0 pb-3">
+        <JmCardTitle className="text-jm-sm">사용 부속</JmCardTitle>
         {!readonly && (
-          <Button
-            size="sm"
+          <JmButton
+            size="xs"
             variant="outline"
-            className="h-8"
             onClick={() => setAdding((v) => !v)}
           >
             <Plus className="size-3.5" />
             부속 검색/추가
-          </Button>
+          </JmButton>
         )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-0">
+      </JmCardHeader>
+      <JmCardContent className="flex flex-col gap-3 p-0">
         {adding && (
           <div className="px-6">
             <ProductCombobox
@@ -763,25 +766,25 @@ function PartsSection({
           </div>
         )}
 
-        <div className="border-y border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6">부속명</TableHead>
-                <TableHead className="w-32">수량</TableHead>
-                <TableHead className="w-28 text-right">단가</TableHead>
-                <TableHead className="w-28 text-right">소계</TableHead>
-                <TableHead className="w-24">상태</TableHead>
-                <TableHead className="w-12 pr-6"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <div className="border-y border-[var(--jm-border)]">
+          <JmTable>
+            <JmTableHeader>
+              <JmTableRow>
+                <JmTableHead className="pl-6">부속명</JmTableHead>
+                <JmTableHead className="w-32">수량</JmTableHead>
+                <JmTableHead className="w-28 text-right">단가</JmTableHead>
+                <JmTableHead className="w-28 text-right">소계</JmTableHead>
+                <JmTableHead className="w-24">상태</JmTableHead>
+                <JmTableHead className="w-12 pr-6"></JmTableHead>
+              </JmTableRow>
+            </JmTableHeader>
+            <JmTableBody>
               {ticket.parts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                <JmTableRow>
+                  <JmTableCell colSpan={6} className="py-6 text-center text-[var(--jm-text-muted)]">
                     추가된 부속이 없습니다
-                  </TableCell>
-                </TableRow>
+                  </JmTableCell>
+                </JmTableRow>
               ) : (
                 ticket.parts.map((p) => (
                   <PartRow
@@ -793,25 +796,25 @@ function PartsSection({
                   />
                 ))
               )}
-            </TableBody>
-          </Table>
+            </JmTableBody>
+          </JmTable>
         </div>
 
-        <div className="flex justify-end gap-4 px-6 pb-2 text-sm">
+        <div className="flex justify-end gap-4 px-6 pb-2 text-jm-sm">
           {lostTotal > 0 && (
-            <span className="text-destructive">
+            <span className="text-[var(--jm-danger-fg)]">
               손실 ₩{lostTotal.toLocaleString("ko-KR")}
             </span>
           )}
           <span>
-            <span className="text-muted-foreground">청구 부속</span>{" "}
+            <span className="text-[var(--jm-text-muted)]">청구 부속</span>{" "}
             <span className="font-semibold tabular-nums">
               ₩{usedTotal.toLocaleString("ko-KR")}
             </span>
           </span>
         </div>
-      </CardContent>
-    </Card>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -851,21 +854,20 @@ function PartRow({
   const isLost = part.status === "LOST";
 
   return (
-    <TableRow className={cn(isLost && "opacity-70")}>
-      <TableCell className="pl-6">
+    <JmTableRow className={cn(isLost && "opacity-70")}>
+      <JmTableCell className="pl-6">
         <div className="flex flex-col">
-          <span className={cn("text-sm", isLost && "line-through")}>
+          <span className={cn("text-jm-sm", isLost && "line-through")}>
             {part.product.name}
           </span>
-          <span className="text-xs text-muted-foreground">{part.product.sku}</span>
+          <span className="text-jm-xs text-[var(--jm-text-muted)]">{part.product.sku}</span>
         </div>
-      </TableCell>
-      <TableCell>
+      </JmTableCell>
+      <JmTableCell>
         <div className="flex items-center gap-1">
-          <Button
+          <JmButton
             variant="ghost"
-            size="icon"
-            className="size-7"
+            className="size-7 rounded-lg p-0"
             disabled={readonly || updateMutation.isPending || Number(qty) <= 1}
             onClick={() => {
               const next = Math.max(1, Number(qty) - 1);
@@ -874,8 +876,8 @@ function PartRow({
             }}
           >
             −
-          </Button>
-          <Input
+          </JmButton>
+          <JmInput
             type="text"
             inputMode="numeric"
             value={qty}
@@ -886,12 +888,11 @@ function PartRow({
               if (n !== Number(part.quantity)) updateMutation.mutate({ quantity: n });
             }}
             disabled={readonly}
-            className="h-7 w-12 text-center text-sm tabular-nums"
+            className="h-7 w-12 rounded-lg px-0 text-center text-jm-sm tabular-nums"
           />
-          <Button
+          <JmButton
             variant="ghost"
-            size="icon"
-            className="size-7"
+            className="size-7 rounded-lg p-0"
             disabled={readonly || updateMutation.isPending}
             onClick={() => {
               const next = Number(qty) + 1;
@@ -900,16 +901,16 @@ function PartRow({
             }}
           >
             +
-          </Button>
+          </JmButton>
         </div>
-      </TableCell>
-      <TableCell className="text-right tabular-nums">
+      </JmTableCell>
+      <JmTableCell className="text-right tabular-nums">
         ₩{Number(part.unitPrice).toLocaleString("ko-KR")}
-      </TableCell>
-      <TableCell className="text-right tabular-nums">
+      </JmTableCell>
+      <JmTableCell className="text-right tabular-nums">
         ₩{Number(part.totalPrice).toLocaleString("ko-KR")}
-      </TableCell>
-      <TableCell>
+      </JmTableCell>
+      <JmTableCell>
         <button
           type="button"
           disabled={readonly}
@@ -917,30 +918,31 @@ function PartRow({
             updateMutation.mutate({ status: isLost ? "USED" : "LOST" })
           }
           className={cn(
-            "inline-flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors",
+            "inline-flex h-6 items-center rounded px-2 text-jm-2xs font-medium transition-colors",
             isLost
-              ? "bg-destructive/10 text-destructive"
-              : "bg-secondary text-secondary-foreground",
+              ? "bg-[var(--jm-danger-bg)] text-[var(--jm-danger-fg)]"
+              : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]",
             readonly && "cursor-not-allowed opacity-50",
           )}
         >
           {isLost ? "LOST" : "USED"}
         </button>
-      </TableCell>
-      <TableCell className="pr-6 text-right">
+      </JmTableCell>
+      <JmTableCell className="pr-6 text-right">
         {!readonly && (
-          <Button
+          <JmIconButton
+            aria-label="삭제"
             variant="ghost"
-            size="icon"
-            className="size-7 text-muted-foreground hover:text-destructive"
+            size="sm"
+            className="size-7 hover:text-[var(--jm-danger-fg)]"
             onClick={() => deleteMutation.mutate()}
             disabled={deleteMutation.isPending}
           >
             <Trash2 className="size-3.5" />
-          </Button>
+          </JmIconButton>
         )}
-      </TableCell>
-    </TableRow>
+      </JmTableCell>
+    </JmTableRow>
   );
 }
 
@@ -986,87 +988,90 @@ function LaborsSection({
   const total = ticket.labors.reduce((s, l) => s + Number(l.totalPrice), 0);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">공임</CardTitle>
+    <JmCard>
+      <JmCardHeader className="flex flex-row items-center justify-between border-b-0 pb-3">
+        <JmCardTitle className="text-jm-sm">공임</JmCardTitle>
         {!readonly && (
-          <Button size="sm" variant="outline" className="h-8" onClick={() => setAdding(!adding)}>
+          <JmButton size="xs" variant="outline" onClick={() => setAdding(!adding)}>
             <Plus className="size-3.5" />
             공임 추가
-          </Button>
+          </JmButton>
         )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 p-0">
+      </JmCardHeader>
+      <JmCardContent className="flex flex-col gap-2 p-0">
         {adding && (
           <div className="flex items-center gap-2 px-6">
-            <Input
+            <JmInput
+              size="sm"
               placeholder="공임명 (예: 분해/조립)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-9 flex-1 text-sm"
+              className="flex-1"
             />
-            <Input
+            <JmInput
+              size="sm"
               placeholder="금액"
               inputMode="numeric"
               value={formatComma(rate)}
               onChange={(e) => setRate(parseComma(e.target.value))}
-              className="h-9 w-32 text-right text-sm tabular-nums"
+              className="w-32 text-right tabular-nums"
             />
-            <Button
+            <JmButton
               size="sm"
               onClick={() => addMutation.mutate()}
               disabled={!name.trim() || !rate || addMutation.isPending}
             >
               추가
-            </Button>
+            </JmButton>
           </div>
         )}
 
-        <div className="border-y border-border">
-          <Table>
-            <TableBody>
+        <div className="border-y border-[var(--jm-border)]">
+          <JmTable>
+            <JmTableBody>
               {ticket.labors.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="py-4 text-center text-sm text-muted-foreground">
+                <JmTableRow>
+                  <JmTableCell colSpan={3} className="py-4 text-center text-jm-sm text-[var(--jm-text-muted)]">
                     추가된 공임이 없습니다
-                  </TableCell>
-                </TableRow>
+                  </JmTableCell>
+                </JmTableRow>
               ) : (
                 ticket.labors.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell className="pl-6">{l.name}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                  <JmTableRow key={l.id}>
+                    <JmTableCell className="pl-6">{l.name}</JmTableCell>
+                    <JmTableCell className="text-right tabular-nums">
                       ₩{Number(l.totalPrice).toLocaleString("ko-KR")}
-                    </TableCell>
-                    <TableCell className="w-12 pr-6 text-right">
+                    </JmTableCell>
+                    <JmTableCell className="w-12 pr-6 text-right">
                       {!readonly && (
-                        <Button
+                        <JmIconButton
+                          aria-label="삭제"
                           variant="ghost"
-                          size="icon"
-                          className="size-7 text-muted-foreground hover:text-destructive"
+                          size="sm"
+                          className="size-7 hover:text-[var(--jm-danger-fg)]"
                           onClick={() => deleteMutation.mutate(l.id)}
                         >
                           <Trash2 className="size-3.5" />
-                        </Button>
+                        </JmIconButton>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </JmTableCell>
+                  </JmTableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </JmTableBody>
+          </JmTable>
         </div>
 
-        <div className="flex justify-end px-6 pb-2 text-sm">
+        <div className="flex justify-end px-6 pb-2 text-jm-sm">
           <span>
-            <span className="text-muted-foreground">공임 합계</span>{" "}
+            <span className="text-[var(--jm-text-muted)]">공임 합계</span>{" "}
             <span className="font-semibold tabular-nums">
               ₩{total.toLocaleString("ko-KR")}
             </span>
           </span>
         </div>
-      </CardContent>
-    </Card>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -1112,52 +1117,54 @@ function FeesAndTotalsSection({
   const { usedPartsTotal: usedParts, laborTotal: labors, diagnosisFee: fee, discountAmount, finalTotal } = totals;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">진단비 · 할인 · 합계</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <JmCard>
+      <JmCardHeader className="border-b-0 pb-3">
+        <JmCardTitle className="text-jm-sm">진단비 · 할인 · 합계</JmCardTitle>
+      </JmCardHeader>
+      <JmCardContent className="flex flex-col gap-3 pt-0">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">
+            <label className="text-jm-xs text-[var(--jm-text-muted)]">
               진단비 (수리 거절 시에도 청구)
             </label>
-            <Input
+            <JmInput
+              size="sm"
               inputMode="numeric"
               value={formatComma(diagnosisFee)}
               onChange={(e) => setDiagnosisFee(parseComma(e.target.value))}
               disabled={readonly}
-              className="h-9 text-right tabular-nums"
+              className="text-right tabular-nums"
               placeholder="0"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">
+            <label className="text-jm-xs text-[var(--jm-text-muted)]">
               전체 할인 (정액 또는 비율 — 예: 5000 / 10%)
             </label>
-            <Input
+            <JmInput
+              size="sm"
               inputMode={totalDiscount.trim().endsWith("%") ? "decimal" : "numeric"}
               value={formatDiscountDisplay(totalDiscount)}
               onChange={(e) => setTotalDiscount(normalizeDiscountInput(e.target.value))}
               onFocus={focusCaretEnd}
               disabled={readonly}
-              className="h-9 text-right tabular-nums"
+              className="text-right tabular-nums"
               placeholder="0"
             />
           </div>
         </div>
 
-        <div className="rounded-lg bg-muted/50 p-3 text-sm">
+        <div className="rounded-lg bg-[var(--jm-surface-muted)] p-3 text-jm-sm">
           <Row label="청구 부속" value={usedParts} />
           <Row label="공임" value={labors} />
           {fee > 0 && <Row label="진단비" value={fee} />}
           {discountAmount > 0 && (
-            <Row label="할인" value={-discountAmount} className="text-destructive" />
+            <Row label="할인" value={-discountAmount} className="text-[var(--jm-danger-fg)]" />
           )}
-          <div className="my-1 border-t border-border" />
+          <div className="my-1 border-t border-[var(--jm-border)]" />
           <div className="flex items-baseline justify-between">
-            <span className="text-base font-semibold">최종 청구</span>
-            <span className="text-2xl font-bold tabular-nums">
+            <span className="text-jm-lg font-semibold">최종 청구</span>
+            <span className="text-jm-2xl font-bold tabular-nums">
               ₩{finalTotal.toLocaleString("ko-KR")}
             </span>
           </div>
@@ -1165,14 +1172,14 @@ function FeesAndTotalsSection({
 
         {!readonly && dirty && (
           <div className="flex justify-end">
-            <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+            <JmButton size="xs" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               {saveMutation.isPending && <Loader2 className="size-4 animate-spin" />}
               저장
-            </Button>
+            </JmButton>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -1187,7 +1194,7 @@ function Row({
 }) {
   return (
     <div className={cn("flex items-baseline justify-between", className)}>
-      <span className="text-muted-foreground">{label}</span>
+      <span className="text-[var(--jm-text-muted)]">{label}</span>
       <span className="tabular-nums">₩{value.toLocaleString("ko-KR")}</span>
     </div>
   );
@@ -1249,8 +1256,8 @@ function StatusActionsSection({
 
   if (actions.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+      <JmCard>
+        <JmCardContent className="flex items-center gap-2 py-4 text-jm-sm text-[var(--jm-text-muted)]">
           {ticket.status === "PICKED_UP" ? (
             <>
               <CheckCircle2 className="size-4" /> 수리 완료 — 픽업/결제 완료 (
@@ -1261,22 +1268,22 @@ function StatusActionsSection({
               <XCircle className="size-4" /> 취소된 수리
             </>
           )}
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">상태 진행</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
+      <JmCard>
+        <JmCardHeader className="border-b-0 pb-3">
+          <JmCardTitle className="text-jm-sm">상태 진행</JmCardTitle>
+        </JmCardHeader>
+        <JmCardContent className="flex flex-wrap gap-2 pt-0">
           {actions.map((a) => (
-            <Button
+            <JmButton
               key={a.action}
-              variant={a.variant ?? "default"}
+              variant={a.variant ?? "cta"}
               size="sm"
               disabled={transitionMutation.isPending}
               onClick={() => {
@@ -1298,25 +1305,25 @@ function StatusActionsSection({
               }}
             >
               {a.label}
-            </Button>
+            </JmButton>
           ))}
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
 
       {/* 픽업/결제 다이얼로그 */}
-      <Dialog open={pickupOpen} onOpenChange={setPickupOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>픽업 / 결제</DialogTitle>
-            <DialogDescription>
+      <JmDialog open={pickupOpen} onOpenChange={setPickupOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>픽업 / 결제</JmDialogTitle>
+            <JmDialogDescription>
               결제수단을 선택하면 수리가 완료 처리되고 보증 만료일이 설정됩니다.
-            </DialogDescription>
-          </DialogHeader>
+            </JmDialogDescription>
+          </JmDialogHeader>
 
-          <div className="flex flex-col gap-4 py-2">
-            <div className="rounded-lg bg-muted/50 p-4 text-center">
-              <div className="text-xs text-muted-foreground">최종 청구 금액</div>
-              <div className="mt-1 text-3xl font-bold tabular-nums">
+          <JmDialogBody className="flex flex-col gap-4">
+            <div className="rounded-lg bg-[var(--jm-surface-muted)] p-4 text-center">
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">최종 청구 금액</div>
+              <div className="mt-1 text-jm-4xl font-bold tabular-nums">
                 ₩{finalAmount.toLocaleString("ko-KR")}
               </div>
             </div>
@@ -1328,10 +1335,10 @@ function StatusActionsSection({
                   type="button"
                   onClick={() => setPaymentMethod(m)}
                   className={cn(
-                    "flex h-12 items-center justify-center rounded-md border text-sm font-medium transition-colors",
+                    "flex h-12 items-center justify-center rounded-md border text-jm-sm font-medium transition-colors",
                     paymentMethod === m
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-background text-muted-foreground hover:bg-muted",
+                      ? "border-[var(--jm-action)] bg-[var(--jm-action)] text-[var(--jm-action-fg)]"
+                      : "border-[var(--jm-border)] bg-[var(--jm-bg)] text-[var(--jm-text-muted)] hover:bg-[var(--jm-surface-muted)]",
                   )}
                 >
                   {PAYMENT_LABEL[m]}
@@ -1340,21 +1347,21 @@ function StatusActionsSection({
             </div>
 
             {ticket.repairWarrantyMonths != null && ticket.repairWarrantyMonths > 0 && (
-              <div className="text-xs text-muted-foreground">
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">
                 ✓ 수리 보증 {ticket.repairWarrantyMonths}개월 자동 적용
               </div>
             )}
-          </div>
+          </JmDialogBody>
 
-          <DialogFooter>
-            <Button
+          <JmDialogFooter>
+            <JmButton
               variant="outline"
               onClick={() => setPickupOpen(false)}
               disabled={transitionMutation.isPending}
             >
               취소
-            </Button>
-            <Button
+            </JmButton>
+            <JmButton
               onClick={() =>
                 transitionMutation.mutate({
                   action: "pickup",
@@ -1365,31 +1372,31 @@ function StatusActionsSection({
             >
               {transitionMutation.isPending && <Loader2 className="size-4 animate-spin" />}
               결제 완료
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
 
       {/* 진단비만 청구 (손님 거절 / 매장 포기) 다이얼로그 */}
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>진단비만 청구</DialogTitle>
-            <DialogDescription>
+      <JmDialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <JmDialogContent size="md">
+          <JmDialogHeader>
+            <JmDialogTitle>진단비만 청구</JmDialogTitle>
+            <JmDialogDescription>
               부속/공임 없이 진단비만 청구하고 인계대기로 이동합니다. 픽업/결제 흐름은 그대로.
-            </DialogDescription>
-          </DialogHeader>
+            </JmDialogDescription>
+          </JmDialogHeader>
 
-          <div className="flex flex-col gap-4 py-2">
-            <div className="rounded-lg bg-muted/50 px-4 py-3">
+          <JmDialogBody className="flex flex-col gap-4">
+            <div className="rounded-lg bg-[var(--jm-surface-muted)] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-muted-foreground">청구 예정 진단비 (VAT 포함)</span>
-                <span className="tabular-nums text-lg font-bold">
+                <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">청구 예정 진단비 (VAT 포함)</span>
+                <span className="tabular-nums text-jm-lg font-bold">
                   ₩{Math.round(Number(ticket.diagnosisFee) * 1.1).toLocaleString("ko-KR")}
                 </span>
               </div>
               {Number(ticket.diagnosisFee) === 0 && (
-                <p className="mt-1 text-xs text-amber-700">
+                <p className="mt-1 text-jm-xs text-[var(--jm-warning-fg)]">
                   ⚠ 진단비가 0 으로 설정되어 있습니다. 위 진단비 카드에서 금액을 먼저 입력하세요.
                 </p>
               )}
@@ -1397,7 +1404,7 @@ function StatusActionsSection({
 
             {(["customer", "shop", "other"] as const).map((g) => (
               <div key={g} className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   {g === "customer" ? "손님 사유" : g === "shop" ? "매장 사유" : "기타"}
                 </span>
                 <div className="flex flex-col gap-1.5">
@@ -1409,10 +1416,10 @@ function StatusActionsSection({
                         type="button"
                         onClick={() => setRejectReason(r.value)}
                         className={cn(
-                          "flex items-center gap-2 rounded-md border-2 px-3 py-2 text-left text-sm transition-colors",
+                          "flex items-center gap-2 rounded-md border-2 px-3 py-2 text-left text-jm-sm transition-colors",
                           active
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-border-strong",
+                            ? "border-[var(--jm-accent-solid)] bg-[var(--jm-accent-bg)]"
+                            : "border-[var(--jm-border)] hover:border-[var(--jm-border-strong)]",
                         )}
                       >
                         <span className="font-medium">{r.label}</span>
@@ -1424,27 +1431,27 @@ function StatusActionsSection({
             ))}
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                메모 {rejectReason === "OTHER" && <span className="text-destructive">(필수)</span>}
+              <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                메모 {rejectReason === "OTHER" && <span className="text-[var(--jm-danger-fg)]">(필수)</span>}
               </span>
-              <Textarea
+              <JmTextarea
                 value={rejectMemo}
                 onChange={(e) => setRejectMemo(e.target.value)}
                 placeholder="추가 설명 (선택)"
                 rows={2}
               />
             </div>
-          </div>
+          </JmDialogBody>
 
-          <DialogFooter>
-            <Button
+          <JmDialogFooter>
+            <JmButton
               variant="outline"
               onClick={() => setRejectOpen(false)}
               disabled={transitionMutation.isPending}
             >
               취소
-            </Button>
-            <Button
+            </JmButton>
+            <JmButton
               onClick={() =>
                 transitionMutation.mutate({
                   action: "reject_after_quote",
@@ -1461,10 +1468,10 @@ function StatusActionsSection({
             >
               {transitionMutation.isPending && <Loader2 className="size-4 animate-spin" />}
               진단비 청구로 진행
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </>
   );
 }

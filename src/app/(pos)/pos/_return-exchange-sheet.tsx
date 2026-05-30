@@ -171,13 +171,13 @@ export function ReturnExchangeSheet({
             ))}
           </div>
         ) : ordersQuery.isError ? (
-          <div className="py-8 text-center text-[14px] text-[var(--jm-danger-fg)]">
+          <div className="py-8 text-center text-jm-base text-[var(--jm-danger-fg)]">
             주문 목록을 불러오지 못했습니다
           </div>
         ) : !ordersQuery.data || ordersQuery.data.length === 0 ? (
-          <div className="py-12 text-center text-[14px] text-[var(--jm-text-muted)]">
+          <div className="py-12 text-center text-jm-base text-[var(--jm-text-muted)]">
             반품·교환 가능한 주문이 없습니다
-            <div className="mt-1 text-[12px] text-[var(--jm-text-subtle)]">
+            <div className="mt-1 text-jm-xs text-[var(--jm-text-subtle)]">
               배송완료 또는 검수완료 상태의 주문만 노출됩니다
             </div>
           </div>
@@ -261,25 +261,25 @@ function OrderCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[13px] font-semibold text-[var(--jm-text)]">
+            <span className="font-mono text-jm-sm font-semibold text-[var(--jm-text)]">
               {order.orderNo}
             </span>
             {order.channel && (
-              <span className="rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[11px] text-[var(--jm-text-muted)]">
+              <span className="rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
                 {order.channel.name}
               </span>
             )}
             {isPartial && (
-              <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-[11px] text-[var(--jm-warning-fg)]">
+              <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-jm-2xs text-[var(--jm-warning-fg)]">
                 부분환불 진행중
               </span>
             )}
           </div>
-          <div className="mt-0.5 truncate text-[13px] text-[var(--jm-text)]">
+          <div className="mt-0.5 truncate text-jm-sm text-[var(--jm-text)]">
             {itemSummary}
             {more}
           </div>
-          <div className="mt-0.5 text-[11px] text-[var(--jm-text-muted)]">
+          <div className="mt-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
             {new Date(order.orderDate).toLocaleDateString("ko-KR")} · ₩
             {Number(order.totalAmount).toLocaleString("ko-KR")}
             {totalRefunded > 0 && (
@@ -295,14 +295,14 @@ function OrderCard({
         <button
           type="button"
           onClick={onRefund}
-          className="flex-1 rounded-xl bg-[var(--jm-danger-bg)] py-2 text-[13px] font-semibold text-[var(--jm-danger-fg)] active:opacity-80"
+          className="flex-1 rounded-xl bg-[var(--jm-danger-bg)] py-2 text-jm-sm font-semibold text-[var(--jm-danger-fg)] active:opacity-80"
         >
           반품
         </button>
         <button
           type="button"
           onClick={onExchange}
-          className="flex-1 rounded-xl bg-[var(--jm-action)] py-2 text-[13px] font-semibold text-[var(--jm-action-fg)] active:opacity-80"
+          className="flex-1 rounded-xl bg-[var(--jm-action)] py-2 text-jm-sm font-semibold text-[var(--jm-action-fg)] active:opacity-80"
         >
           교환
         </button>
@@ -334,10 +334,10 @@ function ExchangeMiniDialog({
         aria-label="닫기"
       />
       <div className="fixed inset-x-4 top-1/2 z-[70] -translate-y-1/2 rounded-3xl bg-[var(--jm-surface)] p-5 shadow-2xl">
-        <h3 className="text-[16px] font-bold text-[var(--jm-text)]">
+        <h3 className="text-jm-lg font-bold text-[var(--jm-text)]">
           교환 처리 — {order.orderNo}
         </h3>
-        <p className="mt-1 text-[12px] text-[var(--jm-text-muted)]">
+        <p className="mt-1 text-jm-xs text-[var(--jm-text-muted)]">
           매장 즉석 교환. 새 주문(-EX) 이 자동 생성됩니다.
         </p>
         <div className="mt-3 flex gap-2">
@@ -345,13 +345,13 @@ function ExchangeMiniDialog({
             type="button"
             onClick={() => setKind("EXCHANGE_SAME")}
             disabled={submitting}
-            className={`flex-1 rounded-xl border-2 p-3 text-left text-[12px] transition-colors ${
+            className={`flex-1 rounded-xl border-2 p-3 text-left text-jm-xs transition-colors ${
               kind === "EXCHANGE_SAME"
                 ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                 : "border-[var(--jm-border)] bg-[var(--jm-surface)]"
             }`}
           >
-            <div className="text-[14px] font-semibold">같은 상품</div>
+            <div className="text-jm-base font-semibold">같은 상품</div>
             <div className="mt-0.5 text-[var(--jm-text-muted)]">
               항목 그대로 복제. 차액 0
             </div>
@@ -360,13 +360,13 @@ function ExchangeMiniDialog({
             type="button"
             onClick={() => setKind("EXCHANGE_DIFFERENT")}
             disabled={submitting}
-            className={`flex-1 rounded-xl border-2 p-3 text-left text-[12px] transition-colors ${
+            className={`flex-1 rounded-xl border-2 p-3 text-left text-jm-xs transition-colors ${
               kind === "EXCHANGE_DIFFERENT"
                 ? "border-[var(--jm-action)] bg-[var(--jm-surface-muted)]"
                 : "border-[var(--jm-border)] bg-[var(--jm-surface)]"
             }`}
           >
-            <div className="text-[14px] font-semibold">다른 상품</div>
+            <div className="text-jm-base font-semibold">다른 상품</div>
             <div className="mt-0.5 text-[var(--jm-text-muted)]">
               빈 항목 + 차액. 워크보드에서 편집
             </div>
@@ -377,7 +377,7 @@ function ExchangeMiniDialog({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="flex-1 rounded-xl border border-[var(--jm-border)] py-2.5 text-[13px] font-semibold text-[var(--jm-text)] disabled:opacity-50"
+            className="flex-1 rounded-xl border border-[var(--jm-border)] py-2.5 text-jm-sm font-semibold text-[var(--jm-text)] disabled:opacity-50"
           >
             취소
           </button>
@@ -395,7 +395,7 @@ function ExchangeMiniDialog({
               onSubmit(kind);
             }}
             disabled={submitting}
-            className="flex-1 rounded-xl bg-[var(--jm-action)] py-2.5 text-[13px] font-semibold text-[var(--jm-action-fg)] disabled:opacity-50"
+            className="flex-1 rounded-xl bg-[var(--jm-action)] py-2.5 text-jm-sm font-semibold text-[var(--jm-action-fg)] disabled:opacity-50"
           >
             {submitting ? "처리 중..." : "교환 확정"}
           </button>

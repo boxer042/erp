@@ -82,7 +82,7 @@ export function WarrantyRing({
             </>
           ) : (
             <>
-              <span className="text-[28px] font-bold leading-none text-[var(--jm-text)]">
+              <span className="text-jm-5xl font-bold leading-none text-[var(--jm-text)]">
                 {daysLeft}
               </span>
               <span className="text-jm-xs text-[var(--jm-text-muted)]">일 남음</span>

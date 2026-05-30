@@ -4,6 +4,7 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { ChevronLeft } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
 
 interface CustomerDetail {
@@ -92,13 +93,13 @@ export default function CustomerProfilePage({
   if (detailQuery.isError || !detailQuery.data) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
-        <span className="text-[15px] font-semibold text-[var(--jm-text)]">
+        <span className="text-jm-md font-semibold text-[var(--jm-text)]">
           고객을 찾을 수 없습니다
         </span>
         <button
           type="button"
           onClick={() => router.push("/pos")}
-          className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-[13px] font-semibold text-white"
+          className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-jm-sm font-semibold text-white"
         >
           POS 로
         </button>
@@ -120,28 +121,20 @@ export default function CustomerProfilePage({
             className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
             aria-label="뒤로"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M12 4l-6 6 6 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <ChevronLeft className="size-5" />
           </button>
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex items-center gap-1.5">
               {c.type === "BUSINESS" && (
-                <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--jm-warning-fg)]">
+                <span className="rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-3xs font-semibold text-[var(--jm-warning-fg)]">
                   기업
                 </span>
               )}
-              <span className="line-clamp-1 text-[16px] font-bold text-[var(--jm-text)]">
+              <span className="line-clamp-1 text-jm-lg font-bold text-[var(--jm-text)]">
                 {c.name}
               </span>
             </div>
-            <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">{c.phone}</span>
+            <span className="font-mono text-jm-xs text-[var(--jm-text-muted)]">{c.phone}</span>
           </div>
         </div>
       </header>
@@ -150,7 +143,7 @@ export default function CustomerProfilePage({
         <div className="flex flex-col gap-3 p-4 sm:p-6">
           {/* 1. 기본 정보 */}
           <Section title="기본 정보">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-jm-sm">
               <Field label={c.type === "BUSINESS" ? "상호" : "이름"} value={c.name} />
               <Field
                 label={c.type === "BUSINESS" ? "대표 전화" : "전화"}
@@ -169,7 +162,7 @@ export default function CustomerProfilePage({
           {/* 1.5 사업자 정보 — 기업일 때만 */}
           {c.type === "BUSINESS" && (
             <Section title="사업자 정보">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-jm-sm">
                 {c.businessNumber && (
                   <Field label="사업자번호" value={c.businessNumber} mono />
                 )}
@@ -182,7 +175,7 @@ export default function CustomerProfilePage({
                   !c.fax &&
                   !c.businessType &&
                   !c.businessItem && (
-                    <span className="col-span-2 text-[12px] text-[var(--jm-text-subtle)]">
+                    <span className="col-span-2 text-jm-xs text-[var(--jm-text-subtle)]">
                       추가 사업자 정보 없음 — 어드민에서 입력 가능
                     </span>
                   )}
@@ -194,7 +187,7 @@ export default function CustomerProfilePage({
           {c.type === "BUSINESS" &&
             (c.contactName || c.contactPhone || c.contactPosition) && (
               <Section title="실무 담당자">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-jm-sm">
                   {c.contactName && <Field label="이름" value={c.contactName} />}
                   {c.contactPhone && (
                     <Field label="전화" value={c.contactPhone} mono />
@@ -209,10 +202,10 @@ export default function CustomerProfilePage({
           {/* 1.7 주소 */}
           {(c.address || c.shippingAddress) && (
             <Section title="주소">
-              <div className="flex flex-col gap-2 text-[13px]">
+              <div className="flex flex-col gap-2 text-jm-sm">
                 {c.address && (
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                    <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                       {c.type === "BUSINESS" ? "사업장 주소" : "주소"}
                     </span>
                     <span className="text-[var(--jm-text)]">{c.address}</span>
@@ -220,7 +213,7 @@ export default function CustomerProfilePage({
                 )}
                 {c.shippingAddress && (
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-success-fg)]">
+                    <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-success-fg)]">
                       배송지 주소 (다름)
                     </span>
                     <span className="text-[var(--jm-text)]">{c.shippingAddress}</span>
@@ -233,9 +226,9 @@ export default function CustomerProfilePage({
           {/* 2. 잔액 */}
           <Section title="잔액">
             <div className="flex items-baseline justify-between">
-              <span className="text-[13px] text-[var(--jm-text-muted)]">미수금</span>
+              <span className="text-jm-sm text-[var(--jm-text-muted)]">미수금</span>
               <span
-                className={`text-[20px] font-bold tabular-nums ${
+                className={`text-jm-2xl font-bold tabular-nums ${
                   Number(d.stats.outstandingAmount) > 0
                     ? "text-[var(--jm-danger-fg)]"
                     : "text-[var(--jm-text)]"
@@ -349,7 +342,7 @@ export default function CustomerProfilePage({
           {/* 8. 메모 */}
           <Section title="메모">
             {c.memo && (
-              <div className="mb-2 rounded-lg bg-[var(--jm-bg)] px-3 py-2 text-[13px] text-[var(--jm-text)]">
+              <div className="mb-2 rounded-lg bg-[var(--jm-bg)] px-3 py-2 text-jm-sm text-[var(--jm-text)]">
                 {c.memo}
               </div>
             )}
@@ -384,7 +377,7 @@ function Section({
 }) {
   return (
     <section className="rounded-2xl bg-[var(--jm-surface)] p-4 border border-[var(--jm-border)]">
-      <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+      <h3 className="mb-3 text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {title}
       </h3>
       {children}
@@ -405,11 +398,11 @@ function Field({
 }) {
   return (
     <div className={`flex flex-col gap-0.5 ${fullWidth ? "col-span-2" : ""}`}>
-      <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+      <span className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
       <span
-        className={`line-clamp-1 text-[13px] text-[var(--jm-text)] ${mono ? "font-mono" : ""}`}
+        className={`line-clamp-1 text-jm-sm text-[var(--jm-text)] ${mono ? "font-mono" : ""}`}
       >
         {value}
       </span>
@@ -428,15 +421,15 @@ function StatCard({
 }) {
   return (
     <div className="flex flex-col gap-0.5 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]">
-      <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+      <span className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
-      <span className="text-[18px] font-bold tabular-nums text-[var(--jm-text)]">
+      <span className="text-jm-xl font-bold tabular-nums text-[var(--jm-text)]">
         {count.toLocaleString("ko-KR")}
-        <span className="ml-0.5 text-[11px] font-normal text-[var(--jm-text-subtle)]">건</span>
+        <span className="ml-0.5 text-jm-2xs font-normal text-[var(--jm-text-subtle)]">건</span>
       </span>
       {amount && (
-        <span className="text-[11px] font-medium tabular-nums text-[var(--jm-text-muted)]">
+        <span className="text-jm-2xs font-medium tabular-nums text-[var(--jm-text-muted)]">
           ₩{Number(amount).toLocaleString("ko-KR")}
         </span>
       )}
@@ -465,15 +458,15 @@ function Row({
       }`}
     >
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-1 text-[13px] font-medium text-[var(--jm-text)]">
+        <span className="line-clamp-1 text-jm-sm font-medium text-[var(--jm-text)]">
           {primary}
         </span>
         {secondary && (
-          <span className="line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">{secondary}</span>
+          <span className="line-clamp-1 text-jm-2xs text-[var(--jm-text-muted)]">{secondary}</span>
         )}
       </div>
       {tail && (
-        <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--jm-text)]">
+        <span className="shrink-0 text-jm-xs font-semibold tabular-nums text-[var(--jm-text)]">
           {tail}
         </span>
       )}
@@ -483,7 +476,7 @@ function Row({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-[var(--jm-bg)] px-3 py-4 text-center text-[12px] text-[var(--jm-text-subtle)]">
+    <div className="rounded-lg bg-[var(--jm-bg)] px-3 py-4 text-center text-jm-xs text-[var(--jm-text-subtle)]">
       {children}
     </div>
   );

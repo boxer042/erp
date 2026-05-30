@@ -1,5 +1,6 @@
 "use client";
 
+import { Info, Package } from "lucide-react";
 import type { ProductLite } from "@/app/(pos)/pos/_types";
 
 interface Props {
@@ -68,16 +69,7 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
           className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--jm-surface)]/95 text-[var(--jm-text)] shadow border border-[var(--jm-border)] backdrop-blur active:scale-95 sm:hover:bg-[var(--jm-surface)]"
           aria-label="상세 보기"
         >
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-            <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4" />
-            <path
-              d="M7 6v3.5"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-            <circle cx="7" cy="3.8" r="0.7" fill="currentColor" />
-          </svg>
+          <Info className="size-[13px]" strokeWidth={1.5} />
         </button>
       )}
 
@@ -93,19 +85,12 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
           />
         ) : (
           <div className="flex size-full items-center justify-center text-[var(--jm-text-disabled)]">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M3 7l9-4 9 4v10l-9 4-9-4V7zM12 3v18M3 7l9 5 9-5"
-                stroke="currentColor"
-                strokeWidth="1"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Package className="size-10" strokeWidth={1} />
           </div>
         )}
         {/* 면세/영세율 배지 */}
         {(taxFree || product.zeroRateEligible) && (
-          <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-[var(--jm-surface)]/95 px-2 py-0.5 text-[10px] font-medium text-[var(--jm-text)] backdrop-blur">
+          <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-[var(--jm-surface)]/95 px-2 py-0.5 text-jm-3xs font-medium text-[var(--jm-text)] backdrop-blur">
             {taxFree ? "면세" : "영세"}
           </span>
         )}
@@ -114,43 +99,43 @@ export function ProductGridCard({ product, onClick, onDetail }: Props) {
       {/* 본문 */}
       <div className="flex flex-1 flex-col gap-0.5 p-2.5 sm:p-3">
         {/* 상품명 + 규격 — 한 묶음. 같은 상품명은 규격으로 구분. */}
-        <span className="line-clamp-2 text-[12px] font-semibold leading-tight text-[var(--jm-text)] sm:text-[13px]">
+        <span className="line-clamp-2 text-jm-xs font-semibold leading-tight text-[var(--jm-text)] sm:text-jm-sm">
           {product.name}
         </span>
         {product.spec && (
-          <span className="line-clamp-1 text-[11px] font-medium text-[var(--jm-text)]">
+          <span className="line-clamp-1 text-jm-2xs font-medium text-[var(--jm-text)]">
             {product.spec}
           </span>
         )}
-        <span className="mt-auto pt-1 font-mono text-[10px] text-[var(--jm-text-subtle)]">
+        <span className="mt-auto pt-1 font-mono text-jm-3xs text-[var(--jm-text-subtle)]">
           {product.sku}
         </span>
         {autoNoPrice ? (
-          <span className="text-[12px] font-semibold text-[var(--jm-warning-fg)]">
+          <span className="text-jm-xs font-semibold text-[var(--jm-warning-fg)]">
             담당자 문의
           </span>
         ) : (
           <div className="flex flex-col">
             <div className="flex items-baseline gap-1.5">
               {showListDiff && (
-                <span className="text-[11px] tabular-nums text-[var(--jm-text-subtle)] line-through">
+                <span className="text-jm-2xs tabular-nums text-[var(--jm-text-subtle)] line-through">
                   ₩{listDisplay.toLocaleString("ko-KR")}
                 </span>
               )}
-              <span className="text-[14px] font-bold tabular-nums text-[var(--jm-text)] sm:text-[15px]">
+              <span className="text-jm-base font-bold tabular-nums text-[var(--jm-text)] sm:text-jm-md">
                 ₩{displayPrice.toLocaleString("ko-KR")}
                 {isOptionParent && (
                   <span className="ml-0.5 text-[var(--jm-text-muted)]">~</span>
                 )}
               </span>
               {!taxFree && (
-                <span className="text-[10px] font-normal text-[var(--jm-text-subtle)]">
+                <span className="text-jm-3xs font-normal text-[var(--jm-text-subtle)]">
                   VAT 포함
                 </span>
               )}
             </div>
             {showListDiff && (
-              <span className="text-[10px] font-semibold tabular-nums text-[var(--jm-success-fg)]">
+              <span className="text-jm-3xs font-semibold tabular-nums text-[var(--jm-success-fg)]">
                 −₩{Math.abs(listDiff).toLocaleString("ko-KR")} ({Math.abs(listDiffPercent).toFixed(1)}% 할인)
               </span>
             )}

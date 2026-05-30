@@ -8,26 +8,24 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Loader2, Undo2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
+  JmBadge,
+  JmButton,
+  JmDialog,
+  JmDialogContent,
+  JmDialogFooter,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDialogDescription,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmSkeleton,
+  JmTextarea,
+} from "@/jm";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { AssemblyRegisterSheet } from "@/components/assembly/assembly-register-sheet";
 import { AssemblyDetailSheet } from "@/components/assembly/assembly-detail-sheet";
@@ -36,27 +34,27 @@ function AssembliesSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell>
+        <JmTableRow key={i}>
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+          <JmTableCell>
             <div className="flex flex-col gap-1">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-3 w-20" />
+              <JmSkeleton className="h-4 w-40" />
+              <JmSkeleton className="h-3 w-20" />
             </div>
-          </TableCell>
-          <TableCell className="text-right">
-            <div className="flex justify-end"><Skeleton className="h-4 w-12" /></div>
-          </TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-md" /></TableCell>
-          <TableCell className="text-right">
-            <div className="flex justify-end"><Skeleton className="h-4 w-16" /></div>
-          </TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell className="text-right">
-            <div className="flex justify-end"><Skeleton className="h-7 w-16 rounded-md" /></div>
-          </TableCell>
-        </TableRow>
+          </JmTableCell>
+          <JmTableCell className="text-right">
+            <div className="flex justify-end"><JmSkeleton className="h-4 w-12" /></div>
+          </JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-12 rounded-md" /></JmTableCell>
+          <JmTableCell className="text-right">
+            <div className="flex justify-end"><JmSkeleton className="h-4 w-16" /></div>
+          </JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell className="text-right">
+            <div className="flex justify-end"><JmSkeleton className="h-7 w-16 rounded-md" /></div>
+          </JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -143,35 +141,35 @@ export default function AssemblyPage() {
       />
 
       <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>조립번호</TableHead>
-              <TableHead>조립상품</TableHead>
-              <TableHead className="text-right">수량</TableHead>
-              <TableHead>유형</TableHead>
-              <TableHead className="text-right">조립비</TableHead>
-              <TableHead>조립일</TableHead>
-              <TableHead>메모</TableHead>
-              <TableHead className="w-28"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <JmTable>
+          <JmTableHeader>
+            <JmTableRow>
+              <JmTableHead>조립번호</JmTableHead>
+              <JmTableHead>조립상품</JmTableHead>
+              <JmTableHead className="text-right">수량</JmTableHead>
+              <JmTableHead>유형</JmTableHead>
+              <JmTableHead className="text-right">조립비</JmTableHead>
+              <JmTableHead>조립일</JmTableHead>
+              <JmTableHead>메모</JmTableHead>
+              <JmTableHead className="w-28"></JmTableHead>
+            </JmTableRow>
+          </JmTableHeader>
+          <JmTableBody>
             {loading ? (
               <AssembliesSkeletonRows />
             ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+              <JmTableRow>
+                <JmTableCell colSpan={8} className="text-center py-8 text-[var(--jm-text-muted)]">
                   등록된 조립 실적이 없습니다
-                </TableCell>
-              </TableRow>
+                </JmTableCell>
+              </JmTableRow>
             ) : (
               rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs">
+                <JmTableRow key={r.id}>
+                  <JmTableCell className="font-mono text-jm-xs">
                     <button
                       type="button"
-                      className="text-primary hover:underline cursor-pointer"
+                      className="text-[var(--jm-accent-fg)] hover:underline cursor-pointer"
                       onClick={() => {
                         setDetailId(r.id);
                         setDetailOpen(true);
@@ -179,51 +177,50 @@ export default function AssemblyPage() {
                     >
                       {r.assemblyNo}
                     </button>
-                  </TableCell>
-                  <TableCell>
+                  </JmTableCell>
+                  <JmTableCell>
                     <div className="flex flex-col">
                       <span>{r.product.name}</span>
-                      <span className="text-xs text-muted-foreground">{r.product.sku}</span>
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">{r.product.sku}</span>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-right">
+                  </JmTableCell>
+                  <JmTableCell className="text-right">
                     {Number(r.quantity).toLocaleString("ko-KR")}
-                  </TableCell>
-                  <TableCell>
+                  </JmTableCell>
+                  <JmTableCell>
                     {r.type === "PRODUCE" ? (
-                      <Badge variant="default">조립</Badge>
+                      <JmBadge variant="solid">조립</JmBadge>
                     ) : (
-                      <Badge variant="destructive">역조립</Badge>
+                      <JmBadge variant="danger">역조립</JmBadge>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right">
+                  </JmTableCell>
+                  <JmTableCell className="text-right">
                     {r.laborCost
                       ? `₩${Number(r.laborCost).toLocaleString("ko-KR")}`
                       : "-"}
-                  </TableCell>
-                  <TableCell>{format(new Date(r.assembledAt), "yyyy-MM-dd")}</TableCell>
-                  <TableCell className="max-w-xs truncate">{r.memo ?? "-"}</TableCell>
-                  <TableCell className="text-right">
+                  </JmTableCell>
+                  <JmTableCell>{format(new Date(r.assembledAt), "yyyy-MM-dd")}</JmTableCell>
+                  <JmTableCell className="max-w-xs truncate">{r.memo ?? "-"}</JmTableCell>
+                  <JmTableCell className="text-right">
                     {r.type === "PRODUCE" && (
-                      <Button
+                      <JmButton
                         variant="outline"
-                        size="sm"
-                        className="h-7 text-[12px]"
+                        size="xs"
                         onClick={() => {
                           setDisTarget(r);
                           setDisOpen(true);
                         }}
                       >
-                        <Undo2 data-icon="inline-start" />
+                        <Undo2 />
                         역조립
-                      </Button>
+                      </JmButton>
                     )}
-                  </TableCell>
-                </TableRow>
+                  </JmTableCell>
+                </JmTableRow>
               ))
             )}
-          </TableBody>
-        </Table>
+          </JmTableBody>
+        </JmTable>
       </div>
 
       <AssemblyRegisterSheet
@@ -242,7 +239,7 @@ export default function AssemblyPage() {
         }}
       />
 
-      <Dialog
+      <JmDialog
         open={disOpen}
         onOpenChange={(o) => {
           setDisOpen(o);
@@ -252,10 +249,10 @@ export default function AssemblyPage() {
           }
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>역조립 확인</DialogTitle>
-            <DialogDescription>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>역조립 확인</JmDialogTitle>
+            <JmDialogDescription>
               {disTarget && (
                 <>
                   <span className="block">
@@ -264,13 +261,13 @@ export default function AssemblyPage() {
                   </span>
                 </>
               )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <label className="text-sm font-medium">
-              역조립 사유 <span className="text-destructive">*</span>
+            </JmDialogDescription>
+          </JmDialogHeader>
+          <div className="space-y-2 px-5 py-2">
+            <label className="text-jm-sm font-medium text-[var(--jm-text)]">
+              역조립 사유 <span className="text-[var(--jm-danger-fg)]">*</span>
             </label>
-            <Textarea
+            <JmTextarea
               value={disReason}
               onChange={(e) => setDisReason(e.target.value)}
               placeholder="예: 부품 오선택, 수량 입력 오류 등"
@@ -278,21 +275,21 @@ export default function AssemblyPage() {
               autoFocus
             />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDisOpen(false)}>
+          <JmDialogFooter>
+            <JmButton variant="outline" onClick={() => setDisOpen(false)}>
               취소
-            </Button>
-            <Button
-              variant="destructive"
+            </JmButton>
+            <JmButton
+              variant="danger"
               onClick={confirmDisassemble}
               disabled={disSubmitting || !disReason.trim()}
             >
               {disSubmitting ? <Loader2 className="animate-spin" /> : null}
               역조립
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </div>
   );
 }

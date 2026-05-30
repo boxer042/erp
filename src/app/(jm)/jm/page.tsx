@@ -327,10 +327,10 @@ export default function JmShowcasePage() {
       <header className="mb-10 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-2">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               jaewoomade design system
             </span>
-            <h1 className="text-[32px] font-bold tracking-tight text-[var(--jm-text)]">
+            <h1 className="text-jm-5xl font-bold tracking-tight text-[var(--jm-text)]">
               컴포넌트 showcase
             </h1>
           </div>
@@ -338,7 +338,7 @@ export default function JmShowcasePage() {
             <JmThemeToggle value={theme} onChange={setTheme} />
           </div>
         </div>
-        <p className="text-[14px] text-[var(--jm-text-muted)]">
+        <p className="text-jm-base text-[var(--jm-text-muted)]">
           프로젝트 전반에서 재사용되는 디자인 primitive 모음. 토큰을 바꾸면 모든 사용처가
           한 번에 바뀝니다. 우상단 토글로 라이트/다크/자동 모드 전환.
         </p>
@@ -369,61 +369,61 @@ export default function JmShowcasePage() {
           <JmCard>
             <JmCardContent className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   --jm-font-sans
                 </span>
-                <code className="font-[family-name:var(--jm-font-mono)] text-[11px] text-[var(--jm-text-muted)]">
+                <code className="font-[family-name:var(--jm-font-mono)] text-jm-2xs text-[var(--jm-text-muted)]">
                   Geist Sans → Pretendard Variable → system-ui → Apple SD Gothic Neo → Malgun Gothic
                 </code>
               </div>
               <div className="flex flex-col gap-2 border-t border-[var(--jm-border)] pt-4">
-                <span className="text-[14px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-base text-[var(--jm-text-muted)]">
                   영문 weight 비교 (Geist)
                 </span>
-                <p className="text-[20px] font-light">
+                <p className="text-jm-2xl font-light">
                   The quick brown fox 0123456789 — Light 300
                 </p>
-                <p className="text-[20px]">
+                <p className="text-jm-2xl">
                   The quick brown fox 0123456789 — Regular 400
                 </p>
-                <p className="text-[20px] font-medium">
+                <p className="text-jm-2xl font-medium">
                   The quick brown fox 0123456789 — Medium 500
                 </p>
-                <p className="text-[20px] font-semibold">
+                <p className="text-jm-2xl font-semibold">
                   The quick brown fox 0123456789 — Semibold 600
                 </p>
-                <p className="text-[20px] font-bold">
+                <p className="text-jm-2xl font-bold">
                   The quick brown fox 0123456789 — Bold 700
                 </p>
               </div>
               <div className="flex flex-col gap-2 border-t border-[var(--jm-border)] pt-4">
-                <span className="text-[14px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-base text-[var(--jm-text-muted)]">
                   한글 weight 비교 (Pretendard)
                 </span>
-                <p className="text-[20px] font-light">
+                <p className="text-jm-2xl font-light">
                   다람쥐 헌 쳇바퀴에 타고파 — Light 300
                 </p>
-                <p className="text-[20px]">
+                <p className="text-jm-2xl">
                   다람쥐 헌 쳇바퀴에 타고파 — Regular 400
                 </p>
-                <p className="text-[20px] font-medium">
+                <p className="text-jm-2xl font-medium">
                   다람쥐 헌 쳇바퀴에 타고파 — Medium 500
                 </p>
-                <p className="text-[20px] font-semibold">
+                <p className="text-jm-2xl font-semibold">
                   다람쥐 헌 쳇바퀴에 타고파 — Semibold 600
                 </p>
-                <p className="text-[20px] font-bold">
+                <p className="text-jm-2xl font-bold">
                   다람쥐 헌 쳇바퀴에 타고파 — Bold 700
                 </p>
               </div>
               <div className="flex flex-col gap-2 border-t border-[var(--jm-border)] pt-4">
-                <span className="text-[14px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-base text-[var(--jm-text-muted)]">
                   Mono — --jm-font-mono (Geist Mono)
                 </span>
-                <p className="font-[family-name:var(--jm-font-mono)] text-[14px] text-[var(--jm-text)]">
+                <p className="font-[family-name:var(--jm-font-mono)] text-jm-base text-[var(--jm-text)]">
                   const total = 1234567.toLocaleString(&quot;ko-KR&quot;);
                 </p>
-                <p className="font-[family-name:var(--jm-font-mono)] text-[14px] tabular-nums text-[var(--jm-text)]">
+                <p className="font-[family-name:var(--jm-font-mono)] text-jm-base tabular-nums text-[var(--jm-text)]">
                   ₩1,234,567 · 010-1234-5678 · SKU-AB-2026-0042
                 </p>
               </div>
@@ -435,25 +435,25 @@ export default function JmShowcasePage() {
         <Section title="타이포그래피" subtitle="POS 스타일 — 픽셀 단위 size로 명시. 본문은 14~15px, 헤더는 18~22px, 라벨은 11~12px.">
           <JmCard>
             <JmCardContent className="flex flex-col gap-3">
-              <p className="text-[32px] font-bold text-[var(--jm-text)]">
+              <p className="text-jm-5xl font-bold text-[var(--jm-text)]">
                 Heading 32 / Bold
               </p>
-              <p className="text-[22px] font-bold text-[var(--jm-text)]">
+              <p className="text-jm-3xl font-bold text-[var(--jm-text)]">
                 Heading 22 / Bold
               </p>
-              <p className="text-[18px] font-bold text-[var(--jm-text)]">
+              <p className="text-jm-xl font-bold text-[var(--jm-text)]">
                 Heading 18 / Bold
               </p>
-              <p className="text-[15px] text-[var(--jm-text)]">
+              <p className="text-jm-md text-[var(--jm-text)]">
                 Body 15 — 본문 큰 사이즈
               </p>
-              <p className="text-[14px] text-[var(--jm-text)]">
+              <p className="text-jm-base text-[var(--jm-text)]">
                 Body 14 — 본문 기본
               </p>
-              <p className="text-[13px] text-[var(--jm-text-muted)]">
+              <p className="text-jm-sm text-[var(--jm-text-muted)]">
                 Body 13 muted — 보조 텍스트
               </p>
-              <p className="text-[12px] text-[var(--jm-text-muted)]">
+              <p className="text-jm-xs text-[var(--jm-text-muted)]">
                 Caption 12 — 캡션, 메타 정보
               </p>
               <JmSectionLabel>SECTION LABEL 11</JmSectionLabel>
@@ -574,7 +574,7 @@ export default function JmShowcasePage() {
                 </JmCardDescription>
               </JmCardHeader>
               <JmCardContent>
-                <p className="text-[14px] text-[var(--jm-text)]">
+                <p className="text-jm-base text-[var(--jm-text)]">
                   본문 내용이 들어가는 영역. 자유롭게 구성 가능.
                 </p>
               </JmCardContent>
@@ -593,14 +593,14 @@ export default function JmShowcasePage() {
                 </div>
                 <div className="flex flex-1 flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[15px] font-semibold text-[var(--jm-text)]">
+                    <span className="text-jm-md font-semibold text-[var(--jm-text)]">
                       간단 카드
                     </span>
                     <JmBadge variant="success" size="sm">
                       활성
                     </JmBadge>
                   </div>
-                  <p className="text-[13px] text-[var(--jm-text-muted)]">
+                  <p className="text-jm-sm text-[var(--jm-text-muted)]">
                     헤더/푸터 없이 자유 레이아웃
                   </p>
                 </div>
@@ -623,7 +623,7 @@ export default function JmShowcasePage() {
               <JmInput placeholder="에러 상태" tone="invalid" defaultValue="잘못된 값" />
             </Row>
             <div className="flex flex-col gap-2">
-              <span className="text-[12px] text-[var(--jm-text-muted)]">textarea</span>
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">textarea</span>
               <JmTextarea
                 rows={3}
                 placeholder="여러 줄 텍스트 입력..."
@@ -705,7 +705,7 @@ export default function JmShowcasePage() {
                 ]}
               />
             </div>
-            <p className="text-[13px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-sm text-[var(--jm-text-muted)]">
               선택값: <span className="font-mono">{selectValue || "(없음)"}</span>
             </p>
           </div>
@@ -724,7 +724,7 @@ export default function JmShowcasePage() {
               searchPlaceholder="이름·사업자번호 검색"
               onCreateNew={(query) => alert(`'${query}' 새로 등록`)}
             />
-            <p className="text-[13px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-sm text-[var(--jm-text-muted)]">
               선택값:{" "}
               <span className="font-mono">{comboboxValue || "(없음)"}</span>
             </p>
@@ -842,7 +842,7 @@ export default function JmShowcasePage() {
                   <button
                     type="button"
                     onClick={resetFilters}
-                    className="ml-1 text-[12px] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:underline"
+                    className="ml-1 text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:underline"
                   >
                     초기화 ({activeFilterCount})
                   </button>
@@ -875,7 +875,7 @@ export default function JmShowcasePage() {
                   <JmTableRow className="hover:bg-transparent">
                     <JmTableCell
                       colSpan={6}
-                      className="py-12 text-center text-[13px] text-[var(--jm-text-muted)]"
+                      className="py-12 text-center text-jm-sm text-[var(--jm-text-muted)]"
                     >
                       조건에 맞는 행이 없습니다
                     </JmTableCell>
@@ -916,7 +916,7 @@ export default function JmShowcasePage() {
                 )}
               </JmTableBody>
             </JmTable>
-            <div className="flex items-center justify-between border-t border-[var(--jm-border)] px-4 py-2.5 text-[12px] text-[var(--jm-text-muted)]">
+            <div className="flex items-center justify-between border-t border-[var(--jm-border)] px-4 py-2.5 text-jm-xs text-[var(--jm-text-muted)]">
               <span>
                 {filteredRows.length} / {SAMPLE_ROWS.length} 행 표시
               </span>
@@ -956,9 +956,9 @@ export default function JmShowcasePage() {
                 Left (메뉴)
               </JmButton>
             </Row>
-            <p className="text-[12px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-xs text-[var(--jm-text-muted)]">
               Drawer 내부에서도 jm 토큰·폰트가 정상 적용되도록 자동으로
-              <code className="mx-1 rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 font-[family-name:var(--jm-font-mono)] text-[11px]">
+              <code className="mx-1 rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 font-[family-name:var(--jm-font-mono)] text-jm-2xs">
                 data-jm-scope
               </code>
               가 부착됩니다.
@@ -1087,7 +1087,7 @@ export default function JmShowcasePage() {
                     <button
                       key={label}
                       type="button"
-                      className="flex items-center justify-between px-5 py-3 text-left text-[14px] text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
+                      className="flex items-center justify-between px-5 py-3 text-left text-jm-base text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
                       onClick={() => setDrawerLeftOpen(false)}
                     >
                       <span>{label}</span>
@@ -1128,7 +1128,7 @@ export default function JmShowcasePage() {
                 </JmDialogDescription>
               </JmDialogHeader>
               <JmDialogBody>
-                <div className="flex flex-col gap-3 text-[14px]">
+                <div className="flex flex-col gap-3 text-jm-base">
                   <Field label="고객명">
                     <JmInput defaultValue="홍길동" />
                   </Field>
@@ -1190,7 +1190,7 @@ export default function JmShowcasePage() {
                 거래처 검색
               </JmButton>
               {comboboxModalSelected && (
-                <span className="text-[13px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-sm text-[var(--jm-text-muted)]">
                   선택:{" "}
                   <span className="font-semibold text-[var(--jm-text)]">
                     {comboboxModalSelected.label}
@@ -1200,13 +1200,13 @@ export default function JmShowcasePage() {
             </Row>
             <Row label="인풋형 trigger">
               <div className="flex w-full max-w-md flex-col gap-1.5">
-                <span className="text-[12px] font-medium text-[var(--jm-text-muted)]">
+                <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
                   거래처
                 </span>
                 <button
                   type="button"
                   onClick={() => setComboboxModalInputOpen(true)}
-                  className="relative flex h-11 w-full items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-left text-[14px] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+                  className="relative flex h-11 w-full items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-left text-jm-base outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
                 >
                   <span
                     className={`truncate ${
@@ -1235,13 +1235,13 @@ export default function JmShowcasePage() {
                     <Search className="size-4" />
                   </span>
                 </button>
-                <span className="text-[11px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   인풋처럼 보이지만 클릭하면 풀스크린 검색 모달이 열립니다 (POS
                   헤더 검색과 동일).
                 </span>
               </div>
             </Row>
-            <p className="text-[12px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-xs text-[var(--jm-text-muted)]">
               모바일/태블릿 화면에 최적화. 큰 입력 필드, 큰 행, 결과 0건일 때 새로
               등록 버튼.
             </p>
@@ -1267,11 +1267,11 @@ export default function JmShowcasePage() {
                   <ShoppingCart className="size-5" />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
+                  <span className="line-clamp-1 text-jm-md font-semibold text-[var(--jm-text)]">
                     {s.label}
                   </span>
                   {s.description && (
-                    <span className="text-[12px] text-[var(--jm-text-muted)]">
+                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
                       {s.description}
                     </span>
                   )}
@@ -1303,11 +1303,11 @@ export default function JmShowcasePage() {
                   <ShoppingCart className="size-5" />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
+                  <span className="line-clamp-1 text-jm-md font-semibold text-[var(--jm-text)]">
                     {s.label}
                   </span>
                   {s.description && (
-                    <span className="text-[12px] text-[var(--jm-text-muted)]">
+                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
                       {s.description}
                     </span>
                   )}
@@ -1333,7 +1333,7 @@ export default function JmShowcasePage() {
                 상품 검색 (드로워)
               </JmButton>
               {comboboxDrawerSelected && (
-                <span className="text-[13px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-sm text-[var(--jm-text-muted)]">
                   선택:{" "}
                   <span className="font-semibold text-[var(--jm-text)]">
                     {comboboxDrawerSelected.label}
@@ -1343,13 +1343,13 @@ export default function JmShowcasePage() {
             </Row>
             <Row label="인풋형 trigger">
               <div className="flex w-full max-w-md flex-col gap-1.5">
-                <span className="text-[12px] font-medium text-[var(--jm-text-muted)]">
+                <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
                   상품 (드로워 열기)
                 </span>
                 <button
                   type="button"
                   onClick={() => setComboboxDrawerOpen(true)}
-                  className="relative flex h-11 w-full items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-left text-[14px] outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
+                  className="relative flex h-11 w-full items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-left text-jm-base outline-none transition-colors hover:border-[var(--jm-border-strong)] focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
                 >
                   <span
                     className={`truncate ${
@@ -1365,7 +1365,7 @@ export default function JmShowcasePage() {
               </div>
             </Row>
             <JmAlert variant="info" title="모바일 키보드 처리">
-              시트의 max-height를 <code className="font-[family-name:var(--jm-font-mono)] text-[12px]">dvh</code>(dynamic viewport height) 단위로 두면 가상 키보드가 올라올 때 viewport가 자동 축소되어 시트도 같이 짧아집니다. 입력창은 시트 상단에 고정 → 키보드 위에 항상 노출, 결과 리스트만 그 사이에서 스크롤. iOS Safari 주소창·노치 영역까지 자동 대응.
+              시트의 max-height를 <code className="font-[family-name:var(--jm-font-mono)] text-jm-xs">dvh</code>(dynamic viewport height) 단위로 두면 가상 키보드가 올라올 때 viewport가 자동 축소되어 시트도 같이 짧아집니다. 입력창은 시트 상단에 고정 → 키보드 위에 항상 노출, 결과 리스트만 그 사이에서 스크롤. iOS Safari 주소창·노치 영역까지 자동 대응.
             </JmAlert>
           </div>
 
@@ -1389,11 +1389,11 @@ export default function JmShowcasePage() {
                   <ShoppingCart className="size-5" />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
+                  <span className="line-clamp-1 text-jm-md font-semibold text-[var(--jm-text)]">
                     {s.label}
                   </span>
                   {s.description && (
-                    <span className="text-[12px] text-[var(--jm-text-muted)]">
+                    <span className="text-jm-xs text-[var(--jm-text-muted)]">
                       {s.description}
                     </span>
                   )}
@@ -1466,7 +1466,7 @@ export default function JmShowcasePage() {
             </Field>
           </div>
           <JmCard>
-            <JmCardContent className="flex flex-col gap-2 text-[13px]">
+            <JmCardContent className="flex flex-col gap-2 text-jm-sm">
               <div className="flex items-center justify-between">
                 <span className="text-[var(--jm-text-muted)]">가격(저장값)</span>
                 <span className="font-[family-name:var(--jm-font-mono)]">
@@ -1479,7 +1479,7 @@ export default function JmShowcasePage() {
                   ₩{Number(price || 0).toLocaleString("ko-KR")}
                 </span>
               </div>
-              <div className="border-t border-[var(--jm-border)] pt-2 text-[12px] text-[var(--jm-text-muted)]">
+              <div className="border-t border-[var(--jm-border)] pt-2 text-jm-xs text-[var(--jm-text-muted)]">
                 onValueChange 는 콤마 없는 raw 문자열로 통보. DB 저장 형식과 동일.
               </div>
             </JmCardContent>
@@ -1528,14 +1528,14 @@ export default function JmShowcasePage() {
                 <JmCardTitle>JmCheckbox</JmCardTitle>
               </JmCardHeader>
               <JmCardContent className="flex flex-col gap-3">
-                <label className="flex items-center gap-2.5 text-[14px]">
+                <label className="flex items-center gap-2.5 text-jm-base">
                   <JmCheckbox
                     checked={agree}
                     onCheckedChange={(v) => setAgree(v === true)}
                   />
                   이용 약관에 동의합니다
                 </label>
-                <label className="flex items-center gap-2.5 text-[14px]">
+                <label className="flex items-center gap-2.5 text-jm-base">
                   <JmCheckbox
                     checked={partial === true}
                     indeterminate={partial === "indeterminate"}
@@ -1543,7 +1543,7 @@ export default function JmShowcasePage() {
                   />
                   부분 선택 (indeterminate)
                 </label>
-                <label className="flex items-center gap-2.5 text-[14px]">
+                <label className="flex items-center gap-2.5 text-jm-base">
                   <JmCheckbox disabled checked />
                   비활성 + 체크
                 </label>
@@ -1559,18 +1559,18 @@ export default function JmShowcasePage() {
                 <JmCardTitle>JmSwitch</JmCardTitle>
               </JmCardHeader>
               <JmCardContent className="flex flex-col gap-3">
-                <label className="flex items-center justify-between gap-2 text-[14px]">
+                <label className="flex items-center justify-between gap-2 text-jm-base">
                   <span>알림 받기</span>
                   <JmSwitch checked={notify} onCheckedChange={setNotify} />
                 </label>
-                <label className="flex items-center justify-between gap-2 text-[14px]">
+                <label className="flex items-center justify-between gap-2 text-jm-base">
                   <span>다크 모드 (시스템)</span>
                   <JmSwitch
                     checked={darkMode}
                     onCheckedChange={setDarkMode}
                   />
                 </label>
-                <label className="flex items-center justify-between gap-2 text-[14px] opacity-60">
+                <label className="flex items-center justify-between gap-2 text-jm-base opacity-60">
                   <span>비활성</span>
                   <JmSwitch disabled defaultChecked />
                 </label>
@@ -1591,7 +1591,7 @@ export default function JmShowcasePage() {
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <span className="text-[12px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
                 variant=&ldquo;line&rdquo;
               </span>
               <JmTabs defaultValue="overview">
@@ -1602,23 +1602,23 @@ export default function JmShowcasePage() {
                   <JmTabsTrigger value="rentals">임대</JmTabsTrigger>
                   <JmTabsIndicator />
                 </JmTabsList>
-                <JmTabsPanel value="overview" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="overview" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   개요 패널 — 요약 정보
                 </JmTabsPanel>
-                <JmTabsPanel value="orders" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="orders" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   주문 내역 (12건)
                 </JmTabsPanel>
-                <JmTabsPanel value="repairs" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="repairs" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   수리 이력
                 </JmTabsPanel>
-                <JmTabsPanel value="rentals" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="rentals" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   임대 이력
                 </JmTabsPanel>
               </JmTabs>
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="text-[12px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
                 variant=&ldquo;pill&rdquo;
               </span>
               <JmTabs defaultValue="month">
@@ -1628,16 +1628,16 @@ export default function JmShowcasePage() {
                   <JmTabsTrigger value="month">월간</JmTabsTrigger>
                   <JmTabsTrigger value="year">연간</JmTabsTrigger>
                 </JmTabsList>
-                <JmTabsPanel value="day" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="day" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   일간 리포트
                 </JmTabsPanel>
-                <JmTabsPanel value="week" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="week" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   주간 리포트
                 </JmTabsPanel>
-                <JmTabsPanel value="month" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="month" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   월간 리포트 — 5월 합계 ₩12,340,000
                 </JmTabsPanel>
-                <JmTabsPanel value="year" className="pt-3 text-[13px] text-[var(--jm-text-muted)]">
+                <JmTabsPanel value="year" className="pt-3 text-jm-sm text-[var(--jm-text-muted)]">
                   연간 리포트
                 </JmTabsPanel>
               </JmTabs>
@@ -1670,7 +1670,7 @@ export default function JmShowcasePage() {
             </Row>
             <Row label="텍스트">
               <JmTooltip content="이 값은 부가세 포함입니다 (10%)">
-                <span className="cursor-help underline decoration-dotted underline-offset-4 text-[14px] text-[var(--jm-text)]">
+                <span className="cursor-help underline decoration-dotted underline-offset-4 text-jm-base text-[var(--jm-text)]">
                   ₩330,000
                 </span>
               </JmTooltip>
@@ -1719,13 +1719,13 @@ export default function JmShowcasePage() {
                     setTagFilter([]);
                     setCategoryFilter([]);
                   }}
-                  className="text-[12px] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:underline"
+                  className="text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:underline"
                 >
                   전체 초기화
                 </button>
               )}
             </div>
-            <p className="text-[12px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-xs text-[var(--jm-text-muted)]">
               현재 선택 — 태그: {tagFilter.length || "없음"} · 카테고리:{" "}
               {categoryFilter.length || "없음"}
             </p>
@@ -1763,7 +1763,7 @@ export default function JmShowcasePage() {
                 name="이재우"
                 src="https://invalid-url-for-fallback-test.example/x.jpg"
               />
-              <span className="self-center text-[12px] text-[var(--jm-text-muted)]">
+              <span className="self-center text-jm-xs text-[var(--jm-text-muted)]">
                 ← 두번째는 잘못된 URL → 자동으로 이니셜 fallback
               </span>
             </Row>
@@ -1793,10 +1793,10 @@ export default function JmShowcasePage() {
                   >
                     <JmRadio value={opt.v} className="mt-0.5" />
                     <div className="flex flex-col">
-                      <span className="text-[14px] font-medium text-[var(--jm-text)]">
+                      <span className="text-jm-base font-medium text-[var(--jm-text)]">
                         {opt.label}
                       </span>
-                      <span className="text-[12px] text-[var(--jm-text-muted)]">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">
                         {opt.desc}
                       </span>
                     </div>
@@ -1844,7 +1844,7 @@ export default function JmShowcasePage() {
                   </JmDropdownMenuItem>
                 </JmDropdownMenuContent>
               </JmDropdownMenu>
-              <span className="text-[12px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
                 ← 클릭해서 메뉴 열기
               </span>
             </Row>
@@ -1909,7 +1909,7 @@ export default function JmShowcasePage() {
           <div className="grid gap-4 sm:max-w-md">
             <JmDateRangePicker value={dateRange} onChange={setDateRange} />
             {dateRange?.from && (
-              <p className="text-[13px] text-[var(--jm-text-muted)]">
+              <p className="text-jm-sm text-[var(--jm-text-muted)]">
                 선택:{" "}
                 <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
                   {dateRange.from.toLocaleDateString("ko-KR")}
@@ -1949,7 +1949,7 @@ export default function JmShowcasePage() {
               />
             </div>
             {singleDate && (
-              <p className="text-[13px] text-[var(--jm-text-muted)]">
+              <p className="text-jm-sm text-[var(--jm-text-muted)]">
                 선택:{" "}
                 <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
                   {singleDate.toLocaleDateString("ko-KR")}
@@ -1970,7 +1970,7 @@ export default function JmShowcasePage() {
               <JmTimePicker value={timeValue} onChange={setTimeValue} size="md" />
               <JmTimePicker value={timeValue} onChange={setTimeValue} size="lg" />
             </div>
-            <p className="text-[13px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-sm text-[var(--jm-text-muted)]">
               선택:{" "}
               <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
                 {timeValue}
@@ -1991,7 +1991,7 @@ export default function JmShowcasePage() {
               className="w-fit"
             />
             {inlineDate && (
-              <p className="text-[13px] text-[var(--jm-text-muted)]">
+              <p className="text-jm-sm text-[var(--jm-text-muted)]">
                 선택:{" "}
                 <span className="font-[family-name:var(--jm-font-mono)] text-[var(--jm-text)]">
                   {inlineDate.toLocaleDateString("ko-KR")}
@@ -2133,7 +2133,7 @@ export default function JmShowcasePage() {
           <JmCard>
             <JmCardContent className="flex flex-col gap-6">
               <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between text-[13px]">
+                <div className="flex items-center justify-between text-jm-sm">
                   <span className="text-[var(--jm-text-muted)]">단일 값</span>
                   <span className="font-[family-name:var(--jm-font-mono)] tabular-nums">
                     {singleVal}
@@ -2150,7 +2150,7 @@ export default function JmShowcasePage() {
                 />
               </div>
               <div className="flex flex-col gap-3 pt-2">
-                <div className="flex items-center justify-between text-[13px]">
+                <div className="flex items-center justify-between text-jm-sm">
                   <span className="text-[var(--jm-text-muted)]">가격 범위</span>
                   <span className="font-[family-name:var(--jm-font-mono)] tabular-nums">
                     ₩{(rangeVal[0] * 1000).toLocaleString()} ~ ₩
@@ -2265,7 +2265,7 @@ export default function JmShowcasePage() {
               <button
                 type="button"
                 onClick={() => setAlertVisible(true)}
-                className="text-[12px] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:underline"
+                className="text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:underline"
               >
                 neutral 알림 다시 보기
               </button>
@@ -2288,7 +2288,7 @@ export default function JmShowcasePage() {
                 value={viewMode}
                 onChange={setViewMode}
               />
-              <span className="text-[12px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">
                 현재: {viewMode}
               </span>
             </Row>
@@ -2415,11 +2415,11 @@ export default function JmShowcasePage() {
               </div>
             </Row>
             <Row label="세로 (inline)">
-              <span className="text-[13px]">왼쪽</span>
+              <span className="text-jm-sm">왼쪽</span>
               <JmSeparator orientation="vertical" className="h-4" />
-              <span className="text-[13px]">가운데</span>
+              <span className="text-jm-sm">가운데</span>
               <JmSeparator orientation="vertical" className="h-4" />
-              <span className="text-[13px]">오른쪽</span>
+              <span className="text-jm-sm">오른쪽</span>
             </Row>
             <Row label="라벨">
               <div className="w-full max-w-md">
@@ -2427,13 +2427,13 @@ export default function JmShowcasePage() {
               </div>
             </Row>
             <Row label="JmKbd">
-              <span className="text-[13px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-sm text-[var(--jm-text-muted)]">
                 저장하려면
               </span>
               <JmKbd>⌘</JmKbd>
-              <span className="text-[12px] text-[var(--jm-text-subtle)]">+</span>
+              <span className="text-jm-xs text-[var(--jm-text-subtle)]">+</span>
               <JmKbd>S</JmKbd>
-              <span className="ml-3 text-[13px] text-[var(--jm-text-muted)]">
+              <span className="ml-3 text-jm-sm text-[var(--jm-text-muted)]">
                 새 항목
               </span>
               <JmKbd>↵</JmKbd>
@@ -2463,7 +2463,7 @@ export default function JmShowcasePage() {
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-[18px] font-bold text-[var(--jm-text)]">
+                  <h3 className="text-jm-xl font-bold text-[var(--jm-text)]">
                     수리 #R241105-001
                   </h3>
                   <JmBadge variant="warning" size="sm">
@@ -2500,7 +2500,7 @@ export default function JmShowcasePage() {
         </Section>
       </div>
 
-      <footer className="mt-16 border-t border-[var(--jm-border)] pt-6 text-center text-[12px] text-[var(--jm-text-muted)]">
+      <footer className="mt-16 border-t border-[var(--jm-border)] pt-6 text-center text-jm-xs text-[var(--jm-text-muted)]">
         jaewoomade design system · Tailwind 4 + base-ui · CSS variables only
       </footer>
       <JmToaster position="top-right" />
@@ -2940,11 +2940,11 @@ function Section({
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-[20px] font-bold tracking-tight text-[var(--jm-text)]">
+        <h2 className="text-jm-2xl font-bold tracking-tight text-[var(--jm-text)]">
           {title}
         </h2>
         {subtitle && (
-          <p className="text-[13px] text-[var(--jm-text-muted)]">{subtitle}</p>
+          <p className="text-jm-sm text-[var(--jm-text-muted)]">{subtitle}</p>
         )}
       </div>
       {children}
@@ -2961,7 +2961,7 @@ function Row({
 }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[120px_1fr] sm:items-center">
-      <span className="text-[12px] font-medium text-[var(--jm-text-muted)]">
+      <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
         {label}
       </span>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -2978,7 +2978,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[12px] font-medium text-[var(--jm-text-muted)]">
+      <span className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
         {label}
       </span>
       {children}
@@ -2994,10 +2994,10 @@ function ColorSwatch({ token, desc }: { token: string; desc: string }) {
         style={{ background: `var(${token})` }}
       />
       <div className="flex flex-col">
-        <code className="text-[11px] font-mono text-[var(--jm-text)]">
+        <code className="text-jm-2xs font-mono text-[var(--jm-text)]">
           {token}
         </code>
-        <span className="text-[11px] text-[var(--jm-text-muted)]">{desc}</span>
+        <span className="text-jm-2xs text-[var(--jm-text-muted)]">{desc}</span>
       </div>
     </div>
   );

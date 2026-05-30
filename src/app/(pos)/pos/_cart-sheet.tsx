@@ -268,7 +268,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               onCheckout();
             }}
             disabled={items.length === 0}
-            className="flex h-14 w-full items-center justify-between rounded-2xl bg-[var(--jm-action)] px-5 text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-[var(--jm-action)] px-5 text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
           >
             <span>{items.length}건 결제</span>
             <span className="tabular-nums">
@@ -310,8 +310,8 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
             )}
             <div className="my-1 h-px bg-[var(--jm-border)]" />
             <div className="flex items-baseline justify-between">
-              <span className="text-[15px] font-semibold text-[var(--jm-text)]">합계</span>
-              <span className="text-[22px] font-bold tabular-nums text-[var(--jm-text)]">
+              <span className="text-jm-md font-semibold text-[var(--jm-text)]">합계</span>
+              <span className="text-jm-3xl font-bold tabular-nums text-[var(--jm-text)]">
                 ₩{totals.total.toLocaleString("ko-KR")}
               </span>
             </div>
@@ -404,14 +404,14 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               onClick={() => setQuotationLoadOpen(true)}
             />
             {cartChangedSinceQuotation && (
-              <p className="col-span-4 -mb-1 mt-1 px-1 text-[11px] text-[var(--jm-warning-fg)]">
+              <p className="col-span-4 -mb-1 mt-1 px-1 text-jm-2xs text-[var(--jm-warning-fg)]">
                 ⚠ 카트가 발행 후 변경됨 — 견적서 버튼 다시 눌러 재발행
               </p>
             )}
           </div>
         )}
         {items.length > 0 && !session.customerId && (
-          <p className="mt-2 px-1 text-[11px] text-[var(--jm-warning-fg)]">
+          <p className="mt-2 px-1 text-jm-2xs text-[var(--jm-warning-fg)]">
             견적서 발행은 고객 연결이 필요합니다 (결제 시트에서 연결)
           </p>
         )}
@@ -499,19 +499,19 @@ function ActionButton({
       disabled={disabled}
       className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-center transition-colors ${
         active
-          ? "bg-[var(--jm-success-bg)] ring-1 ring-emerald-300"
+          ? "bg-[var(--jm-success-bg)] ring-1 ring-[var(--jm-success-solid)]"
           : "bg-[var(--jm-surface)] border border-[var(--jm-border)] active:bg-[var(--jm-bg)]"
       } disabled:opacity-40`}
     >
       <span
-        className={`text-[11px] font-semibold ${
+        className={`text-jm-2xs font-semibold ${
           active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"
         }`}
       >
         {label}
       </span>
       <span
-        className={`max-w-full truncate px-1 text-[10px] tabular-nums ${
+        className={`max-w-full truncate px-1 text-jm-3xs tabular-nums ${
           active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text-muted)]"
         }`}
       >
@@ -532,9 +532,9 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between">
-      <span className="text-[13px] text-[var(--jm-text-muted)]">{label}</span>
+      <span className="text-jm-sm text-[var(--jm-text-muted)]">{label}</span>
       <span
-        className={`text-[14px] font-semibold tabular-nums ${
+        className={`text-jm-base font-semibold tabular-nums ${
           tone === "warn" ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]"
         }`}
       >

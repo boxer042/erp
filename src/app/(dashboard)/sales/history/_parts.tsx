@@ -89,7 +89,7 @@ export function ClaimBadge({
         {CLAIM_TYPE_LABELS[claimType]}
       </JmBadge>
       {claimReason && (
-        <span className="text-[11px] text-[var(--jm-text-subtle)]">
+        <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
           {CLAIM_REASON_LABELS[claimReason]}
         </span>
       )}
@@ -159,7 +159,7 @@ export function SalesAmountCell({ row }: { row: SalesHistoryRow }) {
       {/* 할인이 있던 거래 — 원가와 할인액을 한눈에 보여줘 결제액 차이 이해를 돕는다.
           원가 = 결제액 + 할인. 할인은 -₩X 형태로 강조. */}
       {row.discountAmount > 0 && !reversed && (
-        <span className="text-[10px] tabular-nums text-[var(--jm-text-subtle)]">
+        <span className="text-jm-3xs tabular-nums text-[var(--jm-text-subtle)]">
           원가 ₩{(row.amount + row.discountAmount).toLocaleString("ko-KR")}
           <span className="ml-1 text-[var(--jm-danger-fg)]">
             -₩{row.discountAmount.toLocaleString("ko-KR")}
@@ -169,7 +169,7 @@ export function SalesAmountCell({ row }: { row: SalesHistoryRow }) {
       {/* 서비스로 지급된 라인이 있는 거래 — 0원 행이라도 "그냥 0원" 이 아니라
           무상 제공임을 명시. 영수증/명세표와 동일 정책. */}
       {row.serviceItemCount > 0 && !reversed && (
-        <span className="text-[10px] font-semibold text-[var(--jm-success-fg)]">
+        <span className="text-jm-3xs font-semibold text-[var(--jm-success-fg)]">
           서비스 {row.serviceItemCount}건 포함
         </span>
       )}
@@ -192,7 +192,7 @@ export function ChannelDistribution({
 }) {
   if (channels.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-2.5 text-[12px]">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-4 py-2.5 text-jm-xs">
       <span className="font-medium text-[var(--jm-text-subtle)]">
         채널별 매출
       </span>
@@ -248,7 +248,7 @@ function ChannelChip({
       <span className="text-[var(--jm-text)]">
         ₩{formatCompactKrw(amount)}
       </span>
-      <span className="text-[11px] text-[var(--jm-text-subtle)]">
+      <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
         {share.toFixed(0)}%
       </span>
     </button>

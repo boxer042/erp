@@ -249,7 +249,7 @@ export function RepairDetail({
                 </span>
                 {t.workKind === "CUSTOM_BUILD" && (
                   <span
-                    className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[var(--jm-accent-fg)]"
+                    className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-jm-3xs font-bold tracking-wider text-[var(--jm-accent-fg)]"
                     title="리빌드 — 손님 부품 + 부속 조합"
                   >
                     리빌드
@@ -355,10 +355,10 @@ export function RepairDetail({
                 </span>
               </div>
               {t.quoteRejectMemo && (
-                <p className="mt-0.5 text-[12px] opacity-80">{t.quoteRejectMemo}</p>
+                <p className="mt-0.5 text-jm-xs opacity-80">{t.quoteRejectMemo}</p>
               )}
               {t.quoteRejectedAt && (
-                <p className="mt-0.5 text-[11px] opacity-60">
+                <p className="mt-0.5 text-jm-2xs opacity-60">
                   {format(new Date(t.quoteRejectedAt), "yyyy-MM-dd HH:mm")}
                 </p>
               )}
@@ -544,17 +544,17 @@ function CustomerDeviceCard({
   // onCustomerClick 있으면 고객 영역만 클릭 가능 — 헤더 고객 썸네일과 동일한 시트 트리거
   const customerContent = ticket.customer ? (
     <div className="flex min-w-0 flex-col">
-      <span className="line-clamp-1 text-[15px] font-semibold text-[var(--jm-text)]">
+      <span className="line-clamp-1 text-jm-md font-semibold text-[var(--jm-text)]">
         {ticket.customer.name}
       </span>
       {ticket.customer.phone && (
-        <span className="font-mono text-[12px] text-[var(--jm-text-muted)]">
+        <span className="font-mono text-jm-xs text-[var(--jm-text-muted)]">
           {ticket.customer.phone}
         </span>
       )}
     </div>
   ) : (
-    <span className="text-[14px] text-[var(--jm-text-subtle)]">미등록</span>
+    <span className="text-jm-base text-[var(--jm-text-subtle)]">미등록</span>
   );
 
   return (
@@ -568,29 +568,17 @@ function CustomerDeviceCard({
               className="-mx-2 -my-1 flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             >
               {customerContent}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                className="shrink-0 text-[var(--jm-text-subtle)]"
+              <ChevronDown
+                className="size-3.5 shrink-0 text-[var(--jm-text-subtle)]"
                 aria-hidden
-              >
-                <path
-                  d="M3.5 5.5l3.5 3.5 3.5-3.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              />
             </button>
           ) : (
             customerContent
           )}
         </Field>
         <Field label="담당">
-          <span className="text-[14px] text-[var(--jm-text)]">
+          <span className="text-jm-base text-[var(--jm-text)]">
             {ticket.assignedTo?.name ?? (
               <span className="text-[var(--jm-text-subtle)]">미지정</span>
             )}
@@ -668,16 +656,16 @@ function DiagnosisFeeCard({
         {/* 기본 진단비 섹션 — 수리 안 했을 때만 청구되는 비용 */}
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               기본 진단비
             </span>
-            <span className="text-[10px] text-[var(--jm-text-subtle)]">VAT 포함</span>
+            <span className="text-jm-3xs text-[var(--jm-text-subtle)]">VAT 포함</span>
           </div>
           <button
             type="button"
             onClick={() => !readonly && setFeeOpen(true)}
             disabled={readonly}
-            className={`flex h-12 items-center justify-end rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-right text-[16px] font-semibold tabular-nums transition-colors hover:bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)] disabled:opacity-70 ${
+            className={`flex h-12 items-center justify-end rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-right text-jm-lg font-semibold tabular-nums transition-colors hover:bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)] disabled:opacity-70 ${
               isWaived
                 ? "text-[var(--jm-text-disabled)] line-through"
                 : "text-[var(--jm-text)]"
@@ -687,7 +675,7 @@ function DiagnosisFeeCard({
               <span className="text-[var(--jm-text-subtle)]">탭하여 입력</span>
             )}
           </button>
-          <p className="text-[11px] text-[var(--jm-text-subtle)]">
+          <p className="text-jm-2xs text-[var(--jm-text-subtle)]">
             {isWaived
               ? "수리 진행 — 진단비 면제 (수리비에 흡수)"
               : hasRepairWork
@@ -699,10 +687,10 @@ function DiagnosisFeeCard({
         {/* 수리 보증 섹션 — 픽업 시점부터 시작. 회사 기본값에서 prefill. */}
         <div className="flex flex-col gap-2 border-t border-[var(--jm-border)] pt-3">
           <div className="flex items-baseline justify-between">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               수리 보증
             </span>
-            <span className="text-[10px] text-[var(--jm-text-subtle)]">
+            <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
               픽업 시점부터 시작
             </span>
           </div>

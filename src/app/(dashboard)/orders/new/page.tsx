@@ -584,7 +584,7 @@ export default function NewOrderPage() {
                 <GridSkeleton />
               ) : products.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-16 text-center">
-                  <span className="text-[14px] text-[var(--jm-text-muted)]">
+                  <span className="text-jm-base text-[var(--jm-text-muted)]">
                     {isSearching
                       ? `"${deferredSearch}" 검색 결과가 없습니다`
                       : "해당 카테고리에 상품이 없습니다"}
@@ -613,13 +613,13 @@ export default function NewOrderPage() {
             <div className="flex flex-col gap-5">
               {/* 합계 다크 카드 — POS 결제시트 패턴 */}
               <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
-                <div className="text-[12px] font-semibold uppercase tracking-wider text-white/60">
+                <div className="text-jm-xs font-semibold uppercase tracking-wider text-white/60">
                   주문 금액
                 </div>
-                <div className="mt-1 text-[40px] font-bold tabular-nums leading-none">
+                <div className="mt-1 text-jm-6xl font-bold tabular-nums leading-none">
                   ₩{totals.total.toLocaleString("ko-KR")}
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                <div className="mt-3 grid grid-cols-3 gap-2 text-jm-2xs">
                   <Pill label="공급가액" value={totals.net} />
                   <Pill label="세액" value={totals.vat} />
                   {totals.sessionDiscountAmount > 0 ? (
@@ -794,10 +794,10 @@ export default function NewOrderPage() {
                             : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                         }`}
                       >
-                        <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+                        <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                           {opt.label}
                         </span>
-                        <span className="text-[11px] text-[var(--jm-text-muted)]">
+                        <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                           {opt.sub}
                         </span>
                       </button>
@@ -808,7 +808,7 @@ export default function NewOrderPage() {
                 {isDelivery && (
                   <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-bg)] p-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-semibold text-[var(--jm-text)]">
+                      <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
                         {fulfillmentType === "SHIPPING"
                           ? "택배 발송지"
                           : "배달지"}
@@ -820,7 +820,7 @@ export default function NewOrderPage() {
                             setRecipientName(customerName);
                             setRecipientPhone(customerPhone);
                           }}
-                          className="text-[11px] font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
+                          className="text-jm-2xs font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
                         >
                           고객 정보 채우기
                         </button>
@@ -831,7 +831,7 @@ export default function NewOrderPage() {
                       value={recipientName}
                       onChange={(e) => setRecipientName(e.target.value)}
                       placeholder="받는 사람 이름 (선택)"
-                      className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
+                      className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
                     />
                     <input
                       type="tel"
@@ -840,17 +840,17 @@ export default function NewOrderPage() {
                         setRecipientPhone(formatPhone(e.target.value))
                       }
                       placeholder="받는 사람 연락처 *"
-                      className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
+                      className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
                     />
                     <textarea
                       value={shippingAddress}
                       onChange={(e) => setShippingAddress(e.target.value)}
                       placeholder="주소 *"
                       rows={2}
-                      className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-[13px] text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
+                      className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-jm-sm text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
                     />
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                      <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                         발송 예정일
                       </span>
                       <JmDatePicker
@@ -864,7 +864,7 @@ export default function NewOrderPage() {
                     </div>
                     {/* 배송비 결제 방식 */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                      <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                         배송비
                       </span>
                       <div className="grid grid-cols-3 gap-1.5">
@@ -885,10 +885,10 @@ export default function NewOrderPage() {
                                   : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
                               }`}
                             >
-                              <span className="text-[12px] font-semibold text-[var(--jm-text)]">
+                              <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
                                 {opt.label}
                               </span>
-                              <span className="text-[10px] text-[var(--jm-text-muted)]">
+                              <span className="text-jm-3xs text-[var(--jm-text-muted)]">
                                 {opt.sub}
                               </span>
                             </button>
@@ -898,20 +898,20 @@ export default function NewOrderPage() {
                     </div>
                     {shippingPaymentType !== "COD" && (
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                        <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                           배송 원가 (매장 지불)
                         </span>
                         <button
                           type="button"
                           onClick={() => setShipCostDialogOpen(true)}
-                          className="flex h-10 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-[13px] text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)]"
+                          className="flex h-10 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] outline-none transition-colors hover:border-[var(--jm-border-strong)]"
                         >
                           <span className="tabular-nums">
                             {parseFloat(shippingCostBorne || "0") > 0
                               ? `₩${Math.round(parseFloat(shippingCostBorne) * 1.1).toLocaleString("ko-KR")}`
                               : "—"}
                           </span>
-                          <span className="text-[10px] text-[var(--jm-text-muted)]">
+                          <span className="text-jm-3xs text-[var(--jm-text-muted)]">
                             수정
                           </span>
                         </button>
@@ -929,7 +929,7 @@ export default function NewOrderPage() {
                   onChange={setPaymentMethod}
                 />
                 {paymentMethod === "UNPAID" && !customerId && (
-                  <div className="rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-[11px] text-[var(--jm-warning-fg)]">
+                  <div className="rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-jm-2xs text-[var(--jm-warning-fg)]">
                     외상은 등록 고객 선택이 필요합니다
                   </div>
                 )}
@@ -944,7 +944,7 @@ export default function NewOrderPage() {
                   partial.paidAmount > 0 &&
                   partial.paidAmount < totals.total &&
                   !customerId && (
-                    <div className="rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-[11px] text-[var(--jm-warning-fg)]">
+                    <div className="rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-jm-2xs text-[var(--jm-warning-fg)]">
                       부분 결제(잔금 미수)는 등록 고객 선택이 필요합니다
                     </div>
                   )}
@@ -957,15 +957,15 @@ export default function NewOrderPage() {
                 onClick={() => setTaxInvoiceRequested((v) => !v)}
                 className={`flex items-center justify-between rounded-2xl px-4 py-3 text-left transition-colors ${
                   taxInvoiceRequested
-                    ? "bg-[var(--jm-success-bg)] ring-1 ring-emerald-300"
+                    ? "bg-[var(--jm-success-bg)] ring-1 ring-[var(--jm-success-solid)]"
                     : "bg-[var(--jm-bg)] hover:bg-[var(--jm-surface-muted)]"
                 }`}
               >
                 <div className="flex flex-col">
-                  <span className="text-[13px] font-semibold text-[var(--jm-text)]">
+                  <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
                     세금계산서 발행 요청
                   </span>
-                  <span className="text-[11px] text-[var(--jm-text-muted)]">
+                  <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                     {customerId
                       ? "발행 대기 목록에 등록됩니다"
                       : "등록 고객 권장 — 발행 시 사업자 정보 필요"}
@@ -994,7 +994,7 @@ export default function NewOrderPage() {
                 type="button"
                 onClick={() => router.push("/orders")}
                 disabled={createMutation.isPending}
-                className="flex h-14 shrink-0 items-center justify-center rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-[14px] font-semibold text-[var(--jm-text)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
+                className="flex h-14 shrink-0 items-center justify-center rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-jm-base font-semibold text-[var(--jm-text)] transition-colors active:bg-[var(--jm-bg)] disabled:opacity-50"
               >
                 취소
               </button>
@@ -1002,7 +1002,7 @@ export default function NewOrderPage() {
                 type="button"
                 onClick={() => createMutation.mutate()}
                 disabled={!canSubmit}
-                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
+                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-60"
               >
                 {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
                 {createMutation.isPending
@@ -1241,7 +1241,7 @@ export default function NewOrderPage() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+    <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
       {children}
     </span>
   );
@@ -1256,7 +1256,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+      <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {label}
       </span>
       {children}
@@ -1281,10 +1281,10 @@ function Pill({
       : "bg-[var(--jm-surface)]/10 text-white";
   return (
     <div className={`flex flex-col gap-0.5 rounded-xl px-2.5 py-1.5 ${cls}`}>
-      <span className="text-[10px] uppercase tracking-wider text-white/70">
+      <span className="text-jm-3xs uppercase tracking-wider text-white/70">
         {label}
       </span>
-      <span className="text-[13px] font-semibold tabular-nums">
+      <span className="text-jm-sm font-semibold tabular-nums">
         {suffix
           ? `${value.toLocaleString("ko-KR")}${suffix}`
           : `${value < 0 ? "−" : ""}₩${Math.abs(value).toLocaleString("ko-KR")}`}
@@ -1317,19 +1317,19 @@ function ActionButton({
       disabled={disabled}
       className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-center transition-colors ${
         active
-          ? "bg-[var(--jm-success-bg)] ring-1 ring-emerald-300"
+          ? "bg-[var(--jm-success-bg)] ring-1 ring-[var(--jm-success-solid)]"
           : "border border-[var(--jm-border)] bg-[var(--jm-surface)] active:bg-[var(--jm-bg)]"
       } disabled:opacity-40`}
     >
       <span
-        className={`text-[11px] font-semibold ${
+        className={`text-jm-2xs font-semibold ${
           active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"
         }`}
       >
         {label}
       </span>
       <span
-        className={`max-w-full truncate px-1 text-[10px] tabular-nums ${
+        className={`max-w-full truncate px-1 text-jm-3xs tabular-nums ${
           active ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text-muted)]"
         }`}
       >
@@ -1387,7 +1387,7 @@ function CartLineCard({
       <div className="mb-2.5 flex items-start gap-3">
         {isService ? (
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)]">
+            <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
               기술료
             </span>
             <JmInput
@@ -1419,17 +1419,17 @@ function CartLineCard({
               </div>
             )}
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="line-clamp-1 text-[13px] font-semibold text-[var(--jm-text)]">
+              <span className="line-clamp-1 text-jm-sm font-semibold text-[var(--jm-text)]">
                 {item.name}
               </span>
               {item.sku && (
-                <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">
+                <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">
                   {item.sku}
                 </span>
               )}
               {/* 옵션 스냅샷 — VariantSelectSheet 에서 미리 선택한 옵션 라벨 표시 */}
               {item.optionSnapshot && Object.keys(item.optionSnapshot).length > 0 && (
-                <span className="mt-0.5 line-clamp-1 text-[10px] text-[var(--jm-text-muted)]">
+                <span className="mt-0.5 line-clamp-1 text-jm-3xs text-[var(--jm-text-muted)]">
                   {Object.entries(item.optionSnapshot)
                     .map(([k, v]) => `${k}: ${v}`)
                     .join(" · ")}
@@ -1456,10 +1456,10 @@ function CartLineCard({
           onClick={onEditPrice}
           className="flex flex-col items-start rounded-lg px-2 py-1 text-left hover:bg-[var(--jm-surface-muted)]"
         >
-          <span className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          <span className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-subtle)]">
             단가 (VAT 포함)
           </span>
-          <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
+          <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
             ₩{unitGross.toLocaleString("ko-KR")}
           </span>
         </button>
@@ -1498,10 +1498,10 @@ function CartLineCard({
           </button>
         </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-[var(--jm-text-subtle)]">
+          <div className="text-jm-3xs uppercase tracking-wider text-[var(--jm-text-subtle)]">
             합계
           </div>
-          <div className="text-[14px] font-bold tabular-nums text-[var(--jm-text)]">
+          <div className="text-jm-base font-bold tabular-nums text-[var(--jm-text)]">
             ₩{lineGross.toLocaleString("ko-KR")}
           </div>
         </div>
@@ -1509,7 +1509,7 @@ function CartLineCard({
 
       {/* 라인 할인 안내 — 견적서 로드 등 비-제로 할인이 적용됐을 때 노출 */}
       {discountPerUnit > 0 && (
-        <div className="mt-2 flex items-center justify-between rounded-lg bg-[var(--jm-surface-muted)] px-2.5 py-1.5 text-[11px]">
+        <div className="mt-2 flex items-center justify-between rounded-lg bg-[var(--jm-surface-muted)] px-2.5 py-1.5 text-jm-2xs">
           <span className="text-[var(--jm-text-muted)]">
             할인 {item.discount.endsWith("%") ? `(${item.discount})` : ""}
           </span>

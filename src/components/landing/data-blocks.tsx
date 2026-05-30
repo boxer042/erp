@@ -70,7 +70,7 @@ export function SpecTableBlockView({
             </h3>
           )}
           {!productId ? (
-            <div className="rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+            <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
               상품 컨텍스트 없이는 스펙을 표시할 수 없습니다 (편집기 미리보기에서 정상 동작)
             </div>
           ) : query.isPending ? (
@@ -78,7 +78,7 @@ export function SpecTableBlockView({
               스펙 불러오는 중...
             </div>
           ) : values.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+            <div className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
               아직 등록된 스펙이 없습니다 (상품 상세에서 등록 후 표시됩니다)
             </div>
           ) : (
@@ -191,7 +191,7 @@ export function TableBlockView({ block }: { block: TableBlock }) {
     return (
       <JmScope theme="light" className="w-full">
         <section className="w-full px-6 py-8 md:px-16">
-          <div className="mx-auto flex max-w-3xl items-center justify-center rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-jm-sm text-[var(--jm-text-muted)]">
+          <div className="mx-auto flex max-w-3xl items-center justify-center rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-jm-sm text-[var(--jm-text-muted)]">
             행을 추가하세요
           </div>
         </section>
@@ -306,7 +306,7 @@ export function ChartBlockView({ block }: { block: ChartBlock }) {
     return (
       <JmScope theme="light" className="w-full">
         <section className="w-full px-6 py-8 md:px-16">
-          <div className="mx-auto flex max-w-3xl items-center justify-center rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-jm-sm text-[var(--jm-text-muted)]">
+          <div className="mx-auto flex max-w-3xl items-center justify-center rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-4 py-6 text-jm-sm text-[var(--jm-text-muted)]">
             데이터를 추가하세요
           </div>
         </section>
@@ -957,7 +957,7 @@ export function ProductHeroBlockView({
             PRODUCT_HERO_BG[block.background ?? "none"],
           )}
         >
-          <div className="mx-auto max-w-6xl rounded-md border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface)]/50 px-4 py-10 text-center text-sm text-[var(--jm-text-muted)]">
+          <div className="mx-auto max-w-6xl rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)]/50 px-4 py-10 text-center text-sm text-[var(--jm-text-muted)]">
             상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
           </div>
         </section>
@@ -1609,7 +1609,7 @@ export function ProductInfoBlockView({
               : "",
           )}
         >
-          <div className="mx-auto max-w-5xl rounded-2xl border border-dashed border-[var(--jm-border)] bg-[var(--jm-surface)]/50 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+          <div className="mx-auto max-w-5xl rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)]/50 px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
             상품 컨텍스트 없이는 자동 매핑이 동작하지 않습니다 (편집기 미리보기에서 정상 동작)
           </div>
         </section>
@@ -1663,7 +1663,7 @@ export function ProductInfoBlockView({
             </div>
             <div className="space-y-3 text-jm-sm leading-relaxed text-[var(--jm-text)]">
               {allRows.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[var(--jm-border)] px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
+                <div className="rounded-2xl border border-[var(--jm-border)] px-4 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">
                   표시할 항목이 없습니다 — 상품 정보 또는 ProductSpec 을 먼저 등록하세요
                 </div>
               ) : (

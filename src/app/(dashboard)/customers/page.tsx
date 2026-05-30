@@ -368,7 +368,7 @@ export default function CustomersPage() {
                               {c.name}
                             </span>
                             {c.type === "BUSINESS" && c.ceo && (
-                              <span className="text-[11px] text-[var(--jm-text-muted)]">
+                              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                                 대표 {c.ceo}
                                 {c.businessType && ` · ${c.businessType}`}
                               </span>

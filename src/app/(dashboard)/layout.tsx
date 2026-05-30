@@ -12,7 +12,7 @@ export default async function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex h-screen overflow-hidden bg-[var(--jm-bg)]">
         <DashboardShell user={{ name: user.name, email: user.email }}>
           {children}
         </DashboardShell>

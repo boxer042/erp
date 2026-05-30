@@ -2,42 +2,49 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+  JmScope,
+  JmButton,
+  JmInput,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmDialog,
+  JmDialogContent,
+  JmDialogHeader,
+  JmDialogTitle,
+  JmDialogFooter,
+  JmSelect,
+  JmBadge,
+  JmScrollArea,
+  JmSkeleton,
+} from "@/jm";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { STOCKTAKE_REASONS, STOCKTAKE_REASON_LABELS } from "@/lib/validators/stocktake";
-import { Skeleton } from "@/components/ui/skeleton";
 
 function StocktakeSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-8 w-20 rounded-md" /></div></TableCell>
-          <TableCell><div className="flex justify-end"><Skeleton className="h-4 w-12" /></div></TableCell>
-          <TableCell><Skeleton className="h-8 w-28 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-8 w-32 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-8 w-28 rounded-md" /></TableCell>
-        </TableRow>
+        <JmTableRow key={i}>
+          <JmTableCell><JmSkeleton className="h-4 w-40" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-20" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-12" /></JmTableCell>
+          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-12" /></div></JmTableCell>
+          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-8 w-20 rounded-md" /></div></JmTableCell>
+          <JmTableCell><div className="flex justify-end"><JmSkeleton className="h-4 w-12" /></div></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-8 w-28 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-8 w-32 rounded-md" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-8 w-28 rounded-md" /></JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -82,6 +89,7 @@ interface StocktakeRow {
 }
 
 export default function StocktakePage() {
+  const { resolvedTheme } = useTheme();
   const queryClient = useQueryClient();
   const [rows, setRows] = useState<StocktakeRow[]>([]);
   const [search, setSearch] = useState("");
@@ -166,8 +174,8 @@ export default function StocktakePage() {
   const handleSubmit = () => submitMutation.mutate();
 
   return (
-    <>
-      <div className="flex h-full flex-col">
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
         <DataTableToolbar
           search={{
             value: search,
@@ -179,49 +187,49 @@ export default function StocktakePage() {
           loading={loading}
           filters={
             <div className="flex items-center gap-1.5">
-              <Button
-                variant={showDiffOnly ? "default" : "outline"}
+              <JmButton
+                variant={showDiffOnly ? "cta" : "outline"}
                 size="sm"
-                className="h-[30px] text-[13px]"
+                className="h-[30px] text-jm-sm"
                 onClick={() => setShowDiffOnly(!showDiffOnly)}
               >
                 차이만
-              </Button>
+              </JmButton>
               {changedRows.length > 0 && (
-                <span className="text-xs text-muted-foreground">{changedRows.length}건 변경</span>
+                <span className="text-jm-xs text-[var(--jm-text-muted)]">{changedRows.length}건 변경</span>
               )}
-              <Button
+              <JmButton
                 size="sm"
-                className="h-[30px] text-[13px]"
+                className="h-[30px] text-jm-sm"
                 disabled={changedRows.length === 0}
                 onClick={() => setConfirmOpen(true)}
               >
                 보정 적용
-              </Button>
+              </JmButton>
             </div>
           }
         />
 
-        <ScrollArea className="flex-1 min-h-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>상품명</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>단위</TableHead>
-                <TableHead className="text-right">시스템 재고</TableHead>
-                <TableHead className="text-right w-[120px]">실사 수량</TableHead>
-                <TableHead className="text-right w-[90px]">차이</TableHead>
-                <TableHead className="w-[130px]">보정 사유</TableHead>
-                <TableHead className="w-[160px]">공급상품 (증가 시)</TableHead>
-                <TableHead className="w-[140px]">메모</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <JmScrollArea className="flex-1 min-h-0">
+          <JmTable>
+            <JmTableHeader>
+              <JmTableRow>
+                <JmTableHead>상품명</JmTableHead>
+                <JmTableHead>SKU</JmTableHead>
+                <JmTableHead>단위</JmTableHead>
+                <JmTableHead className="text-right">시스템 재고</JmTableHead>
+                <JmTableHead className="text-right w-[120px]">실사 수량</JmTableHead>
+                <JmTableHead className="text-right w-[90px]">차이</JmTableHead>
+                <JmTableHead className="w-[130px]">보정 사유</JmTableHead>
+                <JmTableHead className="w-[160px]">공급상품 (증가 시)</JmTableHead>
+                <JmTableHead className="w-[140px]">메모</JmTableHead>
+              </JmTableRow>
+            </JmTableHeader>
+            <JmTableBody>
               {loading ? (
                 <StocktakeSkeletonRows />
               ) : filteredRows.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">재고 데이터가 없습니다</TableCell></TableRow>
+                <JmTableRow><JmTableCell colSpan={9} className="text-center py-8 text-[var(--jm-text-muted)]">재고 데이터가 없습니다</JmTableCell></JmTableRow>
               ) : (
                 filteredRows.map((row) => {
                   const rowIndex = rows.findIndex((r) => r.productId === row.productId);
@@ -230,145 +238,128 @@ export default function StocktakePage() {
                   const isIncrease = diff > 0;
 
                   return (
-                    <TableRow key={row.productId}>
-                      <TableCell className="font-medium">
+                    <JmTableRow key={row.productId}>
+                      <JmTableCell className="font-medium">
                         {row.productName}
-                        {row.isSet && <Badge className="ml-2" variant="secondary">세트</Badge>}
-                      </TableCell>
-                      <TableCell><Badge variant="outline">{row.sku}</Badge></TableCell>
-                      <TableCell>{row.unitOfMeasure}</TableCell>
-                      <TableCell className="text-right">{row.systemQty.toLocaleString("ko-KR")}</TableCell>
-                      <TableCell className="p-1">
-                        <Input
+                        {row.isSet && <JmBadge className="ml-2" variant="default">세트</JmBadge>}
+                      </JmTableCell>
+                      <JmTableCell><JmBadge variant="outline">{row.sku}</JmBadge></JmTableCell>
+                      <JmTableCell>{row.unitOfMeasure}</JmTableCell>
+                      <JmTableCell className="text-right">{row.systemQty.toLocaleString("ko-KR")}</JmTableCell>
+                      <JmTableCell className="p-1">
+                        <JmInput
+                          size="sm"
                           type="number"
                           step="0.01"
                           min="0"
                           value={row.actualQty}
                           onChange={(e) => updateRow(rowIndex, { actualQty: e.target.value })}
-                          className={`h-8 text-right text-[13px] ${hasDiff ? "border-yellow-500/50" : ""}`}
+                          className={`h-8 text-right text-jm-sm ${hasDiff ? "border-[var(--jm-warning-solid)]" : ""}`}
                         />
-                      </TableCell>
-                      <TableCell className={`text-right font-medium ${
-                        !hasDiff ? "text-muted-foreground" : diff > 0 ? "text-green-500" : "text-red-500"
+                      </JmTableCell>
+                      <JmTableCell className={`text-right font-medium ${
+                        !hasDiff ? "text-[var(--jm-text-muted)]" : diff > 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"
                       }`}>
                         {!hasDiff ? "0" : `${diff > 0 ? "+" : ""}${diff.toLocaleString("ko-KR", { maximumFractionDigits: 4 })}`}
-                      </TableCell>
-                      <TableCell className="p-1">
-                        <Select
+                      </JmTableCell>
+                      <JmTableCell className="p-1">
+                        <JmSelect
+                          size="sm"
+                          disabled={!hasDiff}
                           value={row.reason}
-                          onValueChange={(v) => updateRow(rowIndex, { reason: (v ?? "PHYSICAL_COUNT") as Reason })}
-                        >
-                          <SelectTrigger className="h-8 text-[13px]" disabled={!hasDiff}>
-                            <SelectValue>
-                              {(v: unknown) =>
-                                typeof v === "string" && v in STOCKTAKE_REASON_LABELS
-                                  ? STOCKTAKE_REASON_LABELS[v as Reason]
-                                  : ""
-                              }
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STOCKTAKE_REASONS.map((r) => (
-                              <SelectItem key={r} value={r}>{STOCKTAKE_REASON_LABELS[r]}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="p-1">
+                          onChange={(v) => updateRow(rowIndex, { reason: (v ?? "PHYSICAL_COUNT") as Reason })}
+                          options={STOCKTAKE_REASONS.map((r) => ({
+                            value: r,
+                            label: STOCKTAKE_REASON_LABELS[r],
+                          }))}
+                        />
+                      </JmTableCell>
+                      <JmTableCell className="p-1">
                         {isIncrease ? (
                           row.mappings.length === 0 ? (
-                            <span className="text-xs text-red-500">매핑 없음</span>
+                            <span className="text-jm-xs text-[var(--jm-danger-fg)]">매핑 없음</span>
                           ) : (
-                            <Select
+                            <JmSelect
+                              size="sm"
+                              placeholder="선택"
                               value={row.supplierProductId}
-                              onValueChange={(v) => updateRow(rowIndex, { supplierProductId: v ?? "" })}
-                            >
-                              <SelectTrigger className="h-8 text-[13px]">
-                                <SelectValue placeholder="선택">
-                                  {(v: unknown) => {
-                                    const found = row.mappings.find((m) => m.supplierProductId === v);
-                                    return found ? `${found.supplierProductName} (${found.supplierName})` : "선택";
-                                  }}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {row.mappings.map((m) => (
-                                  <SelectItem key={m.id} value={m.supplierProductId}>
-                                    {m.supplierProductName} ({m.supplierName})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onChange={(v) => updateRow(rowIndex, { supplierProductId: v ?? "" })}
+                              options={row.mappings.map((m) => ({
+                                value: m.supplierProductId,
+                                label: `${m.supplierProductName} (${m.supplierName})`,
+                              }))}
+                            />
                           )
                         ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <span className="text-jm-xs text-[var(--jm-text-muted)]">—</span>
                         )}
-                      </TableCell>
-                      <TableCell className="p-1">
-                        <Input
+                      </JmTableCell>
+                      <JmTableCell className="p-1">
+                        <JmInput
+                          size="sm"
                           value={row.memo}
                           onChange={(e) => updateRow(rowIndex, { memo: e.target.value })}
-                          className="h-8 text-[13px]"
+                          className="h-8 text-jm-sm"
                           placeholder="메모"
                         />
-                      </TableCell>
-                    </TableRow>
+                      </JmTableCell>
+                    </JmTableRow>
                   );
                 })
               )}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+            </JmTableBody>
+          </JmTable>
+        </JmScrollArea>
       </div>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>실사 보정 확인</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
+      <JmDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>실사 보정 확인</JmDialogTitle>
+          </JmDialogHeader>
+          <div className="space-y-3 px-5 text-jm-sm">
             <p>
               <strong>{changedRows.length}건</strong>의 재고를 보정합니다.
             </p>
-            <ScrollArea className="max-h-[300px] rounded-md border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">상품</TableHead>
-                    <TableHead className="text-xs text-right">현재</TableHead>
-                    <TableHead className="text-xs text-right">실사</TableHead>
-                    <TableHead className="text-xs text-right">차이</TableHead>
-                    <TableHead className="text-xs">사유</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <JmScrollArea className="max-h-[300px] rounded-md border border-[var(--jm-border)]">
+              <JmTable>
+                <JmTableHeader>
+                  <JmTableRow>
+                    <JmTableHead className="text-jm-xs">상품</JmTableHead>
+                    <JmTableHead className="text-jm-xs text-right">현재</JmTableHead>
+                    <JmTableHead className="text-jm-xs text-right">실사</JmTableHead>
+                    <JmTableHead className="text-jm-xs text-right">차이</JmTableHead>
+                    <JmTableHead className="text-jm-xs">사유</JmTableHead>
+                  </JmTableRow>
+                </JmTableHeader>
+                <JmTableBody>
                   {changedRows.map((row) => {
                     const diff = parseFloat(row.actualQty) - row.systemQty;
                     return (
-                      <TableRow key={row.productId}>
-                        <TableCell className="text-xs">{row.productName}</TableCell>
-                        <TableCell className="text-xs text-right">{row.systemQty.toLocaleString("ko-KR")}</TableCell>
-                        <TableCell className="text-xs text-right">{parseFloat(row.actualQty).toLocaleString("ko-KR")}</TableCell>
-                        <TableCell className={`text-xs text-right font-medium ${diff > 0 ? "text-green-500" : "text-red-500"}`}>
+                      <JmTableRow key={row.productId}>
+                        <JmTableCell className="text-jm-xs">{row.productName}</JmTableCell>
+                        <JmTableCell className="text-jm-xs text-right">{row.systemQty.toLocaleString("ko-KR")}</JmTableCell>
+                        <JmTableCell className="text-jm-xs text-right">{parseFloat(row.actualQty).toLocaleString("ko-KR")}</JmTableCell>
+                        <JmTableCell className={`text-jm-xs text-right font-medium ${diff > 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
                           {diff > 0 ? "+" : ""}{diff.toLocaleString("ko-KR", { maximumFractionDigits: 4 })}
-                        </TableCell>
-                        <TableCell className="text-xs">{STOCKTAKE_REASON_LABELS[row.reason]}</TableCell>
-                      </TableRow>
+                        </JmTableCell>
+                        <JmTableCell className="text-jm-xs">{STOCKTAKE_REASON_LABELS[row.reason]}</JmTableCell>
+                      </JmTableRow>
                     );
                   })}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+                </JmTableBody>
+              </JmTable>
+            </JmScrollArea>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>취소</Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
+          <JmDialogFooter>
+            <JmButton variant="outline" onClick={() => setConfirmOpen(false)}>취소</JmButton>
+            <JmButton onClick={handleSubmit} disabled={submitting}>
               {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               보정 적용
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+    </JmScope>
   );
 }

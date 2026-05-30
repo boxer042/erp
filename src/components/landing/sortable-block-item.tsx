@@ -86,7 +86,7 @@ export function SortableBlockItem({
           <span className="text-xs font-medium text-[var(--jm-text)]">{BLOCK_LABELS[block.type]}</span>
           <span className="truncate text-xs text-[var(--jm-text-muted)]">{blockTitle(block)}</span>
           {locked && (
-            <span className="rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--jm-text-muted)]">
+            <span className="rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
               필수
             </span>
           )}

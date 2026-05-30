@@ -125,7 +125,7 @@ export function RepairTicketActionMenu({
           {meta.label}
         </span>
         {t.type === "ON_SITE" && (
-          <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+          <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-white">
             즉시
           </span>
         )}
@@ -148,7 +148,7 @@ export function RepairTicketActionMenu({
                 {meta.label}
               </span>
               {t.type === "ON_SITE" && (
-                <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-white">
                   즉시
                 </span>
               )}

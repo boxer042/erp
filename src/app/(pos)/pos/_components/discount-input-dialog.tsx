@@ -80,7 +80,7 @@ function Body({
         <button
           type="button"
           onClick={handleSubmit}
-          className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99]"
+          className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99]"
         >
           저장
         </button>
@@ -100,7 +100,7 @@ function Body({
                   if (m !== mode) setRaw("");
                   setMode(m);
                 }}
-                className={`h-11 rounded-xl text-[14px] font-semibold transition-colors ${
+                className={`h-11 rounded-xl text-jm-base font-semibold transition-colors ${
                   active ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm" : "text-[var(--jm-text-muted)]"
                 }`}
               >
@@ -112,10 +112,10 @@ function Body({
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               {mode === "flat" ? "할인 금액" : "할인 비율"}
             </span>
-            <span className="text-[10px] text-[var(--jm-text-subtle)]">
+            <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
               {mode === "flat" ? "예: 5,000" : "0~100 (예: 10)"}
             </span>
           </div>
@@ -135,14 +135,14 @@ function Body({
               }}
               onFocus={focusCaretEnd}
               placeholder="0"
-              className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 pr-12 text-right text-[20px] font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
+              className="h-14 w-full rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 pr-12 text-right text-jm-2xl font-semibold tabular-nums outline-none focus:border-[var(--jm-action)]"
             />
-            <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[18px] font-semibold text-[var(--jm-text-subtle)]">
+            <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-jm-xl font-semibold text-[var(--jm-text-subtle)]">
               {mode === "flat" ? "₩" : "%"}
             </span>
           </div>
           {mode === "percent" && parseFloat(raw) > 100 && (
-            <p className="px-1 text-[11px] text-[var(--jm-warning-fg)]">
+            <p className="px-1 text-jm-2xs text-[var(--jm-warning-fg)]">
               100% 로 캡됩니다
             </p>
           )}
@@ -152,18 +152,18 @@ function Body({
         {mode === "percent" && baseAmount && baseAmount > 0 && previewAmount > 0 && (
           <div className="flex items-center justify-between rounded-2xl bg-[var(--jm-success-bg)] px-4 py-3">
             <div className="flex flex-col">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+              <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                 적용 대상
               </span>
-              <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
+              <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
                 ₩{baseAmount.toLocaleString("ko-KR")}
               </span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+              <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                 환산 할인액
               </span>
-              <span className="text-[16px] font-bold tabular-nums text-[var(--jm-success-fg)]">
+              <span className="text-jm-lg font-bold tabular-nums text-[var(--jm-success-fg)]">
                 −₩{previewAmount.toLocaleString("ko-KR")}
               </span>
             </div>

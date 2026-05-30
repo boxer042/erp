@@ -46,11 +46,11 @@ export function PaymentMethodSelector({ value, onChange }: Props) {
                 : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
             }`}
           >
-            <span className="text-[16px] font-semibold text-[var(--jm-text)]">
+            <span className="text-jm-lg font-semibold text-[var(--jm-text)]">
               {m.label}
             </span>
             {m.sub && (
-              <span className="text-[11px] text-[var(--jm-text-muted)]">
+              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                 {m.sub}
               </span>
             )}

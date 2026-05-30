@@ -62,18 +62,18 @@ export function PartialPaymentTile({
         }`}
       >
         <div className="flex items-baseline justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             결제 금액
           </span>
           {isPartial && (
-            <span className="rounded-full bg-[var(--jm-warning-fg)] px-2 py-0.5 text-[10px] font-semibold text-white">
+            <span className="rounded-full bg-[var(--jm-warning-fg)] px-2 py-0.5 text-jm-3xs font-semibold text-white">
               {value.kind === "DEPOSIT" ? "계약금" : "부분결제"}
             </span>
           )}
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <span
-            className={`text-[16px] font-bold tabular-nums ${
+            className={`text-jm-lg font-bold tabular-nums ${
               isPartial
                 ? "text-[var(--jm-warning-fg)]"
                 : "text-[var(--jm-text)]"
@@ -82,7 +82,7 @@ export function PartialPaymentTile({
             ₩{effectivePaid.toLocaleString("ko-KR")}
           </span>
           {isPartial && (
-            <span className="text-[11px] tabular-nums text-[var(--jm-warning-fg)]">
+            <span className="text-jm-2xs tabular-nums text-[var(--jm-warning-fg)]">
               잔금 ₩{outstanding.toLocaleString("ko-KR")} 미수
             </span>
           )}
@@ -136,15 +136,15 @@ function PartialPaymentDialog({
           <div className="flex flex-col gap-4">
             {/* 총액 */}
             <div className="flex items-baseline justify-between rounded-xl bg-[var(--jm-surface-muted)] px-4 py-3">
-              <span className="text-[12px] text-[var(--jm-text-muted)]">총액</span>
-              <span className="text-[18px] font-bold tabular-nums text-[var(--jm-text)]">
+              <span className="text-jm-xs text-[var(--jm-text-muted)]">총액</span>
+              <span className="text-jm-xl font-bold tabular-nums text-[var(--jm-text)]">
                 ₩{totalAmount.toLocaleString("ko-KR")}
               </span>
             </div>
 
             {/* 즉시 결제 금액 입력 */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+              <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                 즉시 결제
               </span>
               <input
@@ -153,7 +153,7 @@ function PartialPaymentDialog({
                 value={formatComma(amountStr)}
                 onChange={(e) => setAmountStr(parseComma(e.target.value))}
                 onFocus={focusCaretEnd}
-                className="h-12 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-[18px] font-bold tabular-nums text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
+                className="h-12 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 text-right text-jm-xl font-bold tabular-nums text-[var(--jm-text)] outline-none focus:border-[var(--jm-border-strong)]"
               />
               <div className="flex gap-1.5">
                 <QuickAmount label="전액" value={totalAmount} onClick={(v) => setAmountStr(String(v))} />
@@ -166,10 +166,10 @@ function PartialPaymentDialog({
             {/* 잔금 안내 */}
             {isPartial && (
               <div className="flex items-baseline justify-between rounded-xl bg-[var(--jm-warning-bg)] px-4 py-3">
-                <span className="text-[12px] text-[var(--jm-warning-fg)]">
+                <span className="text-jm-xs text-[var(--jm-warning-fg)]">
                   잔금 (고객 미수금)
                 </span>
-                <span className="text-[16px] font-bold tabular-nums text-[var(--jm-warning-fg)]">
+                <span className="text-jm-lg font-bold tabular-nums text-[var(--jm-warning-fg)]">
                   ₩{outstanding.toLocaleString("ko-KR")}
                 </span>
               </div>
@@ -177,7 +177,7 @@ function PartialPaymentDialog({
 
             {/* 0원 안내 — UNPAID 결제수단 권장 */}
             {isZero && (
-              <div className="rounded-xl bg-[var(--jm-warning-bg)] px-4 py-3 text-[12px] text-[var(--jm-warning-fg)]">
+              <div className="rounded-xl bg-[var(--jm-warning-bg)] px-4 py-3 text-jm-xs text-[var(--jm-warning-fg)]">
                 전액 외상 — 결제수단을 <strong>외상</strong> 으로 선택하는 것을 권장합니다.
               </div>
             )}
@@ -185,7 +185,7 @@ function PartialPaymentDialog({
             {/* DEPOSIT/PARTIAL 토글 — 부분결제일 때만 노출 */}
             {isPartial && (
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                   잔금 종류
                 </span>
                 <div className="grid grid-cols-2 gap-2">
@@ -202,7 +202,7 @@ function PartialPaymentDialog({
                     onClick={() => setKind("PARTIAL")}
                   />
                 </div>
-                <span className="px-1 text-[10px] text-[var(--jm-text-subtle)]">
+                <span className="px-1 text-jm-3xs text-[var(--jm-text-subtle)]">
                   계약금은 영수증·증명서 출력 시 &ldquo;계약금 영수증&rdquo; 으로 라벨됨
                 </span>
               </div>
@@ -242,7 +242,7 @@ function QuickAmount({
     <button
       type="button"
       onClick={() => onClick(value)}
-      className="flex-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2 py-1.5 text-[12px] font-medium text-[var(--jm-text)] active:bg-[var(--jm-bg)]"
+      className="flex-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-2 py-1.5 text-jm-xs font-medium text-[var(--jm-text)] active:bg-[var(--jm-bg)]"
     >
       {label}
     </button>
@@ -270,8 +270,8 @@ function KindButton({
           : "border-[var(--jm-border)] bg-[var(--jm-surface)] hover:border-[var(--jm-border-strong)]"
       }`}
     >
-      <span className="text-[14px] font-semibold text-[var(--jm-text)]">{label}</span>
-      <span className="text-[11px] text-[var(--jm-text-muted)]">{sub}</span>
+      <span className="text-jm-base font-semibold text-[var(--jm-text)]">{label}</span>
+      <span className="text-jm-2xs text-[var(--jm-text-muted)]">{sub}</span>
     </button>
   );
 }

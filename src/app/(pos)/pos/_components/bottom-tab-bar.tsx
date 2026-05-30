@@ -60,12 +60,12 @@ export function BottomTabBar<T extends string>({
             <div className="relative text-[var(--jm-text)]">
               {prefixAction.icon}
               {prefixAction.badge != null && prefixAction.badge > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-[10px] font-bold tabular-nums text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-jm-3xs font-bold tabular-nums text-white">
                   {prefixAction.badge}
                 </span>
               )}
             </div>
-            <span className="text-[11px] font-medium text-[var(--jm-text)]">
+            <span className="text-jm-2xs font-medium text-[var(--jm-text)]">
               {prefixAction.label}
             </span>
           </button>
@@ -92,13 +92,13 @@ export function BottomTabBar<T extends string>({
               >
                 {t.icon}
                 {t.badge != null && t.badge > 0 && (
-                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-[10px] font-bold tabular-nums text-white">
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-jm-3xs font-bold tabular-nums text-white">
                     {t.badge}
                   </span>
                 )}
               </div>
               <span
-                className={`text-[11px] font-medium ${
+                className={`text-jm-2xs font-medium ${
                   isActive ? "text-[var(--jm-text)]" : "text-[var(--jm-text-muted)]"
                 }`}
               >
@@ -116,12 +116,12 @@ export function BottomTabBar<T extends string>({
             <div className="relative text-[var(--jm-text)]">
               {suffixAction.icon}
               {suffixAction.badge != null && suffixAction.badge > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-[10px] font-bold tabular-nums text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--jm-danger-solid)] px-1 text-jm-3xs font-bold tabular-nums text-white">
                   {suffixAction.badge}
                 </span>
               )}
             </div>
-            <span className="text-[11px] font-medium text-[var(--jm-text)]">
+            <span className="text-jm-2xs font-medium text-[var(--jm-text)]">
               {suffixAction.label}
             </span>
           </button>

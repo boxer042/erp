@@ -88,8 +88,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - 컴포넌트: `JmButton`, `JmCard`, `JmTable`, `JmCombobox`, `JmDrawer` 등 — 모두 `Jm` prefix
 - import: `@/jm` 또는 `@/jm/...`. shadcn `@/components/ui/*` import **금지**
 - 색상: `var(--jm-*)` CSS 변수만 사용. 하드코딩 zinc-*, hex 금지
-- 테마: `<JmScope theme="light|dark|auto">` 로 감싸 토큰 cascade
-- Portal popup (Combobox/Dialog 내부) 은 root 에 `data-jm-scope` 속성 필수
+- 테마: jm 토큰은 전역 `:root`/`.dark` — 페이지 wrapper 불필요. host 가 `<html>` 에 `.dark` 토글 시 자동 전환. 부분 고정만 `<JmScope theme="light|dark|auto">`
+- Portal popup: 토큰이 전역이라 자동 상속 — `data-jm-scope` 재부착 불필요 (남아있어도 무해)
 
 이 분기를 어기면 (POS 에서 shadcn `<Button>` 쓴다든지) **시각 충돌 + 다크 모드 깨짐**. 작업 시작 전 영역 확인 필수.
 
@@ -1291,8 +1291,8 @@ import { SupplierProductCombobox } from "@/components/supplier-product-combobox"
 1. **import 격리** — `@/jm` 또는 `@/jm/...` 만 사용. shadcn `@/components/ui/*` import **금지**
 2. **컴포넌트 prefix** — 모두 `Jm*` (`JmButton`, `JmCard`, `JmTable`, `JmCombobox`, `JmDrawer`, `JmDialog` …)
 3. **토큰만** — 색·radius·shadow·font 모두 `var(--jm-*)`. `zinc-*`, `bg-white`, hex 하드코딩 **금지**
-4. **테마 wrapper** — 페이지/라우트 루트는 `<JmScope theme="light|dark|auto">` 로 감싸야 토큰 cascade
-5. **Portal popup 안전** — base-ui Popover/Dialog Popup 처럼 Portal 로 빠지는 요소는 root element 에 `data-jm-scope` 속성 + `font-[family-name:var(--jm-font-sans)]` 명시. 안 그러면 토큰 cascade 끊김
+4. **테마** — jm 토큰은 전역 `:root`(light)/`.dark`(dark). 페이지를 감쌀 필요 없이 host 의 `.dark` 클래스(next-themes 등)로 앱 전체 자동 전환. `<JmScope theme>` 는 전역과 다른 테마를 강제하는 부분 영역(island, 예: POS 독립 테마)에만 사용
+5. **Portal popup** — 토큰이 전역이라 Portal 도 자동 상속. `data-jm-scope` 재부착 불필요(남아있어도 무해). 폰트만 끊기는 환경이면 popup 에 `font-[family-name:var(--jm-font-sans)]` 명시
 6. **새 컴포넌트 추가** — `src/jm/ui/<name>.tsx`, `forwardRef`, `displayName`, `src/jm/ui/index.ts` 에 export, [showcase](src/app/(jm)/jm/page.tsx) 에 데모 섹션. 외부 의존성은 `@base-ui/react`, `lucide-react`, `clsx`, `tailwind-merge`, `cva` 만. 프로젝트 코드(`@/lib/*`, `@/components/ui/*`) import **금지** (포터빌리티 보장)
 
 ### 컴포넌트 매핑 (shadcn → jm)

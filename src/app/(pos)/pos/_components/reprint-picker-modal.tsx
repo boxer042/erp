@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check } from "lucide-react";
 
 export interface ReprintCandidate {
   code: string;
@@ -47,10 +48,10 @@ export function ReprintPickerModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col gap-1 pb-3">
-          <h3 className="text-[18px] font-bold text-[var(--jm-text)]">
+          <h3 className="text-jm-xl font-bold text-[var(--jm-text)]">
             어떤 라벨 재출력?
           </h3>
-          <p className="text-[12px] text-[var(--jm-text-muted)]">
+          <p className="text-jm-xs text-[var(--jm-text-muted)]">
             이미 발번된 라벨이라 신규 발번은 안 하고 재출력만 합니다.
           </p>
         </div>
@@ -70,10 +71,10 @@ export function ReprintPickerModal({
                 }`}
               >
                 <div className="flex min-w-0 flex-col">
-                  <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                  <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                     {c.displayName}
                   </span>
-                  <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                  <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                     {c.ticketNo} · {c.code}
                   </span>
                 </div>
@@ -84,17 +85,7 @@ export function ReprintPickerModal({
                       : "border-[var(--jm-border-strong)] bg-[var(--jm-surface)]"
                   }`}
                 >
-                  {checked && (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M3 7.5l3 3 5-6"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
+                  {checked && <Check className="size-3.5" strokeWidth={2} />}
                 </span>
               </button>
             );
@@ -105,7 +96,7 @@ export function ReprintPickerModal({
           <button
             type="button"
             onClick={onBack}
-            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-[14px] font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-jm-base font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
           >
             뒤로
           </button>
@@ -113,7 +104,7 @@ export function ReprintPickerModal({
             type="button"
             onClick={() => onConfirm(Array.from(selected))}
             disabled={selected.size === 0}
-            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-[var(--jm-action)] text-jm-md font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
           >
             출력 ({selected.size})
           </button>

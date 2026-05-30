@@ -211,7 +211,7 @@ export default function BrandsPage() {
                     <JmTableRow className="hover:bg-transparent">
                       <JmTableCell
                         colSpan={5}
-                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                        className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                       >
                         브랜드 목록을 불러오지 못했습니다
                       </JmTableCell>
@@ -385,7 +385,7 @@ function BrandCreateDialog({
               placeholder="메모 (선택)"
             />
           </JmFormField>
-          <p className="text-[11px] text-[var(--jm-text-subtle)]">
+          <p className="text-jm-2xs text-[var(--jm-text-subtle)]">
             로고는 등록 후 수정 화면에서 업로드합니다
           </p>
         </JmDialogBody>
@@ -504,7 +504,7 @@ function BrandEditSheet({
                 allowSvgRaw
                 size={80}
               />
-              <p className="text-[11px] text-[var(--jm-text-subtle)]">
+              <p className="text-jm-2xs text-[var(--jm-text-subtle)]">
                 JPG / PNG / WebP / SVG · 최대 5MB
               </p>
             </div>

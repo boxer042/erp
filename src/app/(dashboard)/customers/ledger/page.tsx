@@ -257,7 +257,7 @@ export default function CustomerLedgerPage() {
                 setPrintOpen(true);
               }}
               className={cn(
-                "w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1 transition-colors",
+                "w-full h-7 rounded-md border text-jm-2xs flex items-center justify-center gap-1 transition-colors",
                 selectedCustomerId
                   ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)] hover:bg-[var(--jm-info-bg)]/80"
                   : "border-[var(--jm-border)] bg-[var(--jm-surface)] opacity-40 cursor-not-allowed text-[var(--jm-text-muted)]"
@@ -277,7 +277,7 @@ export default function CustomerLedgerPage() {
                   key={p}
                   onClick={() => applyPreset(p)}
                   className={cn(
-                    "px-2 h-6 rounded text-[11px] border transition-colors",
+                    "px-2 h-6 rounded text-jm-2xs border transition-colors",
                     active
                       ? "bg-[var(--jm-info-bg)] border-[var(--jm-info-fg)]/40 text-[var(--jm-info-fg)]"
                       : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
@@ -394,7 +394,7 @@ export default function CustomerLedgerPage() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-1.5">
                         {c.customerType === "BUSINESS" && (
-                          <span className="shrink-0 rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-[9px] font-semibold text-[var(--jm-warning-fg)]">
+                          <span className="shrink-0 rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-jm-4xs font-semibold text-[var(--jm-warning-fg)]">
                             기업
                           </span>
                         )}
@@ -454,11 +454,11 @@ export default function CustomerLedgerPage() {
           {selectedCustomerSummary && (
             <div className="border-b border-[var(--jm-border)] px-4 py-3 flex items-center flex-wrap gap-x-6 gap-y-3 shrink-0">
               <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">고객</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">고객</p>
                 <p className="text-sm font-medium">{selectedCustomerSummary.customerName}</p>
               </div>
               <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">현재 미수금</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">현재 미수금</p>
                 <p className={cn("text-sm font-medium tabular-nums",
                   selectedCustomerSummary.currentBalance < 0 ? "text-[var(--jm-danger-fg)]" : "text-[var(--jm-text)]")}>
                   ₩{formatAmount(selectedCustomerSummary.currentBalance)}
@@ -466,18 +466,18 @@ export default function CustomerLedgerPage() {
               </div>
               {from && (
                 <div>
-                  <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">이월 미수</p>
+                  <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">이월 미수</p>
                   <p className="text-sm tabular-nums text-[var(--jm-text)]">
                     ₩{formatAmount(selectedCustomerSummary.openingBalance)}
                   </p>
                 </div>
               )}
               <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 매출</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">기간 매출</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedCustomerSummary.totalSale)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-[var(--jm-text-muted)] uppercase tracking-wide">기간 수금</p>
+                <p className="text-jm-3xs text-[var(--jm-text-muted)] uppercase tracking-wide">기간 수금</p>
                 <p className="text-sm tabular-nums">₩{formatAmount(selectedCustomerSummary.totalReceipt)}</p>
               </div>
               <div>
@@ -551,19 +551,19 @@ export default function CustomerLedgerPage() {
                 거래 내역이 없습니다
                 {hasHiddenHistory ? (
                   <div className="mt-3 flex flex-col items-center gap-2">
-                    <p className="text-[11px] text-[var(--jm-text-muted)] max-w-[360px]">
+                    <p className="text-jm-2xs text-[var(--jm-text-muted)] max-w-[360px]">
                       선택한 기간에 거래가 없습니다. 과거 거래를 보려면 기간을 넓혀보세요.
                     </p>
                     <button
                       type="button"
                       onClick={() => applyPreset("all")}
-                      className="px-3 h-7 rounded-md border border-[var(--jm-info-fg)]/40 bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)] text-[11px] hover:bg-[var(--jm-info-bg)]/80 transition-colors"
+                      className="px-3 h-7 rounded-md border border-[var(--jm-info-fg)]/40 bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)] text-jm-2xs hover:bg-[var(--jm-info-bg)]/80 transition-colors"
                     >
                       전체 기간 보기
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-2 text-[11px] text-[var(--jm-text-muted)]">
+                  <p className="mt-2 text-jm-2xs text-[var(--jm-text-muted)]">
                     판매 시스템이 연동되면 매출(SALE) 원장이 자동 기록됩니다.
                     현재는 수동 수금/조정만 등록 가능합니다.
                   </p>

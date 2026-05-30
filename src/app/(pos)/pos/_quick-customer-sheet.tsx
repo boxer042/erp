@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
+import { JmSpinner } from "@/jm";
 import { ApiError, apiMutate } from "@/lib/api-client";
 import { BottomSheet } from "./_components/bottom-sheet";
 import { formatPhone, digitsOnly, formatBusinessNumber } from "@/lib/utils";
@@ -159,14 +160,9 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
           type="button"
           onClick={() => create.mutate()}
           disabled={!valid || create.isPending}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
         >
-          {create.isPending && (
-            <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
-          )}
+          {create.isPending && <JmSpinner size="sm" tone="inverted" />}
           등록
         </button>
       }
@@ -174,10 +170,10 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
       <div className="flex flex-col gap-5 pt-2">
         {/* 타입 토글 — 자동 감지된 경우 amber 힌트 */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             구분
             {!autoTypeLocked && type === "BUSINESS" && (
-              <span className="ml-2 rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--jm-warning-fg)]">
+              <span className="ml-2 rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-jm-3xs font-medium text-[var(--jm-warning-fg)]">
                 자동 감지
               </span>
             )}
@@ -193,7 +189,7 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
                     setType(t);
                     setAutoTypeLocked(true);
                   }}
-                  className={`h-11 rounded-lg text-[14px] font-semibold transition-colors ${
+                  className={`h-11 rounded-lg text-jm-base font-semibold transition-colors ${
                     active
                       ? "bg-[var(--jm-surface)] text-[var(--jm-text)] shadow-sm"
                       : "text-[var(--jm-text-muted)]"
@@ -213,7 +209,7 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={isBusiness ? "(주)대한기계" : "모르면 비워두세요"}
-            className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
+            className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-jm-md outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
           />
         </Field>
         <Field label={isBusiness ? "대표 전화" : "전화"}>
@@ -224,7 +220,7 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
             value={phone}
             onChange={(e) => setPhone(formatPhone(e.target.value))}
             placeholder="010-1234-5678"
-            className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] tabular-nums outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
+            className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-jm-md tabular-nums outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
           />
         </Field>
 
@@ -237,25 +233,25 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
               value={formatBusinessNumber(businessNumber)}
               onChange={(e) => setBusinessNumber(digitsOnly(e.target.value))}
               placeholder="000-00-00000"
-              className={`h-12 w-full rounded-xl border bg-[var(--jm-bg)] px-4 text-[15px] tabular-nums outline-none focus:bg-[var(--jm-surface)] ${
+              className={`h-12 w-full rounded-xl border bg-[var(--jm-bg)] px-4 text-jm-md tabular-nums outline-none focus:bg-[var(--jm-surface)] ${
                 businessNumber.length > 0 && businessNumber.length !== 10
-                  ? "border-[var(--jm-warning-bg)] focus:border-amber-500"
+                  ? "border-[var(--jm-warning-bg)] focus:border-[var(--jm-warning-solid)]"
                   : "border-[var(--jm-border)] focus:border-[var(--jm-border-strong)]"
               }`}
             />
             {/* 즉시 형식 검증 안내 */}
             {businessNumber.length > 0 && businessNumber.length < 10 && (
-              <p className="mt-1.5 text-[11px] text-[var(--jm-warning-fg)]">
+              <p className="mt-1.5 text-jm-2xs text-[var(--jm-warning-fg)]">
                 {10 - businessNumber.length}자리 더 입력 (10자리 필요)
               </p>
             )}
             {businessNumber.length === 10 && (
-              <p className="mt-1.5 text-[11px] text-[var(--jm-success-fg)]">
+              <p className="mt-1.5 text-jm-2xs text-[var(--jm-success-fg)]">
                 형식 OK ({formatBusinessNumber(businessNumber)})
               </p>
             )}
             {businessNumber.length > 10 && (
-              <p className="mt-1.5 text-[11px] text-[var(--jm-danger-fg)]">
+              <p className="mt-1.5 text-jm-2xs text-[var(--jm-danger-fg)]">
                 10자리 초과 — 앞 10자리만 사용됩니다
               </p>
             )}
@@ -278,17 +274,17 @@ function Body({ onOpenChange, onCreated, defaultText = "" }: Props) {
             {serialConsent && <Check className="size-3.5" strokeWidth={3} />}
           </span>
           <span className="flex flex-col gap-0.5">
-            <span className="text-[13px] font-semibold text-[var(--jm-text)]">
+            <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
               시리얼 조회 서비스 이용 동의
             </span>
-            <span className="text-[11px] leading-relaxed text-[var(--jm-text-muted)]">
+            <span className="text-jm-2xs leading-relaxed text-[var(--jm-text-muted)]">
               제품 라벨 QR 로 보증·수리·구매내역을 본인이 조회할 수 있습니다.
               미동의 시 라벨에 QR 이 인쇄되지 않습니다.
             </span>
           </span>
         </button>
 
-        <p className="text-[12px] text-[var(--jm-text-muted)]">
+        <p className="text-jm-xs text-[var(--jm-text-muted)]">
           {isBusiness
             ? "대표자·업태·종목·담당자·배송지는 어드민 /customers 에서 추가 입력 가능."
             : "이메일·주소·메모는 어드민 /customers 에서 추가 입력 가능."}
@@ -307,7 +303,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+      <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         {label}
       </span>
       {children}

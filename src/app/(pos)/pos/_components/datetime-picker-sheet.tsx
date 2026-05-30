@@ -85,7 +85,7 @@ export function DateTimePickerSheet({
     >
       <div className="flex flex-col gap-4 px-1 pt-2">
         <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             날짜
           </span>
           {/* JmCalendar 는 inline-block 폭 — flex 컨테이너에서 가운데 정렬 위해 wrapper 사용 */}
@@ -98,7 +98,7 @@ export function DateTimePickerSheet({
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             시간
           </span>
           <JmTimePicker value={time} onChange={setTime} size="md" />

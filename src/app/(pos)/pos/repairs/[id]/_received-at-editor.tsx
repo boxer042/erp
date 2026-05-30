@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiMutate } from "@/lib/api-client";
@@ -54,24 +55,12 @@ export function ReceivedAtEditor({ ticketId, receivedAt, readonly, onSaved }: Pr
         onClick={() => setOpen(true)}
         className="-mx-2 -my-1 flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)] disabled:cursor-default disabled:hover:bg-transparent disabled:active:bg-transparent"
       >
-        <span className="text-[14px] text-[var(--jm-text)]">{display}</span>
+        <span className="text-jm-base text-[var(--jm-text)]">{display}</span>
         {!readonly && (
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            className="shrink-0 text-[var(--jm-text-subtle)]"
+          <Pencil
+            className="size-3.5 shrink-0 text-[var(--jm-text-subtle)]"
             aria-hidden
-          >
-            <path
-              d="M9 2.5l2.5 2.5L5 11.5H2.5V9L9 2.5z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          />
         )}
       </button>
       {open && (

@@ -73,7 +73,7 @@ function Body({ onOpenChange, onAdd }: Props) {
           type="button"
           disabled={!canAddCustom}
           onClick={() => addLine(name.trim(), amount)}
-          className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+          className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
         >
           기술료 추가
         </button>
@@ -82,13 +82,13 @@ function Body({ onOpenChange, onAdd }: Props) {
       <div className="flex flex-col gap-5 pt-2">
         {/* 프리셋 — 탭하면 즉시 카트에 추가 */}
         <div className="flex flex-col gap-2">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             자주 쓰는 기술료
           </span>
           {presetsQuery.isPending ? (
-            <p className="py-2 text-[13px] text-[var(--jm-text-subtle)]">불러오는 중…</p>
+            <p className="py-2 text-jm-sm text-[var(--jm-text-subtle)]">불러오는 중…</p>
           ) : presets.length === 0 ? (
-            <p className="py-2 text-[13px] text-[var(--jm-text-subtle)]">
+            <p className="py-2 text-jm-sm text-[var(--jm-text-subtle)]">
               등록된 프리셋이 없습니다. 설정 → 기술료 프리셋에서 추가할 수 있습니다.
             </p>
           ) : (
@@ -100,10 +100,10 @@ function Body({ onOpenChange, onAdd }: Props) {
                   onClick={() => addLine(p.name, Number(p.unitPrice))}
                   className="flex items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-3 text-left active:bg-[var(--jm-surface-muted)]"
                 >
-                  <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+                  <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                     {p.name}
                   </span>
-                  <span className="text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
+                  <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
                     ₩{Number(p.unitPrice).toLocaleString("ko-KR")}
                   </span>
                 </button>
@@ -114,7 +114,7 @@ function Body({ onOpenChange, onAdd }: Props) {
 
         {/* 직접 입력 — 항목명 + 가격 입력 드로워 */}
         <div className="flex flex-col gap-2">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             직접 입력
           </span>
           <input
@@ -122,19 +122,19 @@ function Body({ onOpenChange, onAdd }: Props) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="기술료 항목명 (예: 노트북 장착)"
-            className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-[15px] outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
+            className="h-12 w-full rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 text-jm-md outline-none focus:border-[var(--jm-border-strong)] focus:bg-[var(--jm-surface)]"
           />
           <button
             type="button"
             onClick={() => setPriceOpen(true)}
             className="flex h-12 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 active:bg-[var(--jm-surface-muted)]"
           >
-            <span className="text-[13px] text-[var(--jm-text-muted)]">금액 (공급가액)</span>
-            <span className="text-[15px] font-semibold tabular-nums text-[var(--jm-text)]">
+            <span className="text-jm-sm text-[var(--jm-text-muted)]">금액 (공급가액)</span>
+            <span className="text-jm-md font-semibold tabular-nums text-[var(--jm-text)]">
               ₩{amount.toLocaleString("ko-KR")}
             </span>
           </button>
-          <p className="text-[11px] text-[var(--jm-text-muted)]">
+          <p className="text-jm-2xs text-[var(--jm-text-muted)]">
             기술료는 항상 과세(VAT 10%) — 입력은 공급가액(세전) 기준입니다.
           </p>
         </div>

@@ -6,23 +6,20 @@ import { format } from "date-fns";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmInput,
+  JmBadge,
+  JmSkeleton,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+} from "@/jm";
 
 interface ProductRef {
   id: string;
@@ -104,31 +101,33 @@ export default function OptionFunnelPage() {
   }, [data]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border px-5 py-3 flex flex-wrap items-end gap-3">
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="border-b border-[var(--jm-border)] px-5 py-3 flex flex-wrap items-end gap-3">
         <div>
-          <h1 className="text-base font-semibold">옵션 funnel</h1>
-          <p className="text-[12px] text-muted-foreground">
+          <h1 className="text-jm-lg font-semibold text-[var(--jm-text)]">옵션 funnel</h1>
+          <p className="text-jm-xs text-[var(--jm-text-muted)]">
             자사몰·외부 채널 한정 — 손님이 진입한 카탈로그 SKU 와 실제 결제된 SKU 비교 (POS 제외)
           </p>
         </div>
         <div className="flex items-end gap-2 ml-auto">
           <div>
-            <Label className="text-[11px]">From</Label>
-            <Input
+            <label className="text-jm-2xs text-[var(--jm-text-muted)]">From</label>
+            <JmInput
+              size="sm"
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="h-8 w-[140px]"
+              className="w-[140px]"
             />
           </div>
           <div>
-            <Label className="text-[11px]">To</Label>
-            <Input
+            <label className="text-jm-2xs text-[var(--jm-text-muted)]">To</label>
+            <JmInput
+              size="sm"
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="h-8 w-[140px]"
+              className="w-[140px]"
             />
           </div>
         </div>
@@ -177,140 +176,140 @@ export default function OptionFunnelPage() {
         </div>
 
         {/* 진입 페이지 단위 요약 */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[14px]">진입 페이지별 요약</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table className="min-w-[800px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>진입 SKU</TableHead>
-                  <TableHead>상품명</TableHead>
-                  <TableHead className="text-right">주문</TableHead>
-                  <TableHead className="text-right">수량</TableHead>
-                  <TableHead className="text-right">매출</TableHead>
-                  <TableHead className="text-right">SWAP</TableHead>
-                  <TableHead className="text-right">SWAP 비율</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <JmCard>
+          <JmCardHeader className="pb-2">
+            <JmCardTitle className="text-jm-base">진입 페이지별 요약</JmCardTitle>
+          </JmCardHeader>
+          <JmCardContent className="p-0">
+            <JmTable className="min-w-[800px]">
+              <JmTableHeader>
+                <JmTableRow>
+                  <JmTableHead>진입 SKU</JmTableHead>
+                  <JmTableHead>상품명</JmTableHead>
+                  <JmTableHead className="text-right">주문</JmTableHead>
+                  <JmTableHead className="text-right">수량</JmTableHead>
+                  <JmTableHead className="text-right">매출</JmTableHead>
+                  <JmTableHead className="text-right">SWAP</JmTableHead>
+                  <JmTableHead className="text-right">SWAP 비율</JmTableHead>
+                </JmTableRow>
+              </JmTableHeader>
+              <JmTableBody>
                 {query.isPending ? (
                   <SkeletonRows colSpan={7} />
                 ) : (data?.entrySummary ?? []).length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <JmTableRow>
+                    <JmTableCell colSpan={7} className="text-center py-8 text-[var(--jm-text-muted)]">
                       집계할 데이터가 없습니다 (entryProductId 가 채워진 자사몰/채널 주문 한정)
-                    </TableCell>
-                  </TableRow>
+                    </JmTableCell>
+                  </JmTableRow>
                 ) : (
                   data!.entrySummary.map((e) => (
-                    <TableRow key={e.entryProduct.id}>
-                      <TableCell className="font-mono text-[12px]">
+                    <JmTableRow key={e.entryProduct.id}>
+                      <JmTableCell className="font-mono text-jm-xs">
                         {e.entryProduct.sku}
-                      </TableCell>
-                      <TableCell>{e.entryProduct.name}</TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell>{e.entryProduct.name}</JmTableCell>
+                      <JmTableCell className="text-right tabular-nums">
                         {e.orderCount.toLocaleString("ko-KR")}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell className="text-right tabular-nums">
                         {e.quantity.toLocaleString("ko-KR")}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold">
+                      </JmTableCell>
+                      <JmTableCell className="text-right tabular-nums font-semibold">
                         ₩{e.revenue.toLocaleString("ko-KR")}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell className="text-right tabular-nums">
                         {e.swapCount.toLocaleString("ko-KR")}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      </JmTableCell>
+                      <JmTableCell className="text-right tabular-nums">
                         {(e.swapRate * 100).toFixed(1)}%
-                      </TableCell>
-                    </TableRow>
+                      </JmTableCell>
+                    </JmTableRow>
                   ))
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </JmTableBody>
+            </JmTable>
+          </JmCardContent>
+        </JmCard>
 
         {/* 진입 → 결제 매트릭스 */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[14px]">진입 → 결제 매트릭스</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table className="min-w-[900px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>진입 SKU</TableHead>
-                  <TableHead>결제 SKU</TableHead>
-                  <TableHead>SWAP</TableHead>
-                  <TableHead className="text-right">주문</TableHead>
-                  <TableHead className="text-right">수량</TableHead>
-                  <TableHead className="text-right">매출</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <JmCard>
+          <JmCardHeader className="pb-2">
+            <JmCardTitle className="text-jm-base">진입 → 결제 매트릭스</JmCardTitle>
+          </JmCardHeader>
+          <JmCardContent className="p-0">
+            <JmTable className="min-w-[900px]">
+              <JmTableHeader>
+                <JmTableRow>
+                  <JmTableHead>진입 SKU</JmTableHead>
+                  <JmTableHead>결제 SKU</JmTableHead>
+                  <JmTableHead>SWAP</JmTableHead>
+                  <JmTableHead className="text-right">주문</JmTableHead>
+                  <JmTableHead className="text-right">수량</JmTableHead>
+                  <JmTableHead className="text-right">매출</JmTableHead>
+                </JmTableRow>
+              </JmTableHeader>
+              <JmTableBody>
                 {query.isPending ? (
                   <SkeletonRows colSpan={6} />
                 ) : grouped.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <JmTableRow>
+                    <JmTableCell colSpan={6} className="text-center py-8 text-[var(--jm-text-muted)]">
                       집계할 데이터가 없습니다
-                    </TableCell>
-                  </TableRow>
+                    </JmTableCell>
+                  </JmTableRow>
                 ) : (
                   grouped.flatMap((g) =>
                     g.rows.map((r, idx) => (
-                      <TableRow key={`${r.entryProduct.id}-${r.finalProduct?.id ?? "null"}-${idx}`}>
-                        <TableCell className="text-[12px]">
+                      <JmTableRow key={`${r.entryProduct.id}-${r.finalProduct?.id ?? "null"}-${idx}`}>
+                        <JmTableCell className="text-jm-xs">
                           {idx === 0 ? (
                             <div className="flex flex-col">
                               <span className="font-medium">
                                 {r.entryProduct.name}
                               </span>
-                              <span className="font-mono text-[11px] text-muted-foreground">
+                              <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                                 {r.entryProduct.sku}
                               </span>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground">↳</span>
+                            <span className="text-[var(--jm-text-muted)]">↳</span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-[12px]">
+                        </JmTableCell>
+                        <JmTableCell className="text-jm-xs">
                           <div className="flex flex-col">
                             <span>{r.finalProduct?.name ?? "(삭제됨)"}</span>
                             {r.finalProduct?.sku && (
-                              <span className="font-mono text-[11px] text-muted-foreground">
+                              <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                                 {r.finalProduct.sku}
                               </span>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
+                        </JmTableCell>
+                        <JmTableCell>
                           {r.isSwap ? (
-                            <Badge variant="secondary" className="text-[10px]">SWAP</Badge>
+                            <JmBadge variant="info" size="sm">SWAP</JmBadge>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground">−</span>
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">−</span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        </JmTableCell>
+                        <JmTableCell className="text-right tabular-nums">
                           {r.orderCount.toLocaleString("ko-KR")}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        </JmTableCell>
+                        <JmTableCell className="text-right tabular-nums">
                           {r.quantity.toLocaleString("ko-KR")}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        </JmTableCell>
+                        <JmTableCell className="text-right tabular-nums">
                           ₩{r.revenue.toLocaleString("ko-KR")}
-                        </TableCell>
-                      </TableRow>
+                        </JmTableCell>
+                      </JmTableRow>
                     )),
                   )
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </JmTableBody>
+            </JmTable>
+          </JmCardContent>
+        </JmCard>
       </div>
     </div>
   );
@@ -326,23 +325,23 @@ function KpiCard({
   hint?: string;
 }) {
   return (
-    <Card>
-      <CardHeader className="pb-1.5">
-        <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
+    <JmCard>
+      <JmCardHeader className="pb-1.5">
+        <span className="text-jm-2xs text-[var(--jm-text-muted)] uppercase tracking-wider">
           {label}
         </span>
-      </CardHeader>
-      <CardContent>
+      </JmCardHeader>
+      <JmCardContent>
         {value === null ? (
-          <Skeleton className="h-7 w-24" />
+          <JmSkeleton className="h-7 w-24" />
         ) : (
-          <div className="text-[18px] font-bold tabular-nums">{value}</div>
+          <div className="text-jm-xl font-bold tabular-nums text-[var(--jm-text)]">{value}</div>
         )}
         {hint && (
-          <div className="text-[11px] text-muted-foreground mt-0.5">{hint}</div>
+          <div className="text-jm-2xs text-[var(--jm-text-muted)] mt-0.5">{hint}</div>
         )}
-      </CardContent>
-    </Card>
+      </JmCardContent>
+    </JmCard>
   );
 }
 
@@ -350,13 +349,13 @@ function SkeletonRows({ colSpan }: { colSpan: number }) {
   return (
     <>
       {Array.from({ length: 4 }).map((_, i) => (
-        <TableRow key={i}>
+        <JmTableRow key={i}>
           {Array.from({ length: colSpan }).map((_, j) => (
-            <TableCell key={j}>
-              <Skeleton className="h-4 w-24" />
-            </TableCell>
+            <JmTableCell key={j}>
+              <JmSkeleton className="h-4 w-24" />
+            </JmTableCell>
           ))}
-        </TableRow>
+        </JmTableRow>
       ))}
     </>
   );

@@ -378,7 +378,7 @@ export default function CategoriesPage() {
                     <JmTableRow className="hover:bg-transparent">
                       <JmTableCell
                         colSpan={6}
-                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                        className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                       >
                         카테고리 목록을 불러오지 못했습니다
                       </JmTableCell>
@@ -447,10 +447,10 @@ export default function CategoriesPage() {
                           <JmTableCell className="font-medium text-[var(--jm-text)]">
                             {cat.name}
                           </JmTableCell>
-                          <JmTableCell className="text-right text-[13px] text-[var(--jm-text-muted)]">
+                          <JmTableCell className="text-right text-jm-sm text-[var(--jm-text-muted)]">
                             {cat.children.length}
                           </JmTableCell>
-                          <JmTableCell className="text-right text-[13px] text-[var(--jm-text-muted)]">
+                          <JmTableCell className="text-right text-jm-sm text-[var(--jm-text-muted)]">
                             {cat._count.products +
                               cat.children.reduce((s, c) => s + c._count.products, 0)}
                           </JmTableCell>
@@ -515,11 +515,11 @@ export default function CategoriesPage() {
                                   </div>
                                 )}
                               </JmTableCell>
-                              <JmTableCell className="pl-8 text-[13px] text-[var(--jm-text-muted)]">
+                              <JmTableCell className="pl-8 text-jm-sm text-[var(--jm-text-muted)]">
                                 {child.name}
                               </JmTableCell>
                               <JmTableCell />
-                              <JmTableCell className="text-right text-[13px] text-[var(--jm-text-muted)]">
+                              <JmTableCell className="text-right text-jm-sm text-[var(--jm-text-muted)]">
                                 {child._count.products}
                               </JmTableCell>
                               <JmTableCell>

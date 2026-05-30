@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, HelpCircle, Menu } from "lucide-react";
+import { ChevronLeft, HelpCircle, Menu, Plus } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
 import { MenuSheet } from "../_components/menu-sheet";
@@ -114,10 +114,10 @@ export default function RepairsBoardPage() {
             <ChevronLeft className="size-5" />
           </button>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+            <span className="text-jm-base font-semibold text-[var(--jm-text)]">
               수리관리
             </span>
-            <span className="text-[11px] text-[var(--jm-text-muted)]">
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
               매장 수리 현황
             </span>
           </div>
@@ -249,15 +249,8 @@ export default function RepairsBoardPage() {
         className="fixed bottom-6 right-6 z-30 flex h-14 items-center gap-2 rounded-full bg-[var(--jm-action)] px-5 text-white shadow-lg shadow-[var(--jm-shadow-lg)] transition-transform active:scale-95 sm:bottom-8 sm:right-8"
         aria-label="새 수리 시작"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path
-            d="M10 4v12M4 10h12"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-        <span className="text-[15px] font-semibold">새 수리</span>
+        <Plus className="size-5" />
+        <span className="text-jm-md font-semibold">새 수리</span>
       </button>
 
       <MenuSheet
@@ -301,19 +294,19 @@ function FilterChipButton({
 }) {
   const dotColor =
     dot === "emerald"
-      ? "bg-emerald-500"
+      ? "bg-[var(--jm-success-solid)]"
       : dot === "amber"
-        ? "bg-amber-500"
+        ? "bg-[var(--jm-warning-solid)]"
         : dot === "blue"
-          ? "bg-blue-500"
+          ? "bg-[var(--jm-info-solid)]"
           : dot === "zinc"
-            ? "bg-zinc-400"
+            ? "bg-[var(--jm-text-subtle)]"
             : "bg-[var(--jm-text-muted)]";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition-colors ${
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-jm-xs font-medium transition-colors ${
         active
           ? "bg-[var(--jm-action)] text-white"
           : "bg-[var(--jm-surface)] text-[var(--jm-text-muted)] border border-[var(--jm-border)] hover:bg-[var(--jm-bg)]"
@@ -358,21 +351,21 @@ function Section({
 }) {
   const dotColor =
     dot === "emerald"
-      ? "bg-emerald-500"
+      ? "bg-[var(--jm-success-solid)]"
       : dot === "amber"
-        ? "bg-amber-500"
+        ? "bg-[var(--jm-warning-solid)]"
         : dot === "blue"
-          ? "bg-blue-500"
-          : "bg-zinc-400";
+          ? "bg-[var(--jm-info-solid)]"
+          : "bg-[var(--jm-text-subtle)]";
   return (
     <section className="flex flex-col gap-2">
       {!hideHeader && (
         <div className="flex items-center gap-2">
           <span className={`size-2 rounded-full ${dotColor}`} />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             {label}
           </span>
-          <span className="text-[11px] font-semibold tabular-nums text-[var(--jm-text)]">
+          <span className="text-jm-2xs font-semibold tabular-nums text-[var(--jm-text)]">
             {count}
           </span>
         </div>
@@ -431,7 +424,7 @@ function TicketRow({
       }`}
     >
       <div
-        className={`flex size-10 shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${
+        className={`flex size-10 shrink-0 items-center justify-center rounded-full text-jm-base font-bold ${
           muted
             ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
             : "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]"
@@ -441,17 +434,17 @@ function TicketRow({
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5">
-          <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+          <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
             {customerName}
           </span>
           {ticket.type === "ON_SITE" && (
-            <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+            <span className="rounded bg-[var(--jm-action)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-white">
               즉시
             </span>
           )}
           {ticket.workKind === "CUSTOM_BUILD" && (
             <span
-              className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-accent-fg)]"
+              className="rounded bg-[var(--jm-accent-bg)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-[var(--jm-accent-fg)]"
               title="리빌드 — 손님 부품 + 부속 조합"
             >
               리빌드
@@ -459,14 +452,14 @@ function TicketRow({
           )}
           {ticket.quoteRejectedAt && (
             <span
-              className="rounded bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-warning-fg)]"
+              className="rounded bg-[var(--jm-warning-bg)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-[var(--jm-warning-fg)]"
               title="견적 거절 — 진단비만 청구"
             >
               거절
             </span>
           )}
         </div>
-        <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">
+        <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-muted)]">
           {device ?? ticket.symptom ?? meta.label}
           {customerPhone && (
             <span className="ml-1.5 font-mono text-[var(--jm-text-subtle)]">
@@ -474,13 +467,13 @@ function TicketRow({
             </span>
           )}
         </span>
-        <span className="text-[11px] text-[var(--jm-text-muted)]">
+        <span className="text-jm-2xs text-[var(--jm-text-muted)]">
           {ticket.status === "PICKED_UP" && ticket.pickedUpAt
             ? `${format(new Date(ticket.pickedUpAt), "M/d")} 픽업`
             : `접수 ${elapsed} 전`}
         </span>
       </div>
-      <span className="font-mono text-[10px] text-[var(--jm-text-subtle)]">
+      <span className="font-mono text-jm-3xs text-[var(--jm-text-subtle)]">
         {ticket.ticketNo}
       </span>
     </button>
@@ -489,7 +482,7 @@ function TicketRow({
 
 function EmptyHint({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl bg-[var(--jm-surface)] px-4 py-5 text-center text-[13px] text-[var(--jm-text-subtle)] border border-[var(--jm-border)]">
+    <div className="rounded-2xl bg-[var(--jm-surface)] px-4 py-5 text-center text-jm-sm text-[var(--jm-text-subtle)] border border-[var(--jm-border)]">
       {text}
     </div>
   );

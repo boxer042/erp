@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
@@ -66,10 +66,10 @@ export function SymptomCard({
       <Card>
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               증상
             </span>
-            <span className="text-[10px] text-[var(--jm-text-subtle)]">
+            <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
               고객 호소
             </span>
           </div>
@@ -206,10 +206,10 @@ export function DiagnosisCard({
       <Card>
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
               진단
             </span>
-            <span className="text-[10px] text-[var(--jm-text-subtle)]">
+            <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
               {symptomTemplateId ? "증상 기반 추천" : "직원 확인"}
             </span>
           </div>
@@ -337,10 +337,10 @@ export function NotesCard({
     <Card>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             수리 메모
           </span>
-          <span className="text-[10px] text-[var(--jm-text-subtle)]">
+          <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
             내부 작업 메모
           </span>
         </div>
@@ -369,7 +369,7 @@ function SaveStatus({
 }) {
   if (status === "saving") {
     return (
-      <span className="flex items-center gap-1.5 text-[11px] text-[var(--jm-text-muted)]">
+      <span className="flex items-center gap-1.5 text-jm-2xs text-[var(--jm-text-muted)]">
         <span className="size-1.5 animate-pulse rounded-full bg-[var(--jm-text-subtle)]" />
         저장 중…
       </span>
@@ -377,23 +377,15 @@ function SaveStatus({
   }
   if (status === "saved") {
     return (
-      <span className="flex items-center gap-1.5 text-[11px] text-[var(--jm-success-fg)]">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path
-            d="M2.5 6l2.5 2.5L9.5 3.5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+      <span className="flex items-center gap-1.5 text-jm-2xs text-[var(--jm-success-fg)]">
+        <Check className="size-3" />
         저장됨
       </span>
     );
   }
   return (
-    <span className="flex items-center gap-1.5 text-[11px] text-[var(--jm-warning-fg)]">
-      <span className="size-1.5 rounded-full bg-[var(--jm-warning-bg)]0" />
+    <span className="flex items-center gap-1.5 text-jm-2xs text-[var(--jm-warning-fg)]">
+      <span className="size-1.5 rounded-full bg-[var(--jm-warning-solid)]" />
       입력 후 다른 곳을 누르면 저장됩니다
     </span>
   );

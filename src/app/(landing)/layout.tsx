@@ -8,5 +8,5 @@ export default async function LandingPreviewLayout({
   children: React.ReactNode;
 }) {
   await requireAuth();
-  return <div className="min-h-screen bg-background text-foreground">{children}</div>;
+  return <div className="min-h-screen bg-[var(--jm-bg)] text-[var(--jm-text)]">{children}</div>;
 }

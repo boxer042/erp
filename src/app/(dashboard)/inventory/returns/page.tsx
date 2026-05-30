@@ -1,39 +1,42 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useTheme } from "next-themes";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import {
+  JmScope,
+  JmButton,
+  JmBadge,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmSelect,
+  JmScrollArea,
+  JmSkeleton,
+  JmInput,
+  JmCalendar,
+  JmDrawer,
+  JmDrawerContent,
+  JmDrawerHeader,
+  JmDrawerTitle,
+  JmDrawerDescription,
+} from "@/jm";
 import { focusCaretEnd } from "@/jm/lib/focus";
-import { Button } from "@/components/ui/button";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
-} from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger,
-} from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { SupplierCombobox } from "@/components/supplier-combobox";
 import { InlineCellProductSearch } from "@/components/inline-cell-product-search";
 import {
-  Plus, X, CalendarIcon, Loader2, FileText, ArrowUpRight, ChevronsUpDown,
+  Plus, X, CalendarIcon, Loader2, ArrowUpRight, ChevronsUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { QuickSupplierSheet, QuickSupplierProductSheet } from "@/components/quick-register-sheets";
-import Link from "next/link";
 import { formatComma, parseComma } from "@/lib/utils";
 
 interface Supplier {
@@ -138,25 +141,25 @@ const statusLabels: Record<string, string> = {
   CANCELLED: "취소",
 };
 
-const statusVariant: Record<string, "outline" | "secondary" | "default" | "destructive" | "warning" | "success"> = {
+const statusVariant: Record<string, "outline" | "default" | "danger" | "warning" | "success"> = {
   PENDING: "warning",
   CONFIRMED: "success",
-  CANCELLED: "destructive",
+  CANCELLED: "danger",
 };
 
 function ReturnsSkeletonRows({ rows = 8 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell className="text-right"><div className="flex justify-end"><Skeleton className="h-4 w-8" /></div></TableCell>
-          <TableCell className="text-right"><div className="flex justify-end"><Skeleton className="h-4 w-20" /></div></TableCell>
-          <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-        </TableRow>
+        <JmTableRow key={i}>
+          <JmTableCell><JmSkeleton className="h-4 w-28" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-32" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+          <JmTableCell className="text-right"><div className="flex justify-end"><JmSkeleton className="h-4 w-8" /></div></JmTableCell>
+          <JmTableCell className="text-right"><div className="flex justify-end"><JmSkeleton className="h-4 w-20" /></div></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-5 w-12 rounded-full" /></JmTableCell>
+          <JmTableCell><JmSkeleton className="h-4 w-24" /></JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -198,37 +201,41 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
           onBlur={() => tryParse(text)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) tryParse(text); }}
           placeholder="20260329"
-          className="h-9 flex-1 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus:border-primary"
+          className="h-9 flex-1 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
         />
       ) : (
         <button
           type="button"
           onClick={() => { setText(""); setEditing(true); }}
-          className="h-9 flex-1 text-left rounded-lg border border-input bg-transparent px-3 text-sm hover:bg-accent/50"
+          className="h-9 flex-1 text-left rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm text-[var(--jm-text)] hover:border-[var(--jm-border-strong)] outline-none focus-visible:ring-4 focus-visible:ring-[var(--jm-ring)]"
         >
-          {display || <span className="text-muted-foreground">날짜 입력...</span>}
+          {display || <span className="text-[var(--jm-text-subtle)]">날짜 입력...</span>}
         </button>
       )}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger className="h-9 w-9 flex items-center justify-center rounded-lg border border-input hover:bg-accent/50 shrink-0">
-          <CalendarIcon className="size-3.5 text-muted-foreground" />
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
-          <Calendar
-            mode="single"
-            selected={value ? parse(value, "yyyy-MM-dd", new Date()) : undefined}
-            onSelect={(date) => {
-              if (date) {
-                onChange(format(date, "yyyy-MM-dd"));
-                setOpen(false);
-                setEditing(false);
-              }
-            }}
-            defaultMonth={value ? parse(value, "yyyy-MM-dd", new Date()) : new Date()}
-            locale={ko}
-          />
-        </PopoverContent>
-      </Popover>
+      <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
+        <PopoverPrimitive.Trigger className="h-9 w-9 flex items-center justify-center rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] hover:bg-[var(--jm-surface-muted)] shrink-0">
+          <CalendarIcon className="size-3.5 text-[var(--jm-text-muted)]" />
+        </PopoverPrimitive.Trigger>
+        <PopoverPrimitive.Portal>
+          <PopoverPrimitive.Positioner align="end" sideOffset={6} className="isolate z-50">
+            <PopoverPrimitive.Popup
+              data-jm-scope
+              className="rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
+            >
+              <JmCalendar
+                value={value ? parse(value, "yyyy-MM-dd", new Date()) : undefined}
+                onChange={(date) => {
+                  if (date) {
+                    onChange(format(date, "yyyy-MM-dd"));
+                    setOpen(false);
+                    setEditing(false);
+                  }
+                }}
+              />
+            </PopoverPrimitive.Popup>
+          </PopoverPrimitive.Positioner>
+        </PopoverPrimitive.Portal>
+      </PopoverPrimitive.Root>
     </div>
   );
 }
@@ -257,53 +264,67 @@ function IncomingComboboxLocal({
 
   return (
     <div className="relative h-9">
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        disabled={disabled}
-        className="relative flex h-9 max-h-9 box-border w-full items-center overflow-hidden rounded-lg border border-input bg-transparent pl-3 pr-9 text-sm cursor-pointer hover:bg-accent/50 focus:outline-none focus-visible:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        <span className={`truncate ${selected ? "" : "text-muted-foreground"}`}>
-          {selected
-            ? `${selected.incomingNo} — ${format(new Date(selected.incomingDate), "yyyy-MM-dd")} (${selected._count.items}종 / ₩${selected.totalAmount.toLocaleString("ko-KR")})`
-            : disabled ? "거래처를 먼저 선택하세요" : "입고 선택 (선택하면 품목 자동완성)"}
-        </span>
-        <span className="absolute inset-y-0 right-2 flex items-center">
-          {selected ? (
-            <span
-              role="button"
-              className="inline-flex h-4 w-4 items-center justify-center rounded hover:bg-secondary opacity-60 hover:opacity-100"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClear(); }}
+      <PopoverPrimitive.Root open={open} onOpenChange={(o) => { setOpen(o); if (o) setSearch(""); }}>
+        <PopoverPrimitive.Trigger
+          disabled={disabled}
+          className="relative flex h-9 max-h-9 box-border w-full items-center overflow-hidden rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] pl-3 pr-9 text-jm-sm text-[var(--jm-text)] cursor-pointer hover:border-[var(--jm-border-strong)] focus:outline-none focus-visible:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span className={`truncate ${selected ? "" : "text-[var(--jm-text-subtle)]"}`}>
+            {selected
+              ? `${selected.incomingNo} — ${format(new Date(selected.incomingDate), "yyyy-MM-dd")} (${selected._count.items}종 / ₩${selected.totalAmount.toLocaleString("ko-KR")})`
+              : disabled ? "거래처를 먼저 선택하세요" : "입고 선택 (선택하면 품목 자동완성)"}
+          </span>
+          <span className="absolute inset-y-0 right-2 flex items-center">
+            {selected ? (
+              <span
+                role="button"
+                className="inline-flex h-4 w-4 items-center justify-center rounded hover:bg-[var(--jm-surface-muted)] opacity-60 hover:opacity-100"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClear(); }}
+              >
+                <X className="h-3 w-3" />
+              </span>
+            ) : (
+              <ChevronsUpDown className="h-4 w-4 opacity-50" />
+            )}
+          </span>
+        </PopoverPrimitive.Trigger>
+        <PopoverPrimitive.Portal>
+          <PopoverPrimitive.Positioner align="start" sideOffset={6} className="isolate z-50">
+            <PopoverPrimitive.Popup
+              data-jm-scope
+              className="w-(--anchor-width) p-0 rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
             >
-              <X className="h-3 w-3" />
-            </span>
-          ) : (
-            <ChevronsUpDown className="h-4 w-4 opacity-50" />
-          )}
-        </span>
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder="입고번호 검색..." value={search} onValueChange={setSearch} />
-          <CommandList>
-            <CommandEmpty>입고 내역이 없습니다</CommandEmpty>
-            <CommandGroup>
-              {filtered.map((i) => (
-                <CommandItem
-                  key={i.id}
-                  value={i.id}
-                  onSelect={() => { onChange(i.id); setOpen(false); setSearch(""); }}
-                  data-checked={i.id === value ? "true" : undefined}
-                >
-                  <span className="font-mono text-xs mr-2">{i.incomingNo}</span>
-                  <span className="text-muted-foreground text-xs mr-2">{format(new Date(i.incomingDate), "yyyy-MM-dd")}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{i._count.items}종 · ₩{i.totalAmount.toLocaleString("ko-KR")}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+              <div className="border-b border-[var(--jm-border)] px-3 py-2">
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="입고번호 검색..."
+                  className="h-7 w-full bg-transparent text-jm-sm text-[var(--jm-text)] placeholder:text-[var(--jm-text-subtle)] outline-none"
+                />
+              </div>
+              <div className="max-h-[280px] overflow-y-auto p-1">
+                {filtered.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-jm-sm text-[var(--jm-text-muted)]">입고 내역이 없습니다</div>
+                ) : (
+                  filtered.map((i) => (
+                    <button
+                      key={i.id}
+                      type="button"
+                      onClick={() => { onChange(i.id); setOpen(false); setSearch(""); }}
+                      className={`flex w-full items-center rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--jm-surface-muted)] ${i.id === value ? "bg-[var(--jm-surface-muted)]" : ""}`}
+                    >
+                      <span className="font-mono text-jm-xs mr-2 text-[var(--jm-text)]">{i.incomingNo}</span>
+                      <span className="text-[var(--jm-text-muted)] text-jm-xs mr-2">{format(new Date(i.incomingDate), "yyyy-MM-dd")}</span>
+                      <span className="ml-auto text-jm-xs text-[var(--jm-text-muted)]">{i._count.items}종 · ₩{i.totalAmount.toLocaleString("ko-KR")}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverPrimitive.Popup>
+          </PopoverPrimitive.Positioner>
+        </PopoverPrimitive.Portal>
+      </PopoverPrimitive.Root>
     </div>
   );
 }
@@ -312,6 +333,7 @@ const formatPrice = (v: string | number) =>
   (typeof v === "string" ? parseFloat(v) : v).toLocaleString("ko-KR");
 
 export default function SupplierReturnsPage() {
+  const { resolvedTheme } = useTheme();
   const [returns, setReturns] = useState<SupplierReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -557,8 +579,8 @@ export default function SupplierReturnsPage() {
   };
 
   return (
-    <>
-      <div className="flex h-full flex-col">
+    <JmScope theme={resolvedTheme === "dark" ? "dark" : "light"} className="contents">
+      <div className="flex h-full flex-col bg-[var(--jm-bg)]">
         <DataTableToolbar
           onRefresh={fetchReturns}
           loading={loading}
@@ -566,101 +588,99 @@ export default function SupplierReturnsPage() {
           addLabel="반품 등록"
           filters={
             <div className="flex items-center gap-1.5">
-              <Select value={selectedSupplier} onValueChange={(v) => setSelectedSupplier(v ?? "all")}>
-                <SelectTrigger className="h-[30px] w-[140px] text-[13px] bg-card border-border">
-                  <span className="truncate">
-                    {selectedSupplier === "all" ? "전체 거래처" : suppliers.find((s) => s.id === selectedSupplier)?.name ?? "전체 거래처"}
-                  </span>
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  <SelectItem value="all">전체 거래처</SelectItem>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all")}>
-                <SelectTrigger className="h-[30px] w-[100px] text-[13px] bg-card border-border">
-                  <span className="truncate">
-                    {{ all: "전체 상태", PENDING: "대기", CONFIRMED: "확정", CANCELLED: "취소" }[statusFilter] ?? "전체 상태"}
-                  </span>
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  <SelectItem value="all">전체 상태</SelectItem>
-                  <SelectItem value="PENDING">대기</SelectItem>
-                  <SelectItem value="CONFIRMED">확정</SelectItem>
-                  <SelectItem value="CANCELLED">취소</SelectItem>
-                </SelectContent>
-              </Select>
+              <JmSelect
+                variant="pill"
+                size="sm"
+                label="거래처"
+                value={selectedSupplier}
+                onChange={(v) => setSelectedSupplier(v ?? "all")}
+                options={[
+                  { value: "all", label: "전체 거래처" },
+                  ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+              <JmSelect
+                variant="pill"
+                size="sm"
+                label="상태"
+                value={statusFilter}
+                onChange={(v) => setStatusFilter(v ?? "all")}
+                options={[
+                  { value: "all", label: "전체 상태" },
+                  { value: "PENDING", label: "대기" },
+                  { value: "CONFIRMED", label: "확정" },
+                  { value: "CANCELLED", label: "취소" },
+                ]}
+              />
             </div>
           }
         />
 
-        <ScrollArea className="flex-1 min-h-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>반품번호</TableHead>
-                <TableHead>거래처</TableHead>
-                <TableHead>반품일</TableHead>
-                <TableHead className="text-right">품목수</TableHead>
-                <TableHead className="text-right">환불액</TableHead>
-                <TableHead>상태</TableHead>
-                <TableHead>교환 입고</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <JmScrollArea className="flex-1 min-h-0">
+          <JmTable>
+            <JmTableHeader>
+              <JmTableRow>
+                <JmTableHead>반품번호</JmTableHead>
+                <JmTableHead>거래처</JmTableHead>
+                <JmTableHead>반품일</JmTableHead>
+                <JmTableHead className="text-right">품목수</JmTableHead>
+                <JmTableHead className="text-right">환불액</JmTableHead>
+                <JmTableHead>상태</JmTableHead>
+                <JmTableHead>교환 입고</JmTableHead>
+              </JmTableRow>
+            </JmTableHeader>
+            <JmTableBody>
               {loading ? (
                 <ReturnsSkeletonRows />
               ) : returns.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">반품 내역이 없습니다</TableCell>
-                </TableRow>
+                <JmTableRow>
+                  <JmTableCell colSpan={7} className="text-center py-8 text-[var(--jm-text-muted)]">반품 내역이 없습니다</JmTableCell>
+                </JmTableRow>
               ) : (
                 returns.map((r) => (
-                  <TableRow key={r.id} className="cursor-pointer" onClick={() => openDetail(r.id)}>
-                    <TableCell className="font-mono text-xs">{r.returnNo}</TableCell>
-                    <TableCell>{r.supplier.name}</TableCell>
-                    <TableCell>{format(new Date(r.returnDate), "yyyy-MM-dd")}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r._count.items}</TableCell>
-                    <TableCell className="text-right tabular-nums">₩{r.refundAmount.toLocaleString("ko-KR")}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant[r.status]}>{statusLabels[r.status]}</Badge>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                  <JmTableRow key={r.id} className="cursor-pointer" onClick={() => openDetail(r.id)}>
+                    <JmTableCell className="font-mono text-jm-xs">{r.returnNo}</JmTableCell>
+                    <JmTableCell>{r.supplier.name}</JmTableCell>
+                    <JmTableCell>{format(new Date(r.returnDate), "yyyy-MM-dd")}</JmTableCell>
+                    <JmTableCell className="text-right tabular-nums">{r._count.items}</JmTableCell>
+                    <JmTableCell className="text-right tabular-nums">₩{r.refundAmount.toLocaleString("ko-KR")}</JmTableCell>
+                    <JmTableCell>
+                      <JmBadge variant={statusVariant[r.status]}>{statusLabels[r.status]}</JmBadge>
+                    </JmTableCell>
+                    <JmTableCell onClick={(e) => e.stopPropagation()}>
                       {r.exchangeIncoming ? (
-                        <Link href="/inventory/incoming" className="flex items-center gap-1 text-xs text-primary hover:underline">
+                        <Link href="/inventory/incoming" className="flex items-center gap-1 text-jm-xs text-[var(--jm-action)] hover:underline">
                           {r.exchangeIncoming.incomingNo}
                           <ArrowUpRight className="size-3" />
                         </Link>
                       ) : (
-                        <span className="text-muted-foreground text-xs">-</span>
+                        <span className="text-[var(--jm-text-muted)] text-jm-xs">-</span>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </JmTableCell>
+                  </JmTableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+            </JmTableBody>
+          </JmTable>
+        </JmScrollArea>
       </div>
 
       {/* ============================================================ */}
       {/* 반품 등록 Sheet (bottom) */}
       {/* ============================================================ */}
-      <Sheet open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetForm(); }}>
-        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-          <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-            <SheetTitle>반품 등록</SheetTitle>
-            <SheetDescription className="sr-only">거래처 반품 등록</SheetDescription>
-          </SheetHeader>
+      <JmDrawer open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetForm(); }}>
+        <JmDrawerContent side="bottom" size="xl" className="p-0" data-jm-theme={resolvedTheme === "dark" ? "dark" : "light"}>
+          <JmDrawerHeader className="px-5 py-4">
+            <JmDrawerTitle>반품 등록</JmDrawerTitle>
+            <JmDrawerDescription className="sr-only">거래처 반품 등록</JmDrawerDescription>
+          </JmDrawerHeader>
 
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-            <ScrollArea className="flex-1 min-h-0">
+            <JmScrollArea className="flex-1 min-h-0">
               {/* 상단 정보 */}
-            <div className="px-5 py-4 border-b border-border grid grid-cols-2 gap-x-8 gap-y-3">
+            <div className="px-5 py-4 border-b border-[var(--jm-border)] grid grid-cols-2 gap-x-8 gap-y-3">
               <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground">거래처</p>
+                <p className="text-jm-xs text-[var(--jm-text-muted)]">거래처</p>
                 <SupplierCombobox
                   suppliers={suppliers}
                   value={supplierId}
@@ -669,13 +689,13 @@ export default function SupplierReturnsPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground">반품일</p>
+                <p className="text-jm-xs text-[var(--jm-text-muted)]">반품일</p>
                 <DateInput value={returnDate} onChange={setReturnDate} />
               </div>
               <div className="col-span-2 space-y-1.5">
-                <p className="text-xs text-muted-foreground">
+                <p className="text-jm-xs text-[var(--jm-text-muted)]">
                   기준 입고{" "}
-                  <span className="text-muted-foreground/60">(선택하면 품목·단가 자동완성)</span>
+                  <span className="text-[var(--jm-text-subtle)]">(선택하면 품목·단가 자동완성)</span>
                 </p>
                 <IncomingComboboxLocal
                   incomings={incomingOptions}
@@ -686,23 +706,23 @@ export default function SupplierReturnsPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground">반품 사유</p>
-                <input
+                <p className="text-jm-xs text-[var(--jm-text-muted)]">반품 사유</p>
+                <JmInput
+                  size="sm"
                   value={returnReason}
                   onChange={(e) => setReturnReason(e.target.value)}
                   placeholder="반품 사유..."
                   disabled={!supplierId}
-                  className="w-full h-9 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus:border-primary disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
               <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground">메모</p>
-                <input
+                <p className="text-jm-xs text-[var(--jm-text-muted)]">메모</p>
+                <JmInput
+                  size="sm"
                   value={memo}
                   onChange={(e) => setMemo(e.target.value)}
                   placeholder="메모..."
                   disabled={!supplierId}
-                  className="w-full h-9 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus:border-primary disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
               <div className="col-span-2 flex items-center gap-2">
@@ -710,65 +730,65 @@ export default function SupplierReturnsPage() {
                   type="button"
                   onClick={() => setIsExchange(!isExchange)}
                   disabled={!supplierId}
-                  className={`h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isExchange ? "bg-primary border-primary" : "border-input bg-transparent"}`}
+                  className={`h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isExchange ? "bg-[var(--jm-action)] border-[var(--jm-action)]" : "border-[var(--jm-border)] bg-[var(--jm-surface)]"}`}
                 >
                   {isExchange && (
-                    <svg className="size-2.5 text-black" viewBox="0 0 12 12" fill="none">
+                    <svg className="size-2.5 text-[var(--jm-action-fg)]" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
                 </button>
-                <span className={`text-xs text-muted-foreground ${!supplierId ? "opacity-40" : ""}`}>교환 포함 — 확정 시 교환 입고(대기) 자동 생성</span>
+                <span className={`text-jm-xs text-[var(--jm-text-muted)] ${!supplierId ? "opacity-40" : ""}`}>교환 포함 — 확정 시 교환 입고(대기) 자동 생성</span>
               </div>
 
               {/* 반품 비용 */}
               <div className={`col-span-2 space-y-1.5 ${!supplierId ? "opacity-40 pointer-events-none" : ""}`}>
-                <p className="text-xs text-muted-foreground">반품 비용 <span className="text-muted-foreground/60">(택배비 등 발생 시)</span></p>
-                <div className="flex rounded-lg border border-border overflow-hidden text-sm w-full">
+                <p className="text-jm-xs text-[var(--jm-text-muted)]">반품 비용 <span className="text-[var(--jm-text-subtle)]">(택배비 등 발생 시)</span></p>
+                <div className="flex rounded-lg border border-[var(--jm-border)] overflow-hidden text-jm-sm w-full">
                   {/* 공급가액 */}
-                  <div className="flex flex-col border-r border-border">
-                    <div className="px-3 py-1 text-xs text-muted-foreground bg-muted border-b border-border text-center whitespace-nowrap">공급가액</div>
+                  <div className="flex flex-col border-r border-[var(--jm-border)]">
+                    <div className="px-3 py-1 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)] text-center whitespace-nowrap">공급가액</div>
                     <input
                       type="text" inputMode="numeric"
                       value={formatComma(returnCostSupply)}
                       onChange={(e) => { const s = parseComma(e.target.value); setReturnCostSupply(s); setReturnCostTax(String(Math.round(Number(s) * 0.1))); }}
                       onFocus={focusCaretEnd}
                       placeholder="0"
-                      className="w-[110px] px-3 py-1.5 text-right bg-transparent outline-none focus:bg-muted/50 tabular-nums"
+                      className="w-[110px] px-3 py-1.5 text-right bg-transparent outline-none focus:bg-[var(--jm-surface-muted)] tabular-nums text-[var(--jm-text)]"
                     />
                   </div>
                   {/* 세액 */}
-                  <div className="flex flex-col border-r border-border">
-                    <div className="px-3 py-1 text-xs text-muted-foreground bg-muted border-b border-border text-center">세액</div>
+                  <div className="flex flex-col border-r border-[var(--jm-border)]">
+                    <div className="px-3 py-1 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)] text-center">세액</div>
                     <input
                       type="text" inputMode="numeric"
                       value={formatComma(returnCostTax)}
                       onChange={(e) => setReturnCostTax(parseComma(e.target.value))}
                       onFocus={focusCaretEnd}
                       placeholder="0"
-                      className="w-[90px] px-3 py-1.5 text-right bg-transparent outline-none focus:bg-muted/50 tabular-nums"
+                      className="w-[90px] px-3 py-1.5 text-right bg-transparent outline-none focus:bg-[var(--jm-surface-muted)] tabular-nums text-[var(--jm-text)]"
                     />
                   </div>
                   {/* 반품액 */}
-                  <div className="flex flex-col border-r border-border">
-                    <div className="px-3 py-1 text-xs text-muted-foreground bg-muted border-b border-border text-center">반품액</div>
-                    <div className="w-[110px] px-3 py-1.5 text-right font-medium tabular-nums text-foreground">
-                      {(() => { const t = Number(parseComma(returnCostSupply)) + Number(parseComma(returnCostTax)); return t > 0 ? `₩${t.toLocaleString("ko-KR")}` : <span className="text-muted-foreground/40">0</span>; })()}
+                  <div className="flex flex-col border-r border-[var(--jm-border)]">
+                    <div className="px-3 py-1 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)] text-center">반품액</div>
+                    <div className="w-[110px] px-3 py-1.5 text-right font-medium tabular-nums text-[var(--jm-text)]">
+                      {(() => { const t = Number(parseComma(returnCostSupply)) + Number(parseComma(returnCostTax)); return t > 0 ? `₩${t.toLocaleString("ko-KR")}` : <span className="text-[var(--jm-text-subtle)]">0</span>; })()}
                     </div>
                   </div>
                   {/* 유형 — 토글 버튼 (클릭 시 해제 가능) */}
-                  <div className="flex flex-col border-r border-border">
-                    <div className="px-3 py-1 text-xs text-muted-foreground bg-muted border-b border-border text-center">유형</div>
+                  <div className="flex flex-col border-r border-[var(--jm-border)]">
+                    <div className="px-3 py-1 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)] text-center">유형</div>
                     <div className="flex items-center gap-1 px-2 py-1.5">
                       {(["ADD", "DEDUCT", "SEPARATE"] as const).map((t) => (
                         <button
                           key={t}
                           type="button"
                           onClick={() => setReturnCostType(returnCostType === t ? "" : t)}
-                          className={`px-1.5 py-0.5 text-xs rounded border transition-colors whitespace-nowrap ${
+                          className={`px-1.5 py-0.5 text-jm-xs rounded border transition-colors whitespace-nowrap ${
                             returnCostType === t
-                              ? "bg-primary/10 border-primary text-primary"
-                              : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                              ? "bg-[var(--jm-action)]/10 border-[var(--jm-action)] text-[var(--jm-action)]"
+                              : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:border-[var(--jm-border-strong)] hover:text-[var(--jm-text)]"
                           }`}
                         >
                           {{ ADD: "거래처 청구", DEDUCT: "착불 차감", SEPARATE: "자체 부담" }[t]}
@@ -778,18 +798,18 @@ export default function SupplierReturnsPage() {
                   </div>
                   {/* 메모 */}
                   <div className="flex flex-col flex-1 min-w-0">
-                    <div className="px-3 py-1 text-xs text-muted-foreground bg-muted border-b border-border">메모</div>
+                    <div className="px-3 py-1 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)]">메모</div>
                     <input
                       type="text"
                       value={returnCostNote}
                       onChange={(e) => setReturnCostNote(e.target.value)}
                       placeholder="예: CJ대한통운"
-                      className="w-full px-3 py-1.5 bg-transparent outline-none focus:bg-muted/50 text-sm min-w-0"
+                      className="w-full px-3 py-1.5 bg-transparent outline-none focus:bg-[var(--jm-surface-muted)] text-jm-sm min-w-0 text-[var(--jm-text)]"
                     />
                   </div>
                 </div>
                 {returnCostType && (
-                  <p className="text-xs text-muted-foreground/80">
+                  <p className="text-jm-xs text-[var(--jm-text-muted)]">
                     {returnCostType === "ADD" && "우리가 택배비를 먼저 냈고, 거래처에서 돌려받아야 할 금액입니다. 반품 환불액에 이 비용이 더해집니다."}
                     {returnCostType === "DEDUCT" && "거래처가 반품 택배비를 착불로 받았고, 그만큼 우리에게 돌려줄 환불액에서 빠집니다."}
                     {returnCostType === "SEPARATE" && "우리가 택배비를 부담하며 거래처에 청구하지 않습니다. 환불액은 그대로이고 비용은 경비로만 기록됩니다."}
@@ -799,19 +819,19 @@ export default function SupplierReturnsPage() {
             </div>
 
             {/* 품목 테이블 — 거래명세표 스타일 (입고 시트와 동일 구조) */}
-            <table className="w-full text-sm table-fixed">
+            <table className="w-full text-jm-sm table-fixed">
               <thead>
-                <tr className="bg-muted text-muted-foreground text-xs">
-                  <th className="border-r border-b border-border w-[36px] py-2 text-center font-medium">번호</th>
-                  <th className="border-r border-b border-border w-[100px] py-2 px-2 text-left font-medium">품번</th>
-                  <th className="border-r border-b border-border w-[160px] py-2 px-2 text-left font-medium">품명</th>
-                  <th className="border-r border-b border-border w-[100px] py-2 px-2 text-left font-medium">규격</th>
-                  <th className="border-r border-b border-border w-[50px] py-2 text-center font-medium">단위</th>
-                  <th className="border-r border-b border-border w-[70px] py-2 text-center font-medium">수량</th>
-                  <th className="border-r border-b border-border w-[90px] py-2 text-center font-medium">단가</th>
-                  <th className="border-r border-b border-border w-[100px] py-2 text-center font-medium">공급가액</th>
-                  <th className="border-r border-b border-border w-[84px] py-2 text-center font-medium">세액</th>
-                  <th className="border-b border-border w-[80px] py-2 px-2 text-center font-medium">비고</th>
+                <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-jm-xs">
+                  <th className="border-r border-b border-[var(--jm-border)] w-[36px] py-2 text-center font-medium">번호</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[100px] py-2 px-2 text-left font-medium">품번</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[160px] py-2 px-2 text-left font-medium">품명</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[100px] py-2 px-2 text-left font-medium">규격</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[50px] py-2 text-center font-medium">단위</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[70px] py-2 text-center font-medium">수량</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[90px] py-2 text-center font-medium">단가</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[100px] py-2 text-center font-medium">공급가액</th>
+                  <th className="border-r border-b border-[var(--jm-border)] w-[84px] py-2 text-center font-medium">세액</th>
+                  <th className="border-b border-[var(--jm-border)] w-[80px] py-2 px-2 text-center font-medium">비고</th>
                 </tr>
               </thead>
                   <tbody>
@@ -823,23 +843,23 @@ export default function SupplierReturnsPage() {
                       const lineTax = item.isTaxable ? Math.round(lineSupply * 0.1) : 0;
 
                       return (
-                        <tr key={idx} className="group border-b border-border hover:bg-muted/50">
-                          <td className="border-r border-border text-center text-muted-foreground py-1 text-xs">{idx + 1}</td>
+                        <tr key={idx} className="group border-b border-[var(--jm-border)] hover:bg-[var(--jm-surface-muted)]">
+                          <td className="border-r border-[var(--jm-border)] text-center text-[var(--jm-text-muted)] py-1 text-jm-xs">{idx + 1}</td>
 
                           {/* 품번 */}
-                          <td className="border-r border-border px-1 py-0.5">
+                          <td className="border-r border-[var(--jm-border)] px-1 py-0.5">
                             <input
                               value={item.supplierCode}
                               onChange={(e) => updateItem(idx, "supplierCode", e.target.value)}
                               disabled={isEmptyRow}
-                              className="w-full h-7 bg-transparent text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30"
+                              className="w-full h-7 bg-transparent text-jm-sm px-2 outline-none focus:bg-[var(--jm-surface-muted)] rounded disabled:opacity-30 text-[var(--jm-text)]"
                             />
                           </td>
 
                           {/* 품명 */}
-                          <td className="border-r border-border px-1 py-0.5">
+                          <td className="border-r border-[var(--jm-border)] px-1 py-0.5">
                             {item.fromIncoming ? (
-                              <span className="flex h-7 items-center px-2 text-sm font-medium truncate">{item.supplierProductName}</span>
+                              <span className="flex h-7 items-center px-2 text-jm-sm font-medium truncate text-[var(--jm-text)]">{item.supplierProductName}</span>
                             ) : supplierId ? (
                               <InlineCellProductSearch
                                 rowIndex={idx}
@@ -851,25 +871,25 @@ export default function SupplierReturnsPage() {
                                 disableAlreadyAdded
                               />
                             ) : (
-                              <span className="text-xs text-muted-foreground px-2">거래처를 선택하세요</span>
+                              <span className="text-jm-xs text-[var(--jm-text-muted)] px-2">거래처를 선택하세요</span>
                             )}
                           </td>
 
                           {/* 규격 */}
-                          <td className="border-r border-border px-1 py-0.5">
+                          <td className="border-r border-[var(--jm-border)] px-1 py-0.5">
                             <input
                               value={item.spec}
                               onChange={(e) => updateItem(idx, "spec", e.target.value)}
                               disabled={isEmptyRow}
-                              className="w-full h-7 bg-transparent text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30"
+                              className="w-full h-7 bg-transparent text-jm-sm px-2 outline-none focus:bg-[var(--jm-surface-muted)] rounded disabled:opacity-30 text-[var(--jm-text)]"
                             />
                           </td>
 
                           {/* 단위 */}
-                          <td className="border-r border-border text-center text-xs text-muted-foreground py-1">{item.unitOfMeasure}</td>
+                          <td className="border-r border-[var(--jm-border)] text-center text-jm-xs text-[var(--jm-text-muted)] py-1">{item.unitOfMeasure}</td>
 
                           {/* 수량 */}
-                          <td className="border-r border-border p-0.5">
+                          <td className="border-r border-[var(--jm-border)] p-0.5">
                             <input
                               data-rrow={idx}
                               data-rfield="quantity"
@@ -877,12 +897,12 @@ export default function SupplierReturnsPage() {
                               onChange={(e) => updateItem(idx, "quantity", e.target.value)}
                               onFocus={(e) => { if (e.target.value === "0") updateItem(idx, "quantity", ""); }}
                               disabled={isEmptyRow}
-                              className="w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30"
+                              className="w-full h-7 bg-transparent text-right text-jm-sm px-2 outline-none focus:bg-[var(--jm-surface-muted)] rounded disabled:opacity-30 text-[var(--jm-text)]"
                             />
                           </td>
 
                           {/* 단가 */}
-                          <td className="border-r border-border p-0.5">
+                          <td className="border-r border-[var(--jm-border)] p-0.5">
                             <input
                               data-rrow={idx}
                               data-rfield="unitPrice"
@@ -892,17 +912,17 @@ export default function SupplierReturnsPage() {
                               onChange={(e) => updateItem(idx, "unitPrice", parseComma(e.target.value))}
                               onFocus={(e) => { if (e.target.value === "0") updateItem(idx, "unitPrice", ""); else focusCaretEnd(e); }}
                               disabled={isEmptyRow}
-                              className="w-full h-7 bg-transparent text-right text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30 tabular-nums"
+                              className="w-full h-7 bg-transparent text-right text-jm-sm px-2 outline-none focus:bg-[var(--jm-surface-muted)] rounded disabled:opacity-30 tabular-nums text-[var(--jm-text)]"
                             />
                           </td>
 
                           {/* 공급가액 = 단가 × 수량 */}
-                          <td className="border-r border-border text-right px-2 py-1 tabular-nums">
+                          <td className="border-r border-[var(--jm-border)] text-right px-2 py-1 tabular-nums text-[var(--jm-text)]">
                             {!isEmptyRow && lineSupply > 0 && formatPrice(lineSupply)}
                           </td>
 
                           {/* 세액 = 공급가액 × 10% (과세 시) */}
-                          <td className="border-r border-border text-right px-2 py-1 text-muted-foreground tabular-nums">
+                          <td className="border-r border-[var(--jm-border)] text-right px-2 py-1 text-[var(--jm-text-muted)] tabular-nums">
                             {!isEmptyRow && lineTax > 0 && formatPrice(lineTax)}
                           </td>
 
@@ -913,7 +933,7 @@ export default function SupplierReturnsPage() {
                                 value={item.memo}
                                 onChange={(e) => updateItem(idx, "memo", e.target.value)}
                                 disabled={isEmptyRow}
-                                className="flex-1 h-7 bg-transparent text-sm px-2 outline-none focus:bg-muted rounded disabled:opacity-30 min-w-0"
+                                className="flex-1 h-7 bg-transparent text-jm-sm px-2 outline-none focus:bg-[var(--jm-surface-muted)] rounded disabled:opacity-30 min-w-0 text-[var(--jm-text)]"
                                 onKeyDown={(e) => {
                                   if (e.key === "Tab" && !e.shiftKey && idx === items.length - 1 && !isEmptyRow) {
                                     e.preventDefault();
@@ -924,7 +944,7 @@ export default function SupplierReturnsPage() {
                               <button
                                 type="button"
                                 onClick={() => removeItem(idx)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 p-1 shrink-0"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--jm-text-muted)] hover:text-[var(--jm-danger-fg)] p-1 shrink-0"
                               >
                                 <X className="size-3.5" />
                               </button>
@@ -941,7 +961,7 @@ export default function SupplierReturnsPage() {
                           type="button"
                           onClick={addEmptyRow}
                           disabled={!supplierId}
-                          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/70 transition-colors disabled:opacity-30 disabled:cursor-not-allowed px-1 py-0.5"
+                          className="flex items-center gap-1.5 text-jm-xs text-[var(--jm-action)] hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed px-1 py-0.5"
                         >
                           <Plus className="size-3.5" />
                           행 추가
@@ -952,95 +972,95 @@ export default function SupplierReturnsPage() {
             </table>
 
             {/* 합계 — 거래명세표 하단 (입고 시트와 동일 구조) */}
-            <div className="border-t border-border bg-muted">
-              <div className="grid grid-cols-5 text-sm">
-                <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">품목수</span>
-                  <span>{validItems.length}건</span>
+            <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]">
+              <div className="grid grid-cols-5 text-jm-sm">
+                <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">품목수</span>
+                  <span className="text-[var(--jm-text)]">{validItems.length}건</span>
                 </div>
-                <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">공급가액</span>
-                  <span className="tabular-nums">₩{formatPrice(totalAmount)}</span>
+                <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">공급가액</span>
+                  <span className="tabular-nums text-[var(--jm-text)]">₩{formatPrice(totalAmount)}</span>
                 </div>
-                <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">세액</span>
-                  <span className="tabular-nums">{goodsAmount - totalAmount > 0 ? `₩${formatPrice(goodsAmount - totalAmount)}` : ""}</span>
+                <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">세액</span>
+                  <span className="tabular-nums text-[var(--jm-text)]">{goodsAmount - totalAmount > 0 ? `₩${formatPrice(goodsAmount - totalAmount)}` : ""}</span>
                 </div>
-                <div className="border-r border-border px-3 py-2.5 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">반품 비용</span>
-                  <span className="tabular-nums">
+                <div className="border-r border-[var(--jm-border)] px-3 py-2.5 flex items-center justify-between">
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">반품 비용</span>
+                  <span className="tabular-nums text-[var(--jm-text)]">
                     {returnCostTotal > 0
                       ? `${costSign > 0 ? "+" : costSign < 0 ? "−" : ""}₩${formatPrice(returnCostTotal)}`
                       : ""}
                   </span>
                 </div>
                 <div className="px-3 py-2.5 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">환불 예상액</span>
-                  <span className="font-bold text-base tabular-nums">₩{formatPrice(refundAmount)}</span>
+                  <span className="text-jm-xs text-[var(--jm-text-muted)]">환불 예상액</span>
+                  <span className="font-bold text-jm-lg tabular-nums text-[var(--jm-text)]">₩{formatPrice(refundAmount)}</span>
                 </div>
               </div>
             </div>
-            </ScrollArea>
+            </JmScrollArea>
 
             {/* 하단 버튼 */}
-            <div className="border-t border-border px-5 py-4 flex justify-end gap-2 bg-background">
-              <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>
+            <div className="border-t border-[var(--jm-border)] px-5 py-4 flex justify-end gap-2 bg-[var(--jm-surface)]">
+              <JmButton type="button" variant="outline" size="sm" onClick={() => { setCreateOpen(false); resetForm(); }}>
                 취소
-              </Button>
-              <Button type="button" onClick={handleCreate} disabled={submitting || validItems.length === 0 || !supplierId}>
+              </JmButton>
+              <JmButton type="button" size="sm" onClick={handleCreate} disabled={submitting || validItems.length === 0 || !supplierId}>
                 {submitting ? <Loader2 className="animate-spin" /> : null}
                 <span>{submitting ? "등록 중..." : "반품 등록"}</span>
-              </Button>
+              </JmButton>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </JmDrawerContent>
+      </JmDrawer>
 
       {/* 반품 상세 Sheet */}
-      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-        <SheetContent side="bottom" className="h-[85vh] p-0 flex flex-col">
-          <SheetHeader className="border-b border-border px-5 py-4 flex-shrink-0">
-            <SheetTitle>{detailLoading ? <Skeleton className="h-5 w-32" /> : detail?.returnNo}</SheetTitle>
-            <SheetDescription className="sr-only">반품 상세</SheetDescription>
-          </SheetHeader>
+      <JmDrawer open={detailOpen} onOpenChange={setDetailOpen}>
+        <JmDrawerContent side="bottom" size="lg" className="p-0" data-jm-theme={resolvedTheme === "dark" ? "dark" : "light"}>
+          <JmDrawerHeader className="px-5 py-4">
+            <JmDrawerTitle>{detailLoading ? <JmSkeleton className="h-5 w-32" /> : detail?.returnNo}</JmDrawerTitle>
+            <JmDrawerDescription className="sr-only">반품 상세</JmDrawerDescription>
+          </JmDrawerHeader>
 
           {detailLoading ? (
             <div className="flex-1 flex items-center justify-center">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              <Loader2 className="size-5 animate-spin text-[var(--jm-text-muted)]" />
             </div>
           ) : detail ? (
             <>
-              <ScrollArea className="flex-1 min-h-0">
+              <JmScrollArea className="flex-1 min-h-0">
                 {/* 상단 정보 */}
-                <div className="px-5 py-4 border-b border-border grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                <div className="px-5 py-4 border-b border-[var(--jm-border)] grid grid-cols-2 gap-x-8 gap-y-2 text-jm-sm">
                   <div className="flex gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">거래처</span>
-                    <span className="font-medium">{detail.supplier.name}</span>
-                    <span className="text-xs text-muted-foreground">({detail.supplier.paymentMethod === "CREDIT" ? "외상" : "선불"})</span>
+                    <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0">거래처</span>
+                    <span className="font-medium text-[var(--jm-text)]">{detail.supplier.name}</span>
+                    <span className="text-jm-xs text-[var(--jm-text-muted)]">({detail.supplier.paymentMethod === "CREDIT" ? "외상" : "선불"})</span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">반품번호</span>
-                    <span className="font-mono text-xs">{detail.returnNo}</span>
-                    <Badge variant={statusVariant[detail.status]} className="ml-1">{statusLabels[detail.status]}</Badge>
+                    <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0">반품번호</span>
+                    <span className="font-mono text-jm-xs text-[var(--jm-text)]">{detail.returnNo}</span>
+                    <JmBadge variant={statusVariant[detail.status]} className="ml-1">{statusLabels[detail.status]}</JmBadge>
                   </div>
                   <div className="flex gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">반품일</span>
-                    <span>{new Date(detail.returnDate).toLocaleDateString("ko-KR")}</span>
+                    <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0">반품일</span>
+                    <span className="text-[var(--jm-text)]">{new Date(detail.returnDate).toLocaleDateString("ko-KR")}</span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">등록자</span>
-                    <span>{detail.createdBy.name}</span>
+                    <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0">등록자</span>
+                    <span className="text-[var(--jm-text)]">{detail.createdBy.name}</span>
                   </div>
                   {detail.returnReason && (
                     <div className="flex gap-2 col-span-2">
-                      <span className="text-xs text-muted-foreground w-16 shrink-0">반품 사유</span>
-                      <span>{detail.returnReason}</span>
+                      <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0">반품 사유</span>
+                      <span className="text-[var(--jm-text)]">{detail.returnReason}</span>
                     </div>
                   )}
                   {detail.memo && (
                     <div className="flex gap-2 col-span-2">
-                      <span className="text-xs text-muted-foreground w-16 shrink-0">메모</span>
-                      <span>{detail.memo}</span>
+                      <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0">메모</span>
+                      <span className="text-[var(--jm-text)]">{detail.memo}</span>
                     </div>
                   )}
                   {detail.returnCost && parseFloat(detail.returnCost) > 0 && (() => {
@@ -1050,24 +1070,24 @@ export default function SupplierReturnsPage() {
                     const typeLabel: Record<string, string> = { ADD: "거래처 청구", DEDUCT: "착불 차감", SEPARATE: "자체 부담" };
                     return (
                       <div className="flex gap-2 col-span-2 items-start">
-                        <span className="text-xs text-muted-foreground w-16 shrink-0 pt-1.5">반품 비용</span>
-                        <div className="flex rounded-lg border border-border overflow-hidden text-sm">
-                          {[{ label: "공급가액", val: supply }, { label: "세액", val: tax }, { label: "반품액", val: total }].map((col, i) => (
-                            <div key={col.label} className={`flex flex-col ${i < 2 ? "border-r border-border" : "border-r border-border"}`}>
-                              <div className="px-3 py-0.5 text-xs text-muted-foreground bg-muted border-b border-border text-center whitespace-nowrap">{col.label}</div>
-                              <div className="px-3 py-1 text-right tabular-nums">₩{col.val.toLocaleString("ko-KR")}</div>
+                        <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0 pt-1.5">반품 비용</span>
+                        <div className="flex rounded-lg border border-[var(--jm-border)] overflow-hidden text-jm-sm">
+                          {[{ label: "공급가액", val: supply }, { label: "세액", val: tax }, { label: "반품액", val: total }].map((col) => (
+                            <div key={col.label} className="flex flex-col border-r border-[var(--jm-border)]">
+                              <div className="px-3 py-0.5 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)] text-center whitespace-nowrap">{col.label}</div>
+                              <div className="px-3 py-1 text-right tabular-nums text-[var(--jm-text)]">₩{col.val.toLocaleString("ko-KR")}</div>
                             </div>
                           ))}
                           {detail.returnCostType && (
-                            <div className="flex flex-col border-r border-border">
-                              <div className="px-3 py-0.5 text-xs text-muted-foreground bg-muted border-b border-border text-center">유형</div>
-                              <div className="px-3 py-1 whitespace-nowrap">{typeLabel[detail.returnCostType]}</div>
+                            <div className="flex flex-col border-r border-[var(--jm-border)]">
+                              <div className="px-3 py-0.5 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)] text-center">유형</div>
+                              <div className="px-3 py-1 whitespace-nowrap text-[var(--jm-text)]">{typeLabel[detail.returnCostType]}</div>
                             </div>
                           )}
                           {detail.returnCostNote && (
                             <div className="flex flex-col">
-                              <div className="px-3 py-0.5 text-xs text-muted-foreground bg-muted border-b border-border text-center">메모</div>
-                              <div className="px-3 py-1 text-muted-foreground">{detail.returnCostNote}</div>
+                              <div className="px-3 py-0.5 text-jm-xs text-[var(--jm-text-muted)] bg-[var(--jm-surface-muted)] border-b border-[var(--jm-border)] text-center">메모</div>
+                              <div className="px-3 py-1 text-[var(--jm-text-muted)]">{detail.returnCostNote}</div>
                             </div>
                           )}
                         </div>
@@ -1076,12 +1096,12 @@ export default function SupplierReturnsPage() {
                   })()}
                   {detail.exchangeIncoming && (
                     <div className="flex gap-2 col-span-2">
-                      <span className="text-xs text-muted-foreground w-16 shrink-0">교환 입고</span>
-                      <Link href="/inventory/incoming" className="flex items-center gap-1 text-primary hover:underline">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)] w-16 shrink-0">교환 입고</span>
+                      <Link href="/inventory/incoming" className="flex items-center gap-1 text-[var(--jm-action)] hover:underline">
                         {detail.exchangeIncoming.incomingNo}
-                        <Badge variant="outline" className="text-xs ml-1">
+                        <JmBadge variant="outline" className="text-jm-xs ml-1">
                           {statusLabels[detail.exchangeIncoming.status] ?? detail.exchangeIncoming.status}
-                        </Badge>
+                        </JmBadge>
                         <ArrowUpRight className="size-3.5" />
                       </Link>
                     </div>
@@ -1089,67 +1109,67 @@ export default function SupplierReturnsPage() {
                 </div>
 
                 {/* 품목 테이블 */}
-                <table className="w-full text-sm">
+                <table className="w-full text-jm-sm">
                   <thead>
-                    <tr className="bg-muted text-muted-foreground text-xs">
-                      <th className="border-r border-b border-border w-[36px] py-2 text-center font-medium">번호</th>
-                      <th className="border-r border-b border-border py-2 px-2 text-left font-medium">품명</th>
-                      <th className="border-r border-b border-border py-2 px-2 text-left font-medium">품번</th>
-                      <th className="border-r border-b border-border w-[60px] py-2 text-center font-medium">단위</th>
-                      <th className="border-r border-b border-border w-[100px] py-2 text-center font-medium">수량</th>
-                      <th className="border-r border-b border-border w-[130px] py-2 text-center font-medium">단가</th>
-                      <th className="border-b border-border w-[130px] py-2 text-center font-medium">금액</th>
+                    <tr className="bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] text-jm-xs">
+                      <th className="border-r border-b border-[var(--jm-border)] w-[36px] py-2 text-center font-medium">번호</th>
+                      <th className="border-r border-b border-[var(--jm-border)] py-2 px-2 text-left font-medium">품명</th>
+                      <th className="border-r border-b border-[var(--jm-border)] py-2 px-2 text-left font-medium">품번</th>
+                      <th className="border-r border-b border-[var(--jm-border)] w-[60px] py-2 text-center font-medium">단위</th>
+                      <th className="border-r border-b border-[var(--jm-border)] w-[100px] py-2 text-center font-medium">수량</th>
+                      <th className="border-r border-b border-[var(--jm-border)] w-[130px] py-2 text-center font-medium">단가</th>
+                      <th className="border-b border-[var(--jm-border)] w-[130px] py-2 text-center font-medium">금액</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detail.items.map((item, idx) => (
-                      <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-muted/50">
-                        <td className="border-r border-border text-center text-muted-foreground py-1.5 text-xs">{idx + 1}</td>
-                        <td className="border-r border-border px-2 py-1.5 font-medium">{item.supplierProduct.name}</td>
-                        <td className="border-r border-border px-2 py-1.5 text-muted-foreground text-xs">{item.supplierProduct.supplierCode ?? "-"}</td>
-                        <td className="border-r border-border text-center text-muted-foreground py-1.5">{item.supplierProduct.unitOfMeasure}</td>
-                        <td className="border-r border-border text-right px-2 py-1.5 tabular-nums">{parseFloat(item.quantity).toLocaleString("ko-KR")}</td>
-                        <td className="border-r border-border text-right px-2 py-1.5 tabular-nums">₩{formatPrice(item.unitPrice)}</td>
-                        <td className="text-right px-2 py-1.5 tabular-nums">₩{formatPrice(item.totalPrice)}</td>
+                      <tr key={item.id} className="border-b border-[var(--jm-border)] last:border-b-0 hover:bg-[var(--jm-surface-muted)]">
+                        <td className="border-r border-[var(--jm-border)] text-center text-[var(--jm-text-muted)] py-1.5 text-jm-xs">{idx + 1}</td>
+                        <td className="border-r border-[var(--jm-border)] px-2 py-1.5 font-medium text-[var(--jm-text)]">{item.supplierProduct.name}</td>
+                        <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)] text-jm-xs">{item.supplierProduct.supplierCode ?? "-"}</td>
+                        <td className="border-r border-[var(--jm-border)] text-center text-[var(--jm-text-muted)] py-1.5">{item.supplierProduct.unitOfMeasure}</td>
+                        <td className="border-r border-[var(--jm-border)] text-right px-2 py-1.5 tabular-nums text-[var(--jm-text)]">{parseFloat(item.quantity).toLocaleString("ko-KR")}</td>
+                        <td className="border-r border-[var(--jm-border)] text-right px-2 py-1.5 tabular-nums text-[var(--jm-text)]">₩{formatPrice(item.unitPrice)}</td>
+                        <td className="text-right px-2 py-1.5 tabular-nums text-[var(--jm-text)]">₩{formatPrice(item.totalPrice)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
 
                 {/* 합계 */}
-                <div className="border-t border-border bg-muted">
-                  <div className="grid grid-cols-3 text-sm">
-                    <div className="border-r border-border px-5 py-2.5 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">품목수</span>
-                      <span>{detail.items.length}건</span>
+                <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]">
+                  <div className="grid grid-cols-3 text-jm-sm">
+                    <div className="border-r border-[var(--jm-border)] px-5 py-2.5 flex items-center justify-between">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">품목수</span>
+                      <span className="text-[var(--jm-text)]">{detail.items.length}건</span>
                     </div>
                     <div className="col-span-2 px-5 py-2.5 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">합계금액</span>
-                      <span className="font-bold text-base tabular-nums">
+                      <span className="text-jm-xs text-[var(--jm-text-muted)]">합계금액</span>
+                      <span className="font-bold text-jm-lg tabular-nums text-[var(--jm-text)]">
                         ₩{formatPrice(detail.items.reduce((s, i) => s + parseFloat(i.totalPrice), 0))}
                       </span>
                     </div>
                   </div>
                 </div>
-              </ScrollArea>
+              </JmScrollArea>
 
               {detail.status === "PENDING" && (
-                <div className="shrink-0 flex justify-between gap-2 px-6 py-3 border-t border-border">
-                  <Button variant="destructive" size="sm" onClick={handleDelete} disabled={actionLoading}>
+                <div className="shrink-0 flex justify-between gap-2 px-6 py-3 border-t border-[var(--jm-border)]">
+                  <JmButton variant="danger" size="sm" onClick={handleDelete} disabled={actionLoading}>
                     {actionLoading ? <Loader2 className="size-4 animate-spin" /> : "삭제"}
-                  </Button>
+                  </JmButton>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleAction("cancel")} disabled={actionLoading}>취소</Button>
-                    <Button size="sm" onClick={() => handleAction("confirm")} disabled={actionLoading}>
+                    <JmButton variant="outline" size="sm" onClick={() => handleAction("cancel")} disabled={actionLoading}>취소</JmButton>
+                    <JmButton size="sm" onClick={() => handleAction("confirm")} disabled={actionLoading}>
                       {actionLoading ? <Loader2 className="size-4 animate-spin" /> : "확정"}
-                    </Button>
+                    </JmButton>
                   </div>
                 </div>
               )}
             </>
           ) : null}
-        </SheetContent>
-      </Sheet>
+        </JmDrawerContent>
+      </JmDrawer>
 
       <QuickSupplierSheet
         open={quickSupplierOpen}
@@ -1171,6 +1191,6 @@ export default function SupplierReturnsPage() {
           setSupplierProducts((prev) => [...prev, { ...sp, spec: null, supplierCode: null, unitOfMeasure: "EA", isTaxable: true }]);
         }}
       />
-    </>
+    </JmScope>
   );
 }

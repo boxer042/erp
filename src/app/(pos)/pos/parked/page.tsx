@@ -164,10 +164,10 @@ export default function ParkedSessionsPage() {
             <ChevronLeft className="size-5" />
           </button>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+            <span className="text-jm-base font-semibold text-[var(--jm-text)]">
               저장된 상담
             </span>
-            <span className="text-[11px] text-[var(--jm-text-muted)]">
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
               장바구니로 저장한 고객 카트 — 가격은 부활 시 현재가로 갱신됩니다
             </span>
           </div>
@@ -303,21 +303,21 @@ function SessionRow({
 
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-[var(--jm-surface)] p-3 border border-[var(--jm-border)]">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[14px] font-bold text-[var(--jm-text)]">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-base font-bold text-[var(--jm-text)]">
         {customerName.charAt(0)}
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5">
-          <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+          <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
             {customerName}
           </span>
           {session.customerType === "BUSINESS" && (
-            <span className="rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            <span className="rounded bg-[var(--jm-surface-muted)] px-1.5 py-0.5 text-jm-3xs font-bold uppercase tracking-wider text-[var(--jm-text-muted)]">
               기업
             </span>
           )}
         </div>
-        <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">
+        <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-muted)]">
           {session.itemCount > 0
             ? `${session.itemCount}건 담김`
             : "빈 카트"}
@@ -328,7 +328,7 @@ function SessionRow({
           )}
         </span>
         {parked && (
-          <span className="text-[11px] text-[var(--jm-text-muted)]">
+          <span className="text-jm-2xs text-[var(--jm-text-muted)]">
             {format(parked, "M/d HH:mm")} 저장 ·{" "}
             {formatDistanceToNow(parked, { addSuffix: true, locale: ko })}
           </span>
@@ -400,10 +400,10 @@ function EmptyState() {
         <ShoppingBag className="size-7 text-[var(--jm-text-subtle)]" />
       </div>
       <div className="flex flex-col gap-1">
-        <span className="text-[15px] font-semibold text-[var(--jm-text)]">
+        <span className="text-jm-md font-semibold text-[var(--jm-text)]">
           저장된 상담이 없습니다
         </span>
-        <span className="text-[13px] text-[var(--jm-text-muted)]">
+        <span className="text-jm-sm text-[var(--jm-text-muted)]">
           카트의 [장바구니저장] 버튼으로 보관할 수 있어요
         </span>
       </div>

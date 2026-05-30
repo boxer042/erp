@@ -59,11 +59,11 @@ const sizeMap: Record<
   JmBrandMarkSize,
   { box: string; text: string; iconBox: string }
 > = {
-  xs: { box: "size-5", text: "text-[9px]", iconBox: "[&_svg]:size-3" },
-  sm: { box: "size-7", text: "text-[11px]", iconBox: "[&_svg]:size-4" },
-  md: { box: "size-10", text: "text-[14px]", iconBox: "[&_svg]:size-5" },
-  lg: { box: "size-14", text: "text-[18px]", iconBox: "[&_svg]:size-7" },
-  xl: { box: "size-20", text: "text-[26px]", iconBox: "[&_svg]:size-10" },
+  xs: { box: "size-5", text: "text-jm-4xs", iconBox: "[&_svg]:size-3" },
+  sm: { box: "size-7", text: "text-jm-2xs", iconBox: "[&_svg]:size-4" },
+  md: { box: "size-10", text: "text-jm-base", iconBox: "[&_svg]:size-5" },
+  lg: { box: "size-14", text: "text-jm-xl", iconBox: "[&_svg]:size-7" },
+  xl: { box: "size-20", text: "text-jm-4xl", iconBox: "[&_svg]:size-10" },
 };
 
 const shapeMap: Record<JmBrandMarkShape, string> = {

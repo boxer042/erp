@@ -117,9 +117,10 @@ export const statusLabels: Record<PurchaseOrderStatus, string> = {
   CANCELLED: "취소",
 };
 
-// shadcn Badge variant 와 매핑 (Tailwind 색상 직접 — primary/secondary/outline/destructive 외에 커스텀 필요)
+/* eslint-disable no-restricted-syntax -- 11개 PO 상태 구분용 카테고리 색상(다크 대응 포함). jm 5색 시맨틱으로 환원 불가 — 의도된 다색 팔레트. */
+// 상태별 배지 색상 — 상태 구분이 목적이라 다색 팔레트 직접 사용
 export const statusBadgeClass: Record<PurchaseOrderStatus, string> = {
-  DRAFT: "bg-muted text-muted-foreground border-border",
+  DRAFT: "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] border-[var(--jm-border)]",
   SENT: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
   CONFIRMED: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800",
   COUNTER_OFFER: "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
@@ -131,3 +132,4 @@ export const statusBadgeClass: Record<PurchaseOrderStatus, string> = {
   CLOSED: "bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700",
   CANCELLED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
 };
+/* eslint-enable no-restricted-syntax */

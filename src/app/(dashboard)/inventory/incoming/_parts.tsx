@@ -3,11 +3,7 @@
 import { useState } from "react";
 import { format, parse } from "date-fns";
 import { ko } from "date-fns/locale";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { CalendarIcon, Truck } from "lucide-react";
 import {
   JmButton,
@@ -62,8 +58,8 @@ export function ItemShippingPopover({
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpen}>
-      <PopoverTrigger
+    <PopoverPrimitive.Root open={open} onOpenChange={handleOpen}>
+      <PopoverPrimitive.Trigger
         disabled={disabled}
         className={`p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
           has
@@ -77,13 +73,14 @@ export function ItemShippingPopover({
         }
       >
         <Truck className="size-3.5" />
-      </PopoverTrigger>
-      <PopoverContent
-        data-jm-scope
-        className="w-72 p-3 bg-[var(--jm-surface)] border-[var(--jm-border)] text-[var(--jm-text)]"
-        align="end"
-      >
-        <div className="space-y-3">
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Positioner align="end" sideOffset={6} className="isolate z-50">
+          <PopoverPrimitive.Popup
+            data-jm-scope
+            className="w-72 p-3 rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] text-[var(--jm-text)] outline-none font-[family-name:var(--jm-font-sans)]"
+          >
+            <div className="space-y-3">
           <div className="text-jm-sm font-medium text-[var(--jm-text)]">
             이 품목만 다른 배송비
           </div>
@@ -118,9 +115,11 @@ export function ItemShippingPopover({
               적용
             </JmButton>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+            </div>
+          </PopoverPrimitive.Popup>
+        </PopoverPrimitive.Positioner>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
 
@@ -195,23 +194,30 @@ export function DateInput({
             )}
           </button>
         )}
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger className="h-9 w-9 flex items-center justify-center rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] hover:bg-[var(--jm-surface-muted)] shrink-0">
+        <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
+          <PopoverPrimitive.Trigger className="h-9 w-9 flex items-center justify-center rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface)] hover:bg-[var(--jm-surface-muted)] shrink-0">
             <CalendarIcon className="size-3.5 text-[var(--jm-text-muted)]" />
-          </PopoverTrigger>
-          <PopoverContent data-jm-scope className="w-auto p-0 border-0" align="end">
-            <JmCalendar
-              value={value ? parse(value, "yyyy-MM-dd", new Date()) : undefined}
-              onChange={(date) => {
-                if (date) {
-                  onChange(format(date, "yyyy-MM-dd"));
-                  setOpen(false);
-                  setEditing(false);
-                }
-              }}
-            />
-          </PopoverContent>
-        </Popover>
+          </PopoverPrimitive.Trigger>
+          <PopoverPrimitive.Portal>
+            <PopoverPrimitive.Positioner align="end" sideOffset={6} className="isolate z-50">
+              <PopoverPrimitive.Popup
+                data-jm-scope
+                className="rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
+              >
+                <JmCalendar
+                  value={value ? parse(value, "yyyy-MM-dd", new Date()) : undefined}
+                  onChange={(date) => {
+                    if (date) {
+                      onChange(format(date, "yyyy-MM-dd"));
+                      setOpen(false);
+                      setEditing(false);
+                    }
+                  }}
+                />
+              </PopoverPrimitive.Popup>
+            </PopoverPrimitive.Positioner>
+          </PopoverPrimitive.Portal>
+        </PopoverPrimitive.Root>
       </div>
     </div>
   );

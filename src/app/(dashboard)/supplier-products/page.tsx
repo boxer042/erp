@@ -651,7 +651,7 @@ export default function SupplierProductsPage() {
               <span className="font-semibold">전체 거래처</span>의 모든 미매핑 active 상품에 대해 자동으로 자사 판매 상품을 생성하고 매핑합니다 (현재 화면 필터·검색 무관).
             </p>
             <ul className="mt-3 space-y-1 text-jm-xs text-[var(--jm-text-muted)]">
-              <li>· 새 Product 는 <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5 text-[11px]">AUTO-XXXX</code> SKU 로 생성되며 <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5 text-[11px]">autoMapped</code> 표시됩니다</li>
+              <li>· 새 Product 는 <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5 text-jm-2xs">AUTO-XXXX</code> SKU 로 생성되며 <code className="rounded bg-[var(--jm-surface-muted)] px-1 py-0.5 text-jm-2xs">autoMapped</code> 표시됩니다</li>
               <li>· 환산비율 1:1 로 매핑됩니다</li>
               <li>· 기존 미매핑 입고 로트가 있으면 자동으로 흡수되어 재고에 반영됩니다</li>
               <li>· 이미 매핑된 상품은 영향받지 않습니다</li>

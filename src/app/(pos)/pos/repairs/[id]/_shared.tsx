@@ -17,7 +17,7 @@ export function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
+      <span className="text-jm-3xs font-semibold uppercase tracking-wider text-[var(--jm-text-subtle)]">
         {label}
       </span>
       {children}

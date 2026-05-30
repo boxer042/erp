@@ -239,7 +239,7 @@ export default function LandingSettingsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
-          <div className="flex h-8 w-fit rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[13px]">
+          <div className="flex h-8 w-fit rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface)] text-jm-sm">
             <button
               type="button"
               className={cn(
@@ -323,7 +323,7 @@ export default function LandingSettingsPage() {
                           type="button"
                           variant="outline"
                           size="xs"
-                          className="flex h-auto flex-col gap-1 py-2 text-[11px]"
+                          className="flex h-auto flex-col gap-1 py-2 text-jm-2xs"
                           onClick={() => addBlock(t)}
                         >
                           <Icon className="h-4 w-4" />
@@ -333,9 +333,9 @@ export default function LandingSettingsPage() {
                     />
                     <JmTooltipContent side="bottom" className="max-w-[280px] whitespace-normal">
                       <div className="space-y-1.5 text-left">
-                        <div className="text-[12px] font-semibold">{desc.title}</div>
-                        <div className="text-[11px] leading-snug opacity-90">{desc.body}</div>
-                        <div className="text-[10px] italic opacity-70">{desc.example}</div>
+                        <div className="text-jm-xs font-semibold">{desc.title}</div>
+                        <div className="text-jm-2xs leading-snug opacity-90">{desc.body}</div>
+                        <div className="text-jm-3xs italic opacity-70">{desc.example}</div>
                       </div>
                     </JmTooltipContent>
                   </JmTooltipRoot>
@@ -411,7 +411,7 @@ export default function LandingSettingsPage() {
       <JmCard>
         <JmCardHeader className="flex flex-row items-center justify-between gap-3">
           <JmCardTitle>미리보기</JmCardTitle>
-          <div className="flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[12px]">
+          <div className="flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-jm-xs">
             <button
               type="button"
               className={cn(
@@ -465,7 +465,7 @@ export default function LandingSettingsPage() {
             >
               <LandingPageView blocks={blocks} emptyMessage="블록을 추가하면 여기에 표시됩니다" />
               {isHeader && (
-                <div className="border-t border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-[11px] text-[var(--jm-text-muted)]">
+                <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-jm-2xs text-[var(--jm-text-muted)]">
                   ↓ (실제 페이지에서는 여기에 상품별 본문 + 공통 footer 가 이어집니다)
                 </div>
               )}
@@ -509,7 +509,7 @@ export default function LandingSettingsPage() {
                 setJsonText(e.target.value);
                 setJsonError(null);
               }}
-              className="min-h-0 flex-1 resize-none font-mono text-[11px] leading-snug"
+              className="min-h-0 flex-1 resize-none font-mono text-jm-2xs leading-snug"
               spellCheck={false}
             />
             {jsonError && (
@@ -517,7 +517,7 @@ export default function LandingSettingsPage() {
                 {jsonError}
               </p>
             )}
-            <p className="text-[11px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-2xs text-[var(--jm-text-muted)]">
               스키마: <code className="rounded bg-[var(--jm-surface-muted)] px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
               <code className="rounded bg-[var(--jm-surface-muted)] px-1">src/lib/validators/landing-block.ts</code>{" "}
               참고

@@ -5,22 +5,25 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, PackageX, Package, Search, PackagePlus, ExternalLink, ClipboardSignature } from "lucide-react";
 import { toast } from "sonner";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
 import { apiGet } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+  JmCard,
+  JmCardContent,
+  JmCardHeader,
+  JmCardTitle,
+  JmBadge,
+  JmButton,
+  JmInput,
+  JmTable,
+  JmTableBody,
+  JmTableCell,
+  JmTableHead,
+  JmTableHeader,
+  JmTableRow,
+  JmSkeleton,
+} from "@/jm";
 
 interface LowStockMapping {
   supplierId: string;
@@ -93,22 +96,22 @@ export default function LowStockPage() {
   });
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <h1 className="text-lg font-semibold">재고 부족 알림</h1>
-        <span className="text-[12px] text-muted-foreground">
+    <div className="flex h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex items-center gap-3 border-b border-[var(--jm-border)] px-5 py-3">
+        <h1 className="text-jm-lg font-semibold text-[var(--jm-text)]">재고 부족 알림</h1>
+        <span className="text-jm-xs text-[var(--jm-text-muted)]">
           안전재고 미달 상품
         </span>
         <div className="ml-auto">
-          <Button
+          <JmButton
             variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
+            size="xs"
+            className="gap-1.5"
             onClick={() => router.push("/inventory/incoming")}
           >
             <PackagePlus className="size-3.5" />
             입고 등록
-          </Button>
+          </JmButton>
         </div>
       </div>
 
@@ -155,103 +158,99 @@ export default function LowStockPage() {
 
         <div className="mb-3 flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
+            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--jm-text-muted)]" />
+            <JmInput
               type="search"
+              size="sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="상품명·SKU·브랜드"
-              className="h-[30px] w-[280px] pl-8 text-[13px]"
+              className="h-[30px] w-[280px] pl-8 text-jm-sm"
             />
           </div>
         </div>
 
-        <Card>
-          <CardContent className="px-0">
-            <Table className="min-w-[800px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">상태</TableHead>
-                  <TableHead>상품</TableHead>
-                  <TableHead className="w-[120px]">SKU</TableHead>
-                  <TableHead className="w-[120px]">카테고리</TableHead>
-                  <TableHead className="w-[90px] text-right">현재고</TableHead>
-                  <TableHead className="w-[90px] text-right">안전재고</TableHead>
-                  <TableHead className="w-[90px] text-right">부족분</TableHead>
-                  <TableHead className="w-[160px]">동작</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <JmCard>
+          <JmCardContent className="px-0">
+            <JmTable className="min-w-[800px]">
+              <JmTableHeader>
+                <JmTableRow>
+                  <JmTableHead className="w-[80px]">상태</JmTableHead>
+                  <JmTableHead>상품</JmTableHead>
+                  <JmTableHead className="w-[120px]">SKU</JmTableHead>
+                  <JmTableHead className="w-[120px]">카테고리</JmTableHead>
+                  <JmTableHead className="w-[90px] text-right">현재고</JmTableHead>
+                  <JmTableHead className="w-[90px] text-right">안전재고</JmTableHead>
+                  <JmTableHead className="w-[90px] text-right">부족분</JmTableHead>
+                  <JmTableHead className="w-[160px]">동작</JmTableHead>
+                </JmTableRow>
+              </JmTableHeader>
+              <JmTableBody>
                 {dataQuery.isPending ? (
                   <SkeletonRows />
                 ) : items.length === 0 ? (
-                  <TableRow>
-                    <TableCell
+                  <JmTableRow>
+                    <JmTableCell
                       colSpan={8}
-                      className="py-12 text-center text-muted-foreground"
+                      className="py-12 text-center text-[var(--jm-text-muted)]"
                     >
                       {search || filter !== "all"
                         ? "조건에 맞는 상품이 없습니다"
                         : "재고가 부족한 상품이 없습니다"}
-                    </TableCell>
-                  </TableRow>
+                    </JmTableCell>
+                  </JmTableRow>
                 ) : (
                   items.map((it) => (
-                    <TableRow
+                    <JmTableRow
                       key={it.productId}
                       className="cursor-pointer"
                       onClick={() => router.push(`/products/${it.productId}`)}
                     >
-                      <TableCell>
+                      <JmTableCell>
                         {it.isNegative ? (
-                          <Badge variant="destructive">음수재고</Badge>
+                          <JmBadge variant="danger">음수재고</JmBadge>
                         ) : it.isOut ? (
-                          <Badge variant="destructive">결품</Badge>
+                          <JmBadge variant="danger">결품</JmBadge>
                         ) : (
-                          <Badge
-                            variant="outline"
-                            className="border-amber-300 bg-amber-50 text-amber-800"
-                          >
-                            부족
-                          </Badge>
+                          <JmBadge variant="warning">부족</JmBadge>
                         )}
-                      </TableCell>
-                      <TableCell>
+                      </JmTableCell>
+                      <JmTableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{it.name}</span>
                           {it.spec && (
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                               {it.spec}
                             </span>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-[12px]">
+                      </JmTableCell>
+                      <JmTableCell className="font-mono text-jm-xs">
                         {it.sku}
-                      </TableCell>
-                      <TableCell className="text-[13px] text-muted-foreground">
+                      </JmTableCell>
+                      <JmTableCell className="text-jm-sm text-[var(--jm-text-muted)]">
                         {it.categoryName ?? "-"}
-                      </TableCell>
-                      <TableCell
+                      </JmTableCell>
+                      <JmTableCell
                         className={`text-right tabular-nums font-semibold ${
-                          it.isNegative || it.isOut ? "text-rose-700" : ""
+                          it.isNegative || it.isOut ? "text-[var(--jm-danger-fg)]" : ""
                         }`}
                       >
                         {it.quantity.toLocaleString("ko-KR")} {it.unitOfMeasure}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                      </JmTableCell>
+                      <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
                         {it.safetyStock.toLocaleString("ko-KR")}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold text-rose-700">
+                      </JmTableCell>
+                      <JmTableCell className="text-right tabular-nums font-semibold text-[var(--jm-danger-fg)]">
                         −{it.shortage.toLocaleString("ko-KR")}
-                      </TableCell>
-                      <TableCell>
+                      </JmTableCell>
+                      <JmTableCell>
                         <div className="flex items-center gap-1">
                           <PurchaseOrderButton item={it} router={router} />
-                          <Button
+                          <JmButton
                             variant="ghost"
-                            size="sm"
-                            className="h-7 gap-1 px-2 text-[12px]"
+                            size="xs"
+                            className="h-7 gap-1 px-2 text-jm-xs"
                             onClick={(e) => {
                               e.stopPropagation();
                               router.push(`/products/${it.productId}`);
@@ -259,16 +258,16 @@ export default function LowStockPage() {
                           >
                             <ExternalLink className="size-3" />
                             상세
-                          </Button>
+                          </JmButton>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </JmTableCell>
+                    </JmTableRow>
                   ))
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </JmTableBody>
+            </JmTable>
+          </JmCardContent>
+        </JmCard>
       </div>
     </div>
   );
@@ -293,42 +292,42 @@ function SummaryCard({
 }) {
   const ringClass = active
     ? tone === "danger"
-      ? "ring-2 ring-rose-300"
+      ? "ring-2 ring-[var(--jm-danger-solid)]"
       : tone === "warn"
-        ? "ring-2 ring-amber-300"
-        : "ring-2 ring-zinc-300"
+        ? "ring-2 ring-[var(--jm-warning-solid)]"
+        : "ring-2 ring-[var(--jm-border-strong)]"
     : "";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`text-left transition-shadow ${ringClass} rounded-xl`}
+      className={`text-left transition-shadow ${ringClass} rounded-2xl`}
     >
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-[12px] font-medium text-muted-foreground">
+      <JmCard>
+        <JmCardHeader className="flex flex-row items-center justify-between border-b-0 space-y-0 pb-1">
+          <JmCardTitle className="text-jm-xs font-medium text-[var(--jm-text-muted)]">
             {label}
-          </CardTitle>
+          </JmCardTitle>
           <span
             className={
               tone === "danger"
-                ? "text-rose-600"
+                ? "text-[var(--jm-danger-fg)]"
                 : tone === "warn"
-                  ? "text-amber-600"
-                  : "text-muted-foreground"
+                  ? "text-[var(--jm-warning-fg)]"
+                  : "text-[var(--jm-text-muted)]"
             }
           >
             {icon}
           </span>
-        </CardHeader>
-        <CardContent>
+        </JmCardHeader>
+        <JmCardContent>
           {loading ? (
-            <Skeleton className="h-7 w-16" />
+            <JmSkeleton className="h-7 w-16" />
           ) : (
-            <div className="text-2xl font-bold tabular-nums">{value}</div>
+            <div className="text-jm-3xl font-bold tabular-nums text-[var(--jm-text)]">{value}</div>
           )}
-        </CardContent>
-      </Card>
+        </JmCardContent>
+      </JmCard>
     </button>
   );
 }
@@ -337,38 +336,38 @@ function SkeletonRows() {
   return (
     <>
       {Array.from({ length: 6 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell>
-            <Skeleton className="h-5 w-12 rounded-full" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-4 w-40" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-4 w-24" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-4 w-20" />
-          </TableCell>
-          <TableCell className="text-right">
+        <JmTableRow key={i}>
+          <JmTableCell>
+            <JmSkeleton className="h-5 w-12 rounded-full" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-40" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-24" />
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-4 w-20" />
+          </JmTableCell>
+          <JmTableCell className="text-right">
             <div className="flex justify-end">
-              <Skeleton className="h-4 w-16" />
+              <JmSkeleton className="h-4 w-16" />
             </div>
-          </TableCell>
-          <TableCell className="text-right">
+          </JmTableCell>
+          <JmTableCell className="text-right">
             <div className="flex justify-end">
-              <Skeleton className="h-4 w-16" />
+              <JmSkeleton className="h-4 w-16" />
             </div>
-          </TableCell>
-          <TableCell className="text-right">
+          </JmTableCell>
+          <JmTableCell className="text-right">
             <div className="flex justify-end">
-              <Skeleton className="h-4 w-16" />
+              <JmSkeleton className="h-4 w-16" />
             </div>
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-7 w-28 rounded-md" />
-          </TableCell>
-        </TableRow>
+          </JmTableCell>
+          <JmTableCell>
+            <JmSkeleton className="h-7 w-28 rounded-md" />
+          </JmTableCell>
+        </JmTableRow>
       ))}
     </>
   );
@@ -397,10 +396,10 @@ function PurchaseOrderButton({
 
   if (item.mappings.length === 0) {
     return (
-      <Button
+      <JmButton
         variant="outline"
-        size="sm"
-        className="h-7 gap-1 px-2 text-[12px]"
+        size="xs"
+        className="h-7 gap-1 px-2 text-jm-xs"
         onClick={(e) => {
           e.stopPropagation();
           toast.info("매핑된 거래처가 없습니다. 상품 상세에서 매핑을 먼저 등록하세요.");
@@ -409,16 +408,16 @@ function PurchaseOrderButton({
       >
         <ClipboardSignature className="size-3" />
         발주
-      </Button>
+      </JmButton>
     );
   }
 
   if (item.mappings.length === 1) {
     return (
-      <Button
+      <JmButton
         variant="outline"
-        size="sm"
-        className="h-7 gap-1 px-2 text-[12px]"
+        size="xs"
+        className="h-7 gap-1 px-2 text-jm-xs"
         onClick={(e) => {
           e.stopPropagation();
           navigate(item.mappings[0]);
@@ -426,50 +425,58 @@ function PurchaseOrderButton({
       >
         <ClipboardSignature className="size-3" />
         발주
-      </Button>
+      </JmButton>
     );
   }
 
   // 매핑 2개+ — popover 로 거래처 선택
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
+    <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
+      <PopoverPrimitive.Trigger
         render={
-          <Button
+          <JmButton
             variant="outline"
-            size="sm"
-            className="h-7 gap-1 px-2 text-[12px]"
+            size="xs"
+            className="h-7 gap-1 px-2 text-jm-xs"
             onClick={(e) => e.stopPropagation()}
           />
         }
       >
         <ClipboardSignature className="size-3" />
         발주
-      </PopoverTrigger>
-      <PopoverContent className="w-[260px] p-1" onClick={(e) => e.stopPropagation()}>
-        <div className="px-2 py-1.5 text-[11px] text-muted-foreground">발주할 거래처 선택</div>
-        {item.mappings.map((m, i) => (
-          <button
-            key={`${m.supplierId}-${m.supplierProductId}-${i}`}
-            type="button"
-            className="w-full text-left px-2 py-1.5 rounded-md text-[13px] hover:bg-muted/50 flex items-center justify-between gap-2"
-            onClick={() => {
-              setOpen(false);
-              navigate(m);
-            }}
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Positioner align="start" sideOffset={6} className="isolate z-50">
+          <PopoverPrimitive.Popup
+            data-jm-scope
+            onClick={(e) => e.stopPropagation()}
+            className="z-50 flex w-[260px] flex-col overflow-hidden rounded-xl bg-[var(--jm-surface)] p-1 ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
           >
-            <div className="flex flex-col min-w-0">
-              <span className="truncate font-medium">{m.supplierName}</span>
-              <span className="text-[11px] text-muted-foreground truncate">
-                {m.supplierProductName}{m.supplierCode ? ` · ${m.supplierCode}` : ""}
-              </span>
-            </div>
-            <span className="text-[11px] tabular-nums text-muted-foreground shrink-0">
-              {m.suggestedQty.toLocaleString("ko-KR")}개
-            </span>
-          </button>
-        ))}
-      </PopoverContent>
-    </Popover>
+            <div className="px-2 py-1.5 text-jm-2xs text-[var(--jm-text-muted)]">발주할 거래처 선택</div>
+            {item.mappings.map((m, i) => (
+              <button
+                key={`${m.supplierId}-${m.supplierProductId}-${i}`}
+                type="button"
+                className="w-full text-left px-2 py-1.5 rounded-md text-jm-sm hover:bg-[var(--jm-surface-muted)] flex items-center justify-between gap-2"
+                onClick={() => {
+                  setOpen(false);
+                  navigate(m);
+                }}
+              >
+                <div className="flex flex-col min-w-0">
+                  <span className="truncate font-medium">{m.supplierName}</span>
+                  <span className="text-jm-2xs text-[var(--jm-text-muted)] truncate">
+                    {m.supplierProductName}{m.supplierCode ? ` · ${m.supplierCode}` : ""}
+                  </span>
+                </div>
+                <span className="text-jm-2xs tabular-nums text-[var(--jm-text-muted)] shrink-0">
+                  {m.suggestedQty.toLocaleString("ko-KR")}개
+                </span>
+              </button>
+            ))}
+          </PopoverPrimitive.Popup>
+        </PopoverPrimitive.Positioner>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }

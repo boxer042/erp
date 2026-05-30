@@ -97,7 +97,7 @@ export function RejectSheet({
                   ₩{grossFee.toLocaleString("ko-KR")}
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-[var(--jm-text-muted)]">
+              <p className="mt-1 text-jm-2xs text-[var(--jm-text-muted)]">
                 인계대기로 이동 후 [픽업/결제] 단계에서 진단비만 청구됩니다.
                 {diagnosisFee === 0 && (
                   <span className="block mt-0.5 text-[var(--jm-warning-fg)]">
@@ -190,7 +190,7 @@ function ReasonGroup({
               <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
                 {r.label}
               </span>
-              <span className="text-[11px] text-[var(--jm-text-muted)]">{r.desc}</span>
+              <span className="text-jm-2xs text-[var(--jm-text-muted)]">{r.desc}</span>
             </button>
           );
         })}

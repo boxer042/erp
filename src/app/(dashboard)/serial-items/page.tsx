@@ -118,11 +118,11 @@ function StatusBadge({ status }: { status: StatusKey }) {
 
 function WarrantyCell({ ends }: { ends: string | null }) {
   if (!ends)
-    return <span className="text-[13px] text-[var(--jm-text-subtle)]">—</span>;
+    return <span className="text-jm-sm text-[var(--jm-text-subtle)]">—</span>;
   const left = daysUntil(ends);
   return (
     <div className="flex items-center gap-2">
-      <span className="tabular-nums text-[13px] text-[var(--jm-text-muted)]">
+      <span className="tabular-nums text-jm-sm text-[var(--jm-text-muted)]">
         {fmtDate(ends)}
       </span>
       {left < 0 ? (
@@ -134,7 +134,7 @@ function WarrantyCell({ ends }: { ends: string | null }) {
           D-{left}
         </JmBadge>
       ) : (
-        <span className="text-[11px] text-[var(--jm-text-subtle)]">
+        <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
           D-{left}
         </span>
       )}
@@ -418,7 +418,7 @@ export default function SerialItemsPage() {
                     <JmTableRow className="hover:bg-transparent">
                       <JmTableCell
                         colSpan={8}
-                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                        className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                       >
                         라벨 목록을 불러오지 못했습니다
                       </JmTableCell>
@@ -472,7 +472,7 @@ export default function SerialItemsPage() {
                                 수리
                               </JmBadge>
                             )}
-                            <span className="font-[family-name:var(--jm-font-mono)] text-[13px] font-medium text-[var(--jm-text)]">
+                            <span className="font-[family-name:var(--jm-font-mono)] text-jm-sm font-medium text-[var(--jm-text)]">
                               {it.code}
                             </span>
                           </div>
@@ -480,24 +480,24 @@ export default function SerialItemsPage() {
                         <JmTableCell>
                           {it.product ? (
                             <div className="flex flex-col">
-                              <span className="text-[13px] text-[var(--jm-text)]">
+                              <span className="text-jm-sm text-[var(--jm-text)]">
                                 {it.product.name}
                               </span>
-                              <span className="font-[family-name:var(--jm-font-mono)] text-[11px] text-[var(--jm-text-muted)]">
+                              <span className="font-[family-name:var(--jm-font-mono)] text-jm-2xs text-[var(--jm-text-muted)]">
                                 {it.product.sku}
                               </span>
                             </div>
                           ) : it.displayName ? (
                             <div className="flex flex-col">
-                              <span className="text-[13px] text-[var(--jm-text)]">
+                              <span className="text-jm-sm text-[var(--jm-text)]">
                                 {it.displayName}
                               </span>
-                              <span className="text-[11px] text-[var(--jm-text-muted)]">
+                              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                                 외부 기기
                               </span>
                             </div>
                           ) : (
-                            <span className="text-[13px] text-[var(--jm-text-subtle)]">
+                            <span className="text-jm-sm text-[var(--jm-text-subtle)]">
                               —
                             </span>
                           )}
@@ -505,22 +505,22 @@ export default function SerialItemsPage() {
                         <JmTableCell>
                           {it.customer ? (
                             <div className="flex flex-col">
-                              <span className="text-[13px] text-[var(--jm-text)]">
+                              <span className="text-jm-sm text-[var(--jm-text)]">
                                 {it.customer.name}
                               </span>
                               {it.customer.phone && (
-                                <span className="font-[family-name:var(--jm-font-mono)] text-[11px] text-[var(--jm-text-muted)]">
+                                <span className="font-[family-name:var(--jm-font-mono)] text-jm-2xs text-[var(--jm-text-muted)]">
                                   {it.customer.phone}
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-[13px] text-[var(--jm-text-subtle)]">
+                            <span className="text-jm-sm text-[var(--jm-text-subtle)]">
                               —
                             </span>
                           )}
                         </JmTableCell>
-                        <JmTableCell className="tabular-nums text-[13px] text-[var(--jm-text-muted)]">
+                        <JmTableCell className="tabular-nums text-jm-sm text-[var(--jm-text-muted)]">
                           {fmtDate(it.soldAt)}
                         </JmTableCell>
                         <JmTableCell>

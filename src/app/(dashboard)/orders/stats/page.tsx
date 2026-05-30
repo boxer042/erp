@@ -475,7 +475,7 @@ export default function SalesStatsPage() {
                           <TableCell className="text-right tabular-nums">
                             ₩{c.total.toLocaleString("ko-KR")}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-rose-600">
+                          <TableCell className="text-right tabular-nums text-[var(--jm-danger-fg)]">
                             {c.commission > 0
                               ? `−₩${c.commission.toLocaleString("ko-KR")}`
                               : "-"}
@@ -513,10 +513,10 @@ export default function SalesStatsPage() {
                             : "미등록";
                       const tone =
                         g.type === "BUSINESS"
-                          ? "bg-amber-50 text-amber-900 border-amber-200"
+                          ? "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)] border-[var(--jm-warning-solid)]"
                           : g.type === "INDIVIDUAL"
-                            ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-                            : "bg-zinc-50 text-zinc-700 border-zinc-200";
+                            ? "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)] border-[var(--jm-success-solid)]"
+                            : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] border-[var(--jm-border)]";
                       const totalAll = stats.byCustomerType.reduce(
                         (s, x) => s + x.total,
                         0,

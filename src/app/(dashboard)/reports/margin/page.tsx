@@ -5,19 +5,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
-  Card, CardContent, CardHeader, CardTitle,
-} from "@/components/ui/card";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+  JmCard, JmCardContent, JmCardHeader, JmCardTitle,
+  JmSelect,
+  JmTable, JmTableBody, JmTableCell, JmTableHead, JmTableHeader, JmTableRow,
+  JmButton,
+  JmSkeleton,
+  JmAlert,
+} from "@/jm";
 import { Download } from "lucide-react";
 import { format } from "date-fns";
 import { toCSV, downloadCSV } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface PeriodSummary {
   orderCount: number;
@@ -151,17 +148,29 @@ function deltaPct(curr: number, prev: number): { value: number; sign: "up" | "do
 
 function DeltaBadge({ curr, prev }: { curr: number; prev: number }) {
   const { value, sign } = deltaPct(curr, prev);
-  if (sign === "flat") return <span className="text-[11px] text-muted-foreground">— vs 이전</span>;
-  const color = sign === "up" ? "text-primary" : "text-red-400";
+  if (sign === "flat") return <span className="text-jm-2xs text-[var(--jm-text-muted)]">— vs 이전</span>;
+  const color = sign === "up" ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]";
   const arrow = sign === "up" ? "▲" : "▼";
   return (
-    <span className={`text-[11px] tabular-nums ${color}`}>
+    <span className={`text-jm-2xs tabular-nums ${color}`}>
       {arrow} {value.toFixed(1)}% vs 이전
     </span>
   );
 }
 
 type TopProductSort = "revenue" | "netProfit";
+
+const PERIOD_OPTIONS: { value: PeriodKey; label: string }[] = [
+  { value: "this-month", label: "이번 달" },
+  { value: "last-month", label: "전월" },
+  { value: "last-7d", label: "최근 7일" },
+  { value: "last-30d", label: "최근 30일" },
+];
+
+const TOP_SORT_OPTIONS: { value: TopProductSort; label: string }[] = [
+  { value: "revenue", label: "매출 기준" },
+  { value: "netProfit", label: "실수익 기준" },
+];
 
 export default function MarginReportPage() {
   const queryClient = useQueryClient();
@@ -190,6 +199,11 @@ export default function MarginReportPage() {
   const data = reportQuery.data ?? null;
   const loading = reportQuery.isPending;
   const fetchData = () => queryClient.invalidateQueries({ queryKey: ["reports", "margin"] });
+
+  const channelOptions = [
+    { value: "all", label: "전체 채널" },
+    ...channels.map((c) => ({ value: c.id, label: c.name })),
+  ];
 
   const handleExport = (kind: "orders" | "channels" | "products" | "categories") => {
     if (!data) return;
@@ -261,347 +275,334 @@ export default function MarginReportPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">마진 리포트</h2>
-          <p className="text-[13px] text-muted-foreground">매출 시점의 실제 원가·수수료를 반영한 실순이익 분석</p>
-        </div>
-        <div className="flex gap-2">
-          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
-            <SelectTrigger className="!h-9 w-[120px]">
-              <span>
-                {period === "this-month" ? "이번 달"
-                  : period === "last-month" ? "전월"
-                  : period === "last-7d" ? "최근 7일"
-                  : "최근 30일"}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="this-month">이번 달</SelectItem>
-              <SelectItem value="last-month">전월</SelectItem>
-              <SelectItem value="last-7d">최근 7일</SelectItem>
-              <SelectItem value="last-30d">최근 30일</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={channelId} onValueChange={(v) => setChannelId(v ?? "all")}>
-            <SelectTrigger className="!h-9 w-[140px]">
-              <span>{channelId === "all" ? "전체 채널" : channels.find((c) => c.id === channelId)?.name ?? "전체 채널"}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체 채널</SelectItem>
-              {channels.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {loading || !data ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-lg border border-border bg-card p-3 space-y-2">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-6 w-24" />
-              </div>
-            ))}
+    <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
+      <div className="flex w-full flex-col gap-6 p-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-jm-lg font-semibold text-[var(--jm-text)]">마진 리포트</h2>
+            <p className="text-jm-sm text-[var(--jm-text-muted)]">매출 시점의 실제 원가·수수료를 반영한 실순이익 분석</p>
           </div>
-          <Skeleton className="h-3 w-64" />
-          {[8, 6].map((rows, ci) => (
-            <Card key={ci}>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-16 rounded-md" />
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="border-b border-border bg-muted/40 grid grid-cols-8 gap-2 px-3 py-2">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <Skeleton key={i} className="h-3 w-full" />
-                  ))}
+          <div className="flex gap-2">
+            <JmSelect
+              variant="pill"
+              size="sm"
+              options={PERIOD_OPTIONS}
+              value={period}
+              onChange={(v) => setPeriod(v as PeriodKey)}
+            />
+            <JmSelect
+              variant="pill"
+              size="sm"
+              options={channelOptions}
+              value={channelId}
+              onChange={(v) => setChannelId(v ?? "all")}
+            />
+          </div>
+        </div>
+
+        {loading || !data ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-3 space-y-2">
+                  <JmSkeleton className="h-3 w-16" />
+                  <JmSkeleton className="h-6 w-24" />
                 </div>
-                {Array.from({ length: rows }).map((_, r) => (
-                  <div key={r} className="border-b border-border grid grid-cols-8 gap-2 px-3 py-2 items-center">
-                    <Skeleton className="h-4 w-full col-span-1" />
-                    {Array.from({ length: 7 }).map((_, c) => (
-                      <div key={c} className="flex justify-end">
-                        <Skeleton className="h-4 w-16" />
-                      </div>
+              ))}
+            </div>
+            <JmSkeleton className="h-3 w-64" />
+            {[8, 6].map((rows, ci) => (
+              <JmCard key={ci}>
+                <JmCardHeader className="flex flex-row items-center justify-between">
+                  <JmSkeleton className="h-4 w-24" />
+                  <JmSkeleton className="h-8 w-16 rounded-md" />
+                </JmCardHeader>
+                <JmCardContent className="p-0">
+                  <div className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)] grid grid-cols-8 gap-2 px-3 py-2">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <JmSkeleton key={i} className="h-3 w-full" />
                     ))}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <>
-          {/* 원가 정보 누락 경고 */}
-          {data.missingCostCount && data.missingCostCount > 0 ? (
-            <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-2.5 text-sm text-yellow-700 dark:text-yellow-400">
-              ⚠️ {data.missingCostCount}건의 주문 항목에 원가 정보가 누락되어 마진이 과대 표시될 수 있습니다.
-              {data.missingCostOrderIds && data.missingCostOrderIds.length > 0 && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  (관련 주문 {data.missingCostOrderIds.length}건)
-                </span>
-              )}
-            </div>
-          ) : null}
-
-          {/* 요약 카드 그리드 */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <SummaryCard
-              title="매출 (VAT포함)"
-              value={`₩${fmt(data.summary.revenue)}`}
-              delta={<DeltaBadge curr={data.summary.revenue} prev={data.prevSummary.revenue} />}
-            />
-            <SummaryCard
-              title="매출원가"
-              value={`₩${fmt(data.summary.costAmount)}`}
-              delta={<DeltaBadge curr={data.summary.costAmount} prev={data.prevSummary.costAmount} />}
-            />
-            <SummaryCard
-              title="채널 수수료"
-              value={`₩${fmt(data.summary.commissionAmount)}`}
-              delta={<DeltaBadge curr={data.summary.commissionAmount} prev={data.prevSummary.commissionAmount} />}
-            />
-            <SummaryCard
-              title="카드 수수료"
-              value={`₩${fmt(data.summary.cardFeeAmount)}`}
-              delta={<DeltaBadge curr={data.summary.cardFeeAmount} prev={data.prevSummary.cardFeeAmount} />}
-            />
-            <SummaryCard
-              title="운영경비"
-              value={`₩${fmt(data.summary.opexAmount ?? 0)}`}
-              sub={data.summary.opexByCategory && data.summary.opexByCategory.length > 0
-                ? `${data.summary.opexByCategory.length}개 카테고리`
-                : undefined}
-              delta={<DeltaBadge curr={data.summary.opexAmount ?? 0} prev={data.prevSummary.opexAmount ?? 0} />}
-            />
-            <SummaryCard
-              title="실순이익"
-              value={`₩${fmt(data.summary.netProfit)}`}
-              sub={`마진율 ${data.summary.marginRate.toFixed(1)}%`}
-              delta={<DeltaBadge curr={data.summary.netProfit} prev={data.prevSummary.netProfit} />}
-              highlight
-            />
-          </div>
-
-          <div className="text-[12px] text-muted-foreground">
-            기준 기간: {format(new Date(data.period.from), "yyyy-MM-dd")} ~ {format(new Date(data.period.to), "yyyy-MM-dd")}
-            ({data.summary.orderCount}건 / {data.summary.itemCount}품목)
-          </div>
-
-          {/* 채널별 합계 */}
-          {data.channelGroups.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">채널별 합계</CardTitle>
-                <Button variant="outline" size="sm" className="h-8 text-[12px] gap-1.5" onClick={() => handleExport("channels")}>
-                  <Download className="h-3.5 w-3.5" /> CSV
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>채널</TableHead>
-                      <TableHead className="text-right">주문수</TableHead>
-                      <TableHead className="text-right">매출(공급가)</TableHead>
-                      <TableHead className="text-right">원가</TableHead>
-                      <TableHead className="text-right">수수료</TableHead>
-                      <TableHead className="text-right">카드료</TableHead>
-                      <TableHead className="text-right">실순이익</TableHead>
-                      <TableHead className="text-right">마진율</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.channelGroups.map((g) => (
-                      <TableRow key={g.channelId ?? "__offline__"}>
-                        <TableCell className="text-[12px] font-medium">{g.channelName}</TableCell>
-                        <TableCell className="text-right tabular-nums text-[12px]">{g.orderCount}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.supplyRevenue)}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.costAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.commissionAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{g.cardFeeAmount > 0 ? `₩${fmt(g.cardFeeAmount)}` : "—"}</TableCell>
-                        <TableCell className={`text-right tabular-nums font-semibold ${g.netProfit >= 0 ? "text-primary" : "text-red-400"}`}>
-                          ₩{fmt(g.netProfit)}
-                        </TableCell>
-                        <TableCell className={`text-right tabular-nums ${g.marginRate >= 0 ? "text-primary" : "text-red-400"}`}>
-                          {g.marginRate.toFixed(1)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 카테고리별 합계 */}
-          {data.categoryGroups && data.categoryGroups.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">카테고리별 합계</CardTitle>
-                <Button variant="outline" size="sm" className="h-8 text-[12px] gap-1.5" onClick={() => handleExport("categories")}>
-                  <Download className="h-3.5 w-3.5" /> CSV
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>카테고리</TableHead>
-                      <TableHead className="text-right">판매수량</TableHead>
-                      <TableHead className="text-right">매출(공급가)</TableHead>
-                      <TableHead className="text-right">원가</TableHead>
-                      <TableHead className="text-right">수수료</TableHead>
-                      <TableHead className="text-right">배송원가</TableHead>
-                      <TableHead className="text-right">실순이익</TableHead>
-                      <TableHead className="text-right">마진율</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.categoryGroups.map((g) => (
-                      <TableRow key={g.categoryId ?? "__none__"}>
-                        <TableCell className="text-[12px] font-medium">{g.categoryName}</TableCell>
-                        <TableCell className="text-right tabular-nums text-[12px]">{g.quantity}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.supplyRevenue)}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.costAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(g.commissionAmount + g.cardFeeAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{g.shippingCostAmount > 0 ? `₩${fmt(g.shippingCostAmount)}` : "—"}</TableCell>
-                        <TableCell className={`text-right tabular-nums font-semibold ${g.netProfit >= 0 ? "text-primary" : "text-red-400"}`}>
-                          ₩{fmt(g.netProfit)}
-                        </TableCell>
-                        <TableCell className={`text-right tabular-nums ${g.marginRate >= 0 ? "text-primary" : "text-red-400"}`}>
-                          {g.marginRate.toFixed(1)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 상품 TOP 10 */}
-          {data.productGroups.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
-                <CardTitle className="text-base">상품 TOP 10</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Select value={topSort} onValueChange={(v) => setTopSort((v ?? "revenue") as TopProductSort)}>
-                    <SelectTrigger className="!h-8 w-[120px] text-[12px]">
-                      <span>{topSort === "revenue" ? "매출 기준" : "실수익 기준"}</span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="revenue">매출 기준</SelectItem>
-                      <SelectItem value="netProfit">실수익 기준</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button variant="outline" size="sm" className="h-8 text-[12px] gap-1.5" onClick={() => handleExport("products")}>
-                    <Download className="h-3.5 w-3.5" /> CSV
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>순위</TableHead>
-                      <TableHead>상품</TableHead>
-                      <TableHead>규격</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead className="text-right">판매수량</TableHead>
-                      <TableHead className="text-right">매출(공급가)</TableHead>
-                      <TableHead className="text-right">원가</TableHead>
-                      <TableHead className="text-right">배송원가</TableHead>
-                      <TableHead className="text-right">실순이익</TableHead>
-                      <TableHead className="text-right">마진율</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...data.productGroups]
-                      .sort((a, b) => topSort === "revenue" ? b.supplyRevenue - a.supplyRevenue : b.netProfit - a.netProfit)
-                      .slice(0, 10)
-                      .map((p, idx) => (
-                        <TableRow key={p.productId}>
-                          <TableCell className="text-[12px] text-muted-foreground tabular-nums">{idx + 1}</TableCell>
-                          <TableCell className="text-[12px] font-medium">{p.productName}</TableCell>
-                          <TableCell className="text-[12px] text-muted-foreground">{p.spec ?? "-"}</TableCell>
-                          <TableCell className="text-[12px] text-muted-foreground">{p.sku}</TableCell>
-                          <TableCell className="text-right tabular-nums text-[12px]">{p.quantity}</TableCell>
-                          <TableCell className="text-right tabular-nums">₩{fmt(p.supplyRevenue)}</TableCell>
-                          <TableCell className="text-right tabular-nums">₩{fmt(p.costAmount)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{p.shippingCostAmount > 0 ? `₩${fmt(p.shippingCostAmount)}` : "—"}</TableCell>
-                          <TableCell className={`text-right tabular-nums font-semibold ${p.netProfit >= 0 ? "text-primary" : "text-red-400"}`}>
-                            ₩{fmt(p.netProfit)}
-                          </TableCell>
-                          <TableCell className={`text-right tabular-nums ${p.marginRate >= 0 ? "text-primary" : "text-red-400"}`}>
-                            {p.marginRate.toFixed(1)}%
-                          </TableCell>
-                        </TableRow>
+                  {Array.from({ length: rows }).map((_, r) => (
+                    <div key={r} className="border-b border-[var(--jm-border)] grid grid-cols-8 gap-2 px-3 py-2 items-center">
+                      <JmSkeleton className="h-4 w-full col-span-1" />
+                      {Array.from({ length: 7 }).map((_, c) => (
+                        <div key={c} className="flex justify-end">
+                          <JmSkeleton className="h-4 w-16" />
+                        </div>
                       ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
+                    </div>
+                  ))}
+                </JmCardContent>
+              </JmCard>
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* 원가 정보 누락 경고 */}
+            {data.missingCostCount && data.missingCostCount > 0 ? (
+              <JmAlert variant="warning">
+                {data.missingCostCount}건의 주문 항목에 원가 정보가 누락되어 마진이 과대 표시될 수 있습니다.
+                {data.missingCostOrderIds && data.missingCostOrderIds.length > 0 && (
+                  <span className="ml-2 text-jm-xs opacity-80">
+                    (관련 주문 {data.missingCostOrderIds.length}건)
+                  </span>
+                )}
+              </JmAlert>
+            ) : null}
 
-          {/* 주문별 리스트 */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">주문별 마진</CardTitle>
-              <Button variant="outline" size="sm" className="h-8 text-[12px] gap-1.5" onClick={() => handleExport("orders")}>
-                <Download className="h-3.5 w-3.5" /> CSV
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              {data.orders.length === 0 ? (
-                <p className="px-6 py-8 text-center text-muted-foreground text-[13px]">해당 기간에 확정된 주문이 없습니다.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>주문일</TableHead>
-                      <TableHead>주문번호</TableHead>
-                      <TableHead>채널</TableHead>
-                      <TableHead className="text-right">매출(공급가)</TableHead>
-                      <TableHead className="text-right">원가</TableHead>
-                      <TableHead className="text-right">수수료</TableHead>
-                      <TableHead className="text-right">카드료</TableHead>
-                      <TableHead className="text-right">배송원가</TableHead>
-                      <TableHead className="text-right">실순이익</TableHead>
-                      <TableHead className="text-right">마진율</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.orders.map((o) => (
-                      <TableRow key={o.id}>
-                        <TableCell className="text-[12px]">{format(new Date(o.orderDate), "yyyy-MM-dd")}</TableCell>
-                        <TableCell className="text-[12px]">{o.orderNo}</TableCell>
-                        <TableCell className="text-[12px]">{o.channelName}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(o.supplyRevenue)}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(o.costAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">₩{fmt(o.commissionAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{o.cardFeeAmount > 0 ? `₩${fmt(o.cardFeeAmount)}` : "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">{o.shippingCostAmount && o.shippingCostAmount > 0 ? `₩${fmt(o.shippingCostAmount)}` : "—"}</TableCell>
-                        <TableCell className={`text-right tabular-nums font-semibold ${o.netProfit >= 0 ? "text-primary" : "text-red-400"}`}>
-                          ₩{fmt(o.netProfit)}
-                        </TableCell>
-                        <TableCell className={`text-right tabular-nums ${o.marginRate >= 0 ? "text-primary" : "text-red-400"}`}>
-                          {o.marginRate.toFixed(1)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+            {/* 요약 카드 그리드 */}
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <SummaryCard
+                title="매출 (VAT포함)"
+                value={`₩${fmt(data.summary.revenue)}`}
+                delta={<DeltaBadge curr={data.summary.revenue} prev={data.prevSummary.revenue} />}
+              />
+              <SummaryCard
+                title="매출원가"
+                value={`₩${fmt(data.summary.costAmount)}`}
+                delta={<DeltaBadge curr={data.summary.costAmount} prev={data.prevSummary.costAmount} />}
+              />
+              <SummaryCard
+                title="채널 수수료"
+                value={`₩${fmt(data.summary.commissionAmount)}`}
+                delta={<DeltaBadge curr={data.summary.commissionAmount} prev={data.prevSummary.commissionAmount} />}
+              />
+              <SummaryCard
+                title="카드 수수료"
+                value={`₩${fmt(data.summary.cardFeeAmount)}`}
+                delta={<DeltaBadge curr={data.summary.cardFeeAmount} prev={data.prevSummary.cardFeeAmount} />}
+              />
+              <SummaryCard
+                title="운영경비"
+                value={`₩${fmt(data.summary.opexAmount ?? 0)}`}
+                sub={data.summary.opexByCategory && data.summary.opexByCategory.length > 0
+                  ? `${data.summary.opexByCategory.length}개 카테고리`
+                  : undefined}
+                delta={<DeltaBadge curr={data.summary.opexAmount ?? 0} prev={data.prevSummary.opexAmount ?? 0} />}
+              />
+              <SummaryCard
+                title="실순이익"
+                value={`₩${fmt(data.summary.netProfit)}`}
+                sub={`마진율 ${data.summary.marginRate.toFixed(1)}%`}
+                delta={<DeltaBadge curr={data.summary.netProfit} prev={data.prevSummary.netProfit} />}
+                highlight
+              />
+            </div>
+
+            <div className="text-jm-xs text-[var(--jm-text-muted)]">
+              기준 기간: {format(new Date(data.period.from), "yyyy-MM-dd")} ~ {format(new Date(data.period.to), "yyyy-MM-dd")}
+              ({data.summary.orderCount}건 / {data.summary.itemCount}품목)
+            </div>
+
+            {/* 채널별 합계 */}
+            {data.channelGroups.length > 0 && (
+              <JmCard>
+                <JmCardHeader className="flex flex-row items-center justify-between">
+                  <JmCardTitle className="text-jm-base">채널별 합계</JmCardTitle>
+                  <JmButton variant="outline" size="xs" className="gap-1.5" onClick={() => handleExport("channels")}>
+                    <Download className="h-3.5 w-3.5" /> CSV
+                  </JmButton>
+                </JmCardHeader>
+                <JmCardContent className="p-0">
+                  <JmTable>
+                    <JmTableHeader>
+                      <JmTableRow>
+                        <JmTableHead>채널</JmTableHead>
+                        <JmTableHead className="text-right">주문수</JmTableHead>
+                        <JmTableHead className="text-right">매출(공급가)</JmTableHead>
+                        <JmTableHead className="text-right">원가</JmTableHead>
+                        <JmTableHead className="text-right">수수료</JmTableHead>
+                        <JmTableHead className="text-right">카드료</JmTableHead>
+                        <JmTableHead className="text-right">실순이익</JmTableHead>
+                        <JmTableHead className="text-right">마진율</JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {data.channelGroups.map((g) => (
+                        <JmTableRow key={g.channelId ?? "__offline__"}>
+                          <JmTableCell className="text-jm-xs font-medium">{g.channelName}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums text-jm-xs">{g.orderCount}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(g.supplyRevenue)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(g.costAmount)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(g.commissionAmount)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">{g.cardFeeAmount > 0 ? `₩${fmt(g.cardFeeAmount)}` : "—"}</JmTableCell>
+                          <JmTableCell className={`text-right tabular-nums font-semibold ${g.netProfit >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                            ₩{fmt(g.netProfit)}
+                          </JmTableCell>
+                          <JmTableCell className={`text-right tabular-nums ${g.marginRate >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                            {g.marginRate.toFixed(1)}%
+                          </JmTableCell>
+                        </JmTableRow>
+                      ))}
+                    </JmTableBody>
+                  </JmTable>
+                </JmCardContent>
+              </JmCard>
+            )}
+
+            {/* 카테고리별 합계 */}
+            {data.categoryGroups && data.categoryGroups.length > 0 && (
+              <JmCard>
+                <JmCardHeader className="flex flex-row items-center justify-between">
+                  <JmCardTitle className="text-jm-base">카테고리별 합계</JmCardTitle>
+                  <JmButton variant="outline" size="xs" className="gap-1.5" onClick={() => handleExport("categories")}>
+                    <Download className="h-3.5 w-3.5" /> CSV
+                  </JmButton>
+                </JmCardHeader>
+                <JmCardContent className="p-0">
+                  <JmTable>
+                    <JmTableHeader>
+                      <JmTableRow>
+                        <JmTableHead>카테고리</JmTableHead>
+                        <JmTableHead className="text-right">판매수량</JmTableHead>
+                        <JmTableHead className="text-right">매출(공급가)</JmTableHead>
+                        <JmTableHead className="text-right">원가</JmTableHead>
+                        <JmTableHead className="text-right">수수료</JmTableHead>
+                        <JmTableHead className="text-right">배송원가</JmTableHead>
+                        <JmTableHead className="text-right">실순이익</JmTableHead>
+                        <JmTableHead className="text-right">마진율</JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {data.categoryGroups.map((g) => (
+                        <JmTableRow key={g.categoryId ?? "__none__"}>
+                          <JmTableCell className="text-jm-xs font-medium">{g.categoryName}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums text-jm-xs">{g.quantity}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(g.supplyRevenue)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(g.costAmount)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(g.commissionAmount + g.cardFeeAmount)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">{g.shippingCostAmount > 0 ? `₩${fmt(g.shippingCostAmount)}` : "—"}</JmTableCell>
+                          <JmTableCell className={`text-right tabular-nums font-semibold ${g.netProfit >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                            ₩{fmt(g.netProfit)}
+                          </JmTableCell>
+                          <JmTableCell className={`text-right tabular-nums ${g.marginRate >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                            {g.marginRate.toFixed(1)}%
+                          </JmTableCell>
+                        </JmTableRow>
+                      ))}
+                    </JmTableBody>
+                  </JmTable>
+                </JmCardContent>
+              </JmCard>
+            )}
+
+            {/* 상품 TOP 10 */}
+            {data.productGroups.length > 0 && (
+              <JmCard>
+                <JmCardHeader className="flex flex-row items-center justify-between gap-2">
+                  <JmCardTitle className="text-jm-base">상품 TOP 10</JmCardTitle>
+                  <div className="flex items-center gap-2">
+                    <JmSelect
+                      variant="pill"
+                      size="sm"
+                      options={TOP_SORT_OPTIONS}
+                      value={topSort}
+                      onChange={(v) => setTopSort((v ?? "revenue") as TopProductSort)}
+                    />
+                    <JmButton variant="outline" size="xs" className="gap-1.5" onClick={() => handleExport("products")}>
+                      <Download className="h-3.5 w-3.5" /> CSV
+                    </JmButton>
+                  </div>
+                </JmCardHeader>
+                <JmCardContent className="p-0">
+                  <JmTable>
+                    <JmTableHeader>
+                      <JmTableRow>
+                        <JmTableHead>순위</JmTableHead>
+                        <JmTableHead>상품</JmTableHead>
+                        <JmTableHead>규격</JmTableHead>
+                        <JmTableHead>SKU</JmTableHead>
+                        <JmTableHead className="text-right">판매수량</JmTableHead>
+                        <JmTableHead className="text-right">매출(공급가)</JmTableHead>
+                        <JmTableHead className="text-right">원가</JmTableHead>
+                        <JmTableHead className="text-right">배송원가</JmTableHead>
+                        <JmTableHead className="text-right">실순이익</JmTableHead>
+                        <JmTableHead className="text-right">마진율</JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {[...data.productGroups]
+                        .sort((a, b) => topSort === "revenue" ? b.supplyRevenue - a.supplyRevenue : b.netProfit - a.netProfit)
+                        .slice(0, 10)
+                        .map((p, idx) => (
+                          <JmTableRow key={p.productId}>
+                            <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">{idx + 1}</JmTableCell>
+                            <JmTableCell className="text-jm-xs font-medium">{p.productName}</JmTableCell>
+                            <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">{p.spec ?? "-"}</JmTableCell>
+                            <JmTableCell className="text-jm-xs text-[var(--jm-text-muted)]">{p.sku}</JmTableCell>
+                            <JmTableCell className="text-right tabular-nums text-jm-xs">{p.quantity}</JmTableCell>
+                            <JmTableCell className="text-right tabular-nums">₩{fmt(p.supplyRevenue)}</JmTableCell>
+                            <JmTableCell className="text-right tabular-nums">₩{fmt(p.costAmount)}</JmTableCell>
+                            <JmTableCell className="text-right tabular-nums">{p.shippingCostAmount > 0 ? `₩${fmt(p.shippingCostAmount)}` : "—"}</JmTableCell>
+                            <JmTableCell className={`text-right tabular-nums font-semibold ${p.netProfit >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                              ₩{fmt(p.netProfit)}
+                            </JmTableCell>
+                            <JmTableCell className={`text-right tabular-nums ${p.marginRate >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                              {p.marginRate.toFixed(1)}%
+                            </JmTableCell>
+                          </JmTableRow>
+                        ))}
+                    </JmTableBody>
+                  </JmTable>
+                </JmCardContent>
+              </JmCard>
+            )}
+
+            {/* 주문별 리스트 */}
+            <JmCard>
+              <JmCardHeader className="flex flex-row items-center justify-between">
+                <JmCardTitle className="text-jm-base">주문별 마진</JmCardTitle>
+                <JmButton variant="outline" size="xs" className="gap-1.5" onClick={() => handleExport("orders")}>
+                  <Download className="h-3.5 w-3.5" /> CSV
+                </JmButton>
+              </JmCardHeader>
+              <JmCardContent className="p-0">
+                {data.orders.length === 0 ? (
+                  <p className="px-6 py-8 text-center text-[var(--jm-text-muted)] text-jm-sm">해당 기간에 확정된 주문이 없습니다.</p>
+                ) : (
+                  <JmTable>
+                    <JmTableHeader>
+                      <JmTableRow>
+                        <JmTableHead>주문일</JmTableHead>
+                        <JmTableHead>주문번호</JmTableHead>
+                        <JmTableHead>채널</JmTableHead>
+                        <JmTableHead className="text-right">매출(공급가)</JmTableHead>
+                        <JmTableHead className="text-right">원가</JmTableHead>
+                        <JmTableHead className="text-right">수수료</JmTableHead>
+                        <JmTableHead className="text-right">카드료</JmTableHead>
+                        <JmTableHead className="text-right">배송원가</JmTableHead>
+                        <JmTableHead className="text-right">실순이익</JmTableHead>
+                        <JmTableHead className="text-right">마진율</JmTableHead>
+                      </JmTableRow>
+                    </JmTableHeader>
+                    <JmTableBody>
+                      {data.orders.map((o) => (
+                        <JmTableRow key={o.id}>
+                          <JmTableCell className="text-jm-xs">{format(new Date(o.orderDate), "yyyy-MM-dd")}</JmTableCell>
+                          <JmTableCell className="text-jm-xs">{o.orderNo}</JmTableCell>
+                          <JmTableCell className="text-jm-xs">{o.channelName}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(o.supplyRevenue)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(o.costAmount)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">₩{fmt(o.commissionAmount)}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">{o.cardFeeAmount > 0 ? `₩${fmt(o.cardFeeAmount)}` : "—"}</JmTableCell>
+                          <JmTableCell className="text-right tabular-nums">{o.shippingCostAmount && o.shippingCostAmount > 0 ? `₩${fmt(o.shippingCostAmount)}` : "—"}</JmTableCell>
+                          <JmTableCell className={`text-right tabular-nums font-semibold ${o.netProfit >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                            ₩{fmt(o.netProfit)}
+                          </JmTableCell>
+                          <JmTableCell className={`text-right tabular-nums ${o.marginRate >= 0 ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-danger-fg)]"}`}>
+                            {o.marginRate.toFixed(1)}%
+                          </JmTableCell>
+                        </JmTableRow>
+                      ))}
+                    </JmTableBody>
+                  </JmTable>
+                )}
+              </JmCardContent>
+            </JmCard>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -616,10 +617,10 @@ function SummaryCard({
   highlight?: boolean;
 }) {
   return (
-    <div className={`rounded-lg border p-3 space-y-1 ${highlight ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-      <div className="text-[11px] text-muted-foreground">{title}</div>
-      <div className={`text-[15px] font-bold tabular-nums ${highlight ? "text-primary" : "text-foreground"}`}>{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground tabular-nums">{sub}</div>}
+    <div className={`rounded-2xl border p-3 space-y-1 ${highlight ? "border-[var(--jm-success-fg)]/40 bg-[var(--jm-success-bg)]" : "border-[var(--jm-border)] bg-[var(--jm-surface)]"}`}>
+      <div className="text-jm-2xs text-[var(--jm-text-muted)]">{title}</div>
+      <div className={`text-jm-md font-bold tabular-nums ${highlight ? "text-[var(--jm-success-fg)]" : "text-[var(--jm-text)]"}`}>{value}</div>
+      {sub && <div className="text-jm-2xs text-[var(--jm-text-muted)] tabular-nums">{sub}</div>}
       {delta}
     </div>
   );

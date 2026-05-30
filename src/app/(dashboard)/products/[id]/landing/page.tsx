@@ -467,7 +467,7 @@ export default function ProductLandingPage() {
       {/* 모드 토글 */}
       <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 py-2">
         <span className="text-xs text-[var(--jm-text-muted)]">모드:</span>
-        <div className="flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[12px]">
+        <div className="flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-jm-xs">
           <button
             type="button"
             className={cn(
@@ -493,7 +493,7 @@ export default function ProductLandingPage() {
             단일 HTML
           </button>
         </div>
-        <span className="ml-2 text-[11px] text-[var(--jm-text-muted)]">
+        <span className="ml-2 text-jm-2xs text-[var(--jm-text-muted)]">
           {landingMode === "BLOCKS"
             ? "블록을 조합해서 페이지 구성 + 공통 footer 자동 연결"
             : "업로드한 HTML 파일 1개를 통째로 페이지 전체로 (footer 미적용)"}
@@ -531,7 +531,7 @@ export default function ProductLandingPage() {
                             variant="outline"
                             size="xs"
                             disabled={alreadyHasHero}
-                            className="flex h-auto flex-col gap-1 py-2 text-[11px]"
+                            className="flex h-auto flex-col gap-1 py-2 text-jm-2xs"
                             onClick={() => addBlock(t)}
                           >
                             <Icon className="h-4 w-4" />
@@ -541,9 +541,9 @@ export default function ProductLandingPage() {
                       />
                       <JmTooltipContent side="bottom" className="max-w-[260px] whitespace-normal">
                         <div className="space-y-1.5 text-left">
-                          <div className="text-[12px] font-semibold">{desc.title}</div>
-                          <div className="text-[11px] leading-snug opacity-90">{desc.body}</div>
-                          <div className="text-[10px] italic opacity-70">{desc.example}</div>
+                          <div className="text-jm-xs font-semibold">{desc.title}</div>
+                          <div className="text-jm-2xs leading-snug opacity-90">{desc.body}</div>
+                          <div className="text-jm-3xs italic opacity-70">{desc.example}</div>
                         </div>
                       </JmTooltipContent>
                     </JmTooltipRoot>
@@ -551,7 +551,7 @@ export default function ProductLandingPage() {
                 })}
               </div>
             </JmTooltipProvider>
-            <details className="mt-2 rounded-md bg-[var(--jm-surface-muted)]/40 px-2 py-1.5 text-[11px]">
+            <details className="mt-2 rounded-md bg-[var(--jm-surface-muted)]/40 px-2 py-1.5 text-jm-2xs">
               <summary className="cursor-pointer text-[var(--jm-text-muted)] hover:text-[var(--jm-text)]">
                 블록 종류별 설명 보기
               </summary>
@@ -612,11 +612,11 @@ export default function ProductLandingPage() {
           <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2">
             <span className="text-xs text-[var(--jm-text-muted)]">미리보기</span>
             {dirty && (
-              <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-[10px] text-[var(--jm-warning-fg)]">
+              <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-jm-3xs text-[var(--jm-warning-fg)]">
                 저장되지 않은 변경사항
               </span>
             )}
-            <div className="ml-auto flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-[12px]">
+            <div className="ml-auto flex h-7 rounded-md border border-[var(--jm-border)] bg-[var(--jm-bg)] text-jm-xs">
               <button
                 type="button"
                 className={cn(
@@ -669,7 +669,7 @@ export default function ProductLandingPage() {
             >
               {(footerQuery.data?.headerBlocks ?? []).length > 0 && (
                 <>
-                  <div className="border-b border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-[11px] text-[var(--jm-text-muted)]">
+                  <div className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-jm-2xs text-[var(--jm-text-muted)]">
                     ↑ 위는 모든 상품에 공통으로 붙는 상단 공지/배너 (설정 → 상단 공지/배너)
                   </div>
                   <LandingPageView
@@ -684,7 +684,7 @@ export default function ProductLandingPage() {
               <LandingPageView blocks={blocks} productId={id} />
               {(footerQuery.data?.footerBlocks ?? []).length > 0 && (
                 <>
-                  <div className="border-t border-dashed border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-[11px] text-[var(--jm-text-muted)]">
+                  <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/30 px-4 py-2 text-center text-jm-2xs text-[var(--jm-text-muted)]">
                     ↓ 아래는 모든 상품에 공통으로 붙는 footer (설정 → 공통 footer)
                   </div>
                   <LandingPageView
@@ -777,7 +777,7 @@ export default function ProductLandingPage() {
                 setJsonText(e.target.value);
                 setJsonError(null);
               }}
-              className="min-h-0 flex-1 resize-none font-mono text-[11px] leading-snug"
+              className="min-h-0 flex-1 resize-none font-mono text-jm-2xs leading-snug"
               spellCheck={false}
             />
             {jsonError && (
@@ -785,7 +785,7 @@ export default function ProductLandingPage() {
                 {jsonError}
               </p>
             )}
-            <p className="text-[11px] text-[var(--jm-text-muted)]">
+            <p className="text-jm-2xs text-[var(--jm-text-muted)]">
               스키마: <code className="rounded bg-[var(--jm-surface-muted)] px-1">LandingBlock[]</code> · 자세한 스펙은{" "}
               <code className="rounded bg-[var(--jm-surface-muted)] px-1">src/lib/validators/landing-block.ts</code>{" "}
               참고
@@ -866,7 +866,7 @@ function SingleHtmlEditorBody({
   return (
     <div className="flex flex-1 min-h-0">
       <aside className="flex w-[420px] shrink-0 flex-col gap-3 border-r border-[var(--jm-border)] bg-[var(--jm-surface)] p-4">
-        <p className="rounded-md bg-[var(--jm-surface-muted)] px-3 py-2 text-[12px] text-[var(--jm-text-muted)]">
+        <p className="rounded-md bg-[var(--jm-surface-muted)] px-3 py-2 text-jm-xs text-[var(--jm-text-muted)]">
           이 모드는 업로드한 HTML 파일을 페이지 전체로 통째 보여줍니다. 블록과 공통 footer 는 적용되지 않으며, sandboxed iframe 안에 격리되어 렌더링됩니다.
         </p>
 
@@ -914,13 +914,13 @@ function SingleHtmlEditorBody({
             <JmInput
               value={singleHtmlUrl}
               readOnly
-              className="h-8 text-[11px] text-[var(--jm-text-muted)]"
+              className="h-8 text-jm-2xs text-[var(--jm-text-muted)]"
               onFocus={(e) => e.currentTarget.select()}
             />
           )}
         </div>
 
-        <p className="text-[11px] text-[var(--jm-text-muted)]">
+        <p className="text-jm-2xs text-[var(--jm-text-muted)]">
           ⚠️ HTML 안의 <code className="rounded bg-[var(--jm-surface-muted)] px-1">{`<img>`}</code> 는 절대 URL 또는 base64 권장. 상대 경로는 storage 경로 기준이라 깨질 수 있습니다.
         </p>
       </aside>
@@ -929,7 +929,7 @@ function SingleHtmlEditorBody({
         <div className="flex items-center gap-2 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 py-2">
           <span className="text-xs text-[var(--jm-text-muted)]">미리보기</span>
           {dirty && (
-            <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-[10px] text-[var(--jm-warning-fg)]">
+            <span className="rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-jm-3xs text-[var(--jm-warning-fg)]">
               저장되지 않은 변경사항
             </span>
           )}

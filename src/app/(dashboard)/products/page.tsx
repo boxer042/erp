@@ -121,7 +121,7 @@ function CostAlertBadge({ alert }: { alert: CostAlert }) {
   return (
     <JmTooltip content={tooltip}>
       <span
-        className="inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
+        className="inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-jm-2xs font-semibold tabular-nums"
         style={{
           backgroundColor: isUp ? "var(--jm-danger-bg)" : "var(--jm-info-bg)",
           color: isUp ? "var(--jm-danger-fg)" : "var(--jm-info-fg)",
@@ -562,7 +562,7 @@ export default function ProductsPage() {
                     <JmTableRow className="hover:bg-transparent">
                       <JmTableCell
                         colSpan={12}
-                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                        className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                       >
                         상품 목록을 불러오지 못했습니다
                       </JmTableCell>
@@ -664,14 +664,14 @@ export default function ProductsPage() {
                             </div>
                           </JmTableCell>
                           <JmTableCell>
-                            <span className="font-[family-name:var(--jm-font-mono)] text-[12px] text-[var(--jm-text-muted)]">
+                            <span className="font-[family-name:var(--jm-font-mono)] text-jm-xs text-[var(--jm-text-muted)]">
                               {product.sku}
                             </span>
                           </JmTableCell>
-                          <JmTableCell className="truncate text-[13px] text-[var(--jm-text-muted)]">
+                          <JmTableCell className="truncate text-jm-sm text-[var(--jm-text-muted)]">
                             {product.spec || "—"}
                           </JmTableCell>
-                          <JmTableCell className="text-[13px] text-[var(--jm-text-muted)]">
+                          <JmTableCell className="text-jm-sm text-[var(--jm-text-muted)]">
                             {product.unitOfMeasure}
                           </JmTableCell>
                           <JmTableCell className="text-right tabular-nums text-[var(--jm-text-muted)]">
@@ -745,7 +745,7 @@ export default function ProductsPage() {
                           <JmTableCell>
                             <button
                               type="button"
-                              className="flex cursor-pointer items-center gap-1 text-[13px] hover:underline"
+                              className="flex cursor-pointer items-center gap-1 text-jm-sm hover:underline"
                               onClick={() => {
                                 setMappingTarget({
                                   id: product.id,

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Package } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
 import { BottomSheet } from "./_components/bottom-sheet";
 
@@ -301,7 +302,7 @@ function Body({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex h-14 items-center justify-center rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-[14px] font-medium text-[var(--jm-text-muted)]"
+            className="flex h-14 items-center justify-center rounded-2xl border-2 border-[var(--jm-border)] bg-[var(--jm-surface)] px-5 text-jm-base font-medium text-[var(--jm-text-muted)]"
           >
             닫기
           </button>
@@ -309,7 +310,7 @@ function Body({
             type="button"
             onClick={confirm}
             disabled={!canConfirm}
-            className="flex h-14 flex-1 items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[16px] font-semibold text-white disabled:opacity-40"
+            className="flex h-14 flex-1 items-center justify-center rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white disabled:opacity-40"
           >
             변경
             {totalAddDisplay > 0 && (
@@ -323,11 +324,11 @@ function Body({
     >
       <div className="flex flex-col gap-5 pt-2">
         {productQuery.isPending ? (
-          <div className="py-8 text-center text-[12px] text-[var(--jm-text-subtle)]">
+          <div className="py-8 text-center text-jm-xs text-[var(--jm-text-subtle)]">
             불러오는 중…
           </div>
         ) : !hasContent ? (
-          <div className="py-8 text-center text-[12px] text-[var(--jm-text-subtle)]">
+          <div className="py-8 text-center text-jm-xs text-[var(--jm-text-subtle)]">
             선택할 변형/옵션이 없습니다 — 상품 페이지에서 추가
           </div>
         ) : (
@@ -336,17 +337,17 @@ function Body({
             {showVariants && (
               <section className="flex flex-col gap-2">
                 <div className="flex items-baseline justify-between px-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                  <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                     변형 (variant)
                   </span>
                   {needsVariant && (
-                    <span className="text-[10px] text-[var(--jm-warning-fg)]">
+                    <span className="text-jm-3xs text-[var(--jm-warning-fg)]">
                       필수
                     </span>
                   )}
                 </div>
                 {variants.length === 0 ? (
-                  <div className="rounded-2xl bg-[var(--jm-surface-muted)] py-6 text-center text-[12px] text-[var(--jm-text-subtle)]">
+                  <div className="rounded-2xl bg-[var(--jm-surface-muted)] py-6 text-center text-jm-xs text-[var(--jm-text-subtle)]">
                     등록된 변형이 없습니다
                   </div>
                 ) : (
@@ -373,32 +374,25 @@ function Body({
                             />
                           ) : (
                             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
-                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                <path
-                                  d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
-                                  stroke="currentColor"
-                                  strokeWidth="1.3"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
+                              <Package className="size-5" />
                             </div>
                           )}
                           <div className="flex min-w-0 flex-1 flex-col">
-                            <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                            <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                               {v.name}
                             </span>
-                            <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                            <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                               {v.sku}
                             </span>
                             {v.variableComponents && v.variableComponents.length > 0 && (
-                              <span className="line-clamp-1 mt-0.5 text-[11px] text-[var(--jm-text-muted)]">
+                              <span className="line-clamp-1 mt-0.5 text-jm-2xs text-[var(--jm-text-muted)]">
                                 {v.variableComponents
                                   .map((c) => `${c.slotLabel}: ${c.componentName}`)
                                   .join(" · ")}
                               </span>
                             )}
                           </div>
-                          <span className="shrink-0 text-[14px] font-semibold tabular-nums text-[var(--jm-text)]">
+                          <span className="shrink-0 text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
                             ₩{(parseFloat(v.sellingPrice) || 0).toLocaleString("ko-KR")}
                           </span>
                         </button>
@@ -413,7 +407,7 @@ function Body({
             {productOptions.length > 0 && (
               <section className="flex flex-col gap-2">
                 <div className="flex items-baseline justify-between px-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+                  <span className="text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
                     고객 옵션
                   </span>
                 </div>
@@ -433,7 +427,7 @@ function Body({
                   ))}
                 </div>
                 {missingRequired && (
-                  <div className="rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-[11px] text-[var(--jm-warning-fg)]">
+                  <div className="rounded-xl bg-[var(--jm-warning-bg)] px-3 py-2 text-jm-2xs text-[var(--jm-warning-fg)]">
                     ⚠ 필수 옵션 슬롯을 모두 선택해주세요
                   </div>
                 )}
@@ -459,11 +453,11 @@ function OptionSlot({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-1.5 px-1">
-        <span className="text-[13px] font-semibold text-[var(--jm-text)]">
+        <span className="text-jm-sm font-semibold text-[var(--jm-text)]">
           {option.name}
         </span>
         {option.required && (
-          <span className="text-[10px] font-semibold text-[var(--jm-danger-fg)]">
+          <span className="text-jm-3xs font-semibold text-[var(--jm-danger-fg)]">
             필수
           </span>
         )}
@@ -493,21 +487,21 @@ function OptionSlot({
               }`}
             >
               <div className="flex min-w-0 flex-1 flex-col">
-                <span className="line-clamp-1 text-[13px] font-semibold text-[var(--jm-text)]">
+                <span className="line-clamp-1 text-jm-sm font-semibold text-[var(--jm-text)]">
                   {v.label}
                 </span>
                 {mapped && (
-                  <span className="line-clamp-1 text-[11px] text-[var(--jm-text-muted)]">
+                  <span className="line-clamp-1 text-jm-2xs text-[var(--jm-text-muted)]">
                     → {mapped.name}
                   </span>
                 )}
               </div>
               {addPrice > 0 ? (
-                <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--jm-text)]">
+                <span className="shrink-0 text-jm-xs font-semibold tabular-nums text-[var(--jm-text)]">
                   +₩{addPrice.toLocaleString("ko-KR")}
                 </span>
               ) : isSwap && swapPrice > 0 ? (
-                <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--jm-text)]">
+                <span className="shrink-0 text-jm-xs font-semibold tabular-nums text-[var(--jm-text)]">
                   ₩{swapPrice.toLocaleString("ko-KR")}
                 </span>
               ) : null}

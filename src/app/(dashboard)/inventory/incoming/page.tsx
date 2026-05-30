@@ -8,10 +8,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { cn, formatComma, parseComma, formatCommaDecimal, parseCommaDecimal, normalizeDiscountInput, formatDiscountDisplay } from "@/lib/utils";
 import { focusCaretEnd } from "@/jm/lib/focus";
 
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { useTheme } from "next-themes";
 import {
   JmBadge,
@@ -882,7 +879,7 @@ function IncomingPageInner() {
                       key={p}
                       onClick={() => applyPreset(p)}
                       className={cn(
-                        "px-2 h-6 rounded text-[11px] border transition-colors",
+                        "px-2 h-6 rounded text-jm-2xs border transition-colors",
                         active
                           ? "bg-[var(--jm-surface-muted)] border-[var(--jm-border-strong)] text-[var(--jm-text)]"
                           : "border-[var(--jm-border)] text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
@@ -918,8 +915,8 @@ function IncomingPageInner() {
                     className="flex-1 bg-transparent text-jm-xs text-[var(--jm-text)] outline-none placeholder:text-[var(--jm-text-subtle)]"
                   />
                 </div>
-                <Popover>
-                  <PopoverTrigger
+                <PopoverPrimitive.Root>
+                  <PopoverPrimitive.Trigger
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-lg border shrink-0 transition-colors",
                       statusFilter.length < Object.keys(statusLabels).length
@@ -928,42 +925,45 @@ function IncomingPageInner() {
                     )}
                   >
                     <SlidersHorizontal className="size-3.5" />
-                  </PopoverTrigger>
-                  <PopoverContent
-                    data-jm-scope
-                    className="w-[180px] p-2 bg-[var(--jm-surface)] border-[var(--jm-border)]"
-                    align="end"
-                  >
-                    <p className="text-jm-xs text-[var(--jm-text-muted)] mb-2 px-1">상태 필터</p>
-                    {Object.entries(statusLabels).map(([key, label]) => {
-                      const checked = statusFilter.includes(key);
-                      return (
-                        <label
-                          key={key}
-                          className={cn(
-                            "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-jm-xs cursor-pointer transition-colors",
-                            checked ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]" : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
-                          )}
-                        >
-                          <JmCheckbox
-                            checked={checked}
-                            onCheckedChange={() => setStatusFilter(prev => checked ? prev.filter((s) => s !== key) : [...prev, key])}
-                          />
-                          <JmBadge variant={statusJmVariants[key]} size="sm" shape="square">{label}</JmBadge>
-                        </label>
-                      );
-                    })}
-                    {statusFilter.length < Object.keys(statusLabels).length && (
-                      <button className="w-full text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] mt-1.5 pt-1.5 border-t border-[var(--jm-border)]" onClick={() => setStatusFilter(Object.keys(statusLabels))}>
-                        전체 선택
-                      </button>
-                    )}
-                  </PopoverContent>
-                </Popover>
+                  </PopoverPrimitive.Trigger>
+                  <PopoverPrimitive.Portal>
+                    <PopoverPrimitive.Positioner align="end" sideOffset={6} className="isolate z-50">
+                      <PopoverPrimitive.Popup
+                        data-jm-scope
+                        className="w-[180px] p-2 rounded-xl bg-[var(--jm-surface)] ring-1 ring-[var(--jm-border)] shadow-[var(--jm-shadow-lg)] outline-none font-[family-name:var(--jm-font-sans)]"
+                      >
+                        <p className="text-jm-xs text-[var(--jm-text-muted)] mb-2 px-1">상태 필터</p>
+                        {Object.entries(statusLabels).map(([key, label]) => {
+                          const checked = statusFilter.includes(key);
+                          return (
+                            <label
+                              key={key}
+                              className={cn(
+                                "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-jm-xs cursor-pointer transition-colors",
+                                checked ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text)]" : "text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)]"
+                              )}
+                            >
+                              <JmCheckbox
+                                checked={checked}
+                                onCheckedChange={() => setStatusFilter(prev => checked ? prev.filter((s) => s !== key) : [...prev, key])}
+                              />
+                              <JmBadge variant={statusJmVariants[key]} size="sm" shape="square">{label}</JmBadge>
+                            </label>
+                          );
+                        })}
+                        {statusFilter.length < Object.keys(statusLabels).length && (
+                          <button className="w-full text-jm-xs text-[var(--jm-text-muted)] hover:text-[var(--jm-text)] mt-1.5 pt-1.5 border-t border-[var(--jm-border)]" onClick={() => setStatusFilter(Object.keys(statusLabels))}>
+                            전체 선택
+                          </button>
+                        )}
+                      </PopoverPrimitive.Popup>
+                    </PopoverPrimitive.Positioner>
+                  </PopoverPrimitive.Portal>
+                </PopoverPrimitive.Root>
               </div>
 
               {/* 목록 컨텐츠 */}
-              <ScrollArea className="flex-1 min-h-0">
+              <JmScrollArea className="flex-1 min-h-0">
                 {loading ? (
                   <>
                     {Array.from({ length: 10 }).map((_, i) => (
@@ -1050,7 +1050,7 @@ function IncomingPageInner() {
                     })
                   )
                 )}
-              </ScrollArea>
+              </JmScrollArea>
             </div>
           );
         })()}
@@ -1293,9 +1293,9 @@ function IncomingPageInner() {
                                 <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)] truncate">{item.memo || ""}</td>
                                 <td className="text-center py-1.5">
                                   {item.supplierProduct._count.productMappings > 0 ? (
-                                    <span className="text-xs text-brand">&#10003;</span>
+                                    <span className="text-jm-xs text-[var(--jm-success-fg)]">&#10003;</span>
                                   ) : (
-                                    <span className="text-xs text-yellow-400">&#9888;</span>
+                                    <span className="text-jm-xs text-[var(--jm-warning-fg)]">&#9888;</span>
                                   )}
                                 </td>
                               </tr>
@@ -1467,12 +1467,12 @@ function IncomingPageInner() {
                                 <div className="flex items-center justify-end gap-1.5">
                                   <span>₩{formatPrice(Math.round(shipDisplay.perUnit))}</span>
                                   <span
-                                    className={`text-[10px] px-1 py-0.5 rounded ${
+                                    className={`text-jm-3xs px-1 py-0.5 rounded ${
                                       shipDisplay.source === "ITEM"
-                                        ? "bg-primary/10 text-primary"
+                                        ? "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
                                         : shipDisplay.source === "ALLOCATED"
                                           ? "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
-                                          : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                                          : "bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]"
                                     }`}
                                   >
                                     {shipDisplay.source === "ITEM"
@@ -1491,9 +1491,9 @@ function IncomingPageInner() {
                             <td className="border-r border-[var(--jm-border)] px-2 py-1.5 text-[var(--jm-text-muted)]">{item.memo || ""}</td>
                             <td className="text-center py-1.5">
                               {item.supplierProduct.productMappings && item.supplierProduct.productMappings.length > 0 ? (
-                                <span className="text-xs text-brand">&#10003;</span>
+                                <span className="text-jm-xs text-[var(--jm-success-fg)]">&#10003;</span>
                               ) : (
-                                <span className="text-xs text-yellow-400">&#9888;</span>
+                                <span className="text-jm-xs text-[var(--jm-warning-fg)]">&#9888;</span>
                               )}
                             </td>
                           </tr>
@@ -1729,7 +1729,7 @@ function IncomingPageInner() {
                                   }))
                                 }
                                 className={cn(
-                                  "h-8 rounded-md border text-[11px]",
+                                  "h-8 rounded-md border text-jm-2xs",
                                   ov.taxable
                                     ? "border-[var(--jm-action)] text-[var(--jm-text)]"
                                     : "border-[var(--jm-border)] text-[var(--jm-text-muted)]",
@@ -2025,7 +2025,7 @@ function IncomingPageInner() {
                                 <span>{formatPrice(actualPrice)}</span>
                                 {priceDiff !== 0 && (
                                   <span
-                                    className={`text-[10px] whitespace-nowrap ${
+                                    className={`text-jm-3xs whitespace-nowrap ${
                                       priceDiff > 0
                                         ? "text-[var(--jm-warning-fg)]"
                                         : "text-[var(--jm-text-muted)]"

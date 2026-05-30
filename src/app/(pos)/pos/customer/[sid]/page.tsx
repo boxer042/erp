@@ -3,7 +3,19 @@
 import { use, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Package, Wrench, CalendarClock, Menu, ShoppingCart } from "lucide-react";
+import {
+  Package,
+  Wrench,
+  CalendarClock,
+  Menu,
+  ShoppingCart,
+  ChevronLeft,
+  Building2,
+  Search,
+  X,
+  Printer,
+  Check,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiMutate } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -228,13 +240,13 @@ export default function PosV2CustomerPage({
     }
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--jm-bg)] p-6 text-center">
-        <span className="text-[15px] font-semibold text-[var(--jm-text)]">
+        <span className="text-jm-md font-semibold text-[var(--jm-text)]">
           고객 세션을 찾을 수 없습니다
         </span>
         <button
           type="button"
           onClick={() => router.push("/pos")}
-          className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-[13px] font-semibold text-white"
+          className="h-10 rounded-full bg-[var(--jm-action)] px-5 text-jm-sm font-semibold text-white"
         >
           고객 그리드로
         </button>
@@ -258,15 +270,7 @@ export default function PosV2CustomerPage({
             className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="뒤로"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M12 4l-6 6 6 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <ChevronLeft className="size-5" />
           </button>
 
           {detail ? (
@@ -290,32 +294,24 @@ export default function PosV2CustomerPage({
                   <>
                     {session.customerType === "BUSINESS" ? (
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                          <path
-                            d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+                        <Building2 className="size-5" />
                       </div>
                     ) : (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-md font-bold text-[var(--jm-text)]">
                         {(session.customerName ?? "?").charAt(0)}
                       </div>
                     )}
                     <div className="flex min-w-0 max-w-[140px] flex-col">
-                      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                      <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                         {session.customerName}
                       </span>
                       {session.customerType === "BUSINESS" &&
                       session.customerBusinessNumber ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
+                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                           {session.customerBusinessNumber}
                         </span>
                       ) : session.customerPhone ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
+                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                           {session.customerPhone}
                         </span>
                       ) : null}
@@ -326,15 +322,15 @@ export default function PosV2CustomerPage({
                     <div
                       className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
                     >
-                      <span className="font-mono text-[12px] font-bold tracking-wider">
+                      <span className="font-mono text-jm-xs font-bold tracking-wider">
                         {code}
                       </span>
                     </div>
                     <div className="flex min-w-0 flex-col">
-                      <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+                      <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                         미등록 고객
                       </span>
-                      <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                      <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                         #{code}
                       </span>
                     </div>
@@ -346,31 +342,22 @@ export default function PosV2CustomerPage({
             // 일반 모드 — 좌측: 모드 타이틀, (상품모드일 땐 중앙: 검색창), 우측: 고객
             <>
               <div className="flex shrink-0 flex-col">
-                <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+                <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                   {MODE_LABELS[mode]}
                 </span>
-                <span className="text-[11px] text-[var(--jm-text-muted)]">
+                <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                   {MODE_SUBLABELS[mode]}
                 </span>
               </div>
               {mode === "product" ? (
                 <div className="relative flex h-10 min-w-0 flex-1 items-center">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    className="pointer-events-none absolute left-4 text-[var(--jm-text-muted)]"
-                  >
-                    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
+                  <Search className="pointer-events-none absolute left-4 size-4 text-[var(--jm-text-muted)]" />
                   <input
                     type="text"
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     placeholder="상품명 · SKU 검색"
-                    className="h-10 w-full min-w-0 rounded-full bg-[var(--jm-surface-muted)] pl-10 pr-9 text-[13px] text-[var(--jm-text)] placeholder:text-[var(--jm-text-muted)] focus:bg-[var(--jm-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--jm-action)]"
+                    className="h-10 w-full min-w-0 rounded-full bg-[var(--jm-surface-muted)] pl-10 pr-9 text-jm-sm text-[var(--jm-text)] placeholder:text-[var(--jm-text-muted)] focus:bg-[var(--jm-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--jm-action)]"
                   />
                   {productSearch && (
                     <button
@@ -379,14 +366,7 @@ export default function PosV2CustomerPage({
                       aria-label="검색어 지우기"
                       className="absolute right-2 flex h-7 w-7 items-center justify-center rounded-full text-[var(--jm-text-muted)] hover:bg-[var(--jm-border)] active:bg-[var(--jm-border)]"
                     >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path
-                          d="M3 3l8 8M11 3l-8 8"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
-                      </svg>
+                      <X className="size-3.5" />
                     </button>
                   )}
                 </div>
@@ -403,32 +383,24 @@ export default function PosV2CustomerPage({
                   <>
                     {session.customerType === "BUSINESS" ? (
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                          <path
-                            d="M3 21V7l9-4 9 4v14M9 21V11h6v10"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+                        <Building2 className="size-5" />
                       </div>
                     ) : (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-md font-bold text-[var(--jm-text)]">
                         {(session.customerName ?? "?").charAt(0)}
                       </div>
                     )}
                     <div className="flex min-w-0 max-w-[140px] flex-col">
-                      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                      <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                         {session.customerName}
                       </span>
                       {session.customerType === "BUSINESS" &&
                       session.customerBusinessNumber ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
+                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                           {session.customerBusinessNumber}
                         </span>
                       ) : session.customerPhone ? (
-                        <span className="line-clamp-1 font-mono text-[11px] text-[var(--jm-text-muted)]">
+                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                           {session.customerPhone}
                         </span>
                       ) : null}
@@ -439,15 +411,15 @@ export default function PosV2CustomerPage({
                     <div
                       className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
                     >
-                      <span className="font-mono text-[12px] font-bold tracking-wider">
+                      <span className="font-mono text-jm-xs font-bold tracking-wider">
                         {code}
                       </span>
                     </div>
                     <div className="flex min-w-0 flex-col">
-                      <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+                      <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                         미등록 고객
                       </span>
-                      <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                      <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                         #{code}
                       </span>
                     </div>
@@ -711,7 +683,7 @@ function RepairTicketHeader({ ticketId }: { ticketId: string }) {
   return (
     <div className="flex min-w-0 flex-col">
       <RepairTicketActionMenu ticketId={ticketId} />
-      <span className="font-mono text-[13px] text-[var(--jm-text-muted)]">{t.ticketNo}</span>
+      <span className="font-mono text-jm-sm text-[var(--jm-text-muted)]">{t.ticketNo}</span>
     </div>
   );
 }
@@ -731,11 +703,11 @@ function ProductHeader({ productId }: { productId: string }) {
   }
   return (
     <div className="flex min-w-0 flex-col">
-      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+      <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
         {q.data.name}
       </span>
       {q.data.sku && (
-        <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">{q.data.sku}</span>
+        <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">{q.data.sku}</span>
       )}
     </div>
   );
@@ -778,7 +750,7 @@ function PrintModal({
       <button
         type="button"
         onClick={onClose}
-        className="m-4 self-end rounded-full bg-[var(--jm-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--jm-text)] shadow"
+        className="m-4 self-end rounded-full bg-[var(--jm-surface)] px-4 py-2 text-jm-sm font-semibold text-[var(--jm-text)] shadow"
       >
         닫기
       </button>
@@ -860,20 +832,12 @@ function PostPaymentPrintDialog({
       >
         <div className="flex flex-col items-center gap-3 pt-2 text-center">
           <div className="flex size-14 items-center justify-center rounded-full bg-[var(--jm-action)]/10 text-[var(--jm-action)]">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Printer className="size-7" />
           </div>
-          <h3 className="text-[18px] font-bold text-[var(--jm-text)]">
+          <h3 className="text-jm-xl font-bold text-[var(--jm-text)]">
             출력하시겠어요?
           </h3>
-          <p className="text-[13px] leading-relaxed text-[var(--jm-text-muted)]">
+          <p className="text-jm-sm leading-relaxed text-[var(--jm-text-muted)]">
             결제가 완료됐어요. 출력할 항목을 선택해주세요.
           </p>
         </div>
@@ -916,14 +880,14 @@ function PostPaymentPrintDialog({
             type="button"
             onClick={submit}
             disabled={nothingChecked}
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-[15px] font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-action)] text-jm-md font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
           >
             {includeReprint && hasReprintCandidates ? "다음 — 재출력 선택" : "출력하기"}
           </button>
           <button
             type="button"
             onClick={skip}
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-[14px] font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--jm-surface-muted)] text-jm-base font-semibold text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
           >
             출력 안 함
           </button>
@@ -956,10 +920,10 @@ function PrintToggle({
       }`}
     >
       <div className="flex flex-col">
-        <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+        <span className="text-jm-base font-semibold text-[var(--jm-text)]">
           {label}
         </span>
-        <span className="text-[11px] text-[var(--jm-text-muted)]">{sub}</span>
+        <span className="text-jm-2xs text-[var(--jm-text-muted)]">{sub}</span>
       </div>
       <span
         className={`flex size-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
@@ -969,15 +933,7 @@ function PrintToggle({
         }`}
       >
         {checked && (
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M3 7.5l3 3 5-6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Check className="size-3.5" strokeWidth={2} />
         )}
       </span>
     </button>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { ChevronLeft, X, Wrench, Package } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
 import { useSessions } from "@/components/pos/sessions-context";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -117,15 +118,7 @@ function Body({
             className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] active:bg-[var(--jm-border)]"
             aria-label="닫기"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M12 4l-6 6 6 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <ChevronLeft className="size-5" />
           </button>
           <input
             ref={inputRef}
@@ -134,7 +127,7 @@ function Body({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="상품·고객·수리 통합 검색"
-            className="h-11 flex-1 rounded-xl bg-[var(--jm-surface-muted)] px-4 text-[15px] outline-none placeholder:text-[var(--jm-text-subtle)] focus:bg-[var(--jm-bg)]"
+            className="h-11 flex-1 rounded-xl bg-[var(--jm-surface-muted)] px-4 text-jm-md outline-none placeholder:text-[var(--jm-text-subtle)] focus:bg-[var(--jm-bg)]"
           />
           {q && (
             <button
@@ -146,14 +139,7 @@ function Body({
               className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--jm-text-subtle)] hover:bg-[var(--jm-surface-muted)]"
               aria-label="지우기"
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M4 4l8 8M12 4l-8 8"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <X className="size-4" />
             </button>
           )}
         </div>
@@ -161,16 +147,16 @@ function Body({
 
       <div className="flex-1 overflow-y-auto">
         {trimmed.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 px-4 py-16 text-center text-[13px] text-[var(--jm-text-subtle)]">
+          <div className="flex flex-col items-center gap-2 px-4 py-16 text-center text-jm-sm text-[var(--jm-text-subtle)]">
             검색어를 입력하세요
-            <span className="text-[11px]">상품명·SKU · 이름·전화 · 수리번호·증상</span>
+            <span className="text-jm-2xs">상품명·SKU · 이름·전화 · 수리번호·증상</span>
           </div>
         ) : isLoading ? (
-          <div className="flex flex-col items-center gap-2 px-4 py-12 text-[13px] text-[var(--jm-text-subtle)]">
+          <div className="flex flex-col items-center gap-2 px-4 py-12 text-jm-sm text-[var(--jm-text-subtle)]">
             검색 중…
           </div>
         ) : totalCount === 0 ? (
-          <div className="px-4 py-12 text-center text-[13px] text-[var(--jm-text-subtle)]">
+          <div className="px-4 py-12 text-center text-jm-sm text-[var(--jm-text-subtle)]">
             결과 없음
           </div>
         ) : (
@@ -192,10 +178,10 @@ function Body({
                   >
                     <Avatar imageUrl={p.imageUrl} fallback="상품" />
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="line-clamp-1 text-[14px] font-semibold text-[var(--jm-text)]">
+                      <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
                         {p.name}
                       </span>
-                      <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                      <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                         {p.sku}
                       </span>
                     </div>
@@ -229,14 +215,14 @@ function Body({
                       }
                     }}
                   >
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[15px] font-bold text-[var(--jm-text)]">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-md font-bold text-[var(--jm-text)]">
                       {c.name.charAt(0)}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-[14px] font-semibold text-[var(--jm-text)]">
+                      <span className="text-jm-base font-semibold text-[var(--jm-text)]">
                         {c.name}
                       </span>
-                      <span className="font-mono text-[11px] text-[var(--jm-text-muted)]">
+                      <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
                         {c.phone}
                       </span>
                     </div>
@@ -256,24 +242,18 @@ function Body({
                     }}
                   >
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text)]">
-                      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                        <path
-                          d="M14.7 6.3a4 4 0 1 1-5.4 5.4l-5.6 5.6a1.4 1.4 0 0 0 2 2l5.6-5.6a4 4 0 0 1 5.4-5.4z"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                        />
-                      </svg>
+                      <Wrench className="size-4" />
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[12px] font-semibold text-[var(--jm-text)]">
+                        <span className="font-mono text-jm-xs font-semibold text-[var(--jm-text)]">
                           {r.ticketNo}
                         </span>
-                        <span className="text-[11px] text-[var(--jm-text-muted)]">
+                        <span className="text-jm-2xs text-[var(--jm-text-muted)]">
                           {format(new Date(r.receivedAt), "MM-dd")}
                         </span>
                       </div>
-                      <span className="line-clamp-1 text-[12px] text-[var(--jm-text-muted)]">
+                      <span className="line-clamp-1 text-jm-xs text-[var(--jm-text-muted)]">
                         {r.customer?.name ?? "(미등록)"}
                         {r.symptom && ` — ${r.symptom}`}
                       </span>
@@ -300,7 +280,7 @@ function Section({
 }) {
   return (
     <section className="flex flex-col">
-      <div className="flex items-baseline gap-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+      <div className="flex items-baseline gap-2 px-4 py-2 text-jm-2xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
         <span>{title}</span>
         <span className="text-[var(--jm-text-subtle)]">{count}</span>
       </div>
@@ -346,14 +326,7 @@ function Avatar({
   }
   return (
     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-        <path
-          d="M3 6l7-4 7 4v8l-7 4-7-4V6z"
-          stroke="currentColor"
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Package className="size-4" />
     </div>
   );
 }

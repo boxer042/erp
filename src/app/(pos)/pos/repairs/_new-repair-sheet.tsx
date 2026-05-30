@@ -370,7 +370,7 @@ function Section({
       <div className="flex items-center gap-1.5">
         <JmSectionLabel>{label}</JmSectionLabel>
         {optional && (
-          <span className="text-[10px] text-[var(--jm-text-subtle)]">선택</span>
+          <span className="text-jm-3xs text-[var(--jm-text-subtle)]">선택</span>
         )}
       </div>
       {children}

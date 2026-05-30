@@ -329,7 +329,7 @@ export default function SpecSlotsPage() {
                     <JmTableRow className="hover:bg-transparent">
                       <JmTableCell
                         colSpan={8}
-                        className="py-10 text-center text-[13px] text-[var(--jm-danger-fg)]"
+                        className="py-10 text-center text-jm-sm text-[var(--jm-danger-fg)]"
                       >
                         슬롯 목록을 불러오지 못했습니다
                       </JmTableCell>
@@ -373,10 +373,10 @@ export default function SpecSlotsPage() {
                               {TYPE_LABELS[slot.type]}
                             </JmBadge>
                           </JmTableCell>
-                          <JmTableCell className="text-[13px] text-[var(--jm-text-muted)]">
+                          <JmTableCell className="text-jm-sm text-[var(--jm-text-muted)]">
                             {slot.unit ?? "—"}
                           </JmTableCell>
-                          <JmTableCell className="text-[13px] text-[var(--jm-text-muted)]">
+                          <JmTableCell className="text-jm-sm text-[var(--jm-text-muted)]">
                             {slot.options.length === 0
                               ? "—"
                               : slot.options.length <= 3
@@ -513,14 +513,14 @@ export default function SpecSlotsPage() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {form.options.length === 0 ? (
-                        <span className="text-[12px] text-[var(--jm-text-subtle)]">
+                        <span className="text-jm-xs text-[var(--jm-text-subtle)]">
                           옵션 없음
                         </span>
                       ) : (
                         form.options.map((o) => (
                           <span
                             key={o}
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-2 py-0.5 text-[12px] text-[var(--jm-text)]"
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-xs text-[var(--jm-text)]"
                           >
                             {o}
                             <button
@@ -554,7 +554,7 @@ export default function SpecSlotsPage() {
                   />
                 </JmFormField>
                 <div className="flex flex-col justify-end pb-1">
-                  <label className="flex items-center gap-2 text-[13px] text-[var(--jm-text)]">
+                  <label className="flex items-center gap-2 text-jm-sm text-[var(--jm-text)]">
                     <JmSwitch
                       checked={form.isActive}
                       onCheckedChange={(v) =>

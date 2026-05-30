@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { useParams } from "next/navigation";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2, CheckCircle2 } from "lucide-react";
+import { JmCard, JmSkeleton, JmInput, JmButton, JmScope } from "@/jm";
 
 interface Approval {
   id: string;
@@ -53,129 +54,147 @@ export default function ApprovePage() {
 
   if (displayError) {
     return (
-      <div className="mx-auto max-w-md p-8">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-700">
-          {displayError}
+      <JmScope theme="auto" className="min-h-screen">
+        <div className="mx-auto max-w-md p-8">
+          <div className="rounded-2xl border border-[var(--jm-danger-solid)] bg-[var(--jm-danger-bg)] p-6 text-center text-jm-base text-[var(--jm-danger-fg)]">
+            {displayError}
+          </div>
         </div>
-      </div>
+      </JmScope>
     );
   }
 
   if (!data) {
     return (
-      <div className="mx-auto max-w-md p-8 space-y-4">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-32 w-full rounded-md" />
-        <Skeleton className="h-10 w-full rounded-md" />
-      </div>
+      <JmScope theme="auto" className="min-h-screen">
+        <div className="mx-auto max-w-md p-8 space-y-4">
+          <JmSkeleton className="h-6 w-48" />
+          <JmSkeleton className="h-32 w-full rounded-md" />
+          <JmSkeleton className="h-10 w-full rounded-md" />
+        </div>
+      </JmScope>
     );
   }
 
   if (done || data.approvedAt) {
     return (
-      <div className="mx-auto max-w-md p-8">
-        <div className="rounded-xl border border-primary bg-primary/10 p-6 text-center text-primary/80">
-          ✓ 승인이 완료되었습니다.
-          <div className="mt-2 text-sm">수리 번호 {data.ticketNo}</div>
+      <JmScope theme="auto" className="min-h-screen">
+        <div className="mx-auto max-w-md p-8">
+          <div className="rounded-2xl border border-[var(--jm-success-solid)] bg-[var(--jm-success-bg)] p-6 text-center text-jm-base text-[var(--jm-success-fg)]">
+            <CheckCircle2 className="mx-auto mb-1 size-6" />
+            승인이 완료되었습니다.
+            <div className="mt-2 text-jm-sm">수리 번호 {data.ticketNo}</div>
+          </div>
         </div>
-      </div>
+      </JmScope>
     );
   }
 
   return (
-    <div className="mx-auto max-w-xl p-6">
-      <div className="mb-4 text-center">
-        <div className="text-sm text-muted-foreground">수리 견적 승인</div>
-        <div className="text-xl font-semibold">{data.ticketNo}</div>
-      </div>
-
-      <div className="space-y-4 rounded-xl border border-border bg-background p-5">
-        <div>
-          <div className="text-xs text-muted-foreground">고객</div>
-          <div className="text-sm">{data.customerName}</div>
+    <JmScope theme="auto" className="min-h-screen">
+      <div className="mx-auto max-w-xl p-6">
+        <div className="mb-4 text-center">
+          <div className="text-jm-sm text-[var(--jm-text-muted)]">수리 견적 승인</div>
+          <div className="text-jm-xl font-semibold text-[var(--jm-text)]">{data.ticketNo}</div>
         </div>
-        {data.machineName ? (
-          <div>
-            <div className="text-xs text-muted-foreground">기계</div>
-            <div className="text-sm">{data.machineName}</div>
-          </div>
-        ) : null}
-        {data.symptom ? (
-          <div>
-            <div className="text-xs text-muted-foreground">증상</div>
-            <div className="text-sm whitespace-pre-wrap">{data.symptom}</div>
-          </div>
-        ) : null}
-        {data.diagnosis ? (
-          <div>
-            <div className="text-xs text-muted-foreground">진단</div>
-            <div className="text-sm whitespace-pre-wrap">{data.diagnosis}</div>
-          </div>
-        ) : null}
 
-        {data.parts.length > 0 ? (
+        <JmCard className="space-y-4 p-5">
           <div>
-            <div className="mb-1 text-xs text-muted-foreground">부품</div>
-            <ul className="space-y-1 text-sm">
-              {data.parts.map((p, i) => (
-                <li key={i} className="flex justify-between">
-                  <span>{p.name} × {p.quantity}</span>
-                  <span>₩{p.totalPrice.toLocaleString("ko-KR")}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="text-jm-xs text-[var(--jm-text-muted)]">고객</div>
+            <div className="text-jm-sm text-[var(--jm-text)]">{data.customerName}</div>
           </div>
-        ) : null}
+          {data.machineName ? (
+            <div>
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">기계</div>
+              <div className="text-jm-sm text-[var(--jm-text)]">{data.machineName}</div>
+            </div>
+          ) : null}
+          {data.symptom ? (
+            <div>
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">증상</div>
+              <div className="text-jm-sm whitespace-pre-wrap text-[var(--jm-text)]">{data.symptom}</div>
+            </div>
+          ) : null}
+          {data.diagnosis ? (
+            <div>
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">진단</div>
+              <div className="text-jm-sm whitespace-pre-wrap text-[var(--jm-text)]">{data.diagnosis}</div>
+            </div>
+          ) : null}
 
-        {data.labors.length > 0 ? (
-          <div>
-            <div className="mb-1 text-xs text-muted-foreground">공임</div>
-            <ul className="space-y-1 text-sm">
-              {data.labors.map((l, i) => (
-                <li key={i} className="flex justify-between">
-                  <span>{l.name} ({l.hours}h)</span>
-                  <span>₩{l.totalPrice.toLocaleString("ko-KR")}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+          {data.parts.length > 0 ? (
+            <div>
+              <div className="mb-1 text-jm-xs text-[var(--jm-text-muted)]">부품</div>
+              <ul className="space-y-1 text-jm-sm text-[var(--jm-text)]">
+                {data.parts.map((p, i) => (
+                  <li key={i} className="flex justify-between">
+                    <span>{p.name} × {p.quantity}</span>
+                    <span>₩{p.totalPrice.toLocaleString("ko-KR")}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
-        <div className="border-t border-border pt-3">
-          <div className="flex justify-between text-sm">
-            <span>부품</span>
-            <span>₩{data.quotedPartsAmount.toLocaleString("ko-KR")}</span>
+          {data.labors.length > 0 ? (
+            <div>
+              <div className="mb-1 text-jm-xs text-[var(--jm-text-muted)]">공임</div>
+              <ul className="space-y-1 text-jm-sm text-[var(--jm-text)]">
+                {data.labors.map((l, i) => (
+                  <li key={i} className="flex justify-between">
+                    <span>{l.name} ({l.hours}h)</span>
+                    <span>₩{l.totalPrice.toLocaleString("ko-KR")}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="border-t border-[var(--jm-border)] pt-3">
+            <div className="flex justify-between text-jm-sm text-[var(--jm-text)]">
+              <span>부품</span>
+              <span>₩{data.quotedPartsAmount.toLocaleString("ko-KR")}</span>
+            </div>
+            <div className="flex justify-between text-jm-sm text-[var(--jm-text)]">
+              <span>공임</span>
+              <span>₩{data.quotedLaborAmount.toLocaleString("ko-KR")}</span>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-jm-base font-medium text-[var(--jm-text)]">총액</span>
+              <span className="text-jm-2xl font-semibold text-[var(--jm-text)]">
+                ₩{data.quotedTotalAmount.toLocaleString("ko-KR")}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between text-sm">
-            <span>공임</span>
-            <span>₩{data.quotedLaborAmount.toLocaleString("ko-KR")}</span>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-base font-medium">총액</span>
-            <span className="text-2xl font-semibold">
-              ₩{data.quotedTotalAmount.toLocaleString("ko-KR")}
-            </span>
-          </div>
-        </div>
+        </JmCard>
+
+        <JmCard className="mt-5 space-y-3 p-5">
+          <label className="block text-jm-sm font-medium text-[var(--jm-text)]">승인자 이름 (선택)</label>
+          <JmInput
+            size="lg"
+            value={approvedName}
+            onChange={(e) => setApprovedName(e.target.value)}
+            placeholder="본인 이름"
+          />
+          <JmButton
+            variant="cta"
+            size="lg"
+            onClick={approve}
+            disabled={submitting}
+            className="w-full"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="animate-spin" />
+                처리 중...
+              </>
+            ) : (
+              "견적 승인"
+            )}
+          </JmButton>
+          <p className="text-center text-jm-xs text-[var(--jm-text-muted)]">승인 후 수리에 착수됩니다.</p>
+        </JmCard>
       </div>
-
-      <div className="mt-5 space-y-3 rounded-xl border border-border bg-background p-5">
-        <label className="block text-sm font-medium">승인자 이름 (선택)</label>
-        <input
-          className="h-11 w-full rounded-lg border border-border px-3 text-base outline-none focus:border-primary"
-          value={approvedName}
-          onChange={(e) => setApprovedName(e.target.value)}
-          placeholder="본인 이름"
-        />
-        <button
-          onClick={approve}
-          disabled={submitting}
-          className="h-12 w-full rounded-pill border border-brand bg-brand text-base font-medium text-brand-foreground hover:bg-brand/85 disabled:opacity-50"
-        >
-          {submitting ? "처리 중..." : "견적 승인"}
-        </button>
-        <p className="text-center text-xs text-muted-foreground">승인 후 수리에 착수됩니다.</p>
-      </div>
-    </div>
+    </JmScope>
   );
 }

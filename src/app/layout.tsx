@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { JmToaster, JmTooltipProvider } from "@/jm";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -50,10 +49,10 @@ export default function RootLayout({
       <body className="min-h-screen antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Providers>
-            <TooltipProvider>
+            <JmTooltipProvider>
               {children}
-              <Toaster richColors position="top-right" />
-            </TooltipProvider>
+              <JmToaster position="top-right" />
+            </JmTooltipProvider>
           </Providers>
         </ThemeProvider>
       </body>

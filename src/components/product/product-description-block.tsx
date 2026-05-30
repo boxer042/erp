@@ -24,7 +24,7 @@ export function ProductDescriptionBlock({
   if (!hasDescription && !hasMemo && !editable) {
     return (
       <ProductSection title="상품 설명">
-        <p className="text-sm text-muted-foreground">등록된 상품 설명이 없습니다</p>
+        <p className="text-sm text-[var(--jm-text-muted)]">등록된 상품 설명이 없습니다</p>
       </ProductSection>
     );
   }
@@ -34,7 +34,7 @@ export function ProductDescriptionBlock({
       <div className="space-y-4">
         {(hasDescription || onSaveDescription) && (
           <div className="space-y-1">
-            <div className="text-[11px] font-medium text-muted-foreground">설명</div>
+            <div className="text-jm-2xs font-medium text-[var(--jm-text-muted)]">설명</div>
             {onSaveDescription ? (
               <div className="text-sm whitespace-pre-wrap leading-relaxed">
                 <InlineTextEdit
@@ -53,9 +53,9 @@ export function ProductDescriptionBlock({
         )}
         {showMemo && (hasMemo || onSaveMemo) && (
           <div className="space-y-1">
-            <div className="text-[11px] font-medium text-muted-foreground">메모 (내부)</div>
+            <div className="text-jm-2xs font-medium text-[var(--jm-text-muted)]">메모 (내부)</div>
             {onSaveMemo ? (
-              <div className="text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground">
+              <div className="text-sm whitespace-pre-wrap leading-relaxed text-[var(--jm-text-muted)]">
                 <InlineTextEdit
                   value={product.memo ?? ""}
                   productId={product.id}
@@ -66,7 +66,7 @@ export function ProductDescriptionBlock({
                 />
               </div>
             ) : (
-              <p className="text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground">
+              <p className="text-sm whitespace-pre-wrap leading-relaxed text-[var(--jm-text-muted)]">
                 {product.memo}
               </p>
             )}

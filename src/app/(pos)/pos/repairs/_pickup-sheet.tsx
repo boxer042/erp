@@ -58,7 +58,7 @@ export function PickupSheet({
             <div className="text-jm-2xs font-semibold uppercase tracking-wider text-white/60">
               청구 금액
             </div>
-            <div className="mt-1 text-[40px] font-bold tabular-nums leading-none">
+            <div className="mt-1 text-jm-6xl font-bold tabular-nums leading-none">
               {fmtKRWInc(finalAmount)}
             </div>
           </div>

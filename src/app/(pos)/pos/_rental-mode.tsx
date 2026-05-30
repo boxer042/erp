@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { ChevronRight, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet } from "@/lib/api-client";
 import { JmButton, JmDatePicker } from "@/jm";
@@ -612,22 +613,7 @@ function CustomerCard({
           )}
         </div>
         {onClick && (
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            className="shrink-0 text-[var(--jm-text-disabled)]"
-            aria-hidden
-          >
-            <path
-              d="M5 3l4 4-4 4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <ChevronRight className="size-3.5 shrink-0 text-[var(--jm-text-disabled)]" aria-hidden />
         )}
       </div>
     </>
@@ -664,16 +650,7 @@ function CheckoutAtCard({ at }: { at: Date }) {
       </span>
       <div className="flex min-w-0 items-center gap-2.5">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]">
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden>
-            <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
-            <path
-              d="M10 6v4l2.5 2"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Clock className="size-[18px]" aria-hidden />
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-jm-base font-semibold tabular-nums text-[var(--jm-text)]">
