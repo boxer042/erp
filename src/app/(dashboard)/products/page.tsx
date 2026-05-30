@@ -50,6 +50,7 @@ import {
   JmTooltip,
   JmTooltipProvider,
 } from "@/jm";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { MappingSheet } from "@/components/mapping-sheet";
 import { InlineTextEdit } from "@/components/product/edit/inline-text-edit";
 import { ProductsThemeScope } from "./_theme-scope";
@@ -890,7 +891,7 @@ export default function ProductsPage() {
                       inputMode="decimal"
                       value={safetyValue}
                       onChange={(e) => setSafetyValue(e.target.value)}
-                      onFocus={(e) => e.currentTarget.select()}
+                      onFocus={(e) => focusCaretEnd(e)}
                       autoFocus
                     />
                   </JmFormField>

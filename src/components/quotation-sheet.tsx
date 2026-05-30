@@ -84,7 +84,7 @@ const emptyProductItem = (): ItemForm => ({
   spec: "",
   unitOfMeasure: "EA",
   quantity: "1",
-  unitPrice: "0",
+  unitPrice: "",
   discount: "",
   isTaxable: true,
   isZeroRateEligible: false,
@@ -100,7 +100,7 @@ const emptyFreeItem = (): ItemForm => ({
   spec: "",
   unitOfMeasure: "EA",
   quantity: "1",
-  unitPrice: "0",
+  unitPrice: "",
   discount: "",
   isTaxable: true,
   isZeroRateEligible: false,
@@ -526,7 +526,7 @@ export function QuotationSheet({
                                           isZeroRateEligible: false,
                                           unitOfMeasure: pr.unitOfMeasure,
                                           // 중고는 판매가 미지정 — 사용자가 직접 입력
-                                          unitPrice: "0",
+                                          unitPrice: "",
                                         })
                                       : updateItem(idx, {
                                           productId: pr.id,
@@ -613,6 +613,7 @@ export function QuotationSheet({
                                 updateItem(idx, { unitPrice: parseComma(e.target.value) })
                               }
                               onFocus={focusCaretEnd}
+                              placeholder="0"
                             />
                           </td>
                           <td className="px-3 py-1.5">

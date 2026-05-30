@@ -64,7 +64,7 @@ const emptyProductItem = (): ItemForm => ({
   spec: "",
   unitOfMeasure: "EA",
   quantity: "1",
-  unitPrice: "0",
+  unitPrice: "",
   discount: "",
   isTaxable: true,
   isZeroRateEligible: false,
@@ -79,7 +79,7 @@ const emptyFreeItem = (): ItemForm => ({
   spec: "",
   unitOfMeasure: "EA",
   quantity: "1",
-  unitPrice: "0",
+  unitPrice: "",
   discount: "",
   isTaxable: true,
   isZeroRateEligible: false,
@@ -443,7 +443,7 @@ export function StatementSheet({
                                         usedItemId: pr.usedItemId,
                                         name: pr.name,
                                         unitOfMeasure: pr.unitOfMeasure,
-                                        unitPrice: "0",
+                                        unitPrice: "",
                                         isTaxable: true,
                                         isZeroRateEligible: false,
                                       })
@@ -511,6 +511,7 @@ export function StatementSheet({
                                 updateItem(idx, { unitPrice: parseComma(e.target.value) })
                               }
                               onFocus={focusCaretEnd}
+                              placeholder="0"
                             />
                           </td>
                           <td className="px-3 py-1.5">

@@ -284,8 +284,10 @@ function IncomingPageInner() {
     // 수량 셀로 포커스 이동
     setTimeout(() => {
       const el = document.querySelector(`[data-row="${index}"][data-field="quantity"]`) as HTMLInputElement;
-      el?.focus();
-      el?.select();
+      if (el) {
+        el.focus();
+        focusCaretEnd({ currentTarget: el } as React.FocusEvent<HTMLInputElement>);
+      }
     }, 50);
   };
 

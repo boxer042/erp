@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import {
   JmBadge,
   JmButton,
@@ -78,7 +79,7 @@ export const EMPTY_BUILD: UsedItemBuildValue = {
   productId: null,
   spec: "",
   builtAt: format(new Date(), "yyyy-MM-dd"),
-  laborCost: "0",
+  laborCost: "",
   issueSerial: false,
   warrantyMonths: 0,
   imageUrls: [],
@@ -435,7 +436,8 @@ export function UsedItemBuildForm({ value, onChange }: Props) {
                   inputMode="numeric"
                   value={formatComma(value.laborCost)}
                   onChange={(e) => patch({ laborCost: parseComma(e.target.value) })}
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={focusCaretEnd}
+                  placeholder="0"
                 />
                 <span className="shrink-0 text-jm-sm text-[var(--jm-text-muted)]">원</span>
               </div>

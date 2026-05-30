@@ -59,7 +59,7 @@ function fromOption(opt: ProductOptionItem): OptionDraft {
       rowId: tmpId(),
       id: v.id,
       label: v.label,
-      addPrice: String(v.addPrice ?? "0"),
+      addPrice: v.addPrice ? String(v.addPrice) : "",
       mappedProductId: v.mappedProductId,
       mappedVariantId: v.mappedVariantId,
       mappedMode: v.mappedMode ?? "SWAP",
@@ -76,7 +76,7 @@ function emptyOption(): OptionDraft {
       {
         rowId: tmpId(),
         label: "",
-        addPrice: "0",
+        addPrice: "",
         mappedProductId: null,
         mappedVariantId: null,
         mappedMode: "SWAP",
@@ -184,7 +184,7 @@ function Body({ product, onOpenChange }: Props) {
                 {
                   rowId: tmpId(),
                   label: "",
-                  addPrice: "0",
+                  addPrice: "",
                   mappedProductId: null,
                   mappedVariantId: null,
                   mappedMode: "SWAP" as const,

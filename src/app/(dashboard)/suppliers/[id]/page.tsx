@@ -119,7 +119,7 @@ const emptyProductForm = {
   name: "",
   supplierCode: "",
   unitOfMeasure: "EA",
-  unitPrice: "0",
+  unitPrice: "",
   currency: "KRW",
   leadTimeDays: "",
   minOrderQty: "1",
@@ -214,7 +214,8 @@ export default function SupplierDetailPage() {
     if (productForm.vatIncluded && price > 0) {
       return String(Math.round(price / 1.1));
     }
-    return productForm.unitPrice;
+    // 빈값은 서버 parseFloat("")=NaN 방지를 위해 "0" 으로 환산
+    return productForm.unitPrice || "0";
   };
 
   const productSubmitMutation = useMutation({
@@ -657,6 +658,7 @@ export default function SupplierDetailPage() {
                   <JmInput
                     size="sm"
                     inputMode="numeric"
+                    placeholder="0"
                     value={formatComma(productForm.unitPrice)}
                     onChange={(e) =>
                       setProductForm({ ...productForm, unitPrice: parseComma(e.target.value) })

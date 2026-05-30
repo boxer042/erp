@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { JmIconButton, JmInput, JmTextarea } from "@/jm";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 interface InlineTextEditProps {
   /** 표시되는 현재 값 */
@@ -54,6 +55,10 @@ export function InlineTextEdit({
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
+  // money/숫자 인풋이면 select-all 대신 캐럿 끝 (기존 값 보존 + 끝부터 편집)
+  const isMoney =
+    commaFormat || inputMode === "numeric" || inputMode === "decimal";
+
   const startEdit = () => {
     setDraft(value);
     setEditing(true);
@@ -61,10 +66,20 @@ export function InlineTextEdit({
 
   useEffect(() => {
     if (editing && inputRef.current) {
-      inputRef.current.focus();
-      if ("select" in inputRef.current) inputRef.current.select();
+      const el = inputRef.current;
+      el.focus();
+      if (isMoney) {
+        const len = el.value.length;
+        try {
+          el.setSelectionRange(len, len);
+        } catch {
+          // type 이 caret 미지원이면 무시
+        }
+      } else if ("select" in el) {
+        el.select();
+      }
     }
-  }, [editing]);
+  }, [editing, isMoney]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -149,6 +164,7 @@ export function InlineTextEdit({
             )
           }
           onKeyDown={handleKey}
+          onFocus={isMoney ? focusCaretEnd : undefined}
           inputMode={inputMode}
           disabled={saveMutation.isPending}
         />

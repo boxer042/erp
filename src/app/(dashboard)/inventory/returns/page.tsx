@@ -413,7 +413,10 @@ export default function SupplierReturnsPage() {
     );
     setTimeout(() => {
       const el = document.querySelector(`[data-rrow="${index}"][data-rfield="quantity"]`) as HTMLInputElement;
-      el?.focus(); el?.select();
+      if (el) {
+        el.focus();
+        focusCaretEnd({ currentTarget: el } as React.FocusEvent<HTMLInputElement>);
+      }
     }, 50);
   };
 
@@ -863,6 +866,7 @@ export default function SupplierReturnsPage() {
                               value={formatComma(item.unitPrice)}
                               onChange={(e) => updateItem(idx, "unitPrice", parseComma(e.target.value))}
                               onFocus={(e) => { if (e.target.value === "0") updateItem(idx, "unitPrice", ""); else focusCaretEnd(e); }}
+                              placeholder="0"
                               disabled={isEmptyRow}
                               className="w-full h-7 bg-transparent text-right text-jm-sm px-2 outline-none focus:bg-[var(--jm-surface-muted)] rounded disabled:opacity-30 tabular-nums text-[var(--jm-text)]"
                             />

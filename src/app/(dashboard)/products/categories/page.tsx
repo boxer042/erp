@@ -53,6 +53,7 @@ import {
   JmTooltipProvider,
 } from "@/jm";
 import { ImageInput } from "@/components/image-input";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import { ProductsThemeScope } from "../_theme-scope";
 
 interface CategoryChild {
@@ -596,7 +597,7 @@ export default function CategoriesPage() {
                   value={form.order}
                   onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))}
                   placeholder="0"
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={(e) => focusCaretEnd(e)}
                 />
               </JmFormField>
 

@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import {
   jmToast as toast,
   JmAlert,
@@ -51,7 +52,7 @@ interface ReconcileFormValue {
 const EMPTY_FORM: ReconcileFormValue = {
   orderItemId: "",
   displayName: "",
-  acquiredCost: "0",
+  acquiredCost: "",
   sourceMemo: "",
   memo: "",
 };
@@ -87,7 +88,7 @@ export default function UsedItemReconcilePage() {
     setForm({
       orderItemId: item.id,
       displayName: item.serviceName ?? "",
-      acquiredCost: "0",
+      acquiredCost: "",
       sourceMemo: "",
       memo: "",
     });
@@ -216,7 +217,7 @@ export default function UsedItemReconcilePage() {
                           setForm({ ...form, acquiredCost: parseComma(e.target.value) })
                         }
                         placeholder="0"
-                        onFocus={(e) => e.currentTarget.select()}
+                        onFocus={focusCaretEnd}
                       />
                       <span className="shrink-0 text-jm-sm text-[var(--jm-text-muted)]">
                         원

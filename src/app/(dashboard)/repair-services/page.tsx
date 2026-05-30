@@ -125,7 +125,7 @@ export default function RepairServicesPage() {
   const [presetSearch, setPresetSearch] = useState("");
   const [presetSheet, setPresetSheet] = useState(false);
   const [presetEdit, setPresetEdit] = useState<LaborPreset | null>(null);
-  const [presetForm, setPresetForm] = useState({ name: "", description: "", unitRate: "0", memo: "" });
+  const [presetForm, setPresetForm] = useState({ name: "", description: "", unitRate: "", memo: "" });
 
   // 수리 패키지
   const [pkgSearch, setPkgSearch] = useState("");
@@ -136,9 +136,9 @@ export default function RepairServicesPage() {
   const [pkgParts, setPkgParts] = useState<PackagePartItem[]>([]);
 
   // 패키지 Sheet 내 공임 추가 폼
-  const [laborAddForm, setLaborAddForm] = useState({ laborPresetId: "", name: "", unitRate: "0", quantity: "1" });
+  const [laborAddForm, setLaborAddForm] = useState({ laborPresetId: "", name: "", unitRate: "", quantity: "1" });
   // 패키지 Sheet 내 부품 추가 폼
-  const [partAddForm, setPartAddForm] = useState({ productId: "", quantity: "1", unitPrice: "0" });
+  const [partAddForm, setPartAddForm] = useState({ productId: "", quantity: "1", unitPrice: "" });
 
   const presetsQuery = useQuery({
     queryKey: queryKeys.repairServices.presets({ search: presetSearch }),
@@ -172,7 +172,7 @@ export default function RepairServicesPage() {
 
   const openPresetCreate = () => {
     setPresetEdit(null);
-    setPresetForm({ name: "", description: "", unitRate: "0", memo: "" });
+    setPresetForm({ name: "", description: "", unitRate: "", memo: "" });
     setPresetSheet(true);
   };
 
@@ -225,8 +225,8 @@ export default function RepairServicesPage() {
     setPkgForm({ name: "", description: "", memo: "" });
     setPkgLabors([]);
     setPkgParts([]);
-    setLaborAddForm({ laborPresetId: "", name: "", unitRate: "0", quantity: "1" });
-    setPartAddForm({ productId: "", quantity: "1", unitPrice: "0" });
+    setLaborAddForm({ laborPresetId: "", name: "", unitRate: "", quantity: "1" });
+    setPartAddForm({ productId: "", quantity: "1", unitPrice: "" });
     setPkgSheet(true);
   };
 
@@ -247,8 +247,8 @@ export default function RepairServicesPage() {
       unitPrice: String(p.unitPrice),
       quantity: String(p.quantity),
     })));
-    setLaborAddForm({ laborPresetId: "", name: "", unitRate: "0", quantity: "1" });
-    setPartAddForm({ productId: "", quantity: "1", unitPrice: "0" });
+    setLaborAddForm({ laborPresetId: "", name: "", unitRate: "", quantity: "1" });
+    setPartAddForm({ productId: "", quantity: "1", unitPrice: "" });
     setPkgSheet(true);
   };
 
@@ -261,7 +261,7 @@ export default function RepairServicesPage() {
       unitRate: laborAddForm.unitRate,
       quantity: laborAddForm.quantity,
     }]);
-    setLaborAddForm({ laborPresetId: "", name: "", unitRate: "0", quantity: "1" });
+    setLaborAddForm({ laborPresetId: "", name: "", unitRate: "", quantity: "1" });
   };
 
   const addPartToPkg = () => {
@@ -273,7 +273,7 @@ export default function RepairServicesPage() {
       unitPrice: partAddForm.unitPrice,
       quantity: partAddForm.quantity,
     }]);
-    setPartAddForm({ productId: "", quantity: "1", unitPrice: "0" });
+    setPartAddForm({ productId: "", quantity: "1", unitPrice: "" });
   };
 
   const savePkgMutation = useMutation({
@@ -536,6 +536,7 @@ export default function RepairServicesPage() {
                   type="text"
                   inputMode="numeric"
                   className="text-right"
+                  placeholder="0"
                   value={formatComma(presetForm.unitRate)}
                   onChange={(e) => setPresetForm({ ...presetForm, unitRate: parseComma(e.target.value) })}
                   onFocus={focusCaretEnd}
@@ -620,7 +621,7 @@ export default function RepairServicesPage() {
                         value={laborAddForm.laborPresetId}
                         onChange={(v) => {
                           const preset = presets.find((p) => p.id === v);
-                          setLaborAddForm({ ...laborAddForm, laborPresetId: v, name: preset?.name ?? "", unitRate: preset ? String(preset.unitRate) : "0" });
+                          setLaborAddForm({ ...laborAddForm, laborPresetId: v, name: preset?.name ?? "", unitRate: preset ? String(preset.unitRate) : "" });
                         }}
                         options={presets.map((p) => ({ value: p.id, label: p.name }))}
                       />
@@ -636,6 +637,7 @@ export default function RepairServicesPage() {
                         className="w-24 text-right"
                         type="text"
                         inputMode="numeric"
+                        placeholder="0"
                         value={formatComma(laborAddForm.unitRate)}
                         onChange={(e) => setLaborAddForm({ ...laborAddForm, unitRate: parseComma(e.target.value) })}
                         onFocus={focusCaretEnd}
@@ -688,7 +690,7 @@ export default function RepairServicesPage() {
                         value={partAddForm.productId}
                         onChange={(v) => {
                           const prod = products.find((p) => p.id === v);
-                          setPartAddForm({ ...partAddForm, productId: v, unitPrice: prod ? String(prod.sellingPrice) : "0" });
+                          setPartAddForm({ ...partAddForm, productId: v, unitPrice: prod ? String(prod.sellingPrice) : "" });
                         }}
                         options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
                       />
@@ -704,6 +706,7 @@ export default function RepairServicesPage() {
                         className="w-24 text-right"
                         type="text"
                         inputMode="numeric"
+                        placeholder="0"
                         value={formatComma(partAddForm.unitPrice)}
                         onChange={(e) => setPartAddForm({ ...partAddForm, unitPrice: parseComma(e.target.value) })}
                         onFocus={focusCaretEnd}

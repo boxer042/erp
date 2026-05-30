@@ -113,7 +113,7 @@ const emptyForm = {
   imageUrl: "",
   dailyRate: "0",
   monthlyRate: "0",
-  depositAmount: "0",
+  depositAmount: "",
   memo: "",
   status: "AVAILABLE" as AssetStatus,
   acquiredAt: "",
@@ -243,7 +243,7 @@ export default function RentalAssetsPage() {
   // 중고 전환 — 임대 lifecycle 종료 후 UsedItem 으로 핸드오프
   const [convertTarget, setConvertTarget] = useState<Asset | null>(null);
   const [convertForm, setConvertForm] = useState({
-    acquiredCost: "0",
+    acquiredCost: "",
     issueSerial: false,
     warrantyMonths: 0,
     memo: "",
@@ -252,7 +252,7 @@ export default function RentalAssetsPage() {
   const openConvert = (a: Asset) => {
     setConvertTarget(a);
     setConvertForm({
-      acquiredCost: "0",
+      acquiredCost: "",
       issueSerial: false,
       warrantyMonths: 0,
       memo: "",
@@ -576,6 +576,7 @@ export default function RentalAssetsPage() {
                       value={formatComma(form.depositAmount)}
                       onChange={(e) => setForm({ ...form, depositAmount: parseComma(e.target.value) })}
                       onFocus={focusCaretEnd}
+                      placeholder="0"
                     />
                   </JmFormField>
                 </div>
@@ -691,6 +692,7 @@ export default function RentalAssetsPage() {
                         })
                       }
                       onFocus={focusCaretEnd}
+                      placeholder="0"
                     />
                     <span className="shrink-0 text-jm-sm text-[var(--jm-text-muted)]">
                       원

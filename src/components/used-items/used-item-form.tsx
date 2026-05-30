@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 import {
   JmAlert,
   JmButton,
@@ -59,7 +60,7 @@ export const EMPTY_USED_ITEM_FORM: UsedItemFormValue = {
   displayName: "",
   productId: null,
   acquiredFrom: "PURCHASED",
-  acquiredCost: "0",
+  acquiredCost: "",
   isAcquiredTaxable: false,
   acquiredAt: format(new Date(), "yyyy-MM-dd"),
   sourceCustomerId: null,
@@ -217,7 +218,7 @@ export function UsedItemForm({ value, onChange, editing }: Props) {
                     patch({ acquiredCost: parseComma(e.target.value) })
                   }
                   placeholder="0"
-                  onFocus={(e) => e.currentTarget.select()}
+                  onFocus={(e) => focusCaretEnd(e)}
                 />
                 <span className="shrink-0 text-jm-sm text-[var(--jm-text-muted)]">
                   원

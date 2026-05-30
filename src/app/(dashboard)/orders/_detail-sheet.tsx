@@ -2241,6 +2241,7 @@ function EditView({
                       set("shippingCostBorne", parseComma(e.target.value))
                     }
                     onFocus={focusCaretEnd}
+                    placeholder="0"
                   />
                 </JmFormField>
               )}

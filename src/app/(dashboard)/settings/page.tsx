@@ -26,6 +26,7 @@ import { ko } from "date-fns/locale";
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
+import { focusCaretEnd } from "@/jm/lib/focus";
 
 interface Stats {
   products: number;
@@ -720,7 +721,7 @@ function ServiceFeePresetSection() {
                 onChange={(e) =>
                   setForm((p) => ({ ...p, unitPrice: parseComma(e.target.value) }))
                 }
-                onFocus={(e) => e.currentTarget.select()}
+                onFocus={focusCaretEnd}
                 placeholder="예: 20,000"
                 className="h-8"
               />
