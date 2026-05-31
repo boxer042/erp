@@ -160,6 +160,8 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
         isService: i.isService ?? false,
         // UsedItem 단품 — 서버가 lot 차감 우회 + UsedItem.status=SOLD + SerialItem 손님 정보 채움
         usedItemId: i.usedItemId ?? null,
+        // 선판매 자유 라인 구별 — 서버가 OrderItem.presaleKind 로 저장, 사후 정리에서 기술료와 구별
+        presaleKind: i.presaleKind ?? null,
       };
     }), session.totalDiscount),
     repairTicketData,

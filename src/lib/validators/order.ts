@@ -6,6 +6,8 @@ export const orderItemSchema = z
     productId: z.string().optional(),
     /** 기술료/공임 등 상품 없는 서비스 라인명 — productId 없을 때 사용 */
     serviceName: z.string().optional(),
+    /** 선판매(미등록) 자유 라인 구별 — "used"=미등록 중고. 사후 정리에서 기술료와 구별 */
+    presaleKind: z.enum(["used", "catalog"]).optional(),
     quantity: z.string().min(1, "수량을 입력해주세요"),
     /** 라인 단가 (세전, 정수) — 할인 적용 전 단가 (POS 와 동일 정책). 실제 OrderItem.unitPrice 는 unitPrice - discountPerUnit */
     unitPrice: z.string().min(1, "단가를 입력해주세요"),

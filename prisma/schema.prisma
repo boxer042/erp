@@ -1532,6 +1532,12 @@ model OrderItem {
   product                       Product?          @relation(fields: [productId], references: [id])
   canonicalProductId            String?           @map("canonical_product_id")
   serviceName                   String?           @map("service_name")
+  /**
+   * 선판매(미등록) 자유 라인 구별 — "used"=미등록 중고 선판매, "catalog"=미등록 내상품(향후).
+   * [선판매] 버튼으로 추가한 serviceName 라인에만 부여. 사후 정리(reconcile)가 이 값으로
+   * 기술료 라인과 구별해 중고품 등록 후보를 정확히 노출 (lot 처리 혼동 방지).
+   */
+  presaleKind                   String?           @map("presale_kind")
   quantity                      Decimal           @db.Decimal(15, 4)
   /**
    * 정가(할인 전 단가, 세전) — 견적서/거래명세표 → 주문 전환 시 보존

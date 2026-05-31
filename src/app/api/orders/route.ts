@@ -295,6 +295,7 @@ export async function POST(request: NextRequest) {
   type StagedItem = {
     productId: string | null;
     serviceName: string | null;
+    presaleKind: string | null;
     quantity: number;
     /** 실제 결제 단가 (세전) = input.unitPrice - discountPerUnit */
     unitPrice: number;
@@ -325,6 +326,7 @@ export async function POST(request: NextRequest) {
       stagedItems.push({
         productId: null,
         serviceName: item.serviceName?.trim() || "기술료",
+        presaleKind: item.presaleKind ?? null,
         quantity: qty,
         unitPrice: price,
         totalPrice: qty * price,
@@ -382,6 +384,7 @@ export async function POST(request: NextRequest) {
     stagedItems.push({
       productId: mainProductId,
       serviceName: null,
+      presaleKind: null,
       quantity: qty,
       unitPrice: finalUnitPrice,
       totalPrice: qty * finalUnitPrice,
@@ -408,6 +411,7 @@ export async function POST(request: NextRequest) {
       stagedItems.push({
         productId: mp.id,
         serviceName: null,
+        presaleKind: null,
         quantity: qty, // 메인 수량과 동일 (1 PC 사면 1 메모리)
         unitPrice: refUnit,
         totalPrice: qty * refUnit,
@@ -551,6 +555,7 @@ export async function POST(request: NextRequest) {
             orderId: o.id,
             productId: it.productId,
             serviceName: it.serviceName ?? undefined,
+            presaleKind: it.presaleKind ?? undefined,
             quantity: it.quantity,
             unitPrice: it.unitPrice,
             totalPrice: it.totalPrice,

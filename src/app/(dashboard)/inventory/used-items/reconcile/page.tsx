@@ -29,6 +29,8 @@ import {
 interface PendingOrderItem {
   id: string;
   serviceName: string | null;
+  /** "used"=[선판매]로 명시된 미등록 중고. null=기술료 등 일반 자유 라인. */
+  presaleKind: string | null;
   quantity: string;
   unitPrice: string;
   totalPrice: string;
@@ -158,11 +160,18 @@ export default function UsedItemReconcilePage() {
                       }`}
                     >
                       <div className="flex w-full items-center justify-between gap-2">
-                        <span className="font-medium text-[var(--jm-text)]">
-                          {item.serviceName ?? "(이름 없음)"}
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          {item.presaleKind === "used" && (
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-success-bg)] px-2 py-0.5 text-jm-2xs font-semibold text-[var(--jm-success-fg)]">
+                              선판매 중고
+                            </span>
+                          )}
+                          <span className="truncate font-medium text-[var(--jm-text)]">
+                            {item.serviceName ?? "(이름 없음)"}
+                          </span>
                         </span>
                         {selected && (
-                          <Check className="size-4 text-[var(--jm-cta)]" />
+                          <Check className="size-4 shrink-0 text-[var(--jm-cta)]" />
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-jm-xs text-[var(--jm-text-muted)]">

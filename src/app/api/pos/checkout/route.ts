@@ -46,6 +46,8 @@ interface CheckoutItem {
   repairTicketId?: string | null;
   /** 서비스로 지급 — true 면 OrderItem.isService=true 저장. 영수증/명세표에서 배지 노출. */
   isService?: boolean;
+  /** 선판매(미등록) 자유 라인 구별 — "used"=미등록 중고. OrderItem.presaleKind 로 저장, 사후 정리 구별용 */
+  presaleKind?: "used" | "catalog" | null;
   /**
    * UsedItem 단품 라인 — 카트에서 중고 매대 검색으로 선택된 라인.
    * 서버: lot 차감 우회 + UsedItem.status=SOLD + UsedItem.orderItemId link +
@@ -186,6 +188,8 @@ export async function POST(request: NextRequest) {
     optionSnapshot: Record<string, string> | null;
     entryProductId: string | null;
     isService: boolean;
+    /** 선판매 자유 라인 구별 — OrderItem.presaleKind 로 저장 */
+    presaleKind: string | null;
     /** UsedItem 단품 — 있으면 처리 루프에서 fifoConsume 우회, status=SOLD + serialItem 채움 */
     usedItemId: string | null;
   };
@@ -217,6 +221,7 @@ export async function POST(request: NextRequest) {
         optionSnapshot: null,
         entryProductId: null, // ADDON 도 funnel 분석 대상 아님 (메인의 부산물)
         isService: !!it.isService,
+        presaleKind: it.presaleKind ?? null,
         usedItemId: it.usedItemId ?? null,
       });
       continue;
@@ -306,6 +311,7 @@ export async function POST(request: NextRequest) {
       // POS 결제는 직원 입력이라 entryProductId 항상 null. 자사몰/채널 import 시에만 채움.
       entryProductId: it.entryProductId ?? null,
       isService: !!it.isService,
+      presaleKind: it.presaleKind ?? null,
       usedItemId: it.usedItemId ?? null,
     });
     for (const ref of refs) {
@@ -326,6 +332,7 @@ export async function POST(request: NextRequest) {
         optionSnapshot: null,
         entryProductId: null, // OPTION_REF 자식 라인은 funnel 분석 대상 아님
         isService: false, // OPTION_REF 는 메인의 옵션 추가구매 — 별도 서비스 분류 안 함
+        presaleKind: null,
         usedItemId: null,
       });
     }
@@ -624,6 +631,7 @@ export async function POST(request: NextRequest) {
             optionSnapshot: stage.optionSnapshot ?? undefined,
             entryProductId: stage.entryProductId,
             isService: stage.isService,
+            presaleKind: stage.presaleKind ?? undefined,
           },
         });
         createdIds.push(oi.id);

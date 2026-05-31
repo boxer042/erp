@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       serviceName: true,
+      // 선판매(presaleKind="used") 로 명시된 라인 — [선판매] 버튼으로 추가된 미등록 중고.
+      // 기술료(presaleKind=null) 자유 라인과 구별해 UI 배지 + 우선 노출.
+      presaleKind: true,
       quantity: true,
       unitPrice: true,
       totalPrice: true,
@@ -54,6 +57,13 @@ export async function GET(request: NextRequest) {
     orderBy: [{ order: { orderDate: "desc" } }],
     take: 100,
   });
+
+  // 선판매 명시 라인(presaleKind="used")을 위로 — 기술료 자유 라인과 섞이지 않게.
+  // findMany orderBy(날짜 desc)는 그룹 내부에서 유지 (V8 stable sort).
+  items.sort(
+    (a, b) =>
+      (b.presaleKind === "used" ? 1 : 0) - (a.presaleKind === "used" ? 1 : 0),
+  );
 
   return NextResponse.json(items);
 }

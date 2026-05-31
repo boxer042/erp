@@ -435,7 +435,7 @@ export default function NewOrderPage() {
             listPrice: listPrice > 0 ? String(Math.round(listPrice)) : undefined,
           };
           return i.itemType === "service"
-            ? { ...base, serviceName: i.name }
+            ? { ...base, serviceName: i.name, presaleKind: i.presaleKind }
             : {
                 ...base,
                 productId: i.productId,
