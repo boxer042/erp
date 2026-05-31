@@ -22,7 +22,7 @@ test.describe("선판매 영속화 — presaleKind + reconcile 구별", () => {
     await prisma.$disconnect();
   });
 
-  test("presaleKind='used' 가 reconcile 에서 기술료와 구별 + 우선 노출", async ({
+  test("presaleKind='used' 만 선판매 목록 노출 + 기술료(null) 제외", async ({
     page,
   }) => {
     const ts = Date.now();
@@ -66,8 +66,8 @@ test.describe("선판매 영속화 — presaleKind + reconcile 구별", () => {
     expect(laborItem).toBeTruthy();
 
     try {
-      // 2) 사후 정리 API
-      const res = await page.request.get("/api/used-items/reconcile");
+      // 2) 선판매 정리 API
+      const res = await page.request.get("/api/presale");
       expect(res.ok()).toBeTruthy();
       const items = (await res.json()) as Array<{
         id: string;
@@ -75,19 +75,15 @@ test.describe("선판매 영속화 — presaleKind + reconcile 구별", () => {
         presaleKind: string | null;
       }>;
 
-      // 3) 선판매 라인은 presaleKind='used', 기술료 라인은 null 로 반환
+      // 3) 선판매 라인은 presaleKind='used' 로 노출, 기술료(null) 라인은 제외
       const gotPresale = items.find((i) => i.id === presaleItem!.id);
       const gotLabor = items.find((i) => i.id === laborItem!.id);
-      expect(gotPresale, "선판매 라인이 reconcile 후보에 노출돼야 함").toBeTruthy();
+      expect(gotPresale, "선판매 라인이 목록에 노출돼야 함").toBeTruthy();
       expect(gotPresale!.presaleKind).toBe("used");
-      expect(gotLabor!.presaleKind).toBeNull();
-
-      // 4) 우선 정렬 — 선판매(used)가 기술료(null)보다 앞
-      const idxPresale = items.findIndex((i) => i.id === presaleItem!.id);
-      const idxLabor = items.findIndex((i) => i.id === laborItem!.id);
-      expect(idxPresale).toBeGreaterThanOrEqual(0);
-      expect(idxLabor).toBeGreaterThanOrEqual(0);
-      expect(idxPresale).toBeLessThan(idxLabor);
+      // 기술료(presaleKind=null) 라인은 등록할 원가·상품이 없어 선판매 목록에서 제외
+      expect(gotLabor, "기술료 라인은 선판매 목록에서 제외돼야 함").toBeUndefined();
+      // 결과 전체가 presaleKind 마커 보유 (순수 기술료 미포함)
+      expect(items.every((i) => i.presaleKind !== null)).toBeTruthy();
     } finally {
       // 5) 정리 — 주문 삭제 (OrderItem cascade)
       await prisma.order.delete({ where: { id: order.id } });

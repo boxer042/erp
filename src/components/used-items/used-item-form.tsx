@@ -73,7 +73,7 @@ export const EMPTY_USED_ITEM_FORM: UsedItemFormValue = {
 };
 
 // BUILT 은 조립 흐름(/inventory/used-items/build) 전용,
-// EMERGENCY_USE 는 사후 정리 흐름(/inventory/used-items/reconcile) 전용 —
+// EMERGENCY_USE 는 선판매 정리 흐름(/presale) 전용 —
 // 둘 다 수동 매입 등록에선 선택 불가 (각자 전용 화면에서만 발생).
 const SOURCE_OPTIONS = (
   Object.keys(USED_ITEM_SOURCE_LABEL) as UsedItemSource[]

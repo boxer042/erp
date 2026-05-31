@@ -118,28 +118,22 @@ test.describe("Phase 3 — POS UsedItem 통합", () => {
     await prisma.usedItem.delete({ where: { id: inStock.id } });
   });
 
-  test("Reconcile 페이지 로드 + 알림 텍스트", async ({ page }) => {
-    await page.goto("/inventory/used-items/reconcile");
-    await expect(page.getByText("중고 상품 사후 정리")).toBeVisible({
+  test("선판매 정리 페이지 로드 + 알림 텍스트", async ({ page }) => {
+    await page.goto("/presale");
+    await expect(page.getByText(/\[선판매\] 로 결제된 미등록/)).toBeVisible({
       timeout: 30_000,
     });
-    await expect(
-      page.getByText(/POS 에서 자유 라인.*결제된 미정리/),
-    ).toBeVisible();
-    // 두 카드 (미정리 목록 / 매입 정보 등록) 노출
-    await expect(page.getByText(/미정리 항목 \(/)).toBeVisible();
+    // 두 카드 (미등록 선판매 목록 / 매입 정보 등록) 노출
+    await expect(page.getByText(/미등록 선판매 \(/)).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "매입 정보 등록" }),
     ).toBeVisible();
   });
 
-  test("사이드바 '중고 단품' 메뉴 → 목록 → [사후 정리] 진입", async ({ page }) => {
+  test("사이드바 '선판매 정리' 메뉴 → /presale 진입", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "중고 상품" }).click();
-    await page.waitForURL(/\/inventory\/used-items$/);
-
-    await page.getByRole("button", { name: "사후 정리" }).click();
-    await page.waitForURL(/\/inventory\/used-items\/reconcile/);
-    await expect(page.getByText("중고 상품 사후 정리")).toBeVisible();
+    await page.getByRole("link", { name: "선판매 정리" }).first().click();
+    await page.waitForURL(/\/presale/);
+    await expect(page.getByText(/미등록 선판매 \(/)).toBeVisible();
   });
 });

@@ -23,6 +23,7 @@ import {
   BookOpen,
   TrendingUp,
   History,
+  PackagePlus,
   AlertTriangle,
   ShieldAlert,
   FileSpreadsheet,
@@ -97,6 +98,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "orders", label: "주문", href: "/orders", icon: ShoppingCart },
       { id: "sales-history", label: "통합 판매내역", href: "/sales/history", icon: History },
+      { id: "presale", label: "선판매 정리", href: "/presale", icon: PackagePlus },
       { id: "tax-invoices-pending", label: "세금계산서 대기", href: "/tax-invoices/pending", icon: FileSpreadsheet },
       { id: "quotations", label: "견적서", href: "/quotations", icon: FileText },
       { id: "statements", label: "거래명세표", href: "/statements", icon: Receipt },

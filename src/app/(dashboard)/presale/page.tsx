@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Check } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { format } from "date-fns";
 
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
@@ -20,16 +20,15 @@ import {
   JmCardTitle,
   JmContainer,
   JmFormField,
-  JmIconButton,
   JmInput,
   JmSkeleton,
   JmTextarea,
 } from "@/jm";
 
-interface PendingOrderItem {
+interface PendingPresaleItem {
   id: string;
   serviceName: string | null;
-  /** "used"=[선판매]로 명시된 미등록 중고. null=기술료 등 일반 자유 라인. */
+  /** "used"=미등록 중고(활성). 향후 "catalog"(내상품)·수리 등. */
   presaleKind: string | null;
   quantity: string;
   unitPrice: string;
@@ -43,7 +42,16 @@ interface PendingOrderItem {
   };
 }
 
-interface ReconcileFormValue {
+// 선판매 종류별 표시 (확장 지점) — 현재 "used"만 활성.
+const PRESALE_KIND_META: Record<
+  string,
+  { label: string; active: boolean }
+> = {
+  used: { label: "중고", active: true },
+  catalog: { label: "내상품", active: false },
+};
+
+interface RegisterFormValue {
   orderItemId: string;
   displayName: string;
   acquiredCost: string;
@@ -51,7 +59,7 @@ interface ReconcileFormValue {
   memo: string;
 }
 
-const EMPTY_FORM: ReconcileFormValue = {
+const EMPTY_FORM: RegisterFormValue = {
   orderItemId: "",
   displayName: "",
   acquiredCost: "",
@@ -59,18 +67,19 @@ const EMPTY_FORM: ReconcileFormValue = {
   memo: "",
 };
 
-export default function UsedItemReconcilePage() {
+export default function PresalePage() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<ReconcileFormValue>(EMPTY_FORM);
+  const [form, setForm] = useState<RegisterFormValue>(EMPTY_FORM);
+  const [selectedKind, setSelectedKind] = useState<string | null>(null);
 
-  const pendingQuery = useQuery<PendingOrderItem[]>({
-    queryKey: queryKeys.usedItems.reconcile(),
-    queryFn: () => apiGet<PendingOrderItem[]>("/api/used-items/reconcile?days=30"),
+  const pendingQuery = useQuery<PendingPresaleItem[]>({
+    queryKey: queryKeys.presale.list({ days: 30 }),
+    queryFn: () => apiGet<PendingPresaleItem[]>("/api/presale?days=30"),
   });
 
-  const reconcileMutation = useMutation({
+  const registerMutation = useMutation({
     mutationFn: () =>
-      apiMutate("/api/used-items/reconcile", "POST", {
+      apiMutate("/api/presale", "POST", {
         orderItemId: form.orderItemId,
         displayName: form.displayName,
         acquiredCost: form.acquiredCost || "0",
@@ -78,15 +87,18 @@ export default function UsedItemReconcilePage() {
         memo: form.memo || null,
       }),
     onSuccess: () => {
-      toast.success("사후 정리되었습니다");
+      toast.success("선판매 항목이 등록되었습니다");
       setForm(EMPTY_FORM);
+      setSelectedKind(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.presale.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.usedItems.all });
     },
     onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : "사후 정리 실패"),
+      toast.error(err instanceof ApiError ? err.message : "등록 실패"),
   });
 
-  const select = (item: PendingOrderItem) => {
+  const select = (item: PendingPresaleItem) => {
+    setSelectedKind(item.presaleKind);
     setForm({
       orderItemId: item.id,
       displayName: item.serviceName ?? "",
@@ -98,44 +110,41 @@ export default function UsedItemReconcilePage() {
 
   const handleSubmit = () => {
     if (!form.orderItemId) {
-      toast.error("먼저 미정리 항목을 선택하세요");
+      toast.error("먼저 선판매 항목을 선택하세요");
       return;
     }
     if (!form.displayName.trim()) {
       toast.error("품명을 입력해주세요");
       return;
     }
-    reconcileMutation.mutate();
+    registerMutation.mutate();
   };
 
   const pending = pendingQuery.data ?? [];
+  // 선택한 라인이 현재 등록 가능한 종류(used)인지
+  const selectedActive = selectedKind ? PRESALE_KIND_META[selectedKind]?.active : false;
 
   return (
     <div className="flex min-h-full flex-col bg-[var(--jm-bg)]">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--jm-border)] bg-[var(--jm-bg)] px-6 py-3">
-        <Link href="/inventory/used-items">
-          <JmIconButton aria-label="뒤로">
-            <ArrowLeft />
-          </JmIconButton>
-        </Link>
-        <span className="text-jm-base font-semibold">중고 상품 사후 정리</span>
+        <span className="text-jm-base font-semibold">선판매 정리</span>
         <span className="text-jm-xs text-[var(--jm-text-muted)]">
-          (EMERGENCY_USE — POS 선판매 후 매입 정보 등록)
+          (등록 전 먼저 팔린 라인 → 중고품 등록·연결)
         </span>
       </div>
 
       <JmContainer width="default" padded={false} className="p-6">
         <JmAlert variant="info" className="mb-4">
-          POS 에서 자유 라인 (productId 없는 service line) 으로 결제된 미정리
-          주문 항목입니다. 매장이 매입한 중고였다면 매입 정보를 등록해 마진 리포트
-          정합성을 회복하세요. 최근 30일.
+          [선판매] 로 결제된 미등록 라인입니다. 매입 정보를 등록하면 중고품으로
+          연결되고 원가가 보정돼 마진 리포트 정합성이 회복됩니다. 최근 30일. (내상품·수리
+          연결은 준비 중)
         </JmAlert>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* 좌: 미정리 목록 */}
+          {/* 좌: 미등록 선판매 목록 */}
           <JmCard>
             <JmCardHeader>
-              <JmCardTitle>미정리 항목 ({pending.length})</JmCardTitle>
+              <JmCardTitle>미등록 선판매 ({pending.length})</JmCardTitle>
             </JmCardHeader>
             <JmCardContent className="space-y-2 max-h-[600px] overflow-y-auto">
               {pendingQuery.isPending ? (
@@ -144,11 +153,14 @@ export default function UsedItemReconcilePage() {
                 ))
               ) : pending.length === 0 ? (
                 <p className="py-8 text-center text-jm-sm text-[var(--jm-text-muted)]">
-                  미정리 항목이 없습니다
+                  미등록 선판매 항목이 없습니다
                 </p>
               ) : (
                 pending.map((item) => {
                   const selected = form.orderItemId === item.id;
+                  const meta = item.presaleKind
+                    ? PRESALE_KIND_META[item.presaleKind]
+                    : undefined;
                   return (
                     <button
                       key={item.id}
@@ -161,11 +173,15 @@ export default function UsedItemReconcilePage() {
                     >
                       <div className="flex w-full items-center justify-between gap-2">
                         <span className="flex min-w-0 items-center gap-1.5">
-                          {item.presaleKind === "used" && (
-                            <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-success-bg)] px-2 py-0.5 text-jm-2xs font-semibold text-[var(--jm-success-fg)]">
-                              선판매 중고
-                            </span>
-                          )}
+                          <span
+                            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-jm-2xs font-semibold ${
+                              meta?.active
+                                ? "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
+                                : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
+                            }`}
+                          >
+                            선판매 {meta?.label ?? "기타"}
+                          </span>
                           <span className="truncate font-medium text-[var(--jm-text)]">
                             {item.serviceName ?? "(이름 없음)"}
                           </span>
@@ -197,7 +213,7 @@ export default function UsedItemReconcilePage() {
             </JmCardContent>
           </JmCard>
 
-          {/* 우: 등록 폼 */}
+          {/* 우: 등록 폼 (종류별 분기 — 현재 중고만 활성) */}
           <JmCard>
             <JmCardHeader>
               <JmCardTitle>매입 정보 등록</JmCardTitle>
@@ -207,6 +223,12 @@ export default function UsedItemReconcilePage() {
                 <p className="py-8 text-center text-jm-sm text-[var(--jm-text-muted)]">
                   좌측 목록에서 항목을 선택하세요
                 </p>
+              ) : !selectedActive ? (
+                <JmAlert variant="warning">
+                  {selectedKind === "catalog"
+                    ? "내상품 선판매 등록은 준비 중입니다."
+                    : "이 유형의 선판매 등록은 아직 지원하지 않습니다."}
+                </JmAlert>
               ) : (
                 <>
                   <JmFormField label="품명" required>
@@ -249,18 +271,15 @@ export default function UsedItemReconcilePage() {
                     />
                   </JmFormField>
                   <div className="flex justify-end gap-2 pt-2">
-                    <JmButton
-                      variant="ghost"
-                      onClick={() => setForm(EMPTY_FORM)}
-                    >
+                    <JmButton variant="ghost" onClick={() => { setForm(EMPTY_FORM); setSelectedKind(null); }}>
                       취소
                     </JmButton>
                     <JmButton
                       variant="cta"
                       onClick={handleSubmit}
-                      disabled={reconcileMutation.isPending}
+                      disabled={registerMutation.isPending}
                     >
-                      {reconcileMutation.isPending && (
+                      {registerMutation.isPending && (
                         <Loader2 className="size-3.5 animate-spin" />
                       )}
                       등록

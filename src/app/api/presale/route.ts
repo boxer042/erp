@@ -5,12 +5,16 @@ import { nextUsedItemCode } from "@/lib/used-item-code";
 import { z } from "zod";
 
 /**
- * GET /api/used-items/reconcile
- * 미정리 OrderItem 목록 — productId 없고 serviceName 있는 자유 라인 중
- * 아직 UsedItem 으로 link 안 된 것. EMERGENCY_USE 사후 정리 대상.
+ * 선판매 정리 — 결제됐지만 미등록인 자유 라인(presaleKind 보유)을 모아
+ * 종류별(중고/내상품/수리)로 실제 등록해 연결하는 cross-domain 허브.
  *
- * 정책: 최근 30일 + 매장 직원이 "중고였음" 표시할 만한 후보.
- * (productId 없는 모든 OrderItem 이 자동 후보지만 실제로는 매장 직원 판단으로 등록)
+ * presaleKind 가 없는 순수 기술료/공임 라인은 등록할 원가·상품이 없어 제외.
+ * 현재 "used"(중고)만 활성, "catalog"(내상품)·수리는 향후 확장.
+ */
+
+/**
+ * GET /api/presale
+ * 미정리 선판매 라인 목록 — presaleKind 가 있고 아직 등록(link) 안 된 자유 라인.
  */
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
@@ -26,20 +30,17 @@ export async function GET(request: NextRequest) {
       productId: null,
       // 이미 link 된 OrderItem 은 제외 (UsedItem.orderItemId @unique)
       soldUsedItem: null,
-      // 서비스 라인 외에 service line (수리/임대 등) 도 productId=null 일 수 있어
-      // serviceName 만 있는 가장 단순한 라인 위주
       serviceName: { not: null },
+      // 선판매 마커 있는 라인만 — 순수 기술료(presaleKind=null)는 등록 대상 아님
+      presaleKind: { not: null },
       order: {
         orderDate: { gte: since },
-        // 취소/환불은 제외
         status: { notIn: ["CANCELLED", "RETURNED"] },
       },
     },
     select: {
       id: true,
       serviceName: true,
-      // 선판매(presaleKind="used") 로 명시된 라인 — [선판매] 버튼으로 추가된 미등록 중고.
-      // 기술료(presaleKind=null) 자유 라인과 구별해 UI 배지 + 우선 노출.
       presaleKind: true,
       quantity: true,
       unitPrice: true,
@@ -58,8 +59,7 @@ export async function GET(request: NextRequest) {
     take: 100,
   });
 
-  // 선판매 명시 라인(presaleKind="used")을 위로 — 기술료 자유 라인과 섞이지 않게.
-  // findMany orderBy(날짜 desc)는 그룹 내부에서 유지 (V8 stable sort).
+  // 중고(used) 우선 — 향후 catalog/수리 종류 섞일 때 그룹 정렬 (V8 stable sort 로 날짜 순서 유지)
   items.sort(
     (a, b) =>
       (b.presaleKind === "used" ? 1 : 0) - (a.presaleKind === "used" ? 1 : 0),
@@ -79,11 +79,11 @@ const reconcileSchema = z.object({
 });
 
 /**
- * POST /api/used-items/reconcile
- * 미정리 OrderItem 을 UsedItem 으로 사후 등록 + status=SOLD + orderItemId link.
- * acquiredFrom=EMERGENCY_USE 고정.
- *
- * 부가 효과: OrderItem.unitCostSnapshot 도 함께 갱신해 마진 리포트 정합성 회복.
+ * POST /api/presale
+ * 선판매 라인을 종류(presaleKind)에 따라 실제 도메인 레코드로 등록 + link.
+ *  - "used"    → UsedItem 생성 (status=SOLD, acquiredFrom=EMERGENCY_USE) + OrderItem.unitCostSnapshot 보정
+ *  - "catalog" → (향후) 카탈로그 상품 등록/연결
+ *  - 그 외/수리 → (향후) 미지원
  */
 export async function POST(request: NextRequest) {
   const [user, deny] = await guardUser();
@@ -109,7 +109,15 @@ export async function POST(request: NextRequest) {
   }
   if (orderItem.soldUsedItem) {
     return NextResponse.json(
-      { error: "이미 중고 단품이 연결되어 있습니다" },
+      { error: "이미 등록되어 연결된 라인입니다" },
+      { status: 400 },
+    );
+  }
+
+  // 종류 분기 — 현재 중고만 활성
+  if (orderItem.presaleKind !== "used") {
+    return NextResponse.json(
+      { error: "아직 지원하지 않는 선판매 유형입니다 (내상품·수리는 준비 중)" },
       { status: 400 },
     );
   }
@@ -152,7 +160,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(created, { status: 201 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "사후 정리에 실패했습니다";
+    const msg = e instanceof Error ? e.message : "선판매 정리에 실패했습니다";
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

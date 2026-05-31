@@ -114,7 +114,10 @@ export const queryKeys = {
     all: ["used-items"] as const,
     list: (params?: Record<string, unknown>) => ["used-items", "list", params ?? {}] as const,
     detail: (id: string) => ["used-items", "detail", id] as const,
-    reconcile: (params?: Record<string, unknown>) => ["used-items", "reconcile", params ?? {}] as const,
+  },
+  presale: {
+    all: ["presale"] as const,
+    list: (params?: Record<string, unknown>) => ["presale", "list", params ?? {}] as const,
   },
   rentals: {
     all: ["rentals"] as const,

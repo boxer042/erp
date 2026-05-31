@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Boxes, Coins, Layers, Plus, Recycle, RefreshCw, Tag } from "lucide-react";
+import { Boxes, Coins, Layers, Plus, RefreshCw, Tag } from "lucide-react";
 
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -175,12 +175,6 @@ export default function UsedItemsPage() {
               />
             </JmTableToolbarFilters>
             <JmTableToolbarActions>
-              <Link href="/inventory/used-items/reconcile">
-                <JmButton variant="ghost" size="sm">
-                  <Recycle className="size-4" />
-                  사후 정리
-                </JmButton>
-              </Link>
               <Link href="/inventory/used-items/build">
                 <JmButton variant="ghost" size="sm">
                   <Layers className="size-4" />
