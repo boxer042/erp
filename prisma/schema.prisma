@@ -34,7 +34,6 @@ model User {
   supplierReturns           SupplierReturn[]
   createdQuotations         Quotation[]
   createdStatements         Statement[]
-  customerNotes             CustomerNote[]
   createdRepairs            RepairTicket[]
   assignedRepairs           RepairTicket[]            @relation("RepairAssignee")
   createdSymptomTemplates   RepairSymptomTemplate[]   @relation("SymptomTemplateCreator")
@@ -1908,7 +1907,6 @@ model Customer {
   payments         CustomerPayment[]
   refunds          CustomerRefund[]
   machines         CustomerMachine[]
-  notes            CustomerNote[]
   repairs          RepairTicket[]
   rentals          Rental[]
   expenses         Expense[]
@@ -2191,19 +2189,6 @@ model CustomerMachine {
 
   @@index([customerId])
   @@map("customer_machines")
-}
-
-model CustomerNote {
-  id          String   @id @default(uuid())
-  customerId  String   @map("customer_id")
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  content     String
-  createdById String   @map("created_by_id")
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@index([customerId, createdAt])
-  @@map("customer_notes")
 }
 
 // ============================================================

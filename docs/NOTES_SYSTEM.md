@@ -155,7 +155,7 @@ enum NoteSourceType { ORDER INCOMING PURCHASE_ORDER REPAIR CUSTOMER SUPPLIER PAY
 |---|---|---|
 | **0 (완료)** | `Note` 모델+enums, `/api/notes` CRUD, `query-keys`, validators, `/notes` 페이지, 대시보드 위젯 | 무위험(순수 추가) |
 | **1 (대부분 완료)** | 재사용 `NoteTimeline` + 주문·발주·수리·거래처·고객 상세에 타임라인(대표 비고 유지) + 백필 스크립트 + 출처별 탭 + 고객 `CustomerNote` 흡수. 입고·결제 live wiring만 남음 | 중 (읽기·인쇄 경로 검증) |
-| **2** | 잔여 정리 + 전환 완료 컬럼 제거 + 死코드 제거(`CustomerNote` 모델 · `/api/customer-notes` — 호출처 0) | 중 |
+| **2 (부분 완료)** | 死코드 제거 완료(`CustomerNote` 모델 · `/api/customer-notes`). 단일 memo 컬럼은 대표 비고로 유지 결정 → 추가 드롭 없음 | 중 |
 | **3** | 카카오 나에게 보내기 + 토큰 회전 cron + 리마인더 | 중 (외부 OAuth) |
 
 ---
@@ -171,6 +171,9 @@ enum NoteSourceType { ORDER INCOMING PURCHASE_ORDER REPAIR CUSTOMER SUPPLIER PAY
   - **허브 "출처별 메모" 탭** — `/api/notes?hasSource=1`(sourceType≠null 필터) + `/notes` 탭 추가. source 연결 노트(타임라인·백필분)를 한곳에서 출처 배지·원본 모달과 함께 조회 → 요구사항 3 충족.
   - **고객 `CustomerNote`→`Note` 흡수 완료** — 고객 상세 노트 탭을 `NoteTimeline`(sourceType=CUSTOMER)으로 교체 + `/api/customers/[id]/detail` 의 notes 쿼리를 `Note` 로 전환 + 백필(개별 `create` 로 createdAt·createdById 보존). `/api/customer-notes`(GET/POST/DELETE)·`CustomerNote` 모델은 **프론트 호출처 0 = 死코드** → Phase 2 제거.
   - **남은 Phase 1**: 입고·결제 상세 live wiring (전용 상세 페이지가 없어 우선순위 낮음 — 현재는 백필로 과거분 노출).
+- **Phase 2 (부분 완료, 2026-05-31)** — 死코드 제거: `CustomerNote` 모델·관계(User/Customer)·`/api/customer-notes`(GET/POST/DELETE) 삭제 + `db push`(빈 `customer_notes` 테이블 drop). 고객 노트는 `Note`(sourceType=CUSTOMER)로 일원화. tsc 0.
+  - **결정**: 단일 `memo` 컬럼(고객·거래처·입고·결제 등)은 전 도메인에서 **대표 비고로 유지**(컬럼 드롭/입력 마이그레이션 안 함 — 리스크 대비 이득 낮음). `NoteTimeline` 은 그 위 추적 노트/할일 레이어(additive). `CustomerNote` 만 별도 중복 시스템이라 흡수·제거함.
+  - **⚠️ prod 주의**: 운영 DB `customer_notes` 에 데이터가 있으면 `npm run db:push:prod` 전에 백필(`npx tsx --env-file=.env.prod scripts/backfill-notes.ts --commit`)을 먼저 실행해 `Note` 로 이관할 것. (dev 는 0건이라 바로 drop.)
   - **알려진 한계(낮음)**: PENDING 주문 하드삭제 시 연결 노트가 고아로 남음(표시 안 됨·무해). Phase 2 정리 때 cleanup 고려.
 
 **Phase 1 착수 전 검증**:
