@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
     const token = await exchangeCodeForToken(code);
     await saveConnection(user.id, token);
     return NextResponse.redirect(`${base}/notes?kakao=connected`);
-  } catch {
+  } catch (err) {
+    console.error("[kakao callback] 토큰 교환 실패:", err);
     return NextResponse.redirect(`${base}/notes?kakao=error`);
   }
 }

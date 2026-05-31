@@ -53,6 +53,7 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/s/") &&
     !request.nextUrl.pathname.startsWith("/r/") &&
     !request.nextUrl.pathname.startsWith("/api/public") &&
+    !request.nextUrl.pathname.startsWith("/api/cron") &&
     !request.nextUrl.pathname.startsWith("/external/po") &&
     !request.nextUrl.pathname.startsWith("/jm")
   ) {
