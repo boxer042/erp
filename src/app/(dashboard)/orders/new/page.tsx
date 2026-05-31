@@ -25,6 +25,7 @@ import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog
 import { DiscountInputDialog } from "@/app/(pos)/pos/_components/discount-input-dialog";
 import { VariantSelectSheet } from "@/app/(pos)/pos/_variant-select-sheet";
 import { ServiceFeeSheet } from "@/app/(pos)/pos/_service-fee-sheet";
+import { PresaleSheet } from "@/app/(pos)/pos/_presale-sheet";
 import { QuickCustomerSheet } from "@/app/(pos)/pos/_quick-customer-sheet";
 import { LinkCustomerSheet } from "@/app/(pos)/pos/_link-customer-sheet";
 import { CustomerActionSheet } from "@/app/(pos)/pos/_customer-action-sheet";
@@ -155,6 +156,7 @@ export default function NewOrderPage() {
   } | null>(null);
   const [quotationLoadOpen, setQuotationLoadOpen] = useState(false);
   const [serviceFeeOpen, setServiceFeeOpen] = useState(false);
+  const [presaleOpen, setPresaleOpen] = useState(false);
   const [customerActionOpen, setCustomerActionOpen] = useState(false);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
@@ -696,8 +698,8 @@ export default function NewOrderPage() {
                   </div>
                 )}
 
-                {/* 카트 액션 그리드 — POS 카트시트와 동일 7버튼 구성(공용 CartActionButton).
-                    [장바구니저장]은 ERP 주문에서 미지원이라 비활성(제거하지 않고 통일). */}
+                {/* 카트 액션 그리드 — POS 카트시트와 동일 8버튼 구성(공용 CartActionButton).
+                    [시리얼출력][장바구니저장]은 ERP 주문에서 미지원이라 비활성(제거하지 않고 통일). */}
                 <div className="grid grid-cols-4 gap-1.5">
                   <ActionButton
                     label="할인"
@@ -725,6 +727,11 @@ export default function NewOrderPage() {
                     label="기술료"
                     sub="공임 추가"
                     onClick={() => setServiceFeeOpen(true)}
+                  />
+                  <ActionButton
+                    label="선판매"
+                    sub="미등록 항목"
+                    onClick={() => setPresaleOpen(true)}
                   />
                   <ActionButton
                     label="시리얼출력"
@@ -1121,6 +1128,23 @@ export default function NewOrderPage() {
         }
       />
 
+      {/* 선판매 — 미등록 중고/내상품(비활)을 자유 입력으로 먼저 판매. 사후 정리로 연결.
+          itemType="service" + presaleKind 으로 행을 미리 구별 (POS 카트시트와 동일 PresaleSheet 재사용). */}
+      <PresaleSheet
+        open={presaleOpen}
+        onOpenChange={setPresaleOpen}
+        onAdd={(line) =>
+          addCartItem({
+            itemType: "service",
+            presaleKind: line.presaleKind,
+            name: line.name,
+            imageUrl: null,
+            unitPrice: line.unitPrice,
+            taxType: "TAXABLE",
+          })
+        }
+      />
+
       {/* 고객 액션 시트 — 카드 클릭 시 뜨는 POS 패턴 (기존 고객 연결 / 새 고객 등록 / 다른 고객으로 변경 / 고객 페이지) */}
       <CustomerActionSheet
         open={customerActionOpen}
@@ -1363,14 +1387,22 @@ function CartLineCard({
         nameSlot={
           isService ? (
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
-                기술료
-              </span>
+              {item.presaleKind === "used" ? (
+                <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-success-bg)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-success-fg)]">
+                  중고 선판매
+                </span>
+              ) : (
+                <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
+                  기술료
+                </span>
+              )}
               <JmInput
                 size="sm"
                 value={item.name}
                 onChange={(e) => onUpdate({ name: e.target.value })}
-                placeholder="기술료 항목명"
+                placeholder={
+                  item.presaleKind === "used" ? "중고 품명 (예: 센다이 엔진)" : "기술료 항목명"
+                }
               />
             </div>
           ) : undefined

@@ -123,7 +123,12 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                   추가구매
                 </span>
               )}
-              {item.itemType === "service" && (
+              {item.itemType === "service" && item.presaleKind === "used" && (
+                <span className="inline-flex items-center rounded-full bg-[var(--jm-success-bg)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-success-fg)]">
+                  중고 선판매
+                </span>
+              )}
+              {item.itemType === "service" && item.presaleKind !== "used" && (
                 <span className="inline-flex items-center rounded-full bg-[var(--jm-surface-muted)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)]">
                   기술료
                 </span>

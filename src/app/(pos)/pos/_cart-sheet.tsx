@@ -16,6 +16,7 @@ import { PriceInputDialog } from "./_components/price-input-dialog";
 import { DiscountInputDialog } from "./_components/discount-input-dialog";
 import { QuotationLoadSheet } from "./_quotation-load-sheet";
 import { ServiceFeeSheet } from "./_service-fee-sheet";
+import { PresaleSheet } from "./_presale-sheet";
 import {
   ReprintPickerModal,
   type ReprintCandidate,
@@ -97,6 +98,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
   const [shippingOpen, setShippingOpen] = useState(false);
   const [quotationLoadOpen, setQuotationLoadOpen] = useState(false);
   const [serviceFeeOpen, setServiceFeeOpen] = useState(false);
+  const [presaleOpen, setPresaleOpen] = useState(false);
   // 시리얼 발번 결과 — 기존 라벨 발견 시 picker 모달 분기.
   // pendingNewCodes: 신규 발번된 코드 (이미 DB 에 발급됨, picker 결과와 합쳐 출력).
   // reprintCandidates: 기존 시리얼 보유 ticket — picker 에서 선택.
@@ -319,7 +321,7 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
           </div>
         )}
 
-        {/* 액션 그리드 (4열): [할인][배송비][기술료][시리얼출력] / [장바구니저장][견적서][불러오기] */}
+        {/* 액션 그리드 (4열): [할인][배송비][기술료][선판매] / [시리얼출력][장바구니저장][견적서][불러오기] */}
         {items.length > 0 && (
           <div className="mt-3 grid grid-cols-4 gap-1.5">
             <ActionButton
@@ -348,6 +350,11 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
               label="기술료"
               sub="공임 추가"
               onClick={() => setServiceFeeOpen(true)}
+            />
+            <ActionButton
+              label="선판매"
+              sub="미등록 항목"
+              onClick={() => setPresaleOpen(true)}
             />
             <ActionButton
               label="시리얼출력"
@@ -446,6 +453,25 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
           add(
             {
               itemType: "service",
+              name: line.name,
+              imageUrl: null,
+              unitPrice: line.unitPrice,
+            },
+            { sessionId: session.id },
+          )
+        }
+      />
+
+      {/* 선판매 — 미등록 중고/내상품(비활)을 자유 입력으로 먼저 판매. 사후 정리로 연결.
+          itemType="service" + presaleKind 으로 행을 미리 구별. */}
+      <PresaleSheet
+        open={presaleOpen}
+        onOpenChange={setPresaleOpen}
+        onAdd={(line) =>
+          add(
+            {
+              itemType: "service",
+              presaleKind: line.presaleKind,
               name: line.name,
               imageUrl: null,
               unitPrice: line.unitPrice,

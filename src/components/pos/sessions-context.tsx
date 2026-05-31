@@ -98,6 +98,14 @@ export interface CartItem {
    * 일반 product/lot 흐름 우회 (lot 차감 안 함).
    */
   usedItemId?: string;
+  /**
+   * 선판매(미등록) 자유 라인 종류 — [선판매] 버튼 → 모달에서 선택한 타입.
+   * "used"  = 미등록 중고상품을 자유 입력으로 먼저 판매 → 나중에 사후 정리(선판매)로 UsedItem 연결.
+   * "catalog" = 미등록 내상품 (확장 대비, 현재 모달에서 비활성 — 생성 경로 없음).
+   * itemType="service" 자유 라인과 함께 부여돼, 행을 카탈로그/중고로 미리 구별 → 사후 lot 처리 혼동 방지.
+   * 현재는 프론트 표시(배지)·UX 마커. 결제 시엔 일반 serviceName 라인으로 저장돼 reconcile 후보가 됨.
+   */
+  presaleKind?: "used" | "catalog";
   repairMeta?: RepairMeta;
   rentalMeta?: RentalMeta;
 }
