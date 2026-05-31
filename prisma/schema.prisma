@@ -1104,6 +1104,12 @@ model Incoming {
   shippingCost      Decimal               @default(0) @map("shipping_cost") @db.Decimal(12, 2)
   shippingIsTaxable Boolean               @default(true) @map("shipping_is_taxable")
   shippingDeducted  Boolean               @default(false) @map("shipping_deducted")
+  /**
+   * 거래처 직송 입고 — 거래처가 손님에게 직접 발송(drop-ship). 확정 시 재고(InventoryLot/Movement/
+   * Inventory)는 생성하지 않고 거래처원장 매입(채무)·원가 스냅샷·가격 히스토리만 기록.
+   * 택배 발송분(B) 의 원가/발송 연결은 주문 측에서 처리. docs/SPLIT_FULFILLMENT.md
+   */
+  isDropship        Boolean               @default(false) @map("is_dropship")
   memo              String?
   quotationId       String?               @map("quotation_id")
   quotation         Quotation?            @relation(fields: [quotationId], references: [id])

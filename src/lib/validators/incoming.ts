@@ -22,6 +22,8 @@ export const incomingSchema = z.object({
   shippingCost: z.string().optional(),
   shippingIsTaxable: z.boolean().optional(),
   shippingDeducted: z.boolean().optional(),
+  /** 거래처 직송 입고 — 확정 시 재고 미생성, 거래처원장 매입·원가만 기록 (docs/SPLIT_FULFILLMENT.md) */
+  isDropship: z.boolean().optional(),
   // 발주서 기반 입고일 때 발주 ID
   purchaseOrderId: z.string().optional(),
   items: z.array(incomingItemSchema).min(1, "입고 항목을 추가해주세요"),

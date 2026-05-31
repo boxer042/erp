@@ -1151,7 +1151,12 @@ export async function PUT(
     const orphanLots: Array<{ supplierProductId: string; totalQty: number; unitCost: number; canonicalItemId: string }> = [];
     const mappedWorks: MappedWork[] = [];
 
-    for (const [supplierProductId, rows] of groups) {
+    // 거래처 직송 입고 — 재고를 만들지 않음(물건이 우리를 안 거침). works 를 비워두면 아래
+    // inventory upsert / lot / movement 가 length 가드로 자동 skip. 거래처원장 매입·원가스냅샷은 정상.
+    const worksGroups = incoming.isDropship
+      ? new Map<string, typeof itemCalcs>()
+      : groups;
+    for (const [supplierProductId, rows] of worksGroups) {
       const totalQty = rows.reduce((s, r) => s + r.qty, 0);
       const unitCostSnapshot = groupAvgBySpId.get(supplierProductId)!;
       const canonicalItem = rows[0].item;

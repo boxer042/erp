@@ -129,6 +129,8 @@ function IncomingPageInner() {
   const [shippingSupply, setShippingSupply] = useState("");
   const [shippingIsTaxable, setShippingIsTaxable] = useState(true);
   const [shippingDeducted, setShippingDeducted] = useState(false);
+  // 거래처 직송 입고 — 확정 시 재고 미생성, 거래처원장 매입·원가만 기록
+  const [isDropship, setIsDropship] = useState(false);
   const [items, setItems] = useState<IncomingItemForm[]>([]);
 
   // 현재 시트에서 입력된 신규 상품 목록 (다른 행 콤보박스에서 재사용 가능)
@@ -458,6 +460,7 @@ function IncomingPageInner() {
     setShippingSupply("");
     setShippingIsTaxable(true);
     setShippingDeducted(false);
+    setIsDropship(false);
     setCreateOpen(true);
   };
 
@@ -476,6 +479,7 @@ function IncomingPageInner() {
     }
     setShippingIsTaxable(incoming.shippingIsTaxable);
     setShippingDeducted(incoming.shippingDeducted);
+    setIsDropship(incoming.isDropship ?? false);
     setItems(incoming.items.map((item) => {
       const beforeDiscount = item.originalPrice ?? item.unitPrice;
       const discAmt = item.discountAmount ? parseFloat(item.discountAmount) : 0;
@@ -576,6 +580,7 @@ function IncomingPageInner() {
         shippingCost: shippingCost || undefined,
         shippingIsTaxable,
         shippingDeducted,
+        isDropship,
         items: resolvedItems,
         purchaseOrderId: linkedPurchaseOrderId || undefined,
       };
@@ -675,6 +680,7 @@ function IncomingPageInner() {
         setShippingSupply("");
         setShippingIsTaxable(true);
         setShippingDeducted(false);
+        setIsDropship(false);
         // 자유입력 라인이 섞여있는지 확인 — 사용자에게 매핑 필요 안내
         const hasFreeLines = remainingItems.some(({ it }) => !it.supplierProduct);
         setItems(
@@ -1450,7 +1456,7 @@ function IncomingPageInner() {
                     <div>
                       <div className="bg-[var(--jm-surface-muted)] px-3 py-1.5 text-xs text-[var(--jm-text-muted)] font-medium border-b border-[var(--jm-border)]">입고 정보</div>
                       <div className="p-3 space-y-1.5 text-sm">
-                        <div className="flex items-center gap-2"><span className="text-xs text-[var(--jm-text-muted)] w-14 shrink-0">입고번호</span><span>{detail.incomingNo}</span></div>
+                        <div className="flex items-center gap-2"><span className="text-xs text-[var(--jm-text-muted)] w-14 shrink-0">입고번호</span><span>{detail.incomingNo}</span>{detail.isDropship && (<JmBadge variant="outline" size="sm" shape="square">거래처 직송 · 재고 미반영</JmBadge>)}</div>
                         <div className="flex items-center gap-2"><span className="text-xs text-[var(--jm-text-muted)] w-14 shrink-0">입고일</span><span>{new Date(detail.incomingDate).toLocaleDateString("ko-KR")}</span></div>
                         <div className="flex items-center gap-2"><span className="text-xs text-[var(--jm-text-muted)] w-14 shrink-0">등록자</span><span>{detail.createdBy.name}</span></div>
                         {detail.memo && <div className="flex items-center gap-2"><span className="text-xs text-[var(--jm-text-muted)] w-14 shrink-0">비고</span><span>{detail.memo}</span></div>}
@@ -2310,6 +2316,23 @@ function IncomingPageInner() {
                       <span className="text-jm-xs text-[var(--jm-text-muted)]">합계금액</span>
                       <span className="font-bold text-jm-base tabular-nums">₩{formatPrice(supplyAmount + taxAmount)}</span>
                     </div>
+                  </div>
+                  {/* 거래처 직송 — 재고 안 잡고 거래처원장 매입만 기록 */}
+                  <div className="border-t border-[var(--jm-border)] px-3 py-2">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <JmCheckbox
+                        checked={isDropship}
+                        onCheckedChange={(checked) => setIsDropship(!!checked)}
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-jm-xs font-medium text-[var(--jm-text)]">
+                          거래처 직송 (재고 안 잡음)
+                        </span>
+                        <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                          거래처가 손님에게 직접 발송. 확정 시 재고는 안 만들고 거래처원장 매입(채무)·원가만 기록됩니다.
+                        </span>
+                      </div>
+                    </label>
                   </div>
                   {/* 배송비 입력 */}
                   <div className="border-t border-[var(--jm-border)] px-3 py-2 flex items-center justify-end gap-3 flex-wrap">

@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
         shippingCost: data.shippingCost ? parseFloat(data.shippingCost) : 0,
         shippingIsTaxable: data.shippingIsTaxable ?? false,
         shippingDeducted: data.shippingDeducted ?? false,
+        isDropship: data.isDropship ?? false,
         memo: data.memo || null,
         purchaseOrderId: data.purchaseOrderId || null,
         createdById: user.id,

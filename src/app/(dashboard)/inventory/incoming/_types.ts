@@ -59,6 +59,7 @@ export interface IncomingDetail {
   shippingCost: string;
   shippingIsTaxable: boolean;
   shippingDeducted: boolean;
+  isDropship?: boolean;
   memo: string | null;
   supplier: { id: string; name: string; paymentMethod: string };
   createdBy: { name: string };
