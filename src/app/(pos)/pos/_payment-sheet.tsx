@@ -834,6 +834,54 @@ function Body({
           </div>
         )}
 
+        {/* 택배 발송분(B) 배송지 — 분할인데 현장 인도(매장수령/픽업/수리·임대 락)라 위 배송 섹션이 없을 때.
+            여기서 받은 받는사람/주소는 B(/api/orders) 에만 실림 — A 결제는 needsShippingInfo=false 라 무시. */}
+        {isSplit && !needsShippingInfo && (
+          <div className="flex flex-col gap-2 rounded-2xl border border-[var(--jm-warning-solid)]/30 bg-[var(--jm-bg)] p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-jm-xs font-semibold text-[var(--jm-text)]">
+                택배 발송분 배송지{" "}
+                <span className="font-normal text-[var(--jm-text-muted)]">
+                  (선택 — 나중에 입력 가능)
+                </span>
+              </span>
+              {session.customerId && (session.customerName || session.customerPhone) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShippingRecipientName(session.customerName ?? "");
+                    setShippingRecipientPhone(session.customerPhone ?? "");
+                  }}
+                  className="text-jm-2xs font-medium text-[var(--jm-text)] underline-offset-2 hover:underline"
+                >
+                  고객 정보 채우기
+                </button>
+              )}
+            </div>
+            <input
+              type="text"
+              value={shippingRecipientName}
+              onChange={(e) => setShippingRecipientName(e.target.value)}
+              placeholder="받는 사람 이름"
+              className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm outline-none focus:border-[var(--jm-border-strong)]"
+            />
+            <input
+              type="tel"
+              value={shippingRecipientPhone}
+              onChange={(e) => setShippingRecipientPhone(e.target.value)}
+              placeholder="받는 사람 연락처"
+              className="h-10 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 text-jm-sm outline-none focus:border-[var(--jm-border-strong)]"
+            />
+            <textarea
+              value={shippingAddress}
+              onChange={(e) => setShippingAddress(e.target.value)}
+              placeholder="택배 발송 주소"
+              rows={2}
+              className="resize-none rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-3 py-2 text-jm-sm outline-none focus:border-[var(--jm-border-strong)]"
+            />
+          </div>
+        )}
+
         {/* 출고 방식 — 수리/임대 라인이 있으면 PICKUP 강제 (토글 숨김) */}
         {!fulfillmentLocked && (
           <div className="flex flex-col gap-1.5">
