@@ -80,12 +80,20 @@ model Order {
 - **D-4-c 클레임/반품** → 그룹 단위 반품은 **1차 범위 제외**(후속). ORDERS_SYSTEM.md §8 `parentItemId` cascade 정책과 연동.
 - **거래처 직출고 자동화**(공급사 발주 연계) → 1차 범위 제외. 1차는 B 를 수동 PENDING 으로 두고 매장이 입고/직출고 결정.
 
-## 9. 구현 로드맵 (P5, 보류 중)
+## 9. 구현 현황 (2026-05-31 — 주문페이지 1차 완료)
 
-1. 스키마 `splitGroupId`/`splitParentId` + `db push`.
-2. 카트 라인 per-line "지금 받기/나중 배송" 토글(`headerBelow` 슬롯).
-3. 체크아웃 라인 파티션 → N Order 생성 + splitGroup 링크 + 단일 결제 배분(D-4).
-4. 거래명세표/영수증 그룹 집계, 상세 시트 "연결 주문" 표시(exchange UI 재사용).
-5. deficit-lot/입고 정산은 현행 한계 유지(범위 밖).
+> 결제·원장 배분은 최종 **주문별 자체 결제**(각 주문 자기 품목 결제·원장)로 확정 — 7·8절 D-4-a 의 "A 전액 귀속" 은 대체됨. 각 주문이 독립 정합이라 백엔드 트랜잭션/원장 리팩터 0.
 
-**키 파일**: `prisma/schema.prisma`, `src/app/api/pos/checkout/route.ts`, `src/app/api/orders/route.ts`, `src/app/(dashboard)/orders/_detail-sheet.tsx`, `src/app/(dashboard)/orders/page.tsx`, `src/lib/validators/order.ts`.
+- ✅ **스키마** `Order.splitGroupId`/`splitParentId` self-relation + `@@index` + `db push`.
+- ✅ **백엔드 수용** `orderSchema` + `/api/orders` `order.create` 에 split 링크 저장(B 는 SHIPPING→PENDING 미차감 백오더로 정상 생성).
+- ✅ **카트 UI** `orders/new` 상품 라인별 [지금 받기/나중 배송] `JmSegmentedControl` + "택배 나중 배송" 배지 + 결제단계 분할 안내 카드.
+- ✅ **오케스트레이션** 제출 시 mixed 면 프론트가 A(지금/대표, 전역 출고방식·세션할인·배송비) → B(나중/SHIPPING PENDING, 자기 품목·결제수단 상속, splitParentId=A.id) 2건 순차 등록. 단일(비분할) payload 는 byte-identical(흐름 불변). 부분결제+분할 동시 사용은 가드 차단.
+- ✅ **연결 주문** 상세 GET include + `_detail-sheet` "연결 주문 · 분할 출고" 카드(대표↔백오더 상호 link).
+- ✅ **e2e** `e2e/order-new.spec.ts` — 분할 토글→배지→안내 회귀 방어(4 pass).
+
+**남은 작업** (후속):
+- ⏸ **증빙 그룹 1장** — A+B 합산 거래명세표/영수증. 주문별 자체 결제라 per-order 증빙은 이미 정합 → 우선순위 낮음(그룹 합산 출력만 추가).
+- ⏸ **POS 경로 분할** — `/api/pos/checkout` + POS 카트(`_cart-line-row`)에 동일 토글. PosSession·repair/rental 락 때문에 주문페이지보다 복잡.
+- ⏸ **D-4-c 그룹 클레임/반품** — `parentItemId` cascade 정책 연동(범위 밖).
+
+**키 파일**: `prisma/schema.prisma`, `src/lib/validators/order.ts`, `src/app/api/orders/route.ts`, `src/app/api/orders/[id]/route.ts`, `src/app/(dashboard)/orders/new/page.tsx`, `src/app/(dashboard)/orders/_detail-sheet.tsx`, (POS 후속) `src/app/api/pos/checkout/route.ts`, `src/app/(pos)/pos/_cart-line-row.tsx`.
