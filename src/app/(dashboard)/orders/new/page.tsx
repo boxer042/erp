@@ -35,7 +35,6 @@ import {
   type CartTotals,
 } from "@/components/pos/cart-helpers";
 import { CartEmptyState } from "@/components/pos/cart-empty-state";
-import { CustomerSummaryCard } from "@/components/pos/customer-summary-card";
 import { CartActionButton as ActionButton } from "@/components/pos/cart-action-button";
 import { PosLineItemRow } from "@/components/pos/line-item-row";
 import { FooterStat } from "@/components/pos/footer-stat";
@@ -103,9 +102,8 @@ export default function NewOrderPage() {
   const [customerType, setCustomerType] = useState<"INDIVIDUAL" | "BUSINESS">(
     "INDIVIDUAL",
   );
-  const [customerBusinessNumber, setCustomerBusinessNumber] = useState<
-    string | null
-  >(null);
+  // 값은 현재 미표시(헤더 칩은 이름·기업 배지만) — 고객 선택 시 setter 만 사용
+  const [, setCustomerBusinessNumber] = useState<string | null>(null);
 
   // 채널 / 주문일 — ERP-only
   const [channelId, setChannelId] = useState("");
@@ -161,8 +159,6 @@ export default function NewOrderPage() {
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [quickCustomerDefault, setQuickCustomerDefault] = useState("");
-  // draft slot id — 미등록 고객 임시 코드/컬러 시드용 (CustomerSummaryCard 입력)
-  const [draftId] = useState(() => genClientId());
   // 우측 패널(카트+폼) 표시 여부 — 토글로 카탈로그 전체 화면 모드 가능
   const [panelOpen, setPanelOpen] = useState(true);
   // 모바일 카트/결제 하단 시트 — PC 는 측면 패널 유지, 모바일은 우상단 카트 버튼으로 열기
@@ -583,6 +579,15 @@ export default function NewOrderPage() {
 
         {/* 맥락 바 — 채널·거래일(ERP 전용). 기본값이면 멈추지 않고 진행 */}
         <OrderContextBar
+          customerName={customerName || null}
+          customerType={customerType}
+          hasCustomer={!!(customerId || customerName || customerPhone)}
+          onCustomerClick={() => setCustomerActionOpen(true)}
+          onCustomerClear={
+            customerId || customerName || customerPhone
+              ? () => clearCustomer()
+              : undefined
+          }
           channelOptions={channelOptions}
           channelId={channelId}
           onChannelChange={setChannelId}
@@ -658,28 +663,7 @@ export default function NewOrderPage() {
           {/* 본문 — 스크롤 */}
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="flex flex-col gap-5">
-              {/* 고객 — POS 와 동일 패턴: 카드 클릭 → LinkCustomerSheet (검색 + [+ 새 고객 등록] 인라인) */}
-              <div className="flex flex-col gap-2.5">
-                <SectionLabel>고객</SectionLabel>
-                <CustomerSummaryCard
-                  data={{
-                    id: draftId,
-                    customerId: customerId || undefined,
-                    customerName: customerName || undefined,
-                    customerPhone: customerPhone || undefined,
-                    customerType,
-                    customerBusinessNumber,
-                  }}
-                  hideMeta
-                  onClick={() => setCustomerActionOpen(true)}
-                  onClose={
-                    customerId || customerName || customerPhone
-                      ? () => clearCustomer()
-                      : undefined
-                  }
-                />
-              </div>
-
+              {/* 고객은 상단 맥락 바(OrderContextBar)에서 선택 — POS 와 달리 결제 전 미리 지정 */}
               {/* 카트 라인 */}
               <div className="flex flex-col gap-2.5">
                 <SectionLabel>
