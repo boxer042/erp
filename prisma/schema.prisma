@@ -1485,6 +1485,11 @@ model Order {
   exchangeOrder       Order?              @relation("OrderExchange", fields: [exchangeOrderId], references: [id])
   exchangedFromOrders Order[]             @relation("OrderExchange")
   exchangedAt         DateTime?           @map("exchanged_at")
+  // 분할 출고 — 한 결제가 매장수령(대표)/택배(백오더) 등으로 갈릴 때 연결 (docs/SPLIT_FULFILLMENT.md)
+  splitGroupId        String?             @map("split_group_id")
+  splitParentId       String?             @map("split_parent_id")
+  splitParent         Order?              @relation("OrderSplit", fields: [splitParentId], references: [id])
+  splitChildren       Order[]             @relation("OrderSplit")
   /**
    * 클레임 메모 — 손님 자유 사유 + 매장 처리 메모 (claimReason enum 외 보충)
    */
@@ -1514,6 +1519,7 @@ model Order {
   @@index([channelId, orderDate])
   @@index([status])
   @@index([status, expectedShipDate])
+  @@index([splitGroupId])
   // repairTicketId / rentalId 는 @unique 가 자동으로 unique index 생성 — 별도 @@index 불필요
   @@map("orders")
 }
