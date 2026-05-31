@@ -690,9 +690,9 @@ export default function NewOrderPage() {
                   </div>
                 )}
 
-                {/* 카트 액션 그리드 (POS 카트시트와 통일감) — POS 7버튼 중 [장바구니저장] 제외한 6개.
-                    [할인][배송비][기술료] / [시리얼출력][견적서][불러오기]. 3-col × 2 rows 로 정렬. */}
-                <div className="grid grid-cols-3 gap-1.5">
+                {/* 카트 액션 그리드 — POS 카트시트와 동일 7버튼 구성(공용 CartActionButton).
+                    [장바구니저장]은 ERP 주문에서 미지원이라 비활성(제거하지 않고 통일). */}
+                <div className="grid grid-cols-4 gap-1.5">
                   <ActionButton
                     label="할인"
                     sub={
@@ -723,6 +723,12 @@ export default function NewOrderPage() {
                   <ActionButton
                     label="시리얼출력"
                     sub="POS 결제"
+                    disabled
+                    onClick={() => {}}
+                  />
+                  <ActionButton
+                    label="장바구니저장"
+                    sub="POS 전용"
                     disabled
                     onClick={() => {}}
                   />
