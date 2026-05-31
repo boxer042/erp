@@ -3,6 +3,7 @@
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { NoteTimeline } from "@/components/note-timeline";
 import {
   ArrowLeft, PackagePlus, Send, CheckCircle2, XCircle, Lock, Loader2,
   Trash2, Pencil, FileText, RefreshCw, ThumbsUp, Link2, Copy,
@@ -373,6 +374,16 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 )}
               </div>
             )}
+          </JmCardContent>
+        </JmCard>
+
+        {/* 메모 · 할 일 — 업무 노트 허브와 연동 (출처: 발주) */}
+        <JmCard>
+          <JmCardHeader>
+            <JmCardTitle>메모 · 할 일</JmCardTitle>
+          </JmCardHeader>
+          <JmCardContent>
+            <NoteTimeline sourceType="PURCHASE_ORDER" sourceId={id} sourceLabel={data.poNo} />
           </JmCardContent>
         </JmCard>
 

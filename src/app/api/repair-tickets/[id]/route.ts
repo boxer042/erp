@@ -174,7 +174,6 @@ export async function PUT(
           ...(d.assignedToId !== undefined
             ? { assignedToId: d.assignedToId || null }
             : {}),
-          ...(d.memo !== undefined ? { memo: d.memo?.trim() || null } : {}),
           ...(d.repairCategoryId !== undefined
             ? { repairCategoryId: d.repairCategoryId || null }
             : {}),

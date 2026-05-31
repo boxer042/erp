@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { NoteTimeline } from "@/components/note-timeline";
 import { useTheme } from "next-themes";
 import {
   ArrowLeft,
@@ -391,6 +392,16 @@ export default function SupplierDetailPage() {
                   />
                 )}
               </dl>
+            </JmCardContent>
+          </JmCard>
+
+          {/* 메모 · 할 일 — 업무 노트 허브와 연동 (출처: 거래처) */}
+          <JmCard>
+            <JmCardHeader>
+              <JmCardTitle>메모 · 할 일</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent>
+              <NoteTimeline sourceType="SUPPLIER" sourceId={supplierId} sourceLabel={supplier.name} />
             </JmCardContent>
           </JmCard>
 

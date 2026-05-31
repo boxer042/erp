@@ -94,11 +94,11 @@ export async function PUT(
         if (c.id) {
           await tx.supplierContact.update({
             where: { id: c.id },
-            data: { name: c.name, phone: c.phone || null, email: c.email || null, position: c.position || null, memo: c.memo || null },
+            data: { name: c.name, phone: c.phone || null, email: c.email || null, position: c.position || null },
           });
         } else {
           await tx.supplierContact.create({
-            data: { supplierId: id, name: c.name, phone: c.phone || null, email: c.email || null, position: c.position || null, memo: c.memo || null },
+            data: { supplierId: id, name: c.name, phone: c.phone || null, email: c.email || null, position: c.position || null },
           });
         }
       }

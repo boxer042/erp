@@ -7,7 +7,6 @@ export const supplierContactSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email("올바른 이메일을 입력해주세요").optional().or(z.literal("")),
   position: z.string().optional(),
-  memo: z.string().optional(),
 });
 
 export const supplierSchema = z.object({

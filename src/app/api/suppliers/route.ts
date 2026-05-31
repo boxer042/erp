@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
             phone: c.phone || null,
             email: c.email || null,
             position: c.position || null,
-            memo: c.memo || null,
           })),
         },
       } : {}),

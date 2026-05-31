@@ -48,6 +48,7 @@ import {
   Moon,
   LogOut,
   MoreHorizontal,
+  NotebookPen,
 } from "lucide-react";
 
 import { useTheme } from "next-themes";
@@ -91,6 +92,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { id: "home", label: "대시보드", href: "/", icon: LayoutDashboard },
+      { id: "notes", label: "업무 노트", href: "/notes", icon: NotebookPen },
       { id: "pos", label: "POS", href: "/pos", icon: MonitorSmartphone },
     ],
   },

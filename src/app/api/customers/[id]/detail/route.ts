@@ -129,8 +129,9 @@ export async function GET(
       select: { id: true, name: true, memo: true },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.customerNote.findMany({
-      where: { customerId: id },
+    // 업무 노트(Note) 통합 — 고객 노트는 sourceType=CUSTOMER 로 일원화 (구 CustomerNote 는 백필됨)
+    prisma.note.findMany({
+      where: { isActive: true, sourceType: "CUSTOMER", sourceId: id },
       select: { id: true, content: true, createdAt: true },
       orderBy: { createdAt: "desc" },
       take: 5,

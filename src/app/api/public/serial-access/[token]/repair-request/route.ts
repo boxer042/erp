@@ -91,7 +91,6 @@ export async function POST(
       receivedAt: new Date(),
       symptom: parsed.data.symptom.trim(),
       createdById: user.id,
-      memo: "손님 QR 셀프 접수",
     },
     select: { ticketNo: true },
   });

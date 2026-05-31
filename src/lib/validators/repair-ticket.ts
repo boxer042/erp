@@ -13,7 +13,6 @@ export const repairTicketCreateSchema = z.object({
   repairWarrantyMonths: z.coerce.number().int().min(0).nullable().optional(),
   parentRepairTicketId: z.string().nullable().optional(),
   assignedToId: z.string().nullable().optional(),
-  memo: z.string().nullable().optional(),
   // 미등록 손님 ticket 의 카트 세션 매핑 (sessions.repairTicketIds 추적 끊김 대비 DB 보존)
   posSessionId: z.string().nullable().optional(),
   // 수리 카테고리 (ProductCategory.id) — null 이면 "기타"
@@ -37,7 +36,6 @@ export const repairTicketUpdateSchema = z.object({
   totalDiscount: z.string().optional(),
   repairWarrantyMonths: z.coerce.number().int().min(0).nullable().optional(),
   assignedToId: z.string().nullable().optional(),
-  memo: z.string().nullable().optional(),
   repairCategoryId: z.string().nullable().optional(),
   // 접수 일시 — 잘못 입력된 경우 수정 가능. ISO 문자열로 받아 Date 로 변환.
   receivedAt: z

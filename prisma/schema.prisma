@@ -44,6 +44,7 @@ model User {
   posSessions               PosSession[]
   auditLogs                 AuditLog[]
   productPriceChanges       ProductPriceHistory[]     @relation("ProductPriceHistoryChangedBy")
+  notes                     Note[]
 
   @@map("users")
 }
@@ -387,7 +388,6 @@ model SupplierContact {
   phone      String?
   email      String?
   position   String?
-  memo       String?
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("supplier_contacts")
@@ -1592,7 +1592,6 @@ model OrderItem {
    * 서비스 부피 별도 집계 가능.
    */
   isService                     Boolean           @default(false) @map("is_service")
-  memo                          String?
 
   lotConsumptions LotConsumption[]
   serialItems     SerialItem[]
@@ -2342,7 +2341,6 @@ model RepairTicket {
   // null = "기타" (카테고리 미지정 또는 없는 항목)
   repairCategoryId       String?                  @map("repair_category_id")
   repairCategory         ProductCategory?         @relation("RepairCategory", fields: [repairCategoryId], references: [id], onDelete: SetNull)
-  memo                   String?
   createdById            String                   @map("created_by_id")
   createdBy              User                     @relation(fields: [createdById], references: [id])
   createdAt              DateTime                 @default(now()) @map("created_at")
@@ -3283,4 +3281,67 @@ model PosSession {
   @@index([deletedAt])
   @@index([userId, parkedAt])
   @@map("pos_sessions")
+}
+
+// ============================================================
+// 업무 노트 (Business Notes) — 통합 메모/할일 허브
+// 설계 단일 출처: docs/NOTES_SYSTEM.md
+// ============================================================
+
+model Note {
+  id          String          @id @default(uuid())
+  kind        NoteKind        @default(MEMO) // TODO(체크 가능) | MEMO(단순)
+  content     String
+  title       String?
+
+  // 할일(체크) 축 — kind=TODO 일 때만 의미
+  done        Boolean         @default(false)
+  doneAt      DateTime?       @map("done_at")
+  dueDate     DateTime?       @map("due_date")
+  priority    NotePriority    @default(NORMAL)
+
+  // 알림 축
+  notify      Boolean         @default(false)
+  notifyAt    DateTime?       @map("notify_at")
+  notifiedAt  DateTime?       @map("notified_at")
+
+  // 출처 추적 축 — 폴리모픽, 선택. null = 직접 작성
+  sourceType  NoteSourceType? @map("source_type")
+  sourceId    String?         @map("source_id")
+  sourceLabel String?         @map("source_label")
+
+  pinned      Boolean         @default(false)
+  createdById String          @map("created_by_id")
+  createdBy   User            @relation(fields: [createdById], references: [id])
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@index([isActive, done, createdAt])
+  @@index([sourceType, sourceId])
+  @@index([notify, notifyAt, notifiedAt])
+  @@index([createdById])
+  @@map("notes")
+}
+
+enum NoteKind {
+  TODO
+  MEMO
+}
+
+enum NotePriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum NoteSourceType {
+  ORDER
+  INCOMING
+  PURCHASE_ORDER
+  REPAIR
+  CUSTOMER
+  SUPPLIER
+  PAYMENT
+  GENERAL
 }

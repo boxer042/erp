@@ -106,7 +106,6 @@ export async function POST(request: NextRequest) {
       parentRepairTicketId: data.parentRepairTicketId || null,
       // 담당자 기본값 — 명시 미지정 시 현재 user 가 기본 담당자
       assignedToId: data.assignedToId ?? user.id,
-      memo: data.memo?.trim() || null,
       // 미등록 손님 (customerId=null) 일 때 카트 세션 매핑 — 클라이언트 추적 끊겨도 DB 에서 복원 가능
       posSessionId: data.customerId ? null : data.posSessionId || null,
       // 수리 카테고리 — null 이면 "기타"

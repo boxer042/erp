@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { NoteTimeline } from "@/components/note-timeline";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -629,30 +630,15 @@ export default function CustomerDetailPage({ params }: PageProps) {
               </JmCard>
             </JmTabsPanel>
 
-            {/* 노트 */}
+            {/* 노트 — 업무 노트 허브와 연동 (출처: 고객). 구 CustomerNote 는 Note 로 흡수됨 */}
             <JmTabsPanel value="notes" className="pt-2">
               <JmCard>
-                <JmCardContent className="p-0">
-                  {notes.length === 0 ? (
-                    <JmEmpty
-                      icon={<FileText className="size-8" />}
-                      title="등록된 노트 없음"
-                      description="POS 또는 수리 화면에서 고객별 메모를 남길 수 있습니다"
-                    />
-                  ) : (
-                    <ul className="divide-y divide-[var(--jm-border)]">
-                      {notes.map((n) => (
-                        <li key={n.id} className="flex flex-col gap-1 px-5 py-3">
-                          <span className="text-jm-xs text-[var(--jm-text-muted)] tabular-nums">
-                            {formatDateShort(n.createdAt)}
-                          </span>
-                          <p className="whitespace-pre-wrap text-jm-sm text-[var(--jm-text)]">
-                            {n.content}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                <JmCardContent>
+                  <NoteTimeline
+                    sourceType="CUSTOMER"
+                    sourceId={id}
+                    sourceLabel={customer.name}
+                  />
                 </JmCardContent>
               </JmCard>
             </JmTabsPanel>

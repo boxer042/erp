@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { focusCaretEnd } from "@/jm/lib/focus";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { NoteTimeline } from "@/components/note-timeline";
 import { format } from "date-fns";
 import {
   ArrowLeft,
@@ -346,6 +347,14 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
         <div className="flex flex-col gap-4">
           <CustomerSection ticket={t} />
           <SymptomSection ticket={t} readonly={readonly} onSaved={invalidate} />
+          <JmCard>
+            <JmCardHeader className="border-b-0 pb-3">
+              <JmCardTitle className="text-jm-sm">메모 · 할 일</JmCardTitle>
+            </JmCardHeader>
+            <JmCardContent className="pt-0">
+              <NoteTimeline sourceType="REPAIR" sourceId={t.id} sourceLabel={t.ticketNo} />
+            </JmCardContent>
+          </JmCard>
           {!readonly && <PackagesSection ticket={t} onChanged={invalidate} />}
           <PartsSection ticket={t} readonly={readonly} onChanged={invalidate} />
           <LaborsSection ticket={t} readonly={readonly} onChanged={invalidate} />

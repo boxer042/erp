@@ -56,6 +56,7 @@ import { PeriodToggle } from "./_period-toggle";
 import { CollapsibleKpiSection } from "./_kpi-collapse";
 import { ClickableStat } from "./_clickable-stat";
 import { RefreshButton } from "./_refresh-button";
+import { TodoMemosWidget } from "./_todo-memos";
 import { CsvButton, type CsvData } from "./_csv-export";
 
 type BadgeVariant = NonNullable<JmBadgeProps["variant"]>;
@@ -1296,6 +1297,9 @@ export default async function DashboardPage({
         </CollapsibleKpiSection>
         </>
         )}
+
+        {/* 업무 노트 — 미완료 할 일 (ADMIN·STAFF 공통) */}
+        <TodoMemosWidget />
 
         {/* 오늘 현금흐름 + 차트 — 재무·매출. ADMIN 전용 */}
         {isAdmin && (
