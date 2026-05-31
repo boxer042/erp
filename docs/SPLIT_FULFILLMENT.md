@@ -99,10 +99,16 @@ model Order {
 **증빙**
 - ✅ **그룹 1장** `(print)/order-statement` + `(print)/pos-receipt` 가 `splitGroupId` 형제(대표 먼저) 모아 items concat + 합계 Σ. 영수증 배송 섹션은 택배(B) 기준 + "분할 출고" 안내. 비분할 byte-identical. 정식 Statement 레코드(`issue-statement`)는 per-order 1:1 유지.
 
-**e2e**: `e2e/order-new.spec.ts`(분할 토글→배지→안내 4 pass) + `e2e/split-fulfillment.spec.ts`(A+B 링크·B=PENDING·증빙 합산 백엔드 검증).
+**UX 보강 (2026-05-31 추가)**
+- ✅ **용어 통일** "대표/백오더"(이해 어려움) → **"현장 수령분 / 택배 발송분"** (연결주문 카드·분할 안내·토스트 전반).
+- ✅ **연결주문 펼쳐보기** 상세 카드가 "이 주문은 [현장 수령분|택배 발송분]" 역할 명시 + 연결 주문을 **그 자리에서 펼쳐 품목·상태·합계 확인**(페이지 이동 0). [전체 보기]만 client-side 전환. 상세 API 가 splitParent/splitChildren 에 품목+합계 포함.
+- ✅ **택배 발송분 배송지 입력** 분할인데 현장 인도(매장수령/픽업)라 배송 섹션이 없을 때 orders/new·POS 결제에 "택배 발송분 배송지"(선택) 노출 → B 에만 실림.
+- ✅ **그룹 반품 cascade** RefundDialog 전체 반품에 "연결된 택배 발송분 N건도 함께 취소" 체크박스(미출고 자식만). A 반품 후 자식마다 cancel(자기 금액 환불 기록).
+
+**e2e**: `e2e/order-new.spec.ts`(분할 토글→배지→안내) + `e2e/split-fulfillment.spec.ts`(A+B 링크·B=PENDING·증빙 합산·펼쳐보기 데이터·자식 cancel cascade).
 
 **남은 작업** (후속, 1차 범위 밖):
-- ⏸ **D-4-c 그룹 클레임/반품 cascade** — A·B 는 별개 주문이라 **per-order 반품/교환은 기존 워크보드 흐름으로 이미 동작**. "A 반품 시 B 자동 반품" 같은 그룹 cascade 만 미구현(ORDERS_SYSTEM.md §8 `parentItemId` 정책 연동).
+- ⏸ **역방향/출고된 건 cascade** — 현재 그룹 cancel 은 "현장 수령분 반품 → 미출고 택배 발송분 취소" 방향만. 이미 출고된 택배 발송분 반품(RETURNED) cascade·역방향(택배 발송분에서 시작)은 미구현(ORDERS_SYSTEM.md §8 `parentItemId` 정책 연동).
 - ⏸ **거래처 직출고 자동화** — B 백오더의 공급사 발주 자동 연계(현재는 매장이 입고/직출고 수동 결정).
 
 **키 파일**: `prisma/schema.prisma`, `src/lib/validators/order.ts`, `src/app/api/orders/route.ts`, `src/app/api/orders/[id]/route.ts`, `src/app/(dashboard)/orders/new/page.tsx`, `src/app/(dashboard)/orders/_detail-sheet.tsx`, `src/app/api/pos/checkout/route.ts`, `src/components/pos/checkout-submit.ts`, `src/app/(pos)/pos/_cart-line-row.tsx`, `src/app/(pos)/pos/_payment-sheet.tsx`, `src/app/(pos)/pos/customer/[sid]/page.tsx`, `src/app/(print)/order-statement/[id]/print/page.tsx`, `src/app/(print)/pos-receipt/[id]/print/page.tsx`.
