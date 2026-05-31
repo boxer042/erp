@@ -162,6 +162,12 @@ function IncomingPageInner() {
     Record<string, { value: string; taxable: boolean }>
   >({});
 
+  // 단가 정정 다이얼로그 — 품목별 새 단가 + 정정/변동 (key=IncomingItem.id)
+  const [priceEditOpen, setPriceEditOpen] = useState(false);
+  const [priceCorr, setPriceCorr] = useState<
+    Record<string, { unitPrice: string; kind: "CHANGE" | "CORRECTION" }>
+  >({});
+
   const suppliersQuery = useQuery({
     queryKey: queryKeys.suppliers.list(),
     queryFn: () => apiGet<Supplier[]>("/api/suppliers"),
@@ -796,6 +802,43 @@ function IncomingPageInner() {
   };
   const shippingEditSaving = shippingEditMutation.isPending;
 
+  // 단가 정정 — 확정 입고 품목 단가 수정 (재고 사용 후에도, 마진·거래처원장 소급 재계산)
+  const priceEditMutation = useMutation({
+    mutationFn: (vars: {
+      id: string;
+      corrections: Array<{ id: string; unitPrice: number; kind: "CHANGE" | "CORRECTION" }>;
+    }) =>
+      apiMutate(`/api/incoming/${vars.id}`, "PUT", {
+        action: "correct-prices",
+        corrections: vars.corrections,
+      }),
+    onSuccess: (_data, vars) => {
+      setPriceEditOpen(false);
+      toast.success("단가가 정정되었습니다 — 마진·거래처원장 소급 반영");
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.detail(vars.id) });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "정정 실패"),
+  });
+  const handlePriceEdit = () => {
+    if (!detail) return;
+    const corrections = detail.items
+      .filter((it) => it.supplierProduct)
+      .map((it) => {
+        const c = priceCorr[it.id];
+        const np = parseFloat((c?.unitPrice ?? "").trim());
+        return { id: it.id, np, kind: c?.kind ?? ("CHANGE" as const), cur: parseFloat(it.unitPrice) };
+      })
+      .filter((r) => Number.isFinite(r.np) && r.np >= 0 && r.np !== r.cur)
+      .map((r) => ({ id: r.id, unitPrice: r.np, kind: r.kind }));
+    if (corrections.length === 0) {
+      toast.error("변경된 단가가 없습니다");
+      return;
+    }
+    priceEditMutation.mutate({ id: detail.id, corrections });
+  };
+  const priceEditSaving = priceEditMutation.isPending;
+
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const deleteMutation = useMutation({
@@ -1121,6 +1164,24 @@ function IncomingPageInner() {
                 >
                   <Pencil className="size-4" />
                   <span>{parseFloat(detail.shippingCost) > 0 ? "택배비 수정" : "택배비 추가"}</span>
+                </JmButton>
+                <JmButton
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const init: Record<string, { unitPrice: string; kind: "CHANGE" | "CORRECTION" }> = {};
+                    for (const it of detail.items) {
+                      if (!it.supplierProduct) continue;
+                      init[it.id] = {
+                        unitPrice: String(parseFloat(it.unitPrice)),
+                        kind: "CHANGE",
+                      };
+                    }
+                    setPriceCorr(init);
+                    setPriceEditOpen(true);
+                  }}
+                >
+                  <Pencil className="size-4" /><span>단가 정정</span>
                 </JmButton>
                 <JmButton size="sm" variant="ghost" onClick={() => setUnconfirmDialogOpen(true)}>
                   <X className="size-4" /><span>확정 취소</span>
@@ -1752,6 +1813,106 @@ function IncomingPageInner() {
                     <JmButton variant="cta" onClick={handleShippingEdit} disabled={shippingEditSaving}>
                       {shippingEditSaving ? <Loader2 className="size-4 animate-spin" /> : null}
                       <span>{shippingEditSaving ? "저장 중..." : "저장"}</span>
+                    </JmButton>
+                  </JmDialogFooter>
+                </JmDialogContent>
+              </JmDialog>
+
+              {/* 단가 정정 다이얼로그 — 확정 입고 품목 단가 수정 (마진·거래처원장 소급 재계산) */}
+              <JmDialog open={priceEditOpen} onOpenChange={setPriceEditOpen}>
+                <JmDialogContent size="md">
+                  <JmDialogHeader>
+                    <JmDialogTitle>단가 정정 — {detail.incomingNo}</JmDialogTitle>
+                  </JmDialogHeader>
+                  <JmDialogBody>
+                    <div className="space-y-2">
+                      <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+                        새 단가(세전)로 고치면 과거 마진·거래처 매입(원장)이 소급 재계산됩니다.
+                        변경한 품목마다{" "}
+                        <span className="font-medium text-[var(--jm-text)]">실제 변동</span>
+                        (인상/할인 · 추세 반영) /{" "}
+                        <span className="font-medium text-[var(--jm-text)]">오류 정정</span>
+                        (잘못 입력 · 추세 제외)을 선택하세요.
+                      </p>
+                      {detail.items
+                        .filter((it) => it.supplierProduct)
+                        .map((it) => {
+                          const c = priceCorr[it.id] ?? {
+                            unitPrice: String(parseFloat(it.unitPrice)),
+                            kind: "CHANGE" as const,
+                          };
+                          const cur = parseFloat(it.unitPrice);
+                          const np = parseFloat((c.unitPrice ?? "").trim());
+                          const changed = Number.isFinite(np) && np !== cur;
+                          return (
+                            <div
+                              key={it.id}
+                              className="space-y-2 rounded-lg border border-[var(--jm-border)] p-3"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="line-clamp-1 text-jm-sm font-medium text-[var(--jm-text)]">
+                                  {it.supplierProduct?.name ?? "—"}
+                                </span>
+                                <span className="shrink-0 text-jm-2xs text-[var(--jm-text-muted)]">
+                                  현재 ₩{cur.toLocaleString("ko-KR")} · 수량{" "}
+                                  {parseFloat(it.quantity)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                  <JmInput
+                                    size="sm"
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={formatComma(c.unitPrice)}
+                                    onChange={(e) =>
+                                      setPriceCorr((p) => ({
+                                        ...p,
+                                        [it.id]: {
+                                          ...c,
+                                          unitPrice: parseComma(e.target.value),
+                                        },
+                                      }))
+                                    }
+                                    placeholder="새 단가 (세전)"
+                                  />
+                                </div>
+                                {changed && (
+                                  <JmSegmentedControl
+                                    size="sm"
+                                    value={c.kind}
+                                    onChange={(v) =>
+                                      setPriceCorr((p) => ({
+                                        ...p,
+                                        [it.id]: {
+                                          ...c,
+                                          kind: v as "CHANGE" | "CORRECTION",
+                                        },
+                                      }))
+                                    }
+                                    options={[
+                                      { value: "CHANGE", label: "실제 변동" },
+                                      { value: "CORRECTION", label: "오류 정정" },
+                                    ]}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </JmDialogBody>
+                  <JmDialogFooter>
+                    <JmButton
+                      variant="ghost"
+                      onClick={() => setPriceEditOpen(false)}
+                      disabled={priceEditSaving}
+                    >
+                      취소
+                    </JmButton>
+                    <JmButton variant="cta" onClick={handlePriceEdit} disabled={priceEditSaving}>
+                      {priceEditSaving ? <Loader2 className="size-4 animate-spin" /> : null}
+                      <span>{priceEditSaving ? "정정 중..." : "정정 저장"}</span>
                     </JmButton>
                   </JmDialogFooter>
                 </JmDialogContent>
