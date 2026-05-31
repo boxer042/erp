@@ -80,20 +80,29 @@ model Order {
 - **D-4-c 클레임/반품** → 그룹 단위 반품은 **1차 범위 제외**(후속). ORDERS_SYSTEM.md §8 `parentItemId` cascade 정책과 연동.
 - **거래처 직출고 자동화**(공급사 발주 연계) → 1차 범위 제외. 1차는 B 를 수동 PENDING 으로 두고 매장이 입고/직출고 결정.
 
-## 9. 구현 현황 (2026-05-31 — 주문페이지 1차 완료)
+## 9. 구현 현황 (2026-05-31 — 주문페이지 + POS + 증빙 완료)
 
 > 결제·원장 배분은 최종 **주문별 자체 결제**(각 주문 자기 품목 결제·원장)로 확정 — 7·8절 D-4-a 의 "A 전액 귀속" 은 대체됨. 각 주문이 독립 정합이라 백엔드 트랜잭션/원장 리팩터 0.
 
+**주문페이지(`orders/new`)**
 - ✅ **스키마** `Order.splitGroupId`/`splitParentId` self-relation + `@@index` + `db push`.
 - ✅ **백엔드 수용** `orderSchema` + `/api/orders` `order.create` 에 split 링크 저장(B 는 SHIPPING→PENDING 미차감 백오더로 정상 생성).
-- ✅ **카트 UI** `orders/new` 상품 라인별 [지금 받기/나중 배송] `JmSegmentedControl` + "택배 나중 배송" 배지 + 결제단계 분할 안내 카드.
-- ✅ **오케스트레이션** 제출 시 mixed 면 프론트가 A(지금/대표, 전역 출고방식·세션할인·배송비) → B(나중/SHIPPING PENDING, 자기 품목·결제수단 상속, splitParentId=A.id) 2건 순차 등록. 단일(비분할) payload 는 byte-identical(흐름 불변). 부분결제+분할 동시 사용은 가드 차단.
+- ✅ **카트 UI** 상품 라인별 [지금 받기/나중 배송] `JmSegmentedControl` + "택배 나중 배송" 배지 + 결제단계 분할 안내 카드.
+- ✅ **오케스트레이션** mixed 면 프론트가 A(지금/대표, 전역 출고방식·세션할인·배송비) → B(나중/SHIPPING PENDING, 자기 품목·결제수단 상속, splitParentId=A.id) 2건 순차 등록. 단일 payload byte-identical. 부분결제+분할 동시 가드.
 - ✅ **연결 주문** 상세 GET include + `_detail-sheet` "연결 주문 · 분할 출고" 카드(대표↔백오더 상호 link).
-- ✅ **e2e** `e2e/order-new.spec.ts` — 분할 토글→배지→안내 회귀 방어(4 pass).
 
-**남은 작업** (후속):
-- ⏸ **증빙 그룹 1장** — A+B 합산 거래명세표/영수증. 주문별 자체 결제라 per-order 증빙은 이미 정합 → 우선순위 낮음(그룹 합산 출력만 추가).
-- ⏸ **POS 경로 분할** — `/api/pos/checkout` + POS 카트(`_cart-line-row`)에 동일 토글. PosSession·repair/rental 락 때문에 주문페이지보다 복잡.
-- ⏸ **D-4-c 그룹 클레임/반품** — `parentItemId` cascade 정책 연동(범위 밖).
+**POS 경로(`/pos`)**
+- ✅ **카트 토글** `_cart-line-row` 상품 라인 [지금 받기/나중 배송] + 배지(수리/임대/서비스/ADDON 제외). `laterIds` 는 `customer/[sid]/page` 가 보유 → CartSheet·PaymentSheet 양쪽 prop.
+- ✅ **오케스트레이션** `_payment-sheet`: A 는 `/api/pos/checkout`(splitGroupId 부여, **기존 트랜잭션 불변** — repair/rental/PosSession/세션삭제 그대로) + B 는 `/api/orders` SHIPPING PENDING 백오더(splitParentId=A.id). **B 실패 비치명적**(A 완료 후 경고). 라벨 A/B 분리 발번. 부분결제+분할 가드. 비분할 payload byte-identical.
+- ✅ **route 수용** `/api/pos/checkout` + `checkout-submit` 가 splitGroupId 저장(A=대표).
 
-**키 파일**: `prisma/schema.prisma`, `src/lib/validators/order.ts`, `src/app/api/orders/route.ts`, `src/app/api/orders/[id]/route.ts`, `src/app/(dashboard)/orders/new/page.tsx`, `src/app/(dashboard)/orders/_detail-sheet.tsx`, (POS 후속) `src/app/api/pos/checkout/route.ts`, `src/app/(pos)/pos/_cart-line-row.tsx`.
+**증빙**
+- ✅ **그룹 1장** `(print)/order-statement` + `(print)/pos-receipt` 가 `splitGroupId` 형제(대표 먼저) 모아 items concat + 합계 Σ. 영수증 배송 섹션은 택배(B) 기준 + "분할 출고" 안내. 비분할 byte-identical. 정식 Statement 레코드(`issue-statement`)는 per-order 1:1 유지.
+
+**e2e**: `e2e/order-new.spec.ts`(분할 토글→배지→안내 4 pass) + `e2e/split-fulfillment.spec.ts`(A+B 링크·B=PENDING·증빙 합산 백엔드 검증).
+
+**남은 작업** (후속, 1차 범위 밖):
+- ⏸ **D-4-c 그룹 클레임/반품 cascade** — A·B 는 별개 주문이라 **per-order 반품/교환은 기존 워크보드 흐름으로 이미 동작**. "A 반품 시 B 자동 반품" 같은 그룹 cascade 만 미구현(ORDERS_SYSTEM.md §8 `parentItemId` 정책 연동).
+- ⏸ **거래처 직출고 자동화** — B 백오더의 공급사 발주 자동 연계(현재는 매장이 입고/직출고 수동 결정).
+
+**키 파일**: `prisma/schema.prisma`, `src/lib/validators/order.ts`, `src/app/api/orders/route.ts`, `src/app/api/orders/[id]/route.ts`, `src/app/(dashboard)/orders/new/page.tsx`, `src/app/(dashboard)/orders/_detail-sheet.tsx`, `src/app/api/pos/checkout/route.ts`, `src/components/pos/checkout-submit.ts`, `src/app/(pos)/pos/_cart-line-row.tsx`, `src/app/(pos)/pos/_payment-sheet.tsx`, `src/app/(pos)/pos/customer/[sid]/page.tsx`, `src/app/(print)/order-statement/[id]/print/page.tsx`, `src/app/(print)/pos-receipt/[id]/print/page.tsx`.
