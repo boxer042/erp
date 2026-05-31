@@ -163,6 +163,8 @@ export default function NewOrderPage() {
   const [panelOpen, setPanelOpen] = useState(true);
   // 모바일 카트/결제 하단 시트 — PC 는 측면 패널 유지, 모바일은 우상단 카트 버튼으로 열기
   const [cartOpen, setCartOpen] = useState(false);
+  // POS 와 동일한 단계 흐름 — 카트(라인·액션) → [결제하기] → 결제(출고·결제수단·등록)
+  const [step, setStep] = useState<"cart" | "payment">("cart");
 
   const isDelivery =
     fulfillmentType !== "IN_STORE" && fulfillmentType !== "PICKUP";
@@ -552,7 +554,10 @@ export default function NewOrderPage() {
           <button
             type="button"
             aria-label="카트 열기"
-            onClick={() => setCartOpen(true)}
+            onClick={() => {
+              setStep("cart");
+              setCartOpen(true);
+            }}
             className="relative ml-auto inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--jm-text)] hover:bg-[var(--jm-surface-muted)] lg:hidden"
           >
             <ShoppingCart className="size-5" />
@@ -664,7 +669,8 @@ export default function NewOrderPage() {
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="flex flex-col gap-5">
               {/* 고객은 상단 맥락 바(OrderContextBar)에서 선택 — POS 와 달리 결제 전 미리 지정 */}
-              {/* 카트 라인 */}
+              {/* ── 카트 단계 (POS 흐름: 카트 → [결제하기] → 결제) ── */}
+              {step === "cart" && (
               <div className="flex flex-col gap-2.5">
                 <SectionLabel>
                   카트 {cartCount > 0 ? `· ${cartCount}건` : ""}
@@ -758,7 +764,11 @@ export default function NewOrderPage() {
                   />
                 </div>
               </div>
+              )}
 
+              {/* ── 결제 단계 (출고·결제수단·부분결제·세금·메모) ── */}
+              {step === "payment" && (
+                <>
               {/* 출고 방식 — POS 와 동일 5버튼 grid */}
               <div className="flex flex-col gap-2.5">
                 <SectionLabel>출고 방식</SectionLabel>
@@ -968,6 +978,8 @@ export default function NewOrderPage() {
                   placeholder="주문 메모 (선택)"
                 />
               </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -991,29 +1003,51 @@ export default function NewOrderPage() {
                   />
                 )}
               </div>
-              <div className="flex items-stretch gap-2">
-                <JmButton
-                  variant="outline"
-                  size="lg"
-                  onClick={() => router.push("/orders")}
-                  disabled={createMutation.isPending}
-                  className="shrink-0"
-                >
-                  취소
-                </JmButton>
-                <JmButton
-                  variant="cta"
-                  size="lg"
-                  onClick={() => createMutation.mutate()}
-                  disabled={!canSubmit}
-                  className="flex-1"
-                >
-                  {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
-                  {createMutation.isPending
-                    ? "등록 중..."
-                    : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
-                </JmButton>
-              </div>
+              {step === "cart" ? (
+                <div className="flex items-stretch gap-2">
+                  <JmButton
+                    variant="outline"
+                    size="lg"
+                    onClick={() => router.push("/orders")}
+                    className="shrink-0"
+                  >
+                    취소
+                  </JmButton>
+                  <JmButton
+                    variant="cta"
+                    size="lg"
+                    onClick={() => setStep("payment")}
+                    disabled={items.length === 0}
+                    className="flex-1"
+                  >
+                    결제하기 →
+                  </JmButton>
+                </div>
+              ) : (
+                <div className="flex items-stretch gap-2">
+                  <JmButton
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setStep("cart")}
+                    disabled={createMutation.isPending}
+                    className="shrink-0"
+                  >
+                    ← 카트
+                  </JmButton>
+                  <JmButton
+                    variant="cta"
+                    size="lg"
+                    onClick={() => createMutation.mutate()}
+                    disabled={!canSubmit}
+                    className="flex-1"
+                  >
+                    {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
+                    {createMutation.isPending
+                      ? "등록 중..."
+                      : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
+                  </JmButton>
+                </div>
+              )}
             </div>
           </div>
         </aside>
