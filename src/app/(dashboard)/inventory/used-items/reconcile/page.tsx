@@ -118,7 +118,7 @@ export default function UsedItemReconcilePage() {
         </Link>
         <span className="text-jm-base font-semibold">중고 상품 사후 정리</span>
         <span className="text-jm-xs text-[var(--jm-text-muted)]">
-          (EMERGENCY_USE — POS 급매 후 매입 정보 등록)
+          (EMERGENCY_USE — POS 선판매 후 매입 정보 등록)
         </span>
       </div>
 

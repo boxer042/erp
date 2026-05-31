@@ -72,11 +72,13 @@ export const EMPTY_USED_ITEM_FORM: UsedItemFormValue = {
   warrantyMonths: 0,
 };
 
-// BUILT 은 조립 흐름(/inventory/used-items/build) 전용 — 수동 매입 등록에선 선택 불가
+// BUILT 은 조립 흐름(/inventory/used-items/build) 전용,
+// EMERGENCY_USE 는 사후 정리 흐름(/inventory/used-items/reconcile) 전용 —
+// 둘 다 수동 매입 등록에선 선택 불가 (각자 전용 화면에서만 발생).
 const SOURCE_OPTIONS = (
   Object.keys(USED_ITEM_SOURCE_LABEL) as UsedItemSource[]
 )
-  .filter((v) => v !== "BUILT")
+  .filter((v) => v !== "BUILT" && v !== "EMERGENCY_USE")
   .map((v) => ({ value: v, label: USED_ITEM_SOURCE_LABEL[v] }));
 
 interface Props {
@@ -167,9 +169,12 @@ export function UsedItemForm({ value, onChange, editing }: Props) {
                 onChange={(p) =>
                   // 매칭 시 품명을 카탈로그 상품명으로 자동 채움 (제출 폴백 스냅샷 + 즉시 표시).
                   // 표시 surface 들은 live product.name 우선이라 이후 카탈로그 rename 자동 반영.
+                  // 규격(spec)도 카탈로그에 값이 있으면 자동 채움. 카탈로그에 규격이 없으면
+                  // 사용자가 입력 중인 값을 보존(빈 값으로 덮어쓰지 않음).
                   patch({
                     productId: p.id || null,
                     displayName: p.id ? p.name : value.displayName,
+                    spec: p.id && p.spec ? p.spec : value.spec,
                   })
                 }
                 placeholder="카탈로그에서 상품 선택..."

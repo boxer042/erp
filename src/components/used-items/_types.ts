@@ -20,7 +20,7 @@ export const USED_ITEM_SOURCE_LABEL: Record<UsedItemSource, string> = {
   PURCHASED: "매입",
   SCAVENGED: "버려진 부속",
   RENTAL_RETIREMENT: "임대 종료",
-  EMERGENCY_USE: "급매(사후 정리)",
+  EMERGENCY_USE: "선판매",
   BUILT: "중고 조립",
 };
 
