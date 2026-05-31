@@ -19,6 +19,7 @@ import {
 import { apiGet, apiMutate, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
+  JmBadge,
   JmButton,
   JmCard,
   JmEmpty,
@@ -839,7 +840,16 @@ export default function OrdersBoardPage() {
                         {/* 3. 출고 — 첫 행에만 (fulfillmentType: PICKUP/DELIVERY/SHIPPING) */}
                         <JmTableCell>
                           {isFirstInGroup ? (
-                            <FulfillmentBadge type={order.fulfillmentType} />
+                            <div className="flex flex-col items-start gap-1">
+                              <FulfillmentBadge type={order.fulfillmentType} />
+                              {order.procurementMode && (
+                                <JmBadge variant="outline" size="sm" shape="square">
+                                  {order.procurementMode === "DROPSHIP"
+                                    ? "거래처 직출고"
+                                    : "입고 대기"}
+                                </JmBadge>
+                              )}
+                            </div>
                           ) : null}
                         </JmTableCell>
 

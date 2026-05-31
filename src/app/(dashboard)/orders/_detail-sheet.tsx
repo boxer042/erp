@@ -62,6 +62,7 @@ import {
   JmInput,
   JmSectionLabel,
   JmSeparator,
+  JmSegmentedControl,
   JmSwitch,
   JmSkeleton,
   JmSpinner,
@@ -152,6 +153,7 @@ interface OrderDetail {
   channelOrderNo: string | null;
   status: OrderStatus;
   fulfillmentType: FulfillmentType;
+  procurementMode: "RESTOCK" | "DROPSHIP" | null;
   expectedShipDate: string | null;
   customerId: string | null;
   customer: { id: string; name: string } | null;
@@ -489,6 +491,21 @@ export function OrderDetailSheet({
     },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "삭제 실패"),
+  });
+
+  // 조달 방식 설정 — 입고대기/거래처 직출고/해제 (택배 발송분 등)
+  const setProcurementMutation = useMutation({
+    mutationFn: (mode: "RESTOCK" | "DROPSHIP" | null) =>
+      apiMutate(`/api/orders/${orderId}`, "PUT", {
+        action: "set-procurement",
+        procurementMode: mode,
+      }),
+    onSuccess: () => {
+      toast.success("조달 방식이 설정되었습니다");
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "설정 실패"),
   });
 
   // 시리얼 소급 발번 — trackable 상품 라인에 시리얼 라벨 발번 후 라벨 인쇄 탭 오픈
@@ -1013,6 +1030,7 @@ export function OrderDetailSheet({
                     ? (id) => setResolveItemId(id)
                     : undefined
                 }
+                onSetProcurement={(m) => setProcurementMutation.mutate(m)}
               />
             )}
           </div>
@@ -1659,11 +1677,14 @@ function ReadView({
   order,
   highlightItemId,
   onResolveItem,
+  onSetProcurement,
 }: {
   order: OrderDetail;
   highlightItemId?: string | null;
   /** PENDING 상태일 때만 전달 — canonical/OPTION_PARENT 라인의 [출고 SKU 선택] 클릭 핸들러 */
   onResolveItem?: (itemId: string) => void;
+  /** 조달 방식 설정 (입고대기/거래처 직출고/해제) */
+  onSetProcurement?: (mode: "RESTOCK" | "DROPSHIP" | null) => void;
 }) {
   return (
     <>
@@ -2158,6 +2179,46 @@ function ReadView({
             </JmCard>
           );
         })()}
+
+        {/* 조달 방식 — 택배 발송 주문의 입고대기/거래처 직출고 마커 (③) */}
+        {order.fulfillmentType === "SHIPPING" && (
+          <JmCard>
+            <JmCardHeader>
+              <div className="flex items-center gap-2">
+                <Truck className="size-4 text-[var(--jm-text-muted)]" />
+                <JmCardTitle>조달 방식</JmCardTitle>
+                {order.procurementMode && (
+                  <JmBadge variant="outline" size="sm" shape="square">
+                    {order.procurementMode === "DROPSHIP" ? "거래처 직출고" : "입고 대기"}
+                  </JmBadge>
+                )}
+              </div>
+            </JmCardHeader>
+            <JmCardContent>
+              <div className="flex flex-col gap-2">
+                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+                  재고 없이 조달해 보낼 때 — 입고 후 우리가 발송할지(입고 대기), 거래처가 손님에게
+                  직접 보낼지(거래처 직출고) 표시.
+                </p>
+                <JmSegmentedControl
+                  size="sm"
+                  ariaLabel="조달 방식"
+                  value={order.procurementMode ?? "none"}
+                  onChange={(v) =>
+                    onSetProcurement?.(
+                      v === "none" ? null : (v as "RESTOCK" | "DROPSHIP"),
+                    )
+                  }
+                  options={[
+                    { value: "none", label: "미설정" },
+                    { value: "RESTOCK", label: "입고 대기" },
+                    { value: "DROPSHIP", label: "거래처 직출고" },
+                  ]}
+                />
+              </div>
+            </JmCardContent>
+          </JmCard>
+        )}
 
         <JmCard>
           <JmCardHeader>

@@ -1401,6 +1401,15 @@ enum FulfillmentType {
 }
 
 /**
+ * 조달 방식 — 재고 없이 조달해 보내는 주문(택배 발송분 등)의 처리.
+ * 출고 상태(OrderStatus)와 독립적인 별도 축 — 뱃지로 표시.
+ */
+enum ProcurementMode {
+  RESTOCK // 입고 대기 — 발주→우리 입고→우리가 발송
+  DROPSHIP // 거래처 직출고 — 거래처가 손님에게 직접 발송 (직송 입고로 매입만 기록)
+}
+
+/**
  * 배송비 결제 방식 — Order.shippingPaymentType.
  * - PREPAID: 선불 (손님이 결제 시 함께 결제)
  * - COD: 착불 (받는 사람이 택배기사에게 직접 — 매장 회계 무관)
@@ -1507,6 +1516,13 @@ model Order {
   splitParentId       String?             @map("split_parent_id")
   splitParent         Order?              @relation("OrderSplit", fields: [splitParentId], references: [id])
   splitChildren       Order[]             @relation("OrderSplit")
+  /**
+   * 조달 방식 — 재고 없이 조달해 보내는 주문(택배 발송분 등)의 처리 방식.
+   * RESTOCK(입고 대기): 발주→입고→우리 발송. DROPSHIP(거래처 직출고): 거래처가 손님에게 직접 발송.
+   * null = 일반(재고 보유) 주문. 직출고 자동연결 시 dropshipIncomingId 로 직송 입고 link. docs/SPLIT_FULFILLMENT.md
+   */
+  procurementMode     ProcurementMode?    @map("procurement_mode")
+  dropshipIncomingId  String?             @map("dropship_incoming_id")
   /**
    * 클레임 메모 — 손님 자유 사유 + 매장 처리 메모 (claimReason enum 외 보충)
    */

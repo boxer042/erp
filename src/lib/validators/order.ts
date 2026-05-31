@@ -144,6 +144,8 @@ export const orderUpdateSchema = z.object({
   shippingFee: z.string().optional(),
   shippingPaymentType: shippingPaymentTypeSchema.optional(),
   shippingCostBorne: z.string().optional(),
+  /** 조달 방식 — 입고대기(RESTOCK)/거래처 직출고(DROPSHIP). null=해제 (docs/SPLIT_FULFILLMENT.md) */
+  procurementMode: z.enum(["RESTOCK", "DROPSHIP"]).nullable().optional(),
 });
 
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;

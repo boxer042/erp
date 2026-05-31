@@ -287,6 +287,23 @@ export async function PUT(
     return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 });
   }
 
+  // 조달 방식 설정 — 입고대기(RESTOCK)/거래처 직출고(DROPSHIP)/해제(null).
+  // 택배 발송분 등 "재고 없이 조달해 보내는" 주문의 처리 방식 마커 (③). 직출고 자동연결은 ③b 후속.
+  if (action === "set-procurement") {
+    const mode = body.procurementMode;
+    if (mode !== "RESTOCK" && mode !== "DROPSHIP" && mode !== null) {
+      return NextResponse.json({ error: "잘못된 조달 방식" }, { status: 400 });
+    }
+    const updated = await prisma.order.update({
+      where: { id },
+      data: { procurementMode: mode },
+    });
+    return NextResponse.json({
+      id: updated.id,
+      procurementMode: updated.procurementMode,
+    });
+  }
+
   // 주문 확정(prepare) 가드:
   //   1) 대표 상품(canonical) 그대로면 차단 — 변형 확정 후 재시도
   //   2) OPTION_PARENT 그대로면 차단 — 자체 재고 없는 placeholder 라 SWAP 옵션값으로 실제 SKU 결정 필요

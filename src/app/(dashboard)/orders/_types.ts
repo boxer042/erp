@@ -73,6 +73,7 @@ export interface OrderListItem {
   channelOrderNo: string | null;
   status: OrderStatus;
   fulfillmentType: FulfillmentType;
+  procurementMode?: "RESTOCK" | "DROPSHIP" | null;
   expectedShipDate: string | null;
   customerName: string | null;
   customerPhone: string | null;
