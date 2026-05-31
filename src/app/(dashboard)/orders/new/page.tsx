@@ -38,6 +38,7 @@ import { CartEmptyState } from "@/components/pos/cart-empty-state";
 import { CustomerSummaryCard } from "@/components/pos/customer-summary-card";
 import { CartActionButton as ActionButton } from "@/components/pos/cart-action-button";
 import { PosLineItemRow } from "@/components/pos/line-item-row";
+import { FooterStat } from "@/components/pos/footer-stat";
 import { OrderContextBar } from "./_context-bar";
 import {
   PaymentMethodSelector,
@@ -657,29 +658,6 @@ export default function NewOrderPage() {
           {/* 본문 — 스크롤 */}
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="flex flex-col gap-5">
-              {/* 합계 다크 카드 — POS 결제시트 패턴 */}
-              <div className="rounded-2xl bg-[var(--jm-action)] p-5 text-white">
-                <div className="text-jm-xs font-semibold uppercase tracking-wider text-white/60">
-                  주문 금액
-                </div>
-                <div className="mt-1 text-jm-6xl font-bold tabular-nums leading-none">
-                  ₩{totals.total.toLocaleString("ko-KR")}
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-jm-2xs">
-                  <Pill label="공급가액" value={totals.net} />
-                  <Pill label="세액" value={totals.vat} />
-                  {totals.sessionDiscountAmount > 0 ? (
-                    <Pill
-                      label="할인"
-                      value={-totals.sessionDiscountAmount}
-                      tone="warn"
-                    />
-                  ) : (
-                    <Pill label="건수" value={cartCount} suffix="건" />
-                  )}
-                </div>
-              </div>
-
               {/* 고객 — POS 와 동일 패턴: 카드 클릭 → LinkCustomerSheet (검색 + [+ 새 고객 등록] 인라인) */}
               <div className="flex flex-col gap-2.5">
                 <SectionLabel>고객</SectionLabel>
@@ -1003,30 +981,49 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* Sticky bottom bar — POS 결제시트 풋터 패턴. 항상 노출 (모바일·데스크탑 공통). */}
+          {/* Sticky bottom bar — POS 결제시트 풋터 패턴(내역 + CTA). 항상 노출. */}
           <div className="shrink-0 border-t border-[var(--jm-border)] bg-[var(--jm-surface)] p-3">
-            <div className="flex items-stretch gap-2">
-              <JmButton
-                variant="outline"
-                size="lg"
-                onClick={() => router.push("/orders")}
-                disabled={createMutation.isPending}
-                className="shrink-0"
+            <div className="flex flex-col gap-2.5">
+              {/* 내역 — 다크 카드 대체 (공급가액·세액·건수·할인) */}
+              <div
+                className={`grid gap-2 ${
+                  totals.sessionDiscountAmount > 0 ? "grid-cols-4" : "grid-cols-3"
+                }`}
               >
-                취소
-              </JmButton>
-              <JmButton
-                variant="cta"
-                size="lg"
-                onClick={() => createMutation.mutate()}
-                disabled={!canSubmit}
-                className="flex-1"
-              >
-                {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
-                {createMutation.isPending
-                  ? "등록 중..."
-                  : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
-              </JmButton>
+                <FooterStat label="공급가액" value={totals.net} />
+                <FooterStat label="세액" value={totals.vat} />
+                <FooterStat label="건수" value={cartCount} suffix="건" />
+                {totals.sessionDiscountAmount > 0 && (
+                  <FooterStat
+                    label="할인"
+                    value={-totals.sessionDiscountAmount}
+                    tone="warn"
+                  />
+                )}
+              </div>
+              <div className="flex items-stretch gap-2">
+                <JmButton
+                  variant="outline"
+                  size="lg"
+                  onClick={() => router.push("/orders")}
+                  disabled={createMutation.isPending}
+                  className="shrink-0"
+                >
+                  취소
+                </JmButton>
+                <JmButton
+                  variant="cta"
+                  size="lg"
+                  onClick={() => createMutation.mutate()}
+                  disabled={!canSubmit}
+                  className="flex-1"
+                >
+                  {createMutation.isPending && <JmSpinner size="sm" tone="inverted" />}
+                  {createMutation.isPending
+                    ? "등록 중..."
+                    : `₩${totals.total.toLocaleString("ko-KR")} 등록`}
+                </JmButton>
+              </div>
             </div>
           </div>
         </aside>
@@ -1261,35 +1258,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
       {children}
     </span>
-  );
-}
-
-function Pill({
-  label,
-  value,
-  suffix,
-  tone,
-}: {
-  label: string;
-  value: number;
-  suffix?: string;
-  tone?: "warn";
-}) {
-  const cls =
-    tone === "warn"
-      ? "bg-[var(--jm-warning-bg)]/20 text-white"
-      : "bg-[var(--jm-surface)]/10 text-white";
-  return (
-    <div className={`flex flex-col gap-0.5 rounded-xl px-2.5 py-1.5 ${cls}`}>
-      <span className="text-jm-3xs uppercase tracking-wider text-white/70">
-        {label}
-      </span>
-      <span className="text-jm-sm font-semibold tabular-nums">
-        {suffix
-          ? `${value.toLocaleString("ko-KR")}${suffix}`
-          : `${value < 0 ? "−" : ""}₩${Math.abs(value).toLocaleString("ko-KR")}`}
-      </span>
-    </div>
   );
 }
 

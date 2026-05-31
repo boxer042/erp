@@ -53,7 +53,7 @@ async function main() {
   });
 
   let updatedCount = 0;
-  let nowTrackable: typeof products = [];
+  const nowTrackable: typeof products = [];
   for (const p of products) {
     const should = isTrackableP({
       sellingPrice: Number(p.sellingPrice),

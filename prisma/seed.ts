@@ -2482,7 +2482,7 @@ async function restoreStockForOrder(
     if (consumptions.length === 0) continue;
 
     // 세트 vs 단품 — 차감 시 세트는 구성품 lot 차감했으므로 복원도 그대로
-    let totalRestoredByProduct = new Map<string, number>();
+    const totalRestoredByProduct = new Map<string, number>();
 
     for (const c of consumptions) {
       await tx.inventoryLot.update({ where: { id: c.lotId }, data: { remainingQty: { increment: c.quantity } } });
