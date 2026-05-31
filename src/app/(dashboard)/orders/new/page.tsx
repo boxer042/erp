@@ -14,6 +14,7 @@ import {
   JmDatePicker,
   JmIconButton,
   JmInput,
+  JmSegmentedControl,
   JmSpinner,
   JmSwitch,
   JmTextarea,
@@ -167,6 +168,23 @@ export default function NewOrderPage() {
   const [cartOpen, setCartOpen] = useState(false);
   // POS 와 동일한 단계 흐름 — 카트(라인·액션) → [결제하기] → 결제(출고·결제수단·등록)
   const [step, setStep] = useState<"cart" | "payment">("cart");
+
+  // 분할 출고 — "나중 배송"으로 표시한 (상품) 라인. 매장수령(지금) A / 택배 백오더(나중) B 분리.
+  // 서비스(기술료)는 매장에서 수행 → 항상 지금. 상품 라인만 나중 배송 대상.
+  const [laterIds, setLaterIds] = useState<Set<string>>(new Set());
+  const toggleLater = (cartItemId: string) =>
+    setLaterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cartItemId)) next.delete(cartItemId);
+      else next.add(cartItemId);
+      return next;
+    });
+  const isLaterLine = (i: CartItem) =>
+    i.itemType === "product" && laterIds.has(i.cartItemId);
+  const laterItems = items.filter(isLaterLine);
+  const nowItems = items.filter((i) => !isLaterLine(i));
+  // 양쪽 모두 비어있지 않을 때만 분할 (한쪽뿐이면 단일 주문 — 기존 흐름 그대로)
+  const isSplit = laterItems.length > 0 && nowItems.length > 0;
 
   const isDelivery =
     fulfillmentType !== "IN_STORE" && fulfillmentType !== "PICKUP";
@@ -371,7 +389,7 @@ export default function NewOrderPage() {
 
   // ─── 등록 mutation ────────────────────────────────────────────────
   const createMutation = useMutation<
-    { id: string; orderNo: string; labelCodes: string[] },
+    { id: string; orderNo: string; labelCodes: string[]; splitOrderNo?: string },
     Error
   >({
     mutationFn: async () => {
@@ -398,100 +416,150 @@ export default function NewOrderPage() {
         );
       }
 
-      // 1) 라벨 자동 발번 (POS 결제 흐름과 동일 — trackable 상품만 서버가 필터).
-      //    best-effort: 실패해도 등록은 진행. /api/serial-items/issue 가 같은 productId 묶음으로 발번.
-      let labelCodes: string[] = [];
-      const trackableCandidates = items
-        .filter((i) => i.itemType === "product" && i.productId)
-        .map((i) => ({
-          productId: i.productId!,
-          quantity: Math.max(1, Math.round(i.quantity)),
-        }));
-      if (trackableCandidates.length > 0) {
+      // 분할 출고 가드 — 부분 결제와 동시 사용 불가 (주문별 결제 배분이 모호해짐)
+      if (isSplit && isPartialPaidUI) {
+        throw new Error("분할 출고는 전액 결제만 지원합니다 (부분 결제 해제 후 진행)");
+      }
+
+      // 주문 항목 payload 빌더 — POS CartItem → OrderItem contract (단일/분할 공통).
+      // 라인 할인("1000"/"10%")을 개당 정액(net)으로 환산해 OrderItem 에 보존.
+      const buildItems = (subset: CartItem[]) =>
+        subset.map((i) => {
+          const discountPerUnit = calcDiscountPerUnit(i.unitPrice, i.discount);
+          const listPrice = i.listPrice ?? i.unitPrice;
+          const base = {
+            quantity: String(i.quantity),
+            unitPrice: String(i.unitPrice),
+            discountPerUnit:
+              discountPerUnit > 0 ? String(Math.round(discountPerUnit)) : undefined,
+            listPrice: listPrice > 0 ? String(Math.round(listPrice)) : undefined,
+          };
+          return i.itemType === "service"
+            ? { ...base, serviceName: i.name }
+            : {
+                ...base,
+                productId: i.productId,
+                optionValueIds: i.optionValueIds ?? [],
+              };
+        });
+
+      // 라벨 자동 발번 — 해당 주문에 속한 trackable 상품만 (POS 와 동일, best-effort).
+      const issueLabelsFor = async (subset: CartItem[]): Promise<string[]> => {
+        const cands = subset
+          .filter((i) => i.itemType === "product" && i.productId)
+          .map((i) => ({
+            productId: i.productId!,
+            quantity: Math.max(1, Math.round(i.quantity)),
+          }));
+        if (cands.length === 0) return [];
         try {
           const res = await apiMutate<{ labels: { code: string }[] }>(
             "/api/serial-items/issue",
             "POST",
-            {
-              customerId: customerId || null,
-              productItems: trackableCandidates,
-              repairTicketIds: [],
-            },
+            { customerId: customerId || null, productItems: cands, repairTicketIds: [] },
           );
-          labelCodes = res.labels.map((l) => l.code);
+          return res.labels.map((l) => l.code);
         } catch {
-          // 라벨 발번 실패해도 주문 등록은 진행 (POS 와 동일 정책)
+          return []; // 라벨 발번 실패해도 주문 등록은 진행
         }
+      };
+
+      // /api/orders 1건 등록 — subset + 출고방식 + (분할 시) 그룹 링크.
+      // sessionLevel=true 주문(단일 또는 분할 대표 A)만 세션 할인·배송비·부분결제 메타 보유.
+      // B(나중 배송)는 자기 품목 라인만 — 세션 할인/배송비 0, 결제수단 상속(전액), splitParentId=A.id.
+      const postOrder = async (
+        subset: CartItem[],
+        opts: {
+          fulfillmentType: FulfillmentType;
+          sessionLevel: boolean;
+          splitGroupId?: string;
+          splitParentId?: string;
+        },
+      ) => {
+        const labelCodes = await issueLabelsFor(subset);
+        const ship =
+          opts.fulfillmentType !== "IN_STORE" && opts.fulfillmentType !== "PICKUP";
+        const r = await apiMutate<{ id: string; orderNo: string }>(
+          "/api/orders",
+          "POST",
+          {
+            channelId: channelId || null,
+            channelOrderNo: channelOrderNo || undefined,
+            customerId: customerId || undefined,
+            customerName: customerName || undefined,
+            customerPhone: customerPhone || undefined,
+            recipientName: recipientName || undefined,
+            recipientPhone: recipientPhone || undefined,
+            shippingAddress: shippingAddress || undefined,
+            orderDate,
+            fulfillmentType: opts.fulfillmentType,
+            expectedShipDate:
+              opts.sessionLevel && ship ? expectedShipDate || undefined : undefined,
+            paymentMethod: paymentMethod || undefined,
+            // 부분 결제 — 대표 주문(sessionLevel)만. paidAmount<totalAmount 면 서버가 PARTIAL_PAID
+            paidAmount:
+              opts.sessionLevel && partial.paidAmount !== null
+                ? String(partial.paidAmount)
+                : undefined,
+            partialPaymentKind: opts.sessionLevel ? partial.kind ?? undefined : undefined,
+            taxInvoiceRequested,
+            labelCodes: labelCodes.length > 0 ? labelCodes : undefined,
+            // sessionDiscount 는 "1000"/"10%" — calcCartTotals 가 net 으로 환산
+            discountAmount: opts.sessionLevel ? String(totals.sessionDiscountAmount) : "0",
+            // 배송비는 API 가 gross 로 받음 → net × 1.1
+            shippingFee: opts.sessionLevel
+              ? String(Math.round(totals.shippingNet * 1.1))
+              : "0",
+            shippingPaymentType,
+            shippingCostBorne: opts.sessionLevel ? shippingCostBorne || "0" : "0",
+            memo: memo || undefined,
+            splitGroupId: opts.splitGroupId,
+            splitParentId: opts.splitParentId,
+            items: buildItems(subset),
+          },
+        );
+        return { ...r, labelCodes };
+      };
+
+      // 단일 주문 — 기존 동작 그대로 (split 필드 undefined → 서버 null, 흐름 불변)
+      if (!isSplit) {
+        return postOrder(items, { fulfillmentType, sessionLevel: true });
       }
 
-      // 2) /api/orders 페이로드 — 기존 _create-sheet 와 동일 contract + labelCodes
-      const orderResult = await apiMutate<{ id: string; orderNo: string }>(
-        "/api/orders",
-        "POST",
-        {
-          channelId: channelId || null,
-          channelOrderNo: channelOrderNo || undefined,
-          customerId: customerId || undefined,
-          customerName: customerName || undefined,
-          customerPhone: customerPhone || undefined,
-          recipientName: recipientName || undefined,
-          recipientPhone: recipientPhone || undefined,
-          shippingAddress: shippingAddress || undefined,
-          orderDate,
-          fulfillmentType,
-          expectedShipDate: isDelivery ? expectedShipDate || undefined : undefined,
-          paymentMethod: paymentMethod || undefined,
-          // 부분 결제 — paidAmount<totalAmount 면 PARTIAL_PAID + 잔금 ledger SALE (서버 분기)
-          paidAmount:
-            partial.paidAmount !== null ? String(partial.paidAmount) : undefined,
-          partialPaymentKind: partial.kind ?? undefined,
-          taxInvoiceRequested,
-          labelCodes: labelCodes.length > 0 ? labelCodes : undefined,
-          // sessionDiscount 는 "1000" 또는 "10%" — calcCartTotals 가 net 으로 환산
-          discountAmount: String(totals.sessionDiscountAmount),
-          // 배송비는 API 가 gross 로 받음 → net × 1.1
-          shippingFee: String(Math.round(totals.shippingNet * 1.1)),
-          shippingPaymentType,
-          shippingCostBorne: shippingCostBorne || "0",
-          memo: memo || undefined,
-          items: items.map((i) => {
-            // 라인 할인 — POS CartItem.discount("1000" 또는 "10%") 를 개당 정액(net) 으로 환산.
-            // 견적서 불러오기로 들어온 라인의 할인이 그대로 OrderItem 에 보존되게.
-            const discountPerUnit = calcDiscountPerUnit(i.unitPrice, i.discount);
-            // 정가(세전) — listPrice 가 있으면 그것, 없으면 unitPrice (할인 전 단가)
-            const listPrice = i.listPrice ?? i.unitPrice;
-            const base = {
-              quantity: String(i.quantity),
-              unitPrice: String(i.unitPrice),
-              discountPerUnit:
-                discountPerUnit > 0
-                  ? String(Math.round(discountPerUnit))
-                  : undefined,
-              listPrice:
-                listPrice > 0 ? String(Math.round(listPrice)) : undefined,
-            };
-            return i.itemType === "service"
-              ? { ...base, serviceName: i.name }
-              : {
-                  ...base,
-                  productId: i.productId,
-                  optionValueIds: i.optionValueIds ?? [],
-                };
-          }),
-        },
-      );
-
-      return { ...orderResult, labelCodes };
+      // 분할 — A(지금/대표, 전역 출고방식) + B(나중/택배 백오더, SHIPPING PENDING 미차감).
+      // 각 주문이 자기 품목만큼 정상 결제·원장 보유. 동일 splitGroupId, B.splitParentId=A.id.
+      const splitGroupId = genClientId();
+      const a = await postOrder(nowItems, {
+        fulfillmentType,
+        sessionLevel: true,
+        splitGroupId,
+      });
+      const b = await postOrder(laterItems, {
+        fulfillmentType: "SHIPPING",
+        sessionLevel: false,
+        splitGroupId,
+        splitParentId: a.id,
+      });
+      return {
+        id: a.id,
+        orderNo: a.orderNo,
+        labelCodes: [...a.labelCodes, ...b.labelCodes],
+        splitOrderNo: b.orderNo,
+      };
     },
     onSuccess: (data) => {
       // 매장판매(IN_STORE) — 즉시 종결되어 워크보드에 안 노출. 통합 판매내역으로 진입.
       // 그 외(PICKUP/DELIVERY/QUICK/SHIPPING) — PENDING 으로 진입하므로 워크보드로.
+      // 분할 등록이면 택배 백오더(B)가 워크보드에 있으니 항상 워크보드로 보냄.
       const isInStoreSale = fulfillmentType === "IN_STORE";
       const hasLabels = data.labelCodes.length > 0;
       toast.success(
-        `주문이 등록되었습니다 — ${data.orderNo}` +
-          (isInStoreSale ? " (매장판매 · 즉시 종결)" : "") +
-          (hasLabels ? ` · 시리얼 라벨 ${data.labelCodes.length}개 자동 발번` : ""),
+        data.splitOrderNo
+          ? `분할 등록 — 지금 ${data.orderNo} + 택배 백오더 ${data.splitOrderNo}` +
+              (hasLabels ? ` · 라벨 ${data.labelCodes.length}개 발번` : "")
+          : `주문이 등록되었습니다 — ${data.orderNo}` +
+              (isInStoreSale ? " (매장판매 · 즉시 종결)" : "") +
+              (hasLabels ? ` · 시리얼 라벨 ${data.labelCodes.length}개 자동 발번` : ""),
         hasLabels
           ? {
               duration: 8000,
@@ -507,7 +575,8 @@ export default function NewOrderPage() {
           : undefined,
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      router.push(isInStoreSale ? "/sales/history" : "/orders");
+      // 분할이면 워크보드로(B 백오더 노출), 아니면 기존 분기
+      router.push(data.splitOrderNo || !isInStoreSale ? "/orders" : "/sales/history");
     },
     onError: (err) =>
       toast.error(
@@ -693,6 +762,8 @@ export default function NewOrderPage() {
                         onRemove={() => removeCartItem(it.cartItemId)}
                         onUpdate={(patch) => updateCartItem(it.cartItemId, patch)}
                         onEditPrice={() => setPriceLineIdx(idx)}
+                        later={laterIds.has(it.cartItemId)}
+                        onToggleLater={() => toggleLater(it.cartItemId)}
                       />
                     ))}
                   </div>
@@ -803,6 +874,26 @@ export default function NewOrderPage() {
                     );
                   })}
                 </div>
+
+                {/* 분할 출고 안내 — "나중 배송" 라인이 섞이면 택배 백오더(B)가 별도 등록됨 */}
+                {isSplit && (
+                  <div className="flex items-start gap-2 rounded-2xl border border-[var(--jm-warning-solid)]/30 bg-[var(--jm-warning-bg)] px-3 py-2.5">
+                    <span className="mt-0.5 text-jm-sm">📦</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-jm-xs font-semibold text-[var(--jm-warning-fg)]">
+                        분할 출고 — 2개 주문으로 등록됩니다
+                      </span>
+                      <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                        지금(
+                        {FULFILLMENT_OPTIONS.find((o) => o.value === fulfillmentType)
+                          ?.label ?? "매장"}
+                        ) {nowItems.length}건 + 택배 백오더 {laterItems.length}건.
+                        백오더는 미차감 PENDING 으로 워크보드에서 입고/직출고 후
+                        발송하세요.
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {isDelivery && (
                   <div className="flex flex-col gap-2 rounded-2xl bg-[var(--jm-bg)] p-3">
@@ -1336,11 +1427,16 @@ function CartLineCard({
   onRemove,
   onUpdate,
   onEditPrice,
+  later,
+  onToggleLater,
 }: {
   item: CartItem;
   onRemove: () => void;
   onUpdate: (patch: Partial<CartItem>) => void;
   onEditPrice: () => void;
+  /** 분할 출고 — 이 라인이 "나중 배송"(택배 백오더) 으로 표시됐는지 */
+  later: boolean;
+  onToggleLater: () => void;
 }) {
   const taxFree = item.taxType === "TAX_FREE" || item.isZeroRate;
   // 라인 할인 — 견적서 로드 시 반영되는 정액·% 할인을 개당 정액으로 환산
@@ -1408,11 +1504,20 @@ function CartLineCard({
           ) : undefined
         }
         headerBelow={
-          /* 옵션 스냅샷 — VariantSelectSheet 에서 미리 선택한 옵션 라벨 표시 */
-          !isService && optionSummary ? (
-            <span className="mt-0.5 line-clamp-1 text-jm-3xs text-[var(--jm-text-muted)]">
-              {optionSummary}
-            </span>
+          /* 옵션 스냅샷 + 분할 배송 배지 */
+          !isService && (optionSummary || later) ? (
+            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+              {optionSummary && (
+                <span className="line-clamp-1 text-jm-3xs text-[var(--jm-text-muted)]">
+                  {optionSummary}
+                </span>
+              )}
+              {later && (
+                <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-warning-bg)] px-1.5 py-0 text-jm-4xs font-semibold text-[var(--jm-warning-fg)]">
+                  택배 나중 배송
+                </span>
+              )}
+            </div>
           ) : undefined
         }
         onDelete={onRemove}
@@ -1450,6 +1555,27 @@ function CartLineCard({
             selectedIds={item.optionValueIds ?? []}
             onChange={(ids) => onUpdate({ optionValueIds: ids })}
           />
+        )}
+
+        {/* 분할 출고 — 상품 라인만. "나중 배송" 표시 시 택배 백오더(B)로 분리 등록 */}
+        {!isService && item.productId && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-jm-3xs font-medium text-[var(--jm-text-muted)]">
+              출고 시점
+            </span>
+            <JmSegmentedControl
+              size="sm"
+              ariaLabel="출고 시점"
+              value={later ? "later" : "now"}
+              onChange={(v) => {
+                if ((v === "later") !== later) onToggleLater();
+              }}
+              options={[
+                { value: "now", label: "지금 받기" },
+                { value: "later", label: "나중 배송" },
+              ]}
+            />
+          </div>
         )}
       </PosLineItemRow>
     </div>

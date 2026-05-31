@@ -533,6 +533,9 @@ export async function POST(request: NextRequest) {
           totalAmount,
           commissionAmount,
           memo: data.memo || null,
+          // 분할 출고 링크 — A·B 가 동일 splitGroupId, B 는 splitParentId=A.id (docs/SPLIT_FULFILLMENT.md)
+          splitGroupId: data.splitGroupId || null,
+          splitParentId: data.splitParentId || null,
           createdById: user.id,
         },
       });

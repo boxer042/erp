@@ -102,6 +102,13 @@ export const orderSchema = z.object({
    * 미지정 시 라벨 매칭 스킵 (외부 채널 import 등 라벨 무관 흐름).
    */
   labelCodes: z.array(z.string()).optional(),
+  /**
+   * 분할 출고 — 한 결제를 매장수령(대표 A)/택배 백오더(B) 등 여러 주문으로 나눌 때 연결.
+   * 프론트가 그룹 UUID 를 생성해 A·B 두 요청에 동일 splitGroupId 전달, B 에는 A.id 를 splitParentId 로.
+   * 각 주문은 자기 품목만큼 정상 생성(결제·원장 자체 보유) — 백엔드는 링크만 저장. docs/SPLIT_FULFILLMENT.md
+   */
+  splitGroupId: z.string().optional(),
+  splitParentId: z.string().optional(),
   items: z.array(orderItemSchema).min(1, "주문 항목을 추가해주세요"),
 });
 

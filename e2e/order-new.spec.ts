@@ -66,4 +66,50 @@ test.describe("주문 등록 — POS 흐름 통합", () => {
     await page.getByRole("button", { name: /카트/ }).click();
     await expect(page.getByRole("button", { name: /결제하기/ })).toBeVisible();
   });
+
+  test("분할 출고 — 라인 '나중 배송' 표시 → 배지 + 결제단계 분할 안내", async ({
+    page,
+  }) => {
+    const res = await page.request.get("/api/products");
+    const products = (await res.json()) as Array<{
+      name: string;
+      sellingPrice: string;
+      isCanonical?: boolean;
+      productType?: string;
+    }>;
+    const addable = Array.isArray(products)
+      ? products
+          .filter(
+            (p) =>
+              Number(p.sellingPrice) > 0 &&
+              !p.isCanonical &&
+              p.productType !== "OPTION_PARENT" &&
+              p.name?.trim(),
+          )
+          // 이름 중복 제거 — 카드 선택을 이름으로 하므로 서로 다른 이름 2개 필요
+          .filter(
+            (p, i, arr) => arr.findIndex((q) => q.name === p.name) === i,
+          )
+      : [];
+    test.skip(addable.length < 2, "분할 테스트용 상품 2종(가격>0·비대표·비옵션)이 부족");
+
+    await page.goto("/orders/new");
+
+    // 서로 다른 상품 2개 담기 → 카트에 2개 라인
+    await page.getByRole("button", { name: addable[0].name }).first().click();
+    await page.getByRole("button", { name: addable[1].name }).first().click();
+
+    // 첫 라인을 "나중 배송" 으로 표시 (상품 라인의 출고 시점 세그먼트)
+    await page
+      .getByText("나중 배송", { exact: true })
+      .first()
+      .click();
+
+    // "택배 나중 배송" 배지 노출 → 분할 활성
+    await expect(page.getByText("택배 나중 배송")).toBeVisible();
+
+    // 결제 단계 → 분할 출고 안내 카드 노출
+    await page.getByRole("button", { name: /결제하기/ }).click();
+    await expect(page.getByText(/분할 출고 — 2개 주문/)).toBeVisible();
+  });
 });
