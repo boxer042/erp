@@ -156,7 +156,7 @@ enum NoteSourceType { ORDER INCOMING PURCHASE_ORDER REPAIR CUSTOMER SUPPLIER PAY
 | **0 (완료)** | `Note` 모델+enums, `/api/notes` CRUD, `query-keys`, validators, `/notes` 페이지, 대시보드 위젯 | 무위험(순수 추가) |
 | **1 (대부분 완료)** | 재사용 `NoteTimeline` + 주문·발주·수리·거래처·고객 상세에 타임라인(대표 비고 유지) + 백필 스크립트 + 출처별 탭 + 고객 `CustomerNote` 흡수. 입고·결제 live wiring만 남음 | 중 (읽기·인쇄 경로 검증) |
 | **2 (부분 완료)** | 死코드 제거 완료(`CustomerNote` 모델 · `/api/customer-notes`). 단일 memo 컬럼은 대표 비고로 유지 결정 → 추가 드롭 없음 | 중 |
-| **3 (스캐폴드 완료)** | 카카오 나에게 보내기 클라이언트 + OAuth 연결 + 토큰 회전 cron + 리마인더 (env-gated) | 중 (외부 OAuth) |
+| **3 (연동 실증 완료)** | 카카오 나에게 보내기 클라이언트 + OAuth 연결 + 토큰 회전 cron + 리마인더. **localhost 실발송 검증 완료** | 중 (외부 OAuth) |
 
 ---
 
@@ -177,7 +177,11 @@ enum NoteSourceType { ORDER INCOMING PURCHASE_ORDER REPAIR CUSTOMER SUPPLIER PAY
 - **Phase 3 (스캐폴드 완료, 2026-05-31)** — 카카오 "나에게 보내기" 리마인더 인프라. **env-gated** — `KAKAO_REST_API_KEY`+`NEXT_PUBLIC_APP_URL` 미설정이면 전 경로 no-op(연결 버튼 숨김·cron "미설정" 반환). tsc 0 / eslint 0 / 적대적 리뷰(2렌즈) 0 confirmed.
   - `KakaoConnection` 모델(userId별 access/refresh 토큰+만료) · `src/lib/notifications/kakao-memo.ts`(authorize/exchange/refresh+회전/getValidAccessToken/sendMemoText) · `/api/kakao/{connect,callback,status}` · `/api/cron/todo-reminders`(due 노트 발송+notifiedAt 마킹 + keep-alive 토큰 회전) · `/notes` 헤더 "카카오 알림 연결" 버튼(`_kakao-connect.tsx`).
   - **활성화 절차**: ① developers.kakao.com 앱 생성 → REST API 키 ② 카카오 로그인 활성화 + 동의항목 "카카오톡 메시지 전송"(`talk_message`) ③ Redirect URI 등록 `<NEXT_PUBLIC_APP_URL>/api/kakao/callback` ④ env: `KAKAO_REST_API_KEY`,`KAKAO_CLIENT_SECRET`(선택),`NEXT_PUBLIC_APP_URL`,`CRON_TOKEN` ⑤ `/notes` 에서 "카카오 알림 연결" 1회 클릭(OAuth) ⑥ 스케줄러가 `/api/cron/todo-reminders?token=<CRON_TOKEN>` 를 매일(또는 시간별) 호출.
-  - **미검증**: 실제 카카오 발송·OAuth 왕복은 카카오 앱 등록 후에만 검증 가능(현재 dev env 미설정). refresh token 2달 만료는 cron keep-alive 가 회전 유지(만료 1개월 이내 갱신 시 새 토큰 발급) — 단 cron 이 2달 이상 끊기면 재로그인 필요.
+  - **실증 완료 (2026-05-31, localhost)**: 카카오 개발자 앱 생성 → 카카오 로그인 ON + `talk_message` 동의 → Redirect URI(`[앱]>[플랫폼 키]>[REST API 키]>[리다이렉트 URI]`, 콘솔 개편으로 위치 이동) 등록 → Client Secret 사용 → `.env.local` 설정 → `/notes` 연결(OAuth) → cron 호출 → **카카오톡 "나와의 채팅" 실제 도착 확인(`sent:1`)**. 전 경로 작동.
+  - **연동 중 수정**: ① 미들웨어가 `/api/cron` 미허용 → 세션 없는 cron 이 `/login` 으로 막힘 → `src/lib/supabase/middleware.ts` 화이트리스트에 `/api/cron` 추가(기존 cron 들도 해결). ② Client Secret 활성화 앱은 토큰 교환에 `KAKAO_CLIENT_SECRET` 필수(없으면 KOE010).
+  - **localhost 한계**: 메시지의 "자세히 보기" 링크가 `http://localhost:3000/notes` 라 폰에서 안 열림. **운영 도메인으로 `NEXT_PUBLIC_APP_URL` 설정 시 정상**.
+  - refresh token 2달 만료는 cron keep-alive 가 회전 유지(만료 1개월 이내 갱신 시 새 토큰 발급) — cron 이 2달 이상 끊기면 재로그인 필요.
+  - **자동발송**: 스케줄러(EasyCron/Vercel Cron/crontab)가 `GET /api/cron/todo-reminders?token=<CRON_TOKEN>` 를 주기 호출(리마인더 시각 정밀도 위해 10~30분 또는 매시 권장).
   - **알려진 한계(낮음)**: PENDING 주문 하드삭제 시 연결 노트가 고아로 남음(표시 안 됨·무해). Phase 2 정리 때 cleanup 고려.
 
 **Phase 1 착수 전 검증**:
