@@ -52,8 +52,17 @@ export default async function OrderStatementPrintPage({
   const { our: OUR_COMPANY, bank: BANK_INFO } = await loadOurCompany();
   const { auto, supplyOnly } = await searchParams;
 
-  const order = await prisma.order.findUnique({
+  // 분할 출고 — 같은 splitGroupId 형제 주문(매장수령 A + 택배 백오더 B)을 합산해
+  // 증빙 1장으로 발행 (docs/SPLIT_FULFILLMENT.md §8). 비분할(splitGroupId=null)이면
+  // 클릭한 단일 주문 그대로 — 기존 동작 byte-identical 유지.
+  const clicked = await prisma.order.findUnique({
     where: { id },
+    select: { splitGroupId: true },
+  });
+  if (!clicked) notFound();
+
+  const orders = await prisma.order.findMany({
+    where: clicked.splitGroupId ? { splitGroupId: clicked.splitGroupId } : { id },
     include: {
       customer: true,
       items: {
@@ -70,48 +79,66 @@ export default async function OrderStatementPrintPage({
         },
       },
     },
+    // 대표(splitParentId=null) 먼저 → 백오더 B. 단일 주문도 그대로 첫 번째.
+    orderBy: [{ splitParentId: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
   });
-  if (!order) notFound();
+  if (orders.length === 0) notFound();
+
+  const primary = orders[0];
+  const allItems = orders.flatMap((o) => o.items);
+  const subtotalAmount = orders.reduce((s, o) => s + Number(o.subtotalAmount), 0);
+  const taxAmount = orders.reduce((s, o) => s + Number(o.taxAmount), 0);
+  const totalAmount = orders.reduce((s, o) => s + Number(o.totalAmount), 0);
+  const isSplitGroup = orders.length > 1;
 
   const buyer = {
-    name: order.customer?.name || order.customerName || "",
-    businessNumber: order.customer?.businessNumber ?? null,
-    ceo: order.customer?.ceo ?? null,
-    phone: order.customer?.phone || order.customerPhone || null,
-    email: order.customer?.email ?? null,
-    address: order.customer?.address || order.shippingAddress || null,
+    name: primary.customer?.name || primary.customerName || "",
+    businessNumber: primary.customer?.businessNumber ?? null,
+    ceo: primary.customer?.ceo ?? null,
+    phone: primary.customer?.phone || primary.customerPhone || null,
+    email: primary.customer?.email ?? null,
+    address: primary.customer?.address || primary.shippingAddress || null,
   };
 
-  // 부분 결제 (PARTIAL_PAID) — 영수증/명세표 헤더 라벨 분기 + 메모에 결제·잔금 명시
+  // 부분 결제 (PARTIAL_PAID) — 영수증/명세표 헤더 라벨 분기 + 메모에 결제·잔금 명시.
+  // 분할 그룹은 전액결제만 허용(분할+부분결제 차단)이라 단일 주문에만 적용.
   //   DEPOSIT  → "계약금 명세표"     (계약금 ₩X 입금 / 잔금 ₩Y 미수)
   //   PARTIAL  → "부분 결제 명세표"   (즉시 결제 ₩X / 잔금 ₩Y 미수)
   const isPartial =
-    order.paymentStatus === "PARTIAL_PAID" && order.paidAmount !== null;
-  const paid = isPartial ? Number(order.paidAmount) : 0;
+    !isSplitGroup &&
+    primary.paymentStatus === "PARTIAL_PAID" &&
+    primary.paidAmount !== null;
+  const paid = isPartial ? Number(primary.paidAmount) : 0;
   const outstanding = isPartial
-    ? Math.max(0, Number(order.totalAmount) - paid)
+    ? Math.max(0, Number(primary.totalAmount) - paid)
     : 0;
   const partialNote = isPartial
-    ? order.partialPaymentKind === "DEPOSIT"
+    ? primary.partialPaymentKind === "DEPOSIT"
       ? `[계약금] 입금 ₩${paid.toLocaleString("ko-KR")} · 잔금 ₩${outstanding.toLocaleString("ko-KR")} 미수`
       : `[부분 결제] 즉시 결제 ₩${paid.toLocaleString("ko-KR")} · 잔금 ₩${outstanding.toLocaleString("ko-KR")} 미수`
     : null;
   const docTitle = isPartial
-    ? order.partialPaymentKind === "DEPOSIT"
+    ? primary.partialPaymentKind === "DEPOSIT"
       ? "계약금 명세표"
       : "부분 결제 명세표"
     : "거래명세표";
-  const docMemo = [partialNote, order.memo].filter(Boolean).join(" · ");
+  // 분할 그룹이면 합산 안내 (매장수령 대표 + 택배 백오더 합산)
+  const splitNote = isSplitGroup
+    ? `분할 출고 합산 — ${orders.map((o) => o.orderNo).join(" + ")}`
+    : null;
+  const docMemo = [splitNote, partialNote, primary.memo]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <DocumentPdf
       title={docTitle}
       docKind="statement"
-      documentNo={order.orderNo}
-      issueDate={order.orderDate.toISOString()}
+      documentNo={primary.orderNo}
+      issueDate={primary.orderDate.toISOString()}
       supplier={OUR_COMPANY}
       buyer={buyer}
-      items={order.items.map((it) => ({
+      items={allItems.map((it) => ({
         name: it.product?.name ?? it.serviceName ?? "—",
         spec: it.product?.spec ?? null,
         unitOfMeasure: it.product?.unitOfMeasure ?? "EA",
@@ -124,9 +151,9 @@ export default async function OrderStatementPrintPage({
         isTaxable: it.product ? it.product.taxType === "TAXABLE" : true,
         memo: null,
       }))}
-      subtotalAmount={order.subtotalAmount.toString()}
-      taxAmount={order.taxAmount.toString()}
-      totalAmount={order.totalAmount.toString()}
+      subtotalAmount={subtotalAmount.toString()}
+      taxAmount={taxAmount.toString()}
+      totalAmount={totalAmount.toString()}
       memo={docMemo || null}
       autoPrint={auto === "1"}
       supplyOnly={supplyOnly === "1"}
