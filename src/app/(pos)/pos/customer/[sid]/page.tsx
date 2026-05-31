@@ -41,6 +41,7 @@ import { useRepairSync } from "../../_use-repair-sync";
 import { ProductDetailView, type LandingResponse } from "../../_product-detail-view";
 import { RepairDetail } from "@/app/(pos)/pos/repairs/[id]/page";
 import { RepairTicketActionMenu } from "@/app/(pos)/pos/repairs/[id]/_repair-action-menu";
+import { StatusStepperBar } from "@/app/(pos)/pos/repairs/_stepper";
 import { type RepairTicketDetail } from "@/app/(pos)/pos/repairs/_types";
 
 type Mode = "product" | "repair" | "rental";
@@ -696,9 +697,17 @@ function RepairTicketHeader({ ticketId }: { ticketId: string }) {
   }
   const t = q.data;
   return (
-    <div className="flex min-w-0 flex-col">
-      <RepairTicketActionMenu ticketId={ticketId} />
-      <span className="font-mono text-jm-sm text-[var(--jm-text-muted)]">{t.ticketNo}</span>
+    <div className="flex min-w-0 flex-1 items-center gap-4">
+      <div className="flex shrink-0 flex-col">
+        <RepairTicketActionMenu ticketId={ticketId} />
+        <span className="font-mono text-jm-sm text-[var(--jm-text-muted)]">{t.ticketNo}</span>
+      </div>
+      {/* 가운데 진행바 — 통일 헤더 디자인 유지하며 stepper 만 중앙에 (좁은 화면은 숨김) */}
+      {t.status !== "CANCELLED" && (
+        <div className="hidden min-w-0 flex-1 sm:block">
+          <StatusStepperBar status={t.status} type={t.type} />
+        </div>
+      )}
     </div>
   );
 }
