@@ -114,6 +114,8 @@ export async function GET(
       where: {
         supplierProductId: { in: mappedSpIds },
         createdAt: { gt: since },
+        // 오류 정정(CORRECTION)은 실제 시세 변동이 아니므로 원가추세 분석서 제외 (데이터 무결성)
+        kind: { not: "CORRECTION" },
       },
       orderBy: { createdAt: "desc" },
       take: 20,
