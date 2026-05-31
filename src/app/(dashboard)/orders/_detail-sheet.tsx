@@ -508,6 +508,36 @@ export function OrderDetailSheet({
       toast.error(err instanceof ApiError ? err.message : "설정 실패"),
   });
 
+  // ③b 거래처 직출고 처리 — 직송 입고 자동 생성 (거래처 + 라인별 매입가)
+  const [dropshipOpen, setDropshipOpen] = useState(false);
+  const [dropshipSupplierId, setDropshipSupplierId] = useState("");
+  const [dropshipPrices, setDropshipPrices] = useState<Record<string, string>>({});
+  const dropshipSuppliersQuery = useQuery({
+    queryKey: ["suppliers", "dropship-pick"],
+    queryFn: () => apiGet<{ id: string; name: string }[]>("/api/suppliers"),
+    enabled: dropshipOpen,
+  });
+  const processDropshipMutation = useMutation({
+    mutationFn: (vars: {
+      supplierId: string;
+      lines: { orderItemId: string; unitPrice: number }[];
+    }) =>
+      apiMutate(`/api/orders/${orderId}`, "PUT", {
+        action: "process-dropship",
+        supplierId: vars.supplierId,
+        lines: vars.lines,
+      }),
+    onSuccess: () => {
+      toast.success("거래처 직출고 처리 완료 — 직송 입고 생성·발송");
+      setDropshipOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.incoming.all });
+      onOpenChange(false);
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "처리 실패"),
+  });
+
   // 시리얼 소급 발번 — trackable 상품 라인에 시리얼 라벨 발번 후 라벨 인쇄 탭 오픈
   const issueSerialsMutation = useMutation({
     mutationFn: () =>
@@ -1030,7 +1060,18 @@ export function OrderDetailSheet({
                     ? (id) => setResolveItemId(id)
                     : undefined
                 }
-                onSetProcurement={(m) => setProcurementMutation.mutate(m)}
+                onSetProcurement={(m) => {
+                  // 거래처 직출고 선택 → 처리 다이얼로그(직송 입고 자동 생성). 그 외는 마커만 설정.
+                  if (m === "DROPSHIP") {
+                    const init: Record<string, string> = {};
+                    for (const it of data.items) if (it.product) init[it.id] = "";
+                    setDropshipPrices(init);
+                    setDropshipSupplierId("");
+                    setDropshipOpen(true);
+                  } else {
+                    setProcurementMutation.mutate(m);
+                  }
+                }}
               />
             )}
           </div>
@@ -1450,6 +1491,102 @@ export function OrderDetailSheet({
           initialPartialReturns={refundDialogPrefill}
           onDone={() => onOpenChange(false)}
         />
+      )}
+
+      {/* ③b 거래처 직출고 처리 — 거래처 + 라인별 매입가 → 직송 입고 자동 생성·확정 + 발송 */}
+      {data && (
+        <JmDialog open={dropshipOpen} onOpenChange={setDropshipOpen}>
+          <JmDialogContent size="md">
+            <JmDialogHeader>
+              <JmDialogTitle>거래처 직출고 처리 — {data.orderNo}</JmDialogTitle>
+            </JmDialogHeader>
+            <JmDialogBody>
+              <div className="space-y-3">
+                <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+                  거래처가 손님에게 직접 발송합니다. 거래처와 라인별 매입가(세전)를 입력하면 직송
+                  입고가 자동 생성·확정(거래처 매입·원가, 재고 미반영)되고 주문이 발송 처리됩니다.
+                  매핑 없는 상품은 임시 거래처상품이 자동 생성돼요.
+                </p>
+                <JmFormField label="거래처">
+                  <JmCombobox
+                    value={dropshipSupplierId}
+                    onChange={(item) => setDropshipSupplierId(item.id)}
+                    items={(dropshipSuppliersQuery.data ?? []).map((s) => ({
+                      id: s.id,
+                      label: s.name,
+                    }))}
+                    placeholder="거래처 선택"
+                    searchPlaceholder="거래처명"
+                  />
+                </JmFormField>
+                <div className="space-y-2">
+                  {data.items
+                    .filter((it) => it.product)
+                    .map((it) => (
+                      <div
+                        key={it.id}
+                        className="flex items-center gap-2 rounded-lg border border-[var(--jm-border)] p-2"
+                      >
+                        <span className="line-clamp-1 flex-1 text-jm-sm text-[var(--jm-text)]">
+                          {it.product?.name ?? "—"}
+                          <span className="ml-1 text-jm-2xs text-[var(--jm-text-muted)]">
+                            ×{Number(it.quantity)}
+                          </span>
+                        </span>
+                        <div className="w-32">
+                          <JmInput
+                            size="sm"
+                            type="text"
+                            inputMode="numeric"
+                            value={dropshipPrices[it.id] ?? ""}
+                            onChange={(e) =>
+                              setDropshipPrices((p) => ({
+                                ...p,
+                                [it.id]: e.target.value.replace(/[^0-9]/g, ""),
+                              }))
+                            }
+                            placeholder="매입가 (세전)"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </JmDialogBody>
+            <JmDialogFooter>
+              <JmButton
+                variant="ghost"
+                onClick={() => setDropshipOpen(false)}
+                disabled={processDropshipMutation.isPending}
+              >
+                취소
+              </JmButton>
+              <JmButton
+                variant="cta"
+                disabled={processDropshipMutation.isPending || !dropshipSupplierId}
+                onClick={() => {
+                  const lines = data.items
+                    .filter((it) => it.product)
+                    .map((it) => ({
+                      orderItemId: it.id,
+                      unitPrice: parseFloat(dropshipPrices[it.id] || "0") || 0,
+                    }));
+                  processDropshipMutation.mutate({
+                    supplierId: dropshipSupplierId,
+                    lines,
+                  });
+                }}
+              >
+                {processDropshipMutation.isPending && (
+                  <JmSpinner size="sm" tone="inverted" />
+                )}
+                <span>
+                  {processDropshipMutation.isPending ? "처리 중..." : "직출고 처리"}
+                </span>
+              </JmButton>
+            </JmDialogFooter>
+          </JmDialogContent>
+        </JmDialog>
       )}
 
       {/* 교환 Dialog — 내부 state·mutations 자체 관리. parent 는 open + prefill 만 전달 */}
