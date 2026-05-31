@@ -34,6 +34,7 @@ import {
   JmSkeleton,
 } from "@/jm";
 
+import { KakaoConnect } from "./_kakao-connect";
 import { NoteSheet } from "./_note-sheet";
 import {
   type NoteDto,
@@ -136,10 +137,13 @@ export default function NotesPage() {
               할 일과 메모를 한곳에서. 체크하고 알림 받으세요.
             </p>
           </div>
-          <JmButton variant="cta" onClick={openNew}>
-            <Plus className="size-4" />
-            추가
-          </JmButton>
+          <div className="flex items-center gap-2">
+            <KakaoConnect />
+            <JmButton variant="cta" onClick={openNew}>
+              <Plus className="size-4" />
+              추가
+            </JmButton>
+          </div>
         </div>
 
         {/* 탭 + 검색 */}

@@ -190,4 +190,7 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => ["notes", "list", params ?? {}] as const,
     detail: (id: string) => ["notes", "detail", id] as const,
   },
+  kakao: {
+    status: () => ["kakao", "status"] as const,
+  },
 } as const;

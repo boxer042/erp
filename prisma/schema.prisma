@@ -44,6 +44,7 @@ model User {
   auditLogs                 AuditLog[]
   productPriceChanges       ProductPriceHistory[]     @relation("ProductPriceHistoryChangedBy")
   notes                     Note[]
+  kakaoConnection           KakaoConnection?
 
   @@map("users")
 }
@@ -898,10 +899,21 @@ model SupplierProductPriceHistory {
   originalPrice     Decimal?        @map("original_price") @db.Decimal(15, 2)
   discountAmount    Decimal?        @map("discount_amount") @db.Decimal(15, 2)
   reason            String?
+  /**
+   * 변동 종류 — CHANGE(실제 시세 변동, 인상/할인) / CORRECTION(오류 정정, 잘못 입력 수정).
+   * CORRECTION 은 원가추세·시세 분석에서 제외해 데이터 무결성 유지 (docs/SPLIT_FULFILLMENT.md 정정 정책).
+   * 기존 데이터·신규 입고로 인한 변동은 기본 CHANGE.
+   */
+  kind              SupplierPriceChangeKind @default(CHANGE)
   incomingId        String?         @map("incoming_id")
   createdAt         DateTime        @default(now()) @map("created_at")
 
   @@map("supplier_product_price_history")
+}
+
+enum SupplierPriceChangeKind {
+  CHANGE // 실제 시세 변동 (인상/할인) — 추세·분석 포함
+  CORRECTION // 오류 정정 (잘못 입력 수정) — 추세·분석 제외
 }
 
 model ProductMapping {
@@ -3329,4 +3341,21 @@ enum NoteSourceType {
   SUPPLIER
   PAYMENT
   GENERAL
+}
+
+// 카카오 "나에게 보내기" 연결 — 사용자별 OAuth 토큰. 업무 노트 리마인더 발송에 사용 (Phase 3).
+// 설계: docs/NOTES_SYSTEM.md §7. env(KAKAO_REST_API_KEY 등) 미설정 시 전 경로 no-op.
+model KakaoConnection {
+  id                    String   @id @default(uuid())
+  userId                String   @unique @map("user_id")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kakaoUserId           String?  @map("kakao_user_id")
+  accessToken           String   @map("access_token")
+  refreshToken          String   @map("refresh_token")
+  accessTokenExpiresAt  DateTime @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime @map("refresh_token_expires_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("kakao_connections")
 }
