@@ -166,6 +166,23 @@ export async function GET(
           claimReason: true,
         },
       },
+      // 분할 출고 — 이 주문이 백오더(B)면 대표(A) 참조, 대표(A)면 백오더(B) 목록 (docs/SPLIT_FULFILLMENT.md)
+      splitParent: {
+        select: {
+          id: true,
+          orderNo: true,
+          status: true,
+          fulfillmentType: true,
+        },
+      },
+      splitChildren: {
+        select: {
+          id: true,
+          orderNo: true,
+          status: true,
+          fulfillmentType: true,
+        },
+      },
       items: {
         include: {
           product: {

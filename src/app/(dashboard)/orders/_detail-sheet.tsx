@@ -185,6 +185,20 @@ interface OrderDetail {
     claimType: OrderClaimType | null;
     claimReason: OrderClaimReason | null;
   }>;
+  /** 분할 출고 — 이 주문이 백오더(B)면 대표(A) 참조 */
+  splitParent?: {
+    id: string;
+    orderNo: string;
+    status: OrderStatus;
+    fulfillmentType: FulfillmentType;
+  } | null;
+  /** 분할 출고 — 이 주문이 대표(A)면 택배 백오더(B) 목록 */
+  splitChildren?: Array<{
+    id: string;
+    orderNo: string;
+    status: OrderStatus;
+    fulfillmentType: FulfillmentType;
+  }>;
   createdBy: { name: string };
   items: Array<{
     id: string;
@@ -2087,6 +2101,54 @@ function ReadView({
             )}
           </JmCardContent>
         </JmCard>
+
+        {/* 분할 출고 연결 — 대표(A)↔택배 백오더(B) 상호 link (docs/SPLIT_FULFILLMENT.md) */}
+        {((order.splitChildren?.length ?? 0) > 0 || order.splitParent) && (
+          <JmCard>
+            <JmCardHeader>
+              <div className="flex items-center gap-2">
+                <Package className="size-4 text-[var(--jm-text-muted)]" />
+                <JmCardTitle>연결 주문 · 분할 출고</JmCardTitle>
+              </div>
+            </JmCardHeader>
+            <JmCardContent>
+              <div className="space-y-1.5 text-jm-xs">
+                {order.splitParent && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[var(--jm-text-muted)]">
+                      대표(지금 받기) →
+                    </span>
+                    <a
+                      href={`/orders?id=${order.splitParent.id}`}
+                      className="font-mono text-[var(--jm-action)] underline-offset-2 hover:underline"
+                    >
+                      {order.splitParent.orderNo}
+                    </a>
+                    <JmBadge variant="outline" size="sm" shape="square">
+                      {STATUS_LABELS[order.splitParent.status]}
+                    </JmBadge>
+                  </div>
+                )}
+                {order.splitChildren?.map((c) => (
+                  <div key={c.id} className="flex items-center gap-1.5">
+                    <span className="text-[var(--jm-text-muted)]">
+                      택배 백오더 →
+                    </span>
+                    <a
+                      href={`/orders?id=${c.id}`}
+                      className="font-mono text-[var(--jm-action)] underline-offset-2 hover:underline"
+                    >
+                      {c.orderNo}
+                    </a>
+                    <JmBadge variant="outline" size="sm" shape="square">
+                      {STATUS_LABELS[c.status]}
+                    </JmBadge>
+                  </div>
+                ))}
+              </div>
+            </JmCardContent>
+          </JmCard>
+        )}
 
         <JmCard>
           <JmCardHeader>
