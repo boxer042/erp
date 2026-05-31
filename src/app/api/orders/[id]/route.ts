@@ -304,6 +304,191 @@ export async function PUT(
     });
   }
 
+  // 거래처 직출고 처리 (③b) — 택배 발송분(B)을 거래처 직송으로 확정.
+  // 거래처 선택 + 라인별 매입가 → 직송 입고 자동 생성·확정(거래처 매입·원가, 재고 0) + B 원가·발송·링크.
+  // 거래처상품 미등록(첫 매입)이면 임시(provisional) 거래처상품 + 매핑 자동 생성. 직송은 1:1(conversionRate=1) 가정.
+  if (action === "process-dropship") {
+    const supplierId = typeof body.supplierId === "string" ? body.supplierId : null;
+    if (!supplierId) {
+      return NextResponse.json({ error: "거래처를 선택해주세요" }, { status: 400 });
+    }
+    if (order.fulfillmentType !== "SHIPPING") {
+      return NextResponse.json(
+        { error: "택배 발송 주문만 거래처 직출고 처리할 수 있습니다" },
+        { status: 400 },
+      );
+    }
+    if (order.status !== "PENDING" && order.status !== "PREPARING") {
+      return NextResponse.json(
+        { error: "출고 전(대기/출고대기) 주문만 직출고 처리할 수 있습니다" },
+        { status: 400 },
+      );
+    }
+    const productItems = order.items.filter((i) => i.productId);
+    if (productItems.length === 0) {
+      return NextResponse.json({ error: "직출고할 상품 라인이 없습니다" }, { status: 400 });
+    }
+    const priceByItemId = new Map<string, number>();
+    for (const l of (Array.isArray(body.lines) ? body.lines : []) as Array<
+      Record<string, unknown>
+    >) {
+      const oid = typeof l.orderItemId === "string" ? l.orderItemId : null;
+      const up = Number(l.unitPrice);
+      if (oid && Number.isFinite(up) && up >= 0) priceByItemId.set(oid, up);
+    }
+    const auditUser = await getCurrentUser();
+    const now = new Date();
+    const incomingNo = `IN${now.getFullYear().toString().slice(-2)}${String(
+      now.getMonth() + 1,
+    ).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${Math.random()
+      .toString(36)
+      .substring(2, 6)
+      .toUpperCase()}`;
+
+    const created = await prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.findUnique({
+        where: { id: supplierId },
+        select: { id: true, name: true },
+      });
+      if (!supplier) throw new Error("거래처를 찾을 수 없습니다");
+
+      // 1. 라인별 거래처상품 해석/생성 (이 거래처의 매핑 있으면 사용, 없으면 임시 생성 + 매핑)
+      const productIds = Array.from(new Set(productItems.map((i) => i.productId!)));
+      const mappings = await tx.productMapping.findMany({
+        where: { productId: { in: productIds }, supplierProduct: { supplierId } },
+        select: {
+          productId: true,
+          supplierProductId: true,
+          supplierProduct: { select: { isTaxable: true } },
+        },
+      });
+      const mapByProductId = new Map(mappings.map((m) => [m.productId, m]));
+
+      type DsLine = {
+        orderItemId: string;
+        supplierProductId: string;
+        isTaxable: boolean;
+        qty: number;
+        unitPrice: number;
+      };
+      const lines: DsLine[] = [];
+      for (const it of productItems) {
+        const unitPrice = priceByItemId.get(it.id) ?? 0;
+        const qty = Number(it.quantity);
+        const mapped = mapByProductId.get(it.productId!);
+        if (mapped) {
+          lines.push({
+            orderItemId: it.id,
+            supplierProductId: mapped.supplierProductId,
+            isTaxable: mapped.supplierProduct.isTaxable,
+            qty,
+            unitPrice,
+          });
+        } else {
+          const sp = await tx.supplierProduct.create({
+            data: {
+              supplierId,
+              name: it.product?.name ?? "직송 상품",
+              unitPrice,
+              listPrice: unitPrice,
+              isProvisional: true,
+            },
+          });
+          await tx.productMapping.create({
+            data: { productId: it.productId!, supplierProductId: sp.id, conversionRate: 1 },
+          });
+          lines.push({
+            orderItemId: it.id,
+            supplierProductId: sp.id,
+            isTaxable: true,
+            qty,
+            unitPrice,
+          });
+        }
+      }
+
+      // 2. 직송 입고 생성 (CONFIRMED, isDropship — 재고 미생성, 거래처 매입·원가만)
+      const incoming = await tx.incoming.create({
+        data: {
+          incomingNo,
+          supplierId,
+          incomingDate: now,
+          status: "CONFIRMED",
+          isDropship: true,
+          createdById: auditUser?.id ?? order.createdById,
+          totalAmount: lines.reduce((s, l) => s + l.unitPrice * l.qty, 0),
+          memo: `거래처 직출고 — 주문 ${order.orderNo}`,
+        },
+      });
+      await tx.incomingItem.createMany({
+        data: lines.map((l) => ({
+          incomingId: incoming.id,
+          supplierProductId: l.supplierProductId,
+          quantity: l.qty,
+          unitPrice: l.unitPrice,
+          totalPrice: l.unitPrice * l.qty,
+          unitCostSnapshot: l.unitPrice, // 직송은 배송비·부대비 없음 → 원가 = 매입단가
+        })),
+      });
+      // 거래처원장 PURCHASE (VAT 포함)
+      const totalWithTax = lines.reduce((s, l) => {
+        const supply = l.unitPrice * l.qty;
+        return s + supply + (l.isTaxable ? Math.round(supply * 0.1) : 0);
+      }, 0);
+      const lastLedger = await tx.supplierLedger.findFirst({
+        where: { supplierId },
+        orderBy: { createdAt: "desc" },
+      });
+      await tx.supplierLedger.create({
+        data: {
+          supplierId,
+          date: now,
+          type: "PURCHASE",
+          description: `직송 입고 ${incoming.incomingNo}`,
+          debitAmount: totalWithTax,
+          creditAmount: 0,
+          balance: (lastLedger ? Number(lastLedger.balance) : 0) + totalWithTax,
+          referenceId: incoming.id,
+          referenceType: "INCOMING",
+        },
+      });
+
+      // 3. B 원가 set (sale unit cost = 매입단가, 1:1) + 발송 처리 + 링크
+      await Promise.all(
+        lines.map((l) =>
+          tx.orderItem.update({
+            where: { id: l.orderItemId },
+            data: { unitCostSnapshot: l.unitPrice },
+          }),
+        ),
+      );
+      await tx.order.update({
+        where: { id },
+        data: {
+          status: "SHIPPED",
+          procurementMode: "DROPSHIP",
+          dropshipIncomingId: incoming.id,
+        },
+      });
+      await recordAudit(tx, {
+        userId: auditUser?.id ?? null,
+        entity: "Order",
+        entityId: id,
+        action: "UPDATE",
+        meta: {
+          kind: "process-dropship",
+          orderNo: order.orderNo,
+          incomingNo: incoming.incomingNo,
+          supplier: supplier.name,
+          lines: lines.length,
+        },
+      });
+      return { incomingId: incoming.id, incomingNo: incoming.incomingNo };
+    });
+
+    return NextResponse.json(created);
+  }
+
   // 주문 확정(prepare) 가드:
   //   1) 대표 상품(canonical) 그대로면 차단 — 변형 확정 후 재시도
   //   2) OPTION_PARENT 그대로면 차단 — 자체 재고 없는 placeholder 라 SWAP 옵션값으로 실제 SKU 결정 필요
