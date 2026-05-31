@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { NoteTimeline } from "@/components/note-timeline";
 import { format } from "date-fns";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeftRight,
   Banknote,
   CalendarClock,
+  ChevronDown,
   Check,
   CheckCircle2,
   FilePlus,
@@ -126,6 +129,23 @@ type ReturnAction =
   | "refund"
   | "exchange";
 
+/** 분할 출고 연결 주문 — "연결 주문" 카드 펼쳐보기용 요약 (품목·상태·합계) */
+interface SplitLinkedOrder {
+  id: string;
+  orderNo: string;
+  status: OrderStatus;
+  fulfillmentType: FulfillmentType;
+  totalAmount: string;
+  items: Array<{
+    id: string;
+    quantity: string;
+    unitPrice: string;
+    totalPrice: string;
+    serviceName: string | null;
+    product: { name: string; sku: string } | null;
+  }>;
+}
+
 interface OrderDetail {
   id: string;
   orderNo: string;
@@ -185,20 +205,10 @@ interface OrderDetail {
     claimType: OrderClaimType | null;
     claimReason: OrderClaimReason | null;
   }>;
-  /** 분할 출고 — 이 주문이 백오더(B)면 대표(A) 참조 */
-  splitParent?: {
-    id: string;
-    orderNo: string;
-    status: OrderStatus;
-    fulfillmentType: FulfillmentType;
-  } | null;
-  /** 분할 출고 — 이 주문이 대표(A)면 택배 백오더(B) 목록 */
-  splitChildren?: Array<{
-    id: string;
-    orderNo: string;
-    status: OrderStatus;
-    fulfillmentType: FulfillmentType;
-  }>;
+  /** 분할 출고 — 이 주문이 택배 발송분이면 현장 수령분(부모) 참조 */
+  splitParent?: SplitLinkedOrder | null;
+  /** 분할 출고 — 이 주문이 현장 수령분이면 택배 발송분(자식) 목록 */
+  splitChildren?: SplitLinkedOrder[];
   createdBy: { name: string };
   items: Array<{
     id: string;
@@ -1716,6 +1726,16 @@ function ReadView({
         </JmCardContent>
       </JmCard>
 
+      {/* 메모 · 할 일 — 업무 노트 허브와 연동 (출처: 주문) */}
+      <JmCard>
+        <JmCardHeader>
+          <JmCardTitle>메모 · 할 일</JmCardTitle>
+        </JmCardHeader>
+        <JmCardContent>
+          <NoteTimeline sourceType="ORDER" sourceId={order.id} sourceLabel={order.orderNo} />
+        </JmCardContent>
+      </JmCard>
+
       {/* 주문 항목 */}
       <JmCard className="overflow-hidden p-0">
         <JmCardHeader>
@@ -2102,53 +2122,42 @@ function ReadView({
           </JmCardContent>
         </JmCard>
 
-        {/* 분할 출고 연결 — 대표(A)↔택배 백오더(B) 상호 link (docs/SPLIT_FULFILLMENT.md) */}
-        {((order.splitChildren?.length ?? 0) > 0 || order.splitParent) && (
-          <JmCard>
-            <JmCardHeader>
-              <div className="flex items-center gap-2">
-                <Package className="size-4 text-[var(--jm-text-muted)]" />
-                <JmCardTitle>연결 주문 · 분할 출고</JmCardTitle>
-              </div>
-            </JmCardHeader>
-            <JmCardContent>
-              <div className="space-y-1.5 text-jm-xs">
-                {order.splitParent && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[var(--jm-text-muted)]">
-                      대표(지금 받기) →
-                    </span>
-                    <a
-                      href={`/orders?id=${order.splitParent.id}`}
-                      className="font-mono text-[var(--jm-action)] underline-offset-2 hover:underline"
-                    >
-                      {order.splitParent.orderNo}
-                    </a>
-                    <JmBadge variant="outline" size="sm" shape="square">
-                      {STATUS_LABELS[order.splitParent.status]}
-                    </JmBadge>
-                  </div>
-                )}
-                {order.splitChildren?.map((c) => (
-                  <div key={c.id} className="flex items-center gap-1.5">
-                    <span className="text-[var(--jm-text-muted)]">
-                      택배 백오더 →
-                    </span>
-                    <a
-                      href={`/orders?id=${c.id}`}
-                      className="font-mono text-[var(--jm-action)] underline-offset-2 hover:underline"
-                    >
-                      {c.orderNo}
-                    </a>
-                    <JmBadge variant="outline" size="sm" shape="square">
-                      {STATUS_LABELS[c.status]}
-                    </JmBadge>
-                  </div>
-                ))}
-              </div>
-            </JmCardContent>
-          </JmCard>
-        )}
+        {/* 분할 출고 연결 — 이 주문 역할(현장 수령분/택배 발송분) 명시 + 연결 주문 펼쳐보기.
+            현장 수령분(부모) ↔ 택배 발송분(자식) (docs/SPLIT_FULFILLMENT.md) */}
+        {(() => {
+          // splitParent 있으면 이 주문은 택배 발송분(자식), 없고 children 있으면 현장 수령분(부모)
+          const isChild = !!order.splitParent;
+          const connected: SplitLinkedOrder[] = isChild
+            ? [order.splitParent!]
+            : order.splitChildren ?? [];
+          if (connected.length === 0) return null;
+          const currentRole = isChild ? "택배 발송분" : "현장 수령분";
+          const connectedRole = isChild ? "현장 수령분" : "택배 발송분";
+          return (
+            <JmCard>
+              <JmCardHeader>
+                <div className="flex items-center gap-2">
+                  <Package className="size-4 text-[var(--jm-text-muted)]" />
+                  <JmCardTitle>연결 주문 · 분할 출고</JmCardTitle>
+                </div>
+              </JmCardHeader>
+              <JmCardContent>
+                {/* 이 주문이 둘 중 무엇인지 — 헷갈림 방지 */}
+                <div className="mb-2 flex items-center gap-1.5 text-jm-xs">
+                  <span className="text-[var(--jm-text-muted)]">이 주문은</span>
+                  <JmBadge variant="default" size="sm" shape="square">
+                    {currentRole}
+                  </JmBadge>
+                </div>
+                <div className="space-y-1.5">
+                  {connected.map((o) => (
+                    <ConnectedOrderRow key={o.id} order={o} roleLabel={connectedRole} />
+                  ))}
+                </div>
+              </JmCardContent>
+            </JmCard>
+          );
+        })()}
 
         <JmCard>
           <JmCardHeader>
@@ -3425,4 +3434,74 @@ function paymentLabel(method: string): string {
     default:
       return method;
   }
+}
+
+/**
+ * 분할 출고 연결 주문 행 — 누르면 그 자리에서 품목·합계 펼쳐보기(페이지 이동 없음).
+ * [전체 보기] 만 client-side 로 해당 주문 상세로 전환(새로고침 없음).
+ */
+function ConnectedOrderRow({
+  order,
+  roleLabel,
+}: {
+  order: SplitLinkedOrder;
+  roleLabel: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--jm-border)]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-2.5 py-2 text-left text-jm-xs hover:bg-[var(--jm-surface-muted)]"
+      >
+        <span className="font-semibold text-[var(--jm-text)]">{roleLabel}</span>
+        <span className="font-mono text-[var(--jm-text-muted)]">{order.orderNo}</span>
+        <JmBadge variant="outline" size="sm" shape="square">
+          {STATUS_LABELS[order.status]}
+        </JmBadge>
+        <ChevronDown
+          className={`ml-auto size-4 shrink-0 text-[var(--jm-text-muted)] transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="border-t border-[var(--jm-border)] bg-[var(--jm-surface-muted)]/40 px-2.5 py-2">
+          <div className="space-y-1">
+            {order.items.map((it) => (
+              <div
+                key={it.id}
+                className="flex items-center justify-between gap-2 text-jm-2xs"
+              >
+                <span className="line-clamp-1 text-[var(--jm-text)]">
+                  {it.product?.name ?? it.serviceName ?? "—"}
+                  <span className="ml-1 text-[var(--jm-text-muted)]">
+                    ×{Number(it.quantity)}
+                  </span>
+                </span>
+                <span className="shrink-0 font-medium tabular-nums text-[var(--jm-text)]">
+                  ₩{Number(it.totalPrice).toLocaleString("ko-KR")}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-1.5 flex items-center justify-between border-t border-[var(--jm-border)] pt-1.5">
+            <span className="text-jm-2xs text-[var(--jm-text-muted)]">합계</span>
+            <span className="text-jm-xs font-semibold tabular-nums text-[var(--jm-text)]">
+              ₩{Number(order.totalAmount).toLocaleString("ko-KR")}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push(`/orders?id=${order.id}`)}
+            className="mt-1.5 w-full rounded-lg border border-[var(--jm-border)] py-1.5 text-jm-2xs font-medium text-[var(--jm-action)] hover:bg-[var(--jm-surface)]"
+          >
+            전체 보기 →
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }

@@ -547,7 +547,7 @@ function Body({
           }
         } catch {
           // B 실패 — A 는 완료됨. 워크보드 수동 등록 안내.
-          toast.warning("택배 백오더 등록 실패", {
+          toast.warning("택배 발송분 등록 실패", {
             description: `나중 배송 ${laterItems.length}건 — 주문 워크보드에서 수동 등록하세요`,
             duration: 9000,
           });
@@ -568,7 +568,7 @@ function Body({
       } else {
         toast.success(`결제 완료 — ${data.no}`, {
           description: data.splitOrderNo
-            ? `택배 백오더 ${data.splitOrderNo} 함께 등록 (워크보드에서 발송)`
+            ? `택배 발송분 ${data.splitOrderNo} 함께 등록 (워크보드에서 발송)`
             : undefined,
         });
       }
@@ -826,8 +826,8 @@ function Body({
                 분할 출고 — 2개 주문으로 등록됩니다
               </span>
               <span className="text-jm-2xs text-[var(--jm-text-muted)]">
-                지금 {nowItems.length}건(매장수령/지금 결제) + 택배 백오더{" "}
-                {laterItems.length}건. 백오더는 미차감 PENDING 으로 워크보드에서
+                현장 수령분 {nowItems.length}건(매장수령/지금 결제) + 택배 발송분{" "}
+                {laterItems.length}건. 택배 발송분은 미차감 PENDING 으로 워크보드에서
                 입고/직출고 후 발송하세요.
               </span>
             </div>

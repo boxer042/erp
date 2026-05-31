@@ -125,5 +125,15 @@ test.describe("분할 출고 — 2주문 링크 + 증빙 그룹", () => {
     expect(groupTotal).toBe(
       Number(groupOrders[0].totalAmount) + Number(groupOrders[1].totalAmount),
     ); // 합계 = Σ (주문별 자체 결제라 단순 합)
+
+    // 연결 주문 "펼쳐보기" 데이터 — 상세 API 가 splitChildren 에 품목 + 합계 포함
+    const detailRes = await page.request.get(`/api/orders/${a.id}`);
+    expect(detailRes.ok()).toBeTruthy();
+    const detail = (await detailRes.json()) as {
+      splitChildren?: Array<{ totalAmount: string; items: Array<unknown> }>;
+    };
+    expect(detail.splitChildren?.length).toBe(1); // A 상세에서 B 가 연결 주문
+    expect(detail.splitChildren?.[0]?.items.length).toBe(1); // 펼쳐보기용 B 품목
+    expect(Number(detail.splitChildren?.[0]?.totalAmount)).toBeGreaterThan(0);
   });
 });

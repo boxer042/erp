@@ -555,7 +555,7 @@ export default function NewOrderPage() {
       const hasLabels = data.labelCodes.length > 0;
       toast.success(
         data.splitOrderNo
-          ? `분할 등록 — 지금 ${data.orderNo} + 택배 백오더 ${data.splitOrderNo}` +
+          ? `분할 등록 — 현장 수령분 ${data.orderNo} + 택배 발송분 ${data.splitOrderNo}` +
               (hasLabels ? ` · 라벨 ${data.labelCodes.length}개 발번` : "")
           : `주문이 등록되었습니다 — ${data.orderNo}` +
               (isInStoreSale ? " (매장판매 · 즉시 종결)" : "") +
@@ -887,8 +887,8 @@ export default function NewOrderPage() {
                         지금(
                         {FULFILLMENT_OPTIONS.find((o) => o.value === fulfillmentType)
                           ?.label ?? "매장"}
-                        ) {nowItems.length}건 + 택배 백오더 {laterItems.length}건.
-                        백오더는 미차감 PENDING 으로 워크보드에서 입고/직출고 후
+                        ) {nowItems.length}건 + 택배 발송분 {laterItems.length}건.
+                        택배 발송분은 미차감 PENDING 으로 워크보드에서 입고/직출고 후
                         발송하세요.
                       </span>
                     </div>

@@ -166,13 +166,25 @@ export async function GET(
           claimReason: true,
         },
       },
-      // 분할 출고 — 이 주문이 백오더(B)면 대표(A) 참조, 대표(A)면 백오더(B) 목록 (docs/SPLIT_FULFILLMENT.md)
+      // 분할 출고 — 이 주문이 택배 발송분이면 현장 수령분(부모) 참조, 현장 수령분이면 택배 발송분(자식) 목록.
+      // 상세 시트의 "연결 주문" 펼쳐보기용으로 품목 요약 + 합계까지 포함 (docs/SPLIT_FULFILLMENT.md)
       splitParent: {
         select: {
           id: true,
           orderNo: true,
           status: true,
           fulfillmentType: true,
+          totalAmount: true,
+          items: {
+            select: {
+              id: true,
+              quantity: true,
+              unitPrice: true,
+              totalPrice: true,
+              serviceName: true,
+              product: { select: { name: true, sku: true } },
+            },
+          },
         },
       },
       splitChildren: {
@@ -181,6 +193,17 @@ export async function GET(
           orderNo: true,
           status: true,
           fulfillmentType: true,
+          totalAmount: true,
+          items: {
+            select: {
+              id: true,
+              quantity: true,
+              unitPrice: true,
+              totalPrice: true,
+              serviceName: true,
+              product: { select: { name: true, sku: true } },
+            },
+          },
         },
       },
       items: {
