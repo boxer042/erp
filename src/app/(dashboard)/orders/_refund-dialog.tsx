@@ -39,7 +39,14 @@ import { queryKeys } from "@/lib/query-keys";
 import { formatComma, parseComma } from "@/lib/utils";
 import { focusCaretEnd } from "@/jm/lib/focus";
 
-import type { OrderPaymentStatus } from "./_types";
+import type { OrderPaymentStatus, OrderStatus } from "./_types";
+
+/** cascade 취소 가능한 연결 주문(택배 발송분) 상태 — 미출고 단계만 */
+const CANCELLABLE_STATUSES: OrderStatus[] = [
+  "PENDING",
+  "PREPARING",
+  "PREPARING_PACKED",
+];
 
 export type CustomerRefundMethod =
   | "CARD_CANCEL"
@@ -93,6 +100,13 @@ export interface RefundDialogOrder {
     refundedAmount: string;
     product: { name: string } | null;
   }>;
+  /** 분할 출고 — 이 주문(현장 수령분)에 묶인 택배 발송분(들). 함께 취소 cascade 용. */
+  splitChildren?: Array<{
+    id: string;
+    orderNo: string;
+    status: OrderStatus;
+    totalAmount: string;
+  }>;
 }
 
 interface Props {
@@ -119,6 +133,11 @@ export function RefundDialog({
   const [refundMethod, setRefundMethod] = useState<CustomerRefundMethod>("CARD_CANCEL");
   const [refundMemo, setRefundMemo] = useState("");
   const [refundedAtDate, setRefundedAtDate] = useState(todayIsoDate());
+  // 분할 출고 — 연결된 택배 발송분(미출고)도 함께 취소할지 (전체 반품 시 옵션)
+  const [cascadeCancel, setCascadeCancel] = useState(false);
+  const cancellableChildren = (order.splitChildren ?? []).filter((c) =>
+    CANCELLABLE_STATUSES.includes(c.status),
+  );
 
   // 진입 / 모드 변경 / order 변경 시 — 환불 금액·방법·메모·일자 자동 채움 (이후 사용자 수정 가능)
   const ctxKey = `${open ? "1" : "0"}|${mode}|${order.id}`;
@@ -180,15 +199,40 @@ export function RefundDialog({
       toast.error(err instanceof ApiError ? err.message : "처리 실패"),
   });
 
-  // 전체 환불 — refundInput 동봉
+  // 전체 환불 — refundInput 동봉. cascade 면 연결된 택배 발송분(미출고)도 함께 취소.
   const fullRefundMutation = useMutation({
-    mutationFn: (input: { refundInput?: RefundInput }) =>
-      apiMutate(`/api/orders/${order.id}`, "PUT", {
+    mutationFn: async (input: { refundInput?: RefundInput; cascade?: boolean }) => {
+      // 1) 현장 수령분(이 주문) 전체 반품
+      await apiMutate(`/api/orders/${order.id}`, "PUT", {
         action: "refund",
         ...(input.refundInput ? { refundInput: input.refundInput } : {}),
-      }),
-    onSuccess: () => {
-      toast.success("반품완료 — 재고 복원·환불 처리");
+      });
+      // 2) 연결된 택배 발송분 cascade 취소 — 각자 자기 금액으로 환불 기록(주문별 자체 결제)
+      let cancelledCount = 0;
+      if (input.cascade) {
+        for (const child of cancellableChildren) {
+          await apiMutate(`/api/orders/${child.id}`, "PUT", {
+            action: "cancel",
+            ...(input.refundInput
+              ? {
+                  refundInput: {
+                    ...input.refundInput,
+                    amount: Number(child.totalAmount),
+                  },
+                }
+              : {}),
+          });
+          cancelledCount++;
+        }
+      }
+      return { cancelledCount };
+    },
+    onSuccess: (res) => {
+      toast.success(
+        res.cancelledCount > 0
+          ? `반품완료 — 재고·환불 처리 + 택배 발송분 ${res.cancelledCount}건 취소`
+          : "반품완료 — 재고 복원·환불 처리",
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
@@ -226,13 +270,16 @@ export function RefundDialog({
     }
 
     if (mode === "full") {
+      const willCascade = cascadeCancel && cancellableChildren.length > 0;
       if (
         !confirm(
-          "전체 반품 처리합니다. 모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.",
+          willCascade
+            ? `전체 반품 + 연결된 택배 발송분 ${cancellableChildren.length}건 취소를 진행합니다.\n모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.`
+            : "전체 반품 처리합니다. 모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.",
         )
       )
         return;
-      fullRefundMutation.mutate({ refundInput });
+      fullRefundMutation.mutate({ refundInput, cascade: willCascade });
     } else {
       const partials: Array<{ orderItemId: string; returnQty: number }> = [];
       for (const [itemId, qtyStr] of Object.entries(partialReturns)) {
@@ -346,6 +393,29 @@ export function RefundDialog({
                   })}
               </div>
             </div>
+          )}
+
+          {/* 분할 출고 — 연결된 택배 발송분(미출고) 함께 취소 (전체 반품 시만) */}
+          {mode === "full" && cancellableChildren.length > 0 && (
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-[var(--jm-warning-solid)]/30 bg-[var(--jm-warning-bg)] p-3">
+              <input
+                type="checkbox"
+                checked={cascadeCancel}
+                onChange={(e) => setCascadeCancel(e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--jm-action)]"
+              />
+              <span className="text-jm-xs text-[var(--jm-text)]">
+                연결된{" "}
+                <span className="font-semibold">
+                  택배 발송분 {cancellableChildren.length}건
+                </span>
+                도 함께 취소
+                <span className="mt-0.5 block text-jm-2xs text-[var(--jm-text-muted)]">
+                  {cancellableChildren.map((c) => c.orderNo).join(", ")} · 아직
+                  미출고라 취소·환불 처리됩니다 (별도 환불 기록)
+                </span>
+              </span>
+            </label>
           )}
 
           {wasPaid && (

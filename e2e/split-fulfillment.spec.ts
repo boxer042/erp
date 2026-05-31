@@ -135,5 +135,17 @@ test.describe("분할 출고 — 2주문 링크 + 증빙 그룹", () => {
     expect(detail.splitChildren?.length).toBe(1); // A 상세에서 B 가 연결 주문
     expect(detail.splitChildren?.[0]?.items.length).toBe(1); // 펼쳐보기용 B 품목
     expect(Number(detail.splitChildren?.[0]?.totalAmount)).toBeGreaterThan(0);
+
+    // 그룹 반품 cascade 의 B-side — 택배 발송분(미출고 PENDING)을 취소하면 CANCELLED.
+    // (RefundDialog 의 "함께 취소" 가 A 반품 후 이 동작을 자식마다 호출)
+    const cancelRes = await page.request.put(`/api/orders/${b.id}`, {
+      data: { action: "cancel" },
+    });
+    expect(cancelRes.ok()).toBeTruthy();
+    const bAfter = await prisma.order.findUnique({
+      where: { id: b.id },
+      select: { status: true },
+    });
+    expect(bAfter?.status).toBe("CANCELLED");
   });
 });
