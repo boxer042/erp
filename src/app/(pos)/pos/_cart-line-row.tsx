@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Package } from "lucide-react";
+import { JmSegmentedControl } from "@/jm";
 import { useSessions, type CartItem } from "@/components/pos/sessions-context";
 import { PosLineItemRow } from "@/components/pos/line-item-row";
 import { PriceInputDialog } from "./_components/price-input-dialog";
@@ -14,6 +15,9 @@ interface Props {
   sessionId: string;
   /** 표시 모드 — net=세전, gross=VAT 포함 (하단 합계 카드에서 토글) */
   display?: "net" | "gross";
+  /** 분할 출고 — 이 라인이 "나중 배송"(택배 백오더) 으로 표시됐는지 (상품 라인만) */
+  later?: boolean;
+  onToggleLater?: () => void;
 }
 
 /**
@@ -23,7 +27,13 @@ interface Props {
  * 변형/옵션 트리거: isCanonical(변형 미확정) 또는 hasProductOptions(옵션 슬롯 보유)일 때.
  * 클릭 시 VariantSelectSheet 가 두 케이스 모두 처리 (variant 섹션 + 옵션 슬롯 섹션).
  */
-export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
+export function CartLineRow({
+  item,
+  sessionId,
+  display = "gross",
+  later = false,
+  onToggleLater,
+}: Props) {
   const { remove, updateQty, updateUnitPrice, applySelections, toggleZeroRate, add } = useSessions();
   const [priceOpen, setPriceOpen] = useState(false);
   const [totalOpen, setTotalOpen] = useState(false);
@@ -32,6 +42,12 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
   // 추가구매 버튼은 메인 product 라인만 (ADDON 자식 라인은 자기 자식 가질 수 없음, 서비스 라인은 무관)
   const showAddonTrigger =
     !item.isAddon && item.itemType === "product" && !!item.productId;
+  // 분할 출고 토글 — 상품 메인 라인만 (수리/임대/서비스/ADDON 제외). 매장에서 수행·인계되는 라인은 비대상.
+  const showLaterToggle =
+    !!onToggleLater &&
+    item.itemType === "product" &&
+    !!item.productId &&
+    !item.isAddon;
 
   const optionSummary =
     item.optionSnapshot && Object.keys(item.optionSnapshot).length > 0
@@ -118,6 +134,11 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
               </span>
             )}
             <div className="mt-0.5 flex flex-wrap items-center gap-1">
+              {later && (
+                <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--jm-warning-bg)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-warning-fg)]">
+                  택배 나중 배송
+                </span>
+              )}
               {item.isAddon && (
                 <span className="inline-flex items-center rounded-full bg-[var(--jm-surface)] px-2 py-0.5 text-jm-3xs font-semibold text-[var(--jm-text-muted)] border border-[var(--jm-border)]">
                   추가구매
@@ -256,6 +277,27 @@ export function CartLineRow({ item, sessionId, display = "gross" }: Props) {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* 분할 출고 — 상품 라인만. "나중 배송" 표시 시 택배 백오더로 분리 결제 */}
+        {showLaterToggle && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-jm-3xs font-medium text-[var(--jm-text-muted)]">
+              출고 시점
+            </span>
+            <JmSegmentedControl
+              size="sm"
+              ariaLabel="출고 시점"
+              value={later ? "later" : "now"}
+              onChange={(v) => {
+                if ((v === "later") !== later) onToggleLater?.();
+              }}
+              options={[
+                { value: "now", label: "지금 받기" },
+                { value: "later", label: "나중 배송" },
+              ]}
+            />
           </div>
         )}
       </PosLineItemRow>

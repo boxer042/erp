@@ -150,6 +150,17 @@ export default function PosV2CustomerPage({
   // 카트/결제 시트 — 모드 무관 페이지 레벨에서 mount (수리 모드에서도 카트 열 수 있어야 함)
   const [cartOpen, setCartOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  // 분할 출고 — "나중 배송"(택배 백오더) 으로 표시한 상품 라인의 cartItemId 들.
+  // 카트 시트(토글)와 결제 시트(분할 등록) 가 형제라 페이지 레벨에서 들고 양쪽에 내림.
+  // 세션 sync 오염을 피해 CartItem 이 아닌 외부 Set 으로 관리 (orders/new 와 동일 정책).
+  const [laterIds, setLaterIds] = useState<Set<string>>(new Set());
+  const toggleLater = (cartItemId: string) =>
+    setLaterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cartItemId)) next.delete(cartItemId);
+      else next.add(cartItemId);
+      return next;
+    });
 
   // URL 의 ?openCart=1 — 외부 진입 (예: 수리관리 "결제로 이동") 시 도착 후 자동 카트 오픈.
   // 한 번 처리 후 URL 에서 파라미터 제거 → 새로고침 시 재오픈 방지.
@@ -593,6 +604,8 @@ export default function PosV2CustomerPage({
         open={cartOpen}
         onOpenChange={setCartOpen}
         session={session}
+        laterIds={laterIds}
+        onToggleLater={toggleLater}
         onCheckout={() => setPaymentOpen(true)}
         onPrintLabels={(codes) => {
           setPrintQueue([{ kind: "labels", codes }]);
@@ -603,12 +616,14 @@ export default function PosV2CustomerPage({
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
         session={session}
+        laterIds={laterIds}
         onPaymentSuccess={(info) => {
           // 1) 출력 선택 다이얼로그 띄움 (큐는 다이얼로그에서 결정)
           setPaymentResult(info);
           // 2) 로컬 세션 제거 — 그리드에서 즉시 사라짐. 서버는 PaymentSheet 가 await fetch 로 이미 삭제.
           //    인쇄 모달은 session 가드 밖에서 렌더되므로 unmount 되지 않음.
           removeSession(sid);
+          setLaterIds(new Set()); // 분할 표시 초기화
         }}
         onCustomerClick={() => setCustomerActionOpen(true)}
         onCreateCustomer={() => setQuickRegister({ defaultText: "" })}

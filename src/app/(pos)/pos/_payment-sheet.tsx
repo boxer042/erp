@@ -8,7 +8,7 @@ import { JmDatePicker, JmSpinner } from "@/jm";
 import { Building2, ChevronRight, Clock, Pencil, Info, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiMutate } from "@/lib/api-client";
-import { formatComma, parseComma } from "@/lib/utils";
+import { calcDiscountPerUnit, formatComma, genClientId, parseComma } from "@/lib/utils";
 import { useSessions, type CartSession } from "@/components/pos/sessions-context";
 import { calcCartTotals } from "@/components/pos/cart-helpers";
 import { submitCheckout } from "@/components/pos/checkout-submit";
@@ -68,6 +68,8 @@ interface Props {
   onCreateCustomer?: () => void;
   /** 좌상단 뒤로가기 — 부모가 카트 시트로 복귀시킴 */
   onBack?: () => void;
+  /** 분할 출고 — "나중 배송"(택배 백오더) 으로 표시된 상품 라인의 cartItemId Set (부모 페이지 보유) */
+  laterIds?: Set<string>;
 }
 
 /**
@@ -243,6 +245,7 @@ export function PaymentSheet({
   onCustomerClick,
   onCreateCustomer,
   onBack,
+  laterIds,
 }: Props) {
   if (!open) return null;
   return (
@@ -253,6 +256,7 @@ export function PaymentSheet({
       onCustomerClick={onCustomerClick}
       onCreateCustomer={onCreateCustomer}
       onBack={onBack}
+      laterIds={laterIds}
     />
   );
 }
@@ -264,6 +268,7 @@ function Body({
   onCustomerClick,
   onCreateCustomer,
   onBack,
+  laterIds,
 }: Omit<Props, "open">) {
   const { setSessionLabels } = useSessions();
   const [method, setMethod] = useState<PaymentMethod>("CARD");
@@ -314,6 +319,24 @@ function Body({
   const allItems = [...productItems, ...rentalItems, ...repairItems];
   const totals = calcCartTotals({ ...session, items: allItems });
 
+  // 분할 출고 — "나중 배송"(택배 백오더) 으로 표시한 상품 라인 partition.
+  // A(매장수령/대표) = 지금 받기 상품 + 임대 + 수리(자산 인계·기기 인계가 매장 필수).
+  // B(택배 백오더) = 나중 배송 상품(상품만). 양쪽 모두 비어있지 않을 때만 분할.
+  const laterProductItems = productItems.filter(
+    (i) => laterIds?.has(i.cartItemId) ?? false,
+  );
+  const nowProductItems = productItems.filter(
+    (i) => !(laterIds?.has(i.cartItemId) ?? false),
+  );
+  const nowItems = [...nowProductItems, ...rentalItems, ...repairItems];
+  const laterItems = laterProductItems;
+  const isSplit = laterItems.length > 0 && nowItems.length > 0;
+  // 부분 결제 — 분할과 동시 사용 불가 (주문별 결제 배분이 모호해짐)
+  const isPartialPaymentUI =
+    partial.paidAmount !== null &&
+    partial.paidAmount > 0 &&
+    partial.paidAmount < totals.total;
+
   const hasRentalOrRepair = rentalItems.length > 0 || repairItems.length > 0;
   // 출고 방식 토글 노출 여부 — 임대만 매장 인도 강제 (자산 인계·보증금 정산이 매장에서 일어나야 함).
   // 수리는 배달/택배 허용 (수리 끝난 기기를 손님이 배송으로 받는 케이스가 종종 발생).
@@ -344,6 +367,8 @@ function Body({
         displayName: string;
       }[];
       oversoldLines?: { name: string; deficitQty: number }[];
+      /** 분할 출고 시 생성된 택배 백오더(B) 주문번호 */
+      splitOrderNo?: string;
     },
     Error
   >({
@@ -359,6 +384,9 @@ function Body({
           `변형 미확정 라인 ${unresolvedVariants.length}건 — 카트에서 먼저 변형을 선택하세요`,
         );
       }
+      if (isSplit && isPartialPaymentUI) {
+        throw new Error("분할 출고는 전액 결제만 지원합니다 (부분 결제 해제 후 진행)");
+      }
       if (needsShippingInfo) {
         if (!shippingAddress.trim()) {
           throw new Error("배송지를 입력해주세요");
@@ -368,24 +396,14 @@ function Body({
         }
       }
 
-      // 1) 라벨 자동 발번 — 상품(trackable) + 수리. API 가 신규/기존 자동 분기:
-      //    · 시리얼 미발번 수리 → 신규 발번 (newlyIssued: true) → labelCodes 에 포함
-      //    · 시리얼 이미 있는 수리 → 신규 발번 안 함, 기존 코드 반환 (newlyIssued: false)
-      //      → reprintCandidates 에 모아 결제 후 다이얼로그에서 "재출력 포함" 옵션 노출
-      let labelCodes: string[] = [];
-      let reprintCandidates: {
-        code: string;
-        ticketNo: string;
-        displayName: string;
-      }[] = [];
-      const trackableCandidates = productItems
-        .filter((i) => i.productId)
-        .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) }));
-      const repairTicketIds = repairItems
-        .map((i) => i.repairMeta?.repairTicketId)
-        .filter((v): v is string => !!v);
-
-      if (trackableCandidates.length > 0 || repairTicketIds.length > 0) {
+      // 시리얼 라벨 발번 헬퍼 — best-effort. 신규 발번 코드 + 재출력 후보(기존 시리얼 수리) 반환.
+      const issueLabels = async (
+        cands: { productId: string; quantity: number }[],
+        ticketIds: string[],
+      ) => {
+        if (cands.length === 0 && ticketIds.length === 0) {
+          return { newCodes: [] as string[], reprint: [] as typeof reprintCandidates };
+        }
         try {
           const res = await apiMutate<{
             labels: {
@@ -394,35 +412,53 @@ function Body({
               ticketNo: string | null;
               displayName: string;
             }[];
-          }>(
-            "/api/serial-items/issue",
-            "POST",
-            {
-              customerId: session.customerId ?? null,
-              productItems: trackableCandidates,
-              repairTicketIds,
-            },
-          );
-          labelCodes = res.labels.filter((l) => l.newlyIssued).map((l) => l.code);
-          reprintCandidates = res.labels
-            .filter((l) => !l.newlyIssued && l.ticketNo)
-            .map((l) => ({
-              code: l.code,
-              ticketNo: l.ticketNo as string,
-              displayName: l.displayName,
-            }));
-          if (labelCodes.length > 0) {
-            setSessionLabels(labelCodes, session.id, session.id);
-          }
+          }>("/api/serial-items/issue", "POST", {
+            customerId: session.customerId ?? null,
+            productItems: cands,
+            repairTicketIds: ticketIds,
+          });
+          return {
+            newCodes: res.labels.filter((l) => l.newlyIssued).map((l) => l.code),
+            reprint: res.labels
+              .filter((l) => !l.newlyIssued && l.ticketNo)
+              .map((l) => ({
+                code: l.code,
+                ticketNo: l.ticketNo as string,
+                displayName: l.displayName,
+              })),
+          };
         } catch {
-          // 라벨 실패해도 결제는 진행
+          return { newCodes: [], reprint: [] }; // 라벨 실패해도 결제는 진행
         }
+      };
+
+      // 1) A(매장수령/대표) 라벨 — 지금 받기 상품 + 수리. (분할 아니면 nowProductItems = 전체 상품)
+      let reprintCandidates: {
+        code: string;
+        ticketNo: string;
+        displayName: string;
+      }[] = [];
+      const aTrackable = nowProductItems
+        .filter((i) => i.productId)
+        .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) }));
+      const repairTicketIds = repairItems
+        .map((i) => i.repairMeta?.repairTicketId)
+        .filter((v): v is string => !!v);
+      const aLabels = await issueLabels(aTrackable, repairTicketIds);
+      const labelCodes = aLabels.newCodes;
+      reprintCandidates = aLabels.reprint;
+      if (labelCodes.length > 0) {
+        setSessionLabels(labelCodes, session.id, session.id);
       }
 
-      // 2) 결제 — submitCheckout 가 product/rental/repair 모두 처리 (이미 buildCheckoutPayload 가 분기됨)
-      const sessionForCheckout: CartSession = labelCodes.length
-        ? { ...session, labelCodes, items: allItems }
-        : { ...session, items: allItems };
+      // 2) A 결제 — submitCheckout 가 product/rental/repair 모두 처리.
+      //    분할이면 splitGroupId 부여(대표). nowItems 만 결제 (분할 아니면 nowItems = allItems).
+      const splitGroupId = isSplit ? genClientId() : undefined;
+      const sessionForCheckout: CartSession = {
+        ...session,
+        items: nowItems,
+        ...(labelCodes.length ? { labelCodes } : {}),
+      };
       const result = await submitCheckout(sessionForCheckout, {
         action: "order",
         paymentMethod: method,
@@ -444,8 +480,81 @@ function Body({
             }
           : undefined,
         checkoutAt: paymentAt,
+        splitGroupId,
       });
-      return { ...result, labelCodes, reprintCandidates };
+
+      // 3) B(택배 백오더) — 나중 배송 상품을 /api/orders 로 별도 PENDING SHIPPING 주문 생성.
+      //    A 는 이미 완료(결제·세션삭제)되므로 B 실패는 비치명적 — 경고 후 워크보드 수동 등록 유도.
+      //    /api/orders 가 SHIPPING→PENDING 미차감 백오더로 처리(이미 분할 지원). 주문별 자체 결제.
+      let splitOrderNo: string | undefined;
+      if (isSplit) {
+        try {
+          const bLabels = await issueLabels(
+            laterItems
+              .filter((i) => i.productId)
+              .map((i) => ({ productId: i.productId!, quantity: Math.max(1, Math.round(i.quantity)) })),
+            [],
+          );
+          const b = await apiMutate<{ id: string; orderNo: string }>(
+            "/api/orders",
+            "POST",
+            {
+              channelId: null,
+              customerId: session.customerId || undefined,
+              customerName: session.customerName || undefined,
+              customerPhone: session.customerPhone || undefined,
+              recipientName:
+                shippingRecipientName.trim() || session.customerName || undefined,
+              recipientPhone:
+                shippingRecipientPhone.trim() || session.customerPhone || undefined,
+              // 배송지는 매장수령(A=IN_STORE) 케이스면 비어있을 수 있음 → 출고대기에서 입력
+              shippingAddress: shippingAddress.trim() || undefined,
+              orderDate: paymentAt.toISOString(),
+              fulfillmentType: "SHIPPING",
+              paymentMethod: method,
+              taxInvoiceRequested,
+              labelCodes: bLabels.newCodes.length ? bLabels.newCodes : undefined,
+              // B 는 자기 품목 라인 가격만 — 세션 할인/배송비는 A(대표)에 귀속
+              discountAmount: "0",
+              shippingFee: "0",
+              shippingPaymentType: "PREPAID",
+              shippingCostBorne: "0",
+              splitGroupId,
+              splitParentId: result.id,
+              items: laterItems.map((i) => {
+                const discountPerUnit = calcDiscountPerUnit(i.unitPrice, i.discount);
+                const listPrice = i.listPrice ?? i.unitPrice;
+                return {
+                  quantity: String(i.quantity),
+                  // 옵션 가산 포함 단가 — optionValueIds 미전달로 서버 재가산 없음(백오더 단순화)
+                  unitPrice: String(i.unitPrice),
+                  discountPerUnit:
+                    discountPerUnit > 0 ? String(Math.round(discountPerUnit)) : undefined,
+                  listPrice: listPrice > 0 ? String(Math.round(listPrice)) : undefined,
+                  productId: i.productId,
+                  optionValueIds: [],
+                };
+              }),
+            },
+          );
+          splitOrderNo = b.orderNo;
+          if (bLabels.newCodes.length > 0) {
+            setSessionLabels(
+              [...labelCodes, ...bLabels.newCodes],
+              session.id,
+              session.id,
+            );
+          }
+        } catch {
+          // B 실패 — A 는 완료됨. 워크보드 수동 등록 안내.
+          toast.warning("택배 백오더 등록 실패", {
+            description: `나중 배송 ${laterItems.length}건 — 주문 워크보드에서 수동 등록하세요`,
+            duration: 9000,
+          });
+        }
+      }
+
+      return { ...result, labelCodes, reprintCandidates, splitOrderNo };
     },
     onSuccess: async (data) => {
       // 외상 결제는 미수금 자동 등록됐다는 명시적 안내
@@ -457,7 +566,11 @@ function Body({
           duration: 5000,
         });
       } else {
-        toast.success(`결제 완료 — ${data.no}`);
+        toast.success(`결제 완료 — ${data.no}`, {
+          description: data.splitOrderNo
+            ? `택배 백오더 ${data.splitOrderNo} 함께 등록 (워크보드에서 발송)`
+            : undefined,
+        });
       }
       // 적자 출고 경고 — 재고 없이 나간 라인이 있으면 직원에게 명시.
       // 결제는 정상 완료됐지만 시스템 재고가 음수가 됐다는 사후 안내. 실사보정으로 정산 필요.
@@ -477,8 +590,9 @@ function Body({
         try {
           // data.id = 방금 생성된 주문 id — 거래명세표를 주문에 연결해
           // 이후 주문 취소 시 거래명세표도 함께 취소되게 한다.
+          // 분할이면 A(매장수령) 품목만 — 그룹 합산 증빙은 order-statement 인쇄 라우트가 처리.
           const stmt = await issueStatement(
-            { ...session, items: allItems },
+            { ...session, items: isSplit ? nowItems : allItems },
             data.id,
           );
           statementId = stmt.id;
@@ -700,6 +814,23 @@ function Body({
           <div className="flex items-center gap-2 rounded-xl bg-[var(--jm-bg)] px-4 py-3 text-jm-xs text-[var(--jm-text)]">
             <Info className="size-3.5 shrink-0" />
             결제 시 <span className="font-semibold">{session.customerName}</span> 님 미수금에 자동 등록됩니다
+          </div>
+        )}
+
+        {/* 분할 출고 안내 — 카트에서 "나중 배송" 표시한 상품이 섞이면 택배 백오더(B)가 별도 등록됨 */}
+        {isSplit && (
+          <div className="flex items-start gap-2 rounded-2xl border border-[var(--jm-warning-solid)]/30 bg-[var(--jm-warning-bg)] px-3 py-2.5">
+            <span className="mt-0.5 text-jm-sm">📦</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-jm-xs font-semibold text-[var(--jm-warning-fg)]">
+                분할 출고 — 2개 주문으로 등록됩니다
+              </span>
+              <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                지금 {nowItems.length}건(매장수령/지금 결제) + 택배 백오더{" "}
+                {laterItems.length}건. 백오더는 미차감 PENDING 으로 워크보드에서
+                입고/직출고 후 발송하세요.
+              </span>
+            </div>
           </div>
         )}
 

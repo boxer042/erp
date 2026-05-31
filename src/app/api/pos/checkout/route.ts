@@ -125,6 +125,12 @@ interface CheckoutBody {
    * Order.orderDate 로 저장. 모든 ledger date / RECEIPT / customer-payment 와 일관성.
    */
   checkoutAt?: string | null;
+  /**
+   * 분할 출고 — 이 POS 주문(매장수령 A=대표)이 택배 백오더(B, /api/orders 로 별도 생성)와 묶일 때.
+   * 클라이언트가 그룹 UUID 를 생성해 A 에 splitGroupId 만 부여(A 는 대표라 splitParentId=null).
+   * B 는 /api/orders 로 동일 splitGroupId + splitParentId=A.id. docs/SPLIT_FULFILLMENT.md
+   */
+  splitGroupId?: string | null;
 }
 
 function genNo(prefix: string) {
@@ -587,6 +593,8 @@ export async function POST(request: NextRequest) {
           partialPaymentKind,
           taxInvoiceRequested: !!body.taxInvoiceRequested,
           memo: body.memo || null,
+          // 분할 출고 — 매장수령 A=대표. splitGroupId 만 부여(splitParentId=null). 택배 B 는 별도 /api/orders.
+          splitGroupId: body.splitGroupId || null,
           // RepairTicket link 는 N:1 (RepairTicket.orderId) — finalize 블록에서 별도 update.
           rentalId: body.rentalId || null,
           createdById: user.id,

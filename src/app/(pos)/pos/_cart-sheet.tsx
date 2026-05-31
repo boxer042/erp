@@ -33,6 +33,9 @@ interface Props {
    * 카트의 시리얼출력은 결제 전이므로 옵션 미전달 (모달 닫아도 페이지 유지).
    */
   onPrintLabels?: (codes: string[], options?: { afterPayment?: boolean }) => void;
+  /** 분할 출고 — "나중 배송" 표시된 상품 라인의 cartItemId Set (부모 페이지 보유) */
+  laterIds?: Set<string>;
+  onToggleLater?: (cartItemId: string) => void;
 }
 
 /**
@@ -48,7 +51,7 @@ interface Props {
  *
  * 거래명세표는 결제 완료(PaymentSheet onSuccess)에서 자동 발행 — 영수증 성격.
  */
-export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabels }: Props) {
+export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabels, laterIds, onToggleLater }: Props) {
   const router = useRouter();
   const { add, setSessionDiscount, setSessionShipping, setSessionQuotation, setSessionLabels, forceSync } =
     useSessions();
@@ -288,7 +291,15 @@ export function CartSheet({ open, onOpenChange, session, onCheckout, onPrintLabe
             />
           ) : (
             orderedItems.map((it) => (
-              <CartLineRow key={it.cartItemId} item={it} sessionId={session.id} />
+              <CartLineRow
+                key={it.cartItemId}
+                item={it}
+                sessionId={session.id}
+                later={laterIds?.has(it.cartItemId) ?? false}
+                onToggleLater={
+                  onToggleLater ? () => onToggleLater(it.cartItemId) : undefined
+                }
+              />
             ))
           )}
         </div>

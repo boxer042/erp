@@ -39,6 +39,8 @@ export interface CheckoutPayloadOptions {
    * Order.orderDate 로 저장. 미래 시점은 서버에서 거부.
    */
   checkoutAt?: Date;
+  /** 분할 출고 — 매장수령 A(대표)에 부여할 그룹 UUID. 택배 B 는 별도 /api/orders. docs/SPLIT_FULFILLMENT.md */
+  splitGroupId?: string | null;
 }
 
 export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayloadOptions) {
@@ -177,6 +179,8 @@ export function buildCheckoutPayload(session: CartSession, opts: CheckoutPayload
     labelCodes: session.labelCodes ?? [],
     // 결제시간 override — 미지정 시 서버 now() 사용. 영수증 정정 등 사후 입력용.
     checkoutAt: opts.checkoutAt ? opts.checkoutAt.toISOString() : null,
+    // 분할 출고 — 매장수령 A(대표)에 부여할 그룹 UUID (택배 B 는 별도 /api/orders)
+    splitGroupId: opts.action === "order" ? opts.splitGroupId ?? null : null,
   };
 }
 
