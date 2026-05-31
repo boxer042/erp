@@ -137,7 +137,7 @@ export default function RepairTemplatesPage() {
         <JmTabs value={kind} onValueChange={(v) => setKind(v as Kind)}>
           <JmTabsList>
             <JmTabsTrigger value="symptom">증상</JmTabsTrigger>
-            <JmTabsTrigger value="diagnosis">진단</JmTabsTrigger>
+            <JmTabsTrigger value="diagnosis">진단·수리내용</JmTabsTrigger>
           </JmTabsList>
 
           {(["symptom", "diagnosis"] as const).map((k) => (

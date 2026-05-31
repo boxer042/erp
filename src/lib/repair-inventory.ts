@@ -75,9 +75,12 @@ export async function consumeRepairPart(
     });
   }
 
-  const inv = await tx.inventory.update({
+  // 재고 행이 아예 없는 상품(미입고)을 oversell 로 부속 차감하는 경우도 있어 upsert.
+  // ensureBulkStock 이 비-oversell 부족은 이미 차단하므로, 여기 도달하면 음수(적자) 허용 케이스.
+  const inv = await tx.inventory.upsert({
     where: { productId },
-    data: { quantity: { decrement: quantity } },
+    update: { quantity: { decrement: quantity } },
+    create: { productId, quantity: -quantity, safetyStock: 0 },
     select: { id: true, quantity: true },
   });
 
@@ -145,9 +148,11 @@ export async function restoreRepairPart(
 
   await tx.lotConsumption.deleteMany({ where: { repairPartId: partId } });
 
-  const inv = await tx.inventory.update({
+  // 복원 대상 상품의 재고 행이 없을 수도 있어 upsert (적자 정산 등 엣지케이스 방어).
+  const inv = await tx.inventory.upsert({
     where: { productId },
-    data: { quantity: { increment: quantity } },
+    update: { quantity: { increment: quantity } },
+    create: { productId, quantity, safetyStock: 0 },
     select: { id: true, quantity: true },
   });
 

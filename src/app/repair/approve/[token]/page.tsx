@@ -117,7 +117,7 @@ export default function ApprovePage() {
           ) : null}
           {data.diagnosis ? (
             <div>
-              <div className="text-jm-xs text-[var(--jm-text-muted)]">진단</div>
+              <div className="text-jm-xs text-[var(--jm-text-muted)]">진단·수리내용</div>
               <div className="text-jm-sm whitespace-pre-wrap text-[var(--jm-text)]">{data.diagnosis}</div>
             </div>
           ) : null}
