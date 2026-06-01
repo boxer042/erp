@@ -36,6 +36,7 @@ import {
 } from "../_types";
 import { calcFinal, nextActions, fmtKRW, fmtKRWInc, fmtKRWTax } from "../_helpers";
 import { StatusStepperBar } from "../_stepper";
+import { CustomerChip } from "../../_components/customer-chip";
 import { PartsSection } from "../_parts-section";
 import { LaborsSection } from "../_labors-section";
 import { PickupSheet } from "../_pickup-sheet";
@@ -257,9 +258,7 @@ export function RepairDetail({
                   </span>
                 )}
               </div>
-              {/* 손님 · 기기 — 한 줄에 정체성 즉시 표시 (스크롤 없이 누구의 무슨 작업인지) */}
-              <HeaderIdentitySubtitle ticket={t} />
-              {/* 진행률 stepper — 현재 단계 시각화 */}
+              {/* 진행률 stepper — 현재 단계 시각화 (customer 통일 헤더와 동일) */}
               {t.status !== "CANCELLED" && (
                 <StatusStepperBar status={t.status} type={t.type} />
               )}
@@ -273,6 +272,12 @@ export function RepairDetail({
             >
               <FileText className="size-4" />
             </JmIconButton>
+            {/* 고객 — customer 통일 헤더와 동일한 CustomerChip (등록이면 표시만, 미등록이면 클릭→연결) */}
+            <CustomerChip
+              name={t.customer?.name ?? null}
+              phone={t.customer?.phone}
+              onClick={onCustomerClick}
+            />
           </div>
         </header>
       )}
@@ -733,29 +738,6 @@ function DiagnosisFeeCard({
 // ──── 참조 정보 섹션 — 시리얼 이력 + 재수리. 보조 정보라 접힘 기본 ────
 
 
-// ──── 헤더 보조 줄 — 손님 · 기기 한 줄로 정체성 표시 ────
-function HeaderIdentitySubtitle({ ticket }: { ticket: RepairTicketDetail }) {
-  const customerName = ticket.customer?.name ?? "미등록 손님";
-  const deviceName =
-    ticket.serialItem?.product?.name ??
-    ticket.serialItem?.displayName ??
-    ticket.repairProduct?.name ??
-    ticket.repairProductText ??
-    null;
-  return (
-    <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-jm-xs text-[var(--jm-text-muted)]">
-      <span className="line-clamp-1 font-medium text-[var(--jm-text)]">
-        {customerName}
-      </span>
-      {deviceName && (
-        <>
-          <span className="text-[var(--jm-text-disabled)]">·</span>
-          <span className="line-clamp-1">{deviceName}</span>
-        </>
-      )}
-    </div>
-  );
-}
 
 // 미사용 import 정리 — 파일 외부에서 참조될 수 있도록 export 만 한 줄
 export type { RepairPart, RepairLabor };

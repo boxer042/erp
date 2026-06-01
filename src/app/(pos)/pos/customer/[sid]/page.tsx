@@ -10,7 +10,6 @@ import {
   Menu,
   ShoppingCart,
   ChevronLeft,
-  Building2,
   Search,
   X,
   Printer,
@@ -42,6 +41,7 @@ import { ProductDetailView, type LandingResponse } from "../../_product-detail-v
 import { RepairDetail } from "@/app/(pos)/pos/repairs/[id]/page";
 import { RepairTicketActionMenu } from "@/app/(pos)/pos/repairs/[id]/_repair-action-menu";
 import { StatusStepperBar } from "@/app/(pos)/pos/repairs/_stepper";
+import { CustomerChip } from "../../_components/customer-chip";
 import { type RepairTicketDetail } from "@/app/(pos)/pos/repairs/_types";
 
 type Mode = "product" | "repair" | "rental";
@@ -296,59 +296,15 @@ export default function PosV2CustomerPage({
                   <ProductHeader productId={detail.id} />
                 )}
               </div>
-              <button
-                type="button"
+              <CustomerChip
                 onClick={() => setCustomerActionOpen(true)}
-                className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
-                aria-label="고객"
-              >
-                {isRegistered ? (
-                  <>
-                    {session.customerType === "BUSINESS" ? (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
-                        <Building2 className="size-5" />
-                      </div>
-                    ) : (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-md font-bold text-[var(--jm-text)]">
-                        {(session.customerName ?? "?").charAt(0)}
-                      </div>
-                    )}
-                    <div className="flex min-w-0 max-w-[140px] flex-col">
-                      <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
-                        {session.customerName}
-                      </span>
-                      {session.customerType === "BUSINESS" &&
-                      session.customerBusinessNumber ? (
-                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
-                          {session.customerBusinessNumber}
-                        </span>
-                      ) : session.customerPhone ? (
-                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
-                          {session.customerPhone}
-                        </span>
-                      ) : null}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
-                    >
-                      <span className="font-mono text-jm-xs font-bold tracking-wider">
-                        {code}
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-col">
-                      <span className="text-jm-base font-semibold text-[var(--jm-text)]">
-                        미등록 고객
-                      </span>
-                      <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
-                        #{code}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </button>
+                name={isRegistered ? session.customerName : null}
+                type={session.customerType}
+                businessNumber={session.customerBusinessNumber}
+                phone={session.customerPhone}
+                unregisteredCode={code}
+                unregisteredPaletteBg={palette.bg}
+              />
             </>
           ) : (
             // 일반 모드 — 좌측: 모드 타이틀, (상품모드일 땐 중앙: 검색창), 우측: 고객
@@ -385,59 +341,15 @@ export default function PosV2CustomerPage({
               ) : (
                 <div className="min-w-0 flex-1" />
               )}
-              <button
-                type="button"
+              <CustomerChip
                 onClick={() => setCustomerActionOpen(true)}
-                className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 text-left transition-colors hover:bg-[var(--jm-bg)] active:bg-[var(--jm-surface-muted)]"
-                aria-label="고객"
-              >
-                {isRegistered ? (
-                  <>
-                    {session.customerType === "BUSINESS" ? (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-warning-bg)] text-[var(--jm-warning-fg)]">
-                        <Building2 className="size-5" />
-                      </div>
-                    ) : (
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--jm-surface-muted)] text-jm-md font-bold text-[var(--jm-text)]">
-                        {(session.customerName ?? "?").charAt(0)}
-                      </div>
-                    )}
-                    <div className="flex min-w-0 max-w-[140px] flex-col">
-                      <span className="line-clamp-1 text-jm-base font-semibold text-[var(--jm-text)]">
-                        {session.customerName}
-                      </span>
-                      {session.customerType === "BUSINESS" &&
-                      session.customerBusinessNumber ? (
-                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
-                          {session.customerBusinessNumber}
-                        </span>
-                      ) : session.customerPhone ? (
-                        <span className="line-clamp-1 font-mono text-jm-2xs text-[var(--jm-text-muted)]">
-                          {session.customerPhone}
-                        </span>
-                      ) : null}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white ${palette.bg}`}
-                    >
-                      <span className="font-mono text-jm-xs font-bold tracking-wider">
-                        {code}
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-col">
-                      <span className="text-jm-base font-semibold text-[var(--jm-text)]">
-                        미등록 고객
-                      </span>
-                      <span className="font-mono text-jm-2xs text-[var(--jm-text-muted)]">
-                        #{code}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </button>
+                name={isRegistered ? session.customerName : null}
+                type={session.customerType}
+                businessNumber={session.customerBusinessNumber}
+                phone={session.customerPhone}
+                unregisteredCode={code}
+                unregisteredPaletteBg={palette.bg}
+              />
             </>
           )}
         </div>
