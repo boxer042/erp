@@ -24,6 +24,7 @@ export interface Incoming {
   paymentStatus: "UNPAID" | "PAID";
   incomingDate: string;
   totalAmount: string;
+  isDropship?: boolean;
   memo: string | null;
   supplier: { name: string };
   createdBy: { name: string };

@@ -154,6 +154,7 @@ interface OrderDetail {
   status: OrderStatus;
   fulfillmentType: FulfillmentType;
   procurementMode: "RESTOCK" | "DROPSHIP" | null;
+  dropshipIncoming?: { id: string; incomingNo: string; isDropship: boolean } | null;
   expectedShipDate: string | null;
   customerId: string | null;
   customer: { id: string; name: string } | null;
@@ -2352,6 +2353,21 @@ function ReadView({
                     { value: "DROPSHIP", label: "거래처 직출고" },
                   ]}
                 />
+                {/* 직출고 처리로 생성된 직송 입고 링크 — 추적용 (③b) */}
+                {order.dropshipIncoming && (
+                  <div className="flex items-center gap-1.5 text-jm-xs">
+                    <span className="text-[var(--jm-text-muted)]">직송 입고 →</span>
+                    <a
+                      href="/inventory/incoming"
+                      className="font-mono text-[var(--jm-action)] underline-offset-2 hover:underline"
+                    >
+                      {order.dropshipIncoming.incomingNo}
+                    </a>
+                    <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                      (거래처 매입·재고 미반영)
+                    </span>
+                  </div>
+                )}
               </div>
             </JmCardContent>
           </JmCard>

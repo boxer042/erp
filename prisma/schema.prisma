@@ -1122,6 +1122,8 @@ model Incoming {
 
   items          IncomingItem[]
   supplierReturn SupplierReturn?
+  // 거래처 직출고 자동 처리로 이 직송 입고와 연결된 주문(택배 발송분) (③b)
+  dropshipOrders Order[]         @relation("OrderDropship")
 
   @@index([supplierId, incomingDate])
   @@index([supplierId, paymentStatus, incomingDate])
@@ -1523,6 +1525,7 @@ model Order {
    */
   procurementMode     ProcurementMode?    @map("procurement_mode")
   dropshipIncomingId  String?             @map("dropship_incoming_id")
+  dropshipIncoming    Incoming?           @relation("OrderDropship", fields: [dropshipIncomingId], references: [id])
   /**
    * 클레임 메모 — 손님 자유 사유 + 매장 처리 메모 (claimReason enum 외 보충)
    */

@@ -206,6 +206,10 @@ export async function GET(
           },
         },
       },
+      // 거래처 직출고 자동 처리로 연결된 직송 입고 (③b) — 상세에서 링크 표시
+      dropshipIncoming: {
+        select: { id: true, incomingNo: true, isDropship: true },
+      },
       items: {
         include: {
           product: {

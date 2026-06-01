@@ -1085,6 +1085,9 @@ function IncomingPageInner() {
                               {inc.status === "CONFIRMED" && inc.paymentStatus === "PAID" && (
                                 <JmBadge variant="success" size="sm" shape="square">결제완료</JmBadge>
                               )}
+                              {inc.isDropship && (
+                                <JmBadge variant="outline" size="sm" shape="square">거래처 직송</JmBadge>
+                              )}
                               <JmBadge variant={statusJmVariants[inc.status]} size="sm" shape="square">{statusLabels[inc.status]}</JmBadge>
                             </div>
                           </div>

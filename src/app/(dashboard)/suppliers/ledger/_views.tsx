@@ -139,6 +139,12 @@ export function ItemsView({
                     <JmTableCell className="px-3 py-2.5 text-[var(--jm-text-muted)] truncate">
                       <span className="inline-flex items-center gap-1.5">
                         {p.description}
+                        {/* 직송 매입 — 거래처가 손님에게 직접 발송한 건(재고 미반영) 명시 */}
+                        {p.type === "PURCHASE" && p.description?.includes("직송") && (
+                          <JmBadge variant="outline" size="sm" shape="square">
+                            거래처 직송
+                          </JmBadge>
+                        )}
                         {p.paymentKind && p.paymentKind !== "MIXED" && (
                           <JmBadge variant="warning" size="sm" shape="square">
                             {PAYMENT_KIND_LABELS[p.paymentKind]}

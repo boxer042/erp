@@ -1291,7 +1291,7 @@ export async function PUT(
           supplierId: incoming.supplierId,
           date: incoming.incomingDate,
           type: "PURCHASE",
-          description: `입고 ${incoming.incomingNo}`,
+          description: `${incoming.isDropship ? "직송 입고" : "입고"} ${incoming.incomingNo}`,
           debitAmount: totalWithTax,
           creditAmount: 0,
           balance: newBalance,
