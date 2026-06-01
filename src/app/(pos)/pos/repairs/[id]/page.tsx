@@ -35,6 +35,7 @@ import {
   type RepairTicketRow,
 } from "../_types";
 import { calcFinal, nextActions, fmtKRW, fmtKRWInc, fmtKRWTax } from "../_helpers";
+import { StatusStepperBar } from "../_stepper";
 import { PartsSection } from "../_parts-section";
 import { LaborsSection } from "../_labors-section";
 import { PickupSheet } from "../_pickup-sheet";
@@ -731,91 +732,6 @@ function DiagnosisFeeCard({
 
 // ──── 참조 정보 섹션 — 시리얼 이력 + 재수리. 보조 정보라 접힘 기본 ────
 
-// ──── 상태 진행률 — 헤더에 표시. 단계 dot + 라벨 + 현재 위치 (n/m) ────
-// ON_SITE: RECEIVED → REPAIRING → READY → PICKED_UP (4단계, 진단/견적/승인 생략)
-// DROP_OFF: RECEIVED → DIAGNOSING → QUOTED → APPROVED → REPAIRING → READY → PICKED_UP (7단계)
-const STEPPER_LABELS: Record<string, string> = {
-  RECEIVED: "접수",
-  DIAGNOSING: "진단",
-  QUOTED: "견적",
-  APPROVED: "승인",
-  REPAIRING: "수리중",
-  READY: "완료",
-  PICKED_UP: "픽업",
-};
-
-function StatusStepperBar({
-  status,
-  type,
-}: {
-  status: RepairTicketDetail["status"];
-  type: RepairTicketDetail["type"];
-}) {
-  const steps: string[] =
-    type === "ON_SITE"
-      ? ["RECEIVED", "REPAIRING", "READY", "PICKED_UP"]
-      : [
-          "RECEIVED",
-          "DIAGNOSING",
-          "QUOTED",
-          "APPROVED",
-          "REPAIRING",
-          "READY",
-          "PICKED_UP",
-        ];
-
-  const currentIndex = steps.indexOf(status);
-  const activeIdx = Math.max(0, currentIndex);
-  const currentLabel = STEPPER_LABELS[status] ?? status;
-
-  return (
-    <div className="mt-1.5 flex flex-col gap-1">
-      {/* 점 + 연결선 — 각 단계별로 dot 표시. 현재 단계는 강조 (큰 원 + 보라) */}
-      <div className="flex items-center">
-        {steps.map((s, i) => {
-          const done = i < activeIdx;
-          const active = i === activeIdx;
-          const isLast = i === steps.length - 1;
-          return (
-            <div
-              key={s}
-              className={isLast ? "flex shrink-0 items-center" : "flex flex-1 items-center"}
-            >
-              {/* dot */}
-              <span
-                aria-label={s}
-                className={`shrink-0 rounded-full transition-all ${
-                  active
-                    ? "size-2.5 bg-[var(--jm-action)] ring-2 ring-[var(--jm-action)]/30"
-                    : done
-                      ? "size-2 bg-[var(--jm-action)]"
-                      : "size-2 bg-[var(--jm-border)]"
-                }`}
-              />
-              {/* 연결선 (마지막 단계 제외) */}
-              {!isLast && (
-                <span
-                  className={`h-0.5 flex-1 transition-colors ${
-                    done || active ? "bg-[var(--jm-action)]" : "bg-[var(--jm-border)]"
-                  }`}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {/* 현재 단계 라벨 + 진행률 (n/m) */}
-      <div className="flex items-baseline justify-between gap-2 text-jm-2xs">
-        <span className="font-medium text-[var(--jm-action)]">
-          {currentLabel}
-        </span>
-        <span className="text-[var(--jm-text-subtle)]">
-          {activeIdx + 1}/{steps.length}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 // ──── 헤더 보조 줄 — 손님 · 기기 한 줄로 정체성 표시 ────
 function HeaderIdentitySubtitle({ ticket }: { ticket: RepairTicketDetail }) {

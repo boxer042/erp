@@ -60,12 +60,11 @@ export function nextActions(
     }
     list.push({ action: "ready", label: "수리 완료", primary: true });
   } else if (status === "READY") {
+    // 결제는 직접결제(PickupSheet) 를 기본으로 통일 — ERP 주문의 "세션 없이 직접결제" 와 동일 패턴.
+    // 카트 통합(다른 상품/임대와 합산)은 세션 있을 때만 보조로 노출 (나중에 유지/개선 결정).
+    list.push({ action: "pickup", label: "바로 결제", primary: true });
     if (canSendToCart) {
-      // v2 흐름: 카트에 라인 추가 → 다른 상품/임대와 함께 한 번에 결제
-      list.push({ action: "cart", label: "카트에 추가", primary: true });
-    } else {
-      // 기존 흐름: 자체 픽업 결제
-      list.push({ action: "pickup", label: "픽업 / 결제", primary: true });
+      list.push({ action: "cart", label: "카트에 추가" });
     }
   }
   return list;
