@@ -107,6 +107,15 @@ export interface RefundDialogOrder {
     status: OrderStatus;
     totalAmount: string;
   }>;
+  /** 분할 출고 — 이 주문(택배 발송분)이 묶인 현장 수령분(부모). 역방향 cascade 용. */
+  splitParent?: {
+    id: string;
+    orderNo: string;
+    status: OrderStatus;
+    totalAmount: string;
+  } | null;
+  /** 조달 방식 — DROPSHIP 이면 거래처 직송 안내 노출(거래처 매입은 자동 취소 안 됨). */
+  procurementMode?: "RESTOCK" | "DROPSHIP" | null;
 }
 
 interface Props {
@@ -138,6 +147,17 @@ export function RefundDialog({
   const cancellableChildren = (order.splitChildren ?? []).filter((c) =>
     CANCELLABLE_STATUSES.includes(c.status),
   );
+  // 분할 출고(역방향) — 이 주문(택배 발송분) 반품 시 연결된 현장 수령분(부모)도 함께 처리할지
+  const [cascadeParent, setCascadeParent] = useState(false);
+  const parentCancellable =
+    !!order.splitParent && CANCELLABLE_STATUSES.includes(order.splitParent.status);
+  const parentReturnable =
+    !!order.splitParent &&
+    (order.splitParent.status === "COMPLETED" ||
+      order.splitParent.status === "RETURN_INSPECTED");
+  const cascadableParent =
+    parentCancellable || parentReturnable ? order.splitParent! : null;
+  const isDropship = order.procurementMode === "DROPSHIP";
 
   // 진입 / 모드 변경 / order 변경 시 — 환불 금액·방법·메모·일자 자동 채움 (이후 사용자 수정 가능)
   const ctxKey = `${open ? "1" : "0"}|${mode}|${order.id}`;
@@ -201,8 +221,12 @@ export function RefundDialog({
 
   // 전체 환불 — refundInput 동봉. cascade 면 연결된 택배 발송분(미출고)도 함께 취소.
   const fullRefundMutation = useMutation({
-    mutationFn: async (input: { refundInput?: RefundInput; cascade?: boolean }) => {
-      // 1) 현장 수령분(이 주문) 전체 반품
+    mutationFn: async (input: {
+      refundInput?: RefundInput;
+      cascade?: boolean;
+      cascadeParent?: boolean;
+    }) => {
+      // 1) 이 주문 전체 반품
       await apiMutate(`/api/orders/${order.id}`, "PUT", {
         action: "refund",
         ...(input.refundInput ? { refundInput: input.refundInput } : {}),
@@ -225,13 +249,31 @@ export function RefundDialog({
           cancelledCount++;
         }
       }
-      return { cancelledCount };
+      // 3) (역방향) 연결된 현장 수령분(부모)도 함께 처리 — 미출고면 취소, 완료/검수면 반품
+      let parentDone = false;
+      if (input.cascadeParent && cascadableParent) {
+        await apiMutate(`/api/orders/${cascadableParent.id}`, "PUT", {
+          action: parentCancellable ? "cancel" : "refund",
+          ...(input.refundInput
+            ? {
+                refundInput: {
+                  ...input.refundInput,
+                  amount: Number(cascadableParent.totalAmount),
+                },
+              }
+            : {}),
+        });
+        parentDone = true;
+      }
+      return { cancelledCount, parentDone };
     },
     onSuccess: (res) => {
       toast.success(
-        res.cancelledCount > 0
-          ? `반품완료 — 재고·환불 처리 + 택배 발송분 ${res.cancelledCount}건 취소`
-          : "반품완료 — 재고 복원·환불 처리",
+        res.parentDone
+          ? "반품완료 — 재고·환불 처리 + 연결된 현장 수령분도 함께 처리"
+          : res.cancelledCount > 0
+            ? `반품완료 — 재고·환불 처리 + 택배 발송분 ${res.cancelledCount}건 취소`
+            : "반품완료 — 재고 복원·환불 처리",
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.sales.all });
@@ -271,15 +313,18 @@ export function RefundDialog({
 
     if (mode === "full") {
       const willCascade = cascadeCancel && cancellableChildren.length > 0;
-      if (
-        !confirm(
-          willCascade
-            ? `전체 반품 + 연결된 택배 발송분 ${cancellableChildren.length}건 취소를 진행합니다.\n모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.`
-            : "전체 반품 처리합니다. 모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.",
-        )
-      )
-        return;
-      fullRefundMutation.mutate({ refundInput, cascade: willCascade });
+      const willCascadeParent = cascadeParent && !!cascadableParent;
+      const msg = willCascadeParent
+        ? `전체 반품 + 연결된 현장 수령분(${cascadableParent!.orderNo})도 함께 ${parentCancellable ? "취소" : "반품"}합니다.\n모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.`
+        : willCascade
+          ? `전체 반품 + 연결된 택배 발송분 ${cancellableChildren.length}건 취소를 진행합니다.\n모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.`
+          : "전체 반품 처리합니다. 모든 항목 재고가 복원되고 환불(또는 매출취소)됩니다.";
+      if (!confirm(msg)) return;
+      fullRefundMutation.mutate({
+        refundInput,
+        cascade: willCascade,
+        cascadeParent: willCascadeParent,
+      });
     } else {
       const partials: Array<{ orderItemId: string; returnQty: number }> = [];
       for (const [itemId, qtyStr] of Object.entries(partialReturns)) {
@@ -416,6 +461,45 @@ export function RefundDialog({
                 </span>
               </span>
             </label>
+          )}
+
+          {/* 분할 출고(역방향) — 연결된 현장 수령분(부모) 함께 처리 (전체 반품 시만) */}
+          {mode === "full" && cascadableParent && (
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-[var(--jm-warning-solid)]/30 bg-[var(--jm-warning-bg)] p-3">
+              <input
+                type="checkbox"
+                checked={cascadeParent}
+                onChange={(e) => setCascadeParent(e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--jm-action)]"
+              />
+              <span className="text-jm-xs text-[var(--jm-text)]">
+                연결된{" "}
+                <span className="font-semibold">
+                  현장 수령분({cascadableParent.orderNo})
+                </span>
+                도 함께 {parentCancellable ? "취소" : "반품"}
+                <span className="mt-0.5 block text-jm-2xs text-[var(--jm-text-muted)]">
+                  {parentCancellable
+                    ? "아직 미출고라 취소·환불 처리됩니다"
+                    : "완료된 건이라 반품·환불 처리됩니다"}{" "}
+                  (별도 환불 기록)
+                </span>
+              </span>
+            </label>
+          )}
+
+          {/* 거래처 직송 — 손님 환불만 처리, 거래처 매입(채무)은 자동 취소 안 됨 */}
+          {isDropship && (
+            <div className="rounded-md border border-[var(--jm-info-solid)]/30 bg-[var(--jm-info-bg)] p-3">
+              <span className="text-jm-xs text-[var(--jm-info-fg)]">
+                <span className="font-semibold">거래처 직송 건</span> — 손님 환불은
+                처리되지만, 거래처 매입(채무)은 자동 취소되지 않습니다.
+                <span className="mt-0.5 block text-jm-2xs text-[var(--jm-info-fg)]/80">
+                  거래처에 반품하려면 입고 반품을 별도로 처리하세요 (거래처원장 직송
+                  입고 건 참고).
+                </span>
+              </span>
+            </div>
           )}
 
           {wasPaid && (

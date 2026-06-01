@@ -363,52 +363,59 @@ export async function PUT(
         select: {
           productId: true,
           supplierProductId: true,
+          conversionRate: true,
           supplierProduct: { select: { isTaxable: true } },
         },
       });
       const mapByProductId = new Map(mappings.map((m) => [m.productId, m]));
 
+      // 사용자는 판매단위당 매입가(saleUnitCost)를 입력. 환산비율(conversionRate=판매단위/거래처단위)로
+      // 거래처상품 단위 수량·단가를 역산. 합계(거래처 매입)·B원가는 환산과 무관하게 일관. 1:1 이면 그대로.
       type DsLine = {
         orderItemId: string;
         supplierProductId: string;
         isTaxable: boolean;
-        qty: number;
-        unitPrice: number;
+        saleUnitCost: number; // = B 원가 (판매단위당)
+        supplierQty: number; // 판매수량 / 환산비율 (거래처 단위)
+        supplierUnitPrice: number; // saleUnitCost × 환산비율
       };
       const lines: DsLine[] = [];
       for (const it of productItems) {
-        const unitPrice = priceByItemId.get(it.id) ?? 0;
-        const qty = Number(it.quantity);
+        const saleUnitCost = priceByItemId.get(it.id) ?? 0;
+        const saleQty = Number(it.quantity);
         const mapped = mapByProductId.get(it.productId!);
+        let supplierProductId: string;
+        let isTaxable: boolean;
+        let conv: number;
         if (mapped) {
-          lines.push({
-            orderItemId: it.id,
-            supplierProductId: mapped.supplierProductId,
-            isTaxable: mapped.supplierProduct.isTaxable,
-            qty,
-            unitPrice,
-          });
+          supplierProductId = mapped.supplierProductId;
+          isTaxable = mapped.supplierProduct.isTaxable;
+          conv = Number(mapped.conversionRate) || 1;
         } else {
           const sp = await tx.supplierProduct.create({
             data: {
               supplierId,
               name: it.product?.name ?? "직송 상품",
-              unitPrice,
-              listPrice: unitPrice,
+              unitPrice: saleUnitCost,
+              listPrice: saleUnitCost,
               isProvisional: true,
             },
           });
           await tx.productMapping.create({
             data: { productId: it.productId!, supplierProductId: sp.id, conversionRate: 1 },
           });
-          lines.push({
-            orderItemId: it.id,
-            supplierProductId: sp.id,
-            isTaxable: true,
-            qty,
-            unitPrice,
-          });
+          supplierProductId = sp.id;
+          isTaxable = true;
+          conv = 1;
         }
+        lines.push({
+          orderItemId: it.id,
+          supplierProductId,
+          isTaxable,
+          saleUnitCost,
+          supplierQty: conv !== 0 ? saleQty / conv : saleQty,
+          supplierUnitPrice: saleUnitCost * conv,
+        });
       }
 
       // 2. 직송 입고 생성 (CONFIRMED, isDropship — 재고 미생성, 거래처 매입·원가만)
@@ -420,7 +427,7 @@ export async function PUT(
           status: "CONFIRMED",
           isDropship: true,
           createdById: auditUser?.id ?? order.createdById,
-          totalAmount: lines.reduce((s, l) => s + l.unitPrice * l.qty, 0),
+          totalAmount: lines.reduce((s, l) => s + l.supplierQty * l.supplierUnitPrice, 0),
           memo: `거래처 직출고 — 주문 ${order.orderNo}`,
         },
       });
@@ -428,15 +435,15 @@ export async function PUT(
         data: lines.map((l) => ({
           incomingId: incoming.id,
           supplierProductId: l.supplierProductId,
-          quantity: l.qty,
-          unitPrice: l.unitPrice,
-          totalPrice: l.unitPrice * l.qty,
-          unitCostSnapshot: l.unitPrice, // 직송은 배송비·부대비 없음 → 원가 = 매입단가
+          quantity: l.supplierQty,
+          unitPrice: l.supplierUnitPrice,
+          totalPrice: l.supplierQty * l.supplierUnitPrice,
+          unitCostSnapshot: l.supplierUnitPrice, // 거래처 단위 원가(직송은 배송비·부대비 없음 → 매입단가)
         })),
       });
-      // 거래처원장 PURCHASE (VAT 포함)
+      // 거래처원장 PURCHASE (VAT 포함) — 합계는 판매수량×판매단가와 동일(환산 무관)
       const totalWithTax = lines.reduce((s, l) => {
-        const supply = l.unitPrice * l.qty;
+        const supply = l.supplierQty * l.supplierUnitPrice;
         return s + supply + (l.isTaxable ? Math.round(supply * 0.1) : 0);
       }, 0);
       const lastLedger = await tx.supplierLedger.findFirst({
@@ -457,12 +464,12 @@ export async function PUT(
         },
       });
 
-      // 3. B 원가 set (sale unit cost = 매입단가, 1:1) + 발송 처리 + 링크
+      // 3. B 원가 set (판매단위당 = 입력 매입가) + 발송 처리 + 링크
       await Promise.all(
         lines.map((l) =>
           tx.orderItem.update({
             where: { id: l.orderItemId },
-            data: { unitCostSnapshot: l.unitPrice },
+            data: { unitCostSnapshot: l.saleUnitCost },
           }),
         ),
       );
