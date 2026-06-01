@@ -58,6 +58,7 @@ export interface SalesHistoryRow {
     | "QUICK"
     | "SHIPPING"
     | null;
+  procurementMode?: "RESTOCK" | "DROPSHIP" | null;
   amount: number;
   netAmount: number;
   /** 손님 청구 배송비 (세전). orphan 은 0 */

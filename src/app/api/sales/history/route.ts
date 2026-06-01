@@ -67,6 +67,8 @@ export type SalesHistoryRow = {
     | "QUICK"
     | "SHIPPING"
     | null;
+  /** 조달 방식 — 입고대기(RESTOCK)/거래처 직출고(DROPSHIP). 택배 발송분 등 (③) */
+  procurementMode: "RESTOCK" | "DROPSHIP" | null;
   /** 거래액 — VAT 포함 (고객 청구 총액). 표시용 */
   amount: number;
   /**
@@ -235,6 +237,7 @@ export async function GET(request: NextRequest) {
       claimType: true,
       claimReason: true,
       fulfillmentType: true,
+      procurementMode: true,
       rentalId: true,
       channelId: true,
       channel: { select: { id: true, name: true } },
@@ -451,6 +454,7 @@ export async function GET(request: NextRequest) {
       claimType: o.claimType,
       claimReason: o.claimReason,
       fulfillmentType: o.fulfillmentType,
+      procurementMode: o.procurementMode,
       amount,
       netAmount: isReversed ? 0 : partialNet,
       partialRefundAmount: isPartial ? partialRefundAmount : 0,
@@ -488,6 +492,7 @@ export async function GET(request: NextRequest) {
       claimType: null,
       claimReason: null,
       fulfillmentType: null,
+      procurementMode: null,
       amount,
       netAmount: amount,
       partialRefundAmount: 0,
@@ -524,6 +529,7 @@ export async function GET(request: NextRequest) {
       claimType: null,
       claimReason: null,
       fulfillmentType: null,
+      procurementMode: null,
       amount,
       netAmount: amount,
       partialRefundAmount: 0,

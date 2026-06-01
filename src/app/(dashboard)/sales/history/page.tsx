@@ -19,6 +19,7 @@ import {
 import { apiGet } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
+  JmBadge,
   JmButton,
   JmCard,
   JmCheckbox,
@@ -676,16 +677,25 @@ export default function SalesHistoryPage() {
                           />
                         </JmTableCell>
                         <JmTableCell>
-                          {row.fulfillmentType ? (
-                            <span className="text-jm-xs text-[var(--jm-text)]">
-                              {FULFILLMENT_LABEL[row.fulfillmentType] ??
-                                row.fulfillmentType}
-                            </span>
-                          ) : (
-                            <span className="text-jm-xs text-[var(--jm-text-subtle)]">
-                              —
-                            </span>
-                          )}
+                          <div className="flex flex-col items-start gap-1">
+                            {row.fulfillmentType ? (
+                              <span className="text-jm-xs text-[var(--jm-text)]">
+                                {FULFILLMENT_LABEL[row.fulfillmentType] ??
+                                  row.fulfillmentType}
+                              </span>
+                            ) : (
+                              <span className="text-jm-xs text-[var(--jm-text-subtle)]">
+                                —
+                              </span>
+                            )}
+                            {row.procurementMode && (
+                              <JmBadge variant="outline" size="sm" shape="square">
+                                {row.procurementMode === "DROPSHIP"
+                                  ? "거래처 직출고"
+                                  : "입고 대기"}
+                              </JmBadge>
+                            )}
+                          </div>
                         </JmTableCell>
                         <JmTableCell>
                           <div className="flex flex-col gap-0">
