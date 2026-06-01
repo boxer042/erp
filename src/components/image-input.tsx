@@ -4,12 +4,7 @@ import { useRef, useState } from "react";
 import { Images, RectangleHorizontal, Square, X } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  JmDrawer,
-  JmDrawerContent,
-  JmDrawerHeader,
-  JmDrawerTitle,
-} from "@/jm";
+import { JmSourceDrawer } from "@/jm";
 import { ImageEditDialog } from "@/components/image-edit-dialog";
 import { MediaPickerDialog } from "@/components/media-picker-dialog";
 import { cn } from "@/lib/utils";
@@ -185,42 +180,37 @@ export function ImagePickerDrawer({
 
   return (
     <>
-      <JmDrawer
+      <JmSourceDrawer
         open={open}
         onOpenChange={(v) => {
           if (!v) reset();
           onOpenChange(v);
         }}
-      >
-        <JmDrawerContent side="bottom" size="sm" className="p-0">
-          <JmDrawerHeader className="px-5 py-4">
-            <JmDrawerTitle>이미지 추가</JmDrawerTitle>
-          </JmDrawerHeader>
-          <div className="flex flex-col gap-2 px-5 pb-6 pt-4">
-            <SourceButton
-              icon={<Square />}
-              title="1:1 썸네일"
-              desc="정사각형으로 잘라 업로드 (카드·리스트용)"
-              disabled={!allowThumbnail || uploading}
-              onClick={() => startMode("thumbnail")}
-            />
-            <SourceButton
-              icon={<RectangleHorizontal />}
-              title="자유 비율"
-              desc="원하는 비율로 잘라 업로드 (상세·배너용)"
-              disabled={!allowFree || uploading}
-              onClick={() => startMode("free")}
-            />
-            <SourceButton
-              icon={<Images />}
-              title="라이브러리"
-              desc="이미 올린 사진에서 선택"
-              disabled={!allowLibrary || uploading}
-              onClick={() => setPickerOpen(true)}
-            />
-          </div>
-        </JmDrawerContent>
-      </JmDrawer>
+        title="이미지 추가"
+        options={[
+          {
+            icon: <Square />,
+            title: "1:1 썸네일",
+            desc: "정사각형으로 잘라 업로드 (카드·리스트용)",
+            disabled: !allowThumbnail || uploading,
+            onSelect: () => startMode("thumbnail"),
+          },
+          {
+            icon: <RectangleHorizontal />,
+            title: "자유 비율",
+            desc: "원하는 비율로 잘라 업로드 (상세·배너용)",
+            disabled: !allowFree || uploading,
+            onSelect: () => startMode("free"),
+          },
+          {
+            icon: <Images />,
+            title: "라이브러리",
+            desc: "이미 올린 사진에서 선택",
+            disabled: !allowLibrary || uploading,
+            onSelect: () => setPickerOpen(true),
+          },
+        ]}
+      />
 
       <input
         ref={fileRef}
@@ -250,37 +240,6 @@ export function ImagePickerDrawer({
         }}
       />
     </>
-  );
-}
-
-function SourceButton({
-  icon,
-  title,
-  desc,
-  disabled,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex items-center gap-3 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] px-4 py-3 text-left transition-colors hover:bg-[var(--jm-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--jm-surface-muted)] text-[var(--jm-text)] [&_svg]:size-4.5">
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-jm-sm font-semibold text-[var(--jm-text)]">{title}</span>
-        <span className="block text-jm-xs text-[var(--jm-text-muted)]">{desc}</span>
-      </span>
-    </button>
   );
 }
 

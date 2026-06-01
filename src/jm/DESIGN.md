@@ -52,7 +52,8 @@ src/jm/
 - 모든 import: `@/jm/...` 또는 `@/jm` (barrel)
 - 새 컴포넌트는 `src/jm/ui/<name>.tsx`, prefix `Jm*`, `index.ts` 에 export 추가
 - 외부 의존성: `react`, `react-dom`, `@base-ui/react`, `lucide-react`, `clsx`, `tailwind-merge`, `class-variance-authority` (peer)
-- 선택적 peer: `react-day-picker` + `date-fns/locale/ko` (DateRangePicker), `sonner` (Toaster)
+- 선택적 peer: `react-day-picker` + `date-fns/locale/ko` (DateRangePicker), `sonner` (Toaster), `react-easy-crop` (JmImageEditor)
+  - ⚠️ `JmImageEditor` 의 AI 배경 제거는 jm 의존성이 **아님** — `onRemoveBackground` prop 으로 호스트가 주입 (무거운 ML 패키지 `@imgly/background-removal` 는 jm 밖에 유지). 토스트도 `onError` prop 주입.
 
 ---
 
@@ -212,6 +213,8 @@ export default function Page() {
 | `JmFilterDropdown` | 다중 선택 필터 dropdown | `options`, `value`, `onChange` |
 | `JmDrawer` (+ Content/Header/Body/Footer) | 모달성 사이드/바텀 시트 | `side`, `size`, `dragHandle` |
 | `JmDialog` (+ Content/Header/Body/Footer) | 가운데 정렬 모달 | `size: sm\|md\|lg\|xl` |
+| `JmSourceDrawer` | 하단 "소스 선택" 시트 (아이콘+제목+설명 옵션 리스트) | `title`, `options[]` (헤드리스 — onSelect 콜백만) |
+| `JmImageEditor` | 이미지 편집 모달 (크롭/회전/줌/밝기/지우개) | `file`, `onConfirm(blob,name)`, `onRemoveBackground?`, `onError?` — 업로드·ML 은 호스트 주입 |
 
 ---
 

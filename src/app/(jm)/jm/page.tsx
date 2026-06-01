@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -9,11 +9,14 @@ import {
   Check,
   Columns2,
   Copy,
+  Crop,
   Edit,
   FileText,
   Grid3x3,
   Heart,
   Home,
+  ImagePlus,
+  Images,
   Inbox,
   List,
   LogOut,
@@ -21,6 +24,7 @@ import {
   Package,
   PanelLeftOpen,
   Plus,
+  RectangleHorizontal,
   Search,
   Settings,
   ShoppingBag,
@@ -86,6 +90,8 @@ import {
   JmEmpty,
   JmFilterDropdown,
   JmIconButton,
+  JmImageEditor,
+  JmSourceDrawer,
   JmInput,
   JmNumberInput,
   JmQuantityStepper,
@@ -241,6 +247,12 @@ export default function JmShowcasePage() {
   const [comboboxDrawerOpen, setComboboxDrawerOpen] = useState(false);
   const [comboboxDrawerSelected, setComboboxDrawerSelected] =
     useState<JmComboboxItem | null>(null);
+
+  // 이미지 — SourceDrawer / ImageEditor
+  const [sourceDrawerOpen, setSourceDrawerOpen] = useState(false);
+  const editorInputRef = useRef<HTMLInputElement>(null);
+  const [editorFile, setEditorFile] = useState<File | null>(null);
+  const [editorResult, setEditorResult] = useState<string | null>(null);
 
   // NumberInput 상태
   const [price, setPrice] = useState("125000");
@@ -1173,6 +1185,99 @@ export default function JmShowcasePage() {
               </JmDialogFooter>
             </JmDialogContent>
           </JmDialog>
+        </Section>
+
+        {/* SOURCE DRAWER + IMAGE EDITOR */}
+        <Section
+          title="이미지 — 소스 드로워 + 편집기"
+          subtitle="JmSourceDrawer(하단 소스 선택 시트) + JmImageEditor(크롭/회전/줌/밝기/지우개). 업로드·AI 배경제거는 호스트가 prop 으로 주입 — jm 은 순수 UI."
+        >
+          <div className="flex flex-col gap-5">
+            <Row label="SourceDrawer">
+              <JmButton
+                variant="outline"
+                onClick={() => setSourceDrawerOpen(true)}
+              >
+                <ImagePlus />
+                이미지 추가
+              </JmButton>
+            </Row>
+            <Row label="ImageEditor">
+              <JmButton
+                variant="outline"
+                onClick={() => editorInputRef.current?.click()}
+              >
+                <Crop />
+                파일 골라 편집
+              </JmButton>
+              <input
+                ref={editorInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  setEditorFile(f);
+                }}
+              />
+              {editorResult && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={editorResult}
+                  alt="편집 결과"
+                  className="size-16 rounded-lg border border-[var(--jm-border)] object-cover"
+                />
+              )}
+            </Row>
+          </div>
+
+          <JmSourceDrawer
+            open={sourceDrawerOpen}
+            onOpenChange={setSourceDrawerOpen}
+            title="이미지 추가"
+            options={[
+              {
+                icon: <Square />,
+                title: "1:1 썸네일",
+                desc: "정사각형으로 잘라 업로드 (카드·리스트용)",
+                onSelect: () => {
+                  setSourceDrawerOpen(false);
+                  jmToast("1:1 썸네일 선택");
+                },
+              },
+              {
+                icon: <RectangleHorizontal />,
+                title: "자유 비율",
+                desc: "원하는 비율로 잘라 업로드 (상세·배너용)",
+                onSelect: () => {
+                  setSourceDrawerOpen(false);
+                  jmToast("자유 비율 선택");
+                },
+              },
+              {
+                icon: <Images />,
+                title: "라이브러리",
+                desc: "이미 올린 사진에서 선택",
+                onSelect: () => {
+                  setSourceDrawerOpen(false);
+                  jmToast("라이브러리 선택");
+                },
+              },
+            ]}
+          />
+
+          <JmImageEditor
+            open={editorFile !== null}
+            file={editorFile}
+            onConfirm={(blob) => {
+              setEditorResult(URL.createObjectURL(blob));
+              setEditorFile(null);
+              jmToast.success("편집 완료 (이 데모는 업로드 없이 결과만 표시)");
+            }}
+            onCancel={() => setEditorFile(null)}
+            onError={(m) => jmToast.error(m)}
+          />
         </Section>
 
         {/* COMBOBOX MODAL */}

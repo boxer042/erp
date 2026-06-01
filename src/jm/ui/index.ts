@@ -185,3 +185,12 @@ export {
   JmComboboxDrawer,
   type JmComboboxDrawerProps,
 } from "./combobox-drawer";
+export {
+  JmSourceDrawer,
+  type JmSourceDrawerProps,
+  type JmSourceOption,
+} from "./source-drawer";
+export {
+  JmImageEditor,
+  type JmImageEditorProps,
+} from "./image-editor";
