@@ -227,7 +227,15 @@ export function SupplierLedgerTable({
                     </JmBadge>
                   </JmTableCell>
                   <JmTableCell className="px-3 py-2.5 truncate">
-                    {e.description}
+                    <span className="inline-flex items-center gap-1.5">
+                      {e.description}
+                      {/* 직송 매입 — 거래처가 손님에게 직접 발송한 건(재고 미반영) 명시 */}
+                      {e.type === "PURCHASE" && e.description?.includes("직송") && (
+                        <JmBadge variant="outline" size="sm" shape="square">
+                          거래처 직송
+                        </JmBadge>
+                      )}
+                    </span>
                   </JmTableCell>
                   <JmTableCell className="px-3 py-2.5 text-center text-[var(--jm-text-muted)] text-xs">
                     {e.referenceType ?? "-"}

@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
       },
       _count: { select: { incomingItems: true } },
       incomingCosts: { where: { isActive: true }, select: { id: true, name: true, costType: true, value: true, perUnit: true, isTaxable: true } },
-      priceHistory: { orderBy: { createdAt: "desc" }, take: 1, select: { oldPrice: true, newPrice: true } },
+      // 정정(CORRECTION)은 오타 교정 → 가격 변동 방향 표시에서 제외, 최근 '실제 변동'만
+      priceHistory: { where: { kind: { not: "CORRECTION" } }, orderBy: { createdAt: "desc" }, take: 1, select: { oldPrice: true, newPrice: true } },
       incomingItems: {
         where: { incoming: { status: "CONFIRMED" } },
         select: {

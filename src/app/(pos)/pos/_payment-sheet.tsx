@@ -457,6 +457,11 @@ function Body({
       const sessionForCheckout: CartSession = {
         ...session,
         items: nowItems,
+        // 분할 — 세션 할인(%/정액)을 '카트 전체 기준 확정 금액'으로 A(대표)에 귀속.
+        // %를 nowItems 에만 재적용하면 B 가 할인 누락돼 청구 합계가 표시 총액보다 커진다.
+        // totals.sessionDiscountAmount = 푸터에 표시된 할인액이므로 A 청구액이 표시와 일치.
+        // (비분할은 nowItems=allItems 라 그대로 — 데이터 흐름 불변)
+        ...(isSplit ? { totalDiscount: String(totals.sessionDiscountAmount) } : {}),
         ...(labelCodes.length ? { labelCodes } : {}),
       };
       const result = await submitCheckout(sessionForCheckout, {

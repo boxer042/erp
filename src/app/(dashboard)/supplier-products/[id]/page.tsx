@@ -93,6 +93,7 @@ interface PriceHistory {
   reason: string | null;
   incomingId: string | null;
   createdAt: string;
+  kind: "CHANGE" | "CORRECTION";
 }
 
 interface ActiveLot {
@@ -1051,9 +1052,12 @@ export default function SupplierProductDetailPage() {
                 </p>
               ) : (
                 <>
-                  {/* 라인 차트 */}
+                  {/* 라인 차트 — 정정(CORRECTION)은 오타 교정이라 가격 '변동' 추이에서 제외 */}
                   {(() => {
-                    const sorted = [...product.priceHistory].reverse();
+                    const sorted = [...product.priceHistory]
+                      .filter((h) => h.kind !== "CORRECTION")
+                      .reverse();
+                    if (sorted.length === 0) return null;
                     const chartData = [
                       {
                         date: new Date(sorted[0].createdAt).toLocaleDateString("ko-KR"),
@@ -1170,7 +1174,14 @@ export default function SupplierProductDetailPage() {
                               {pct.toFixed(1)}%
                             </td>
                             <td className="px-3 py-2.5 text-[var(--jm-text-muted)]">
-                              {h.reason || "-"}
+                              <span className="inline-flex items-center gap-1.5">
+                                {h.reason || "-"}
+                                {h.kind === "CORRECTION" && (
+                                  <JmBadge variant="outline" size="sm" shape="square">
+                                    정정(추이 제외)
+                                  </JmBadge>
+                                )}
+                              </span>
                             </td>
                           </tr>
                         );
