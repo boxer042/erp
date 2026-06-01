@@ -170,7 +170,8 @@ enum NoteSourceType { ORDER INCOMING PURCHASE_ORDER REPAIR CUSTOMER SUPPLIER PAY
   - **백필 스크립트** `scripts/backfill-notes.ts` — 기존 인라인 메모(고객·거래처·입고·공급결제·수금) → source 연결 `Note` 복사. 멱등(동일 source+content 건너뜀)·dry-run 기본. **`--commit` 실행 완료** (dev DB 2건 생성: 입고·결제). 재실행 시 중복 건너뜀.
   - **허브 "출처별 메모" 탭** — `/api/notes?hasSource=1`(sourceType≠null 필터) + `/notes` 탭 추가. source 연결 노트(타임라인·백필분)를 한곳에서 출처 배지·원본 모달과 함께 조회 → 요구사항 3 충족.
   - **고객 `CustomerNote`→`Note` 흡수 완료** — 고객 상세 노트 탭을 `NoteTimeline`(sourceType=CUSTOMER)으로 교체 + `/api/customers/[id]/detail` 의 notes 쿼리를 `Note` 로 전환 + 백필(개별 `create` 로 createdAt·createdById 보존). `/api/customer-notes`(GET/POST/DELETE)·`CustomerNote` 모델은 **프론트 호출처 0 = 死코드** → Phase 2 제거.
-  - **남은 Phase 1**: 입고·결제 상세 live wiring (전용 상세 페이지가 없어 우선순위 낮음 — 현재는 백필로 과거분 노출).
+  - **입고 live wiring 완료** — 입고 상세(인라인 명세표 뷰, `inventory/incoming/page.tsx`)의 "입고 정보" 아래 "메모·할 일" 박스 추가 (sourceType=INCOMING, `detail.id`/`incomingNo`).
+  - **결제는 별도 live wiring 안 함** — 전용 상세 뷰가 없고(다이얼로그+원장 줄), 결제 맥락의 노트는 해당 **거래처/고객 타임라인**(이미 wiring됨)으로 커버. 기존 결제 memo 는 백필로 허브 노출. 필요 시 추후 거래처원장 내 결제 모달에 추가 가능.
 - **Phase 2 (부분 완료, 2026-05-31)** — 死코드 제거: `CustomerNote` 모델·관계(User/Customer)·`/api/customer-notes`(GET/POST/DELETE) 삭제 + `db push`(빈 `customer_notes` 테이블 drop). 고객 노트는 `Note`(sourceType=CUSTOMER)로 일원화. tsc 0.
   - **결정**: 단일 `memo` 컬럼(고객·거래처·입고·결제 등)은 전 도메인에서 **대표 비고로 유지**(컬럼 드롭/입력 마이그레이션 안 함 — 리스크 대비 이득 낮음). `NoteTimeline` 은 그 위 추적 노트/할일 레이어(additive). `CustomerNote` 만 별도 중복 시스템이라 흡수·제거함.
   - **⚠️ prod 주의**: 운영 DB `customer_notes` 에 데이터가 있으면 `npm run db:push:prod` 전에 백필(`npx tsx --env-file=.env.prod scripts/backfill-notes.ts --commit`)을 먼저 실행해 `Note` 로 이관할 것. (dev 는 0건이라 바로 drop.)

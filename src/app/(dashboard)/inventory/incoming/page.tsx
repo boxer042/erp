@@ -42,6 +42,7 @@ import {
 import { startOfMonth, endOfMonth, startOfDay, subMonths } from "date-fns";
 import { toast } from "sonner";
 import { QuickSupplierSheet } from "@/components/quick-register-sheets";
+import { NoteTimeline } from "@/components/note-timeline";
 import type { Supplier, SupplierProduct, Incoming, IncomingDetail, IncomingItemForm } from "./_types";
 import {
   calcDiscountPerUnit,
@@ -1464,6 +1465,14 @@ function IncomingPageInner() {
                         <div className="flex items-center gap-2"><span className="text-xs text-[var(--jm-text-muted)] w-14 shrink-0">등록자</span><span>{detail.createdBy.name}</span></div>
                         {detail.memo && <div className="flex items-center gap-2"><span className="text-xs text-[var(--jm-text-muted)] w-14 shrink-0">비고</span><span>{detail.memo}</span></div>}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* 메모 · 할 일 — 업무 노트 허브와 연동 (출처: 입고) */}
+                  <div className="mb-4 overflow-hidden rounded-[var(--jm-radius-md)] border border-[var(--jm-border)]">
+                    <div className="border-b border-[var(--jm-border)] bg-[var(--jm-surface-muted)] px-3 py-1.5 text-xs font-medium text-[var(--jm-text-muted)]">메모 · 할 일</div>
+                    <div className="p-3">
+                      <NoteTimeline sourceType="INCOMING" sourceId={detail.id} sourceLabel={detail.incomingNo} />
                     </div>
                   </div>
 
