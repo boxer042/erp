@@ -47,7 +47,10 @@ export async function snapshotTicketUsage(
   }
   return {
     diagnosisId: ticket.diagnosisTemplateId,
-    partProductIds: new Set(ticket.parts.map((p) => p.productId)),
+    // 자유부속(productId=null)은 카탈로그 상품이 없어 추천 학습 대상 아님 → 제외
+    partProductIds: new Set(
+      ticket.parts.map((p) => p.productId).filter((id): id is string => id !== null),
+    ),
     laborNames: new Set(ticket.labors.map((l) => l.name)),
   };
 }
@@ -218,9 +221,10 @@ export async function learnDiagnosisPartSet(
   });
   if (!ticket || !ticket.diagnosisTemplateId) return;
 
-  // productId 별 수량 합 (같은 productId 가 여러 행이면 합산)
+  // productId 별 수량 합 (같은 productId 가 여러 행이면 합산). 자유부속(null)은 제외.
   const partQtyByProduct = new Map<string, number>();
   for (const p of ticket.parts) {
+    if (!p.productId) continue;
     const cur = partQtyByProduct.get(p.productId) ?? 0;
     partQtyByProduct.set(p.productId, cur + Number(p.quantity));
   }

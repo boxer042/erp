@@ -2536,8 +2536,15 @@ model RepairPart {
   id               String           @id @default(uuid())
   repairTicketId   String           @map("repair_ticket_id")
   repairTicket     RepairTicket     @relation(fields: [repairTicketId], references: [id], onDelete: Cascade)
-  productId        String           @map("product_id")
-  product          Product          @relation(fields: [productId], references: [id])
+  // 카탈로그 부속이면 productId, 미등록 자유부속이면 null (이름/규격 직접 입력).
+  // 자유부속: FIFO 미차감(consumedAt=null) → 결제 후 /presale 허브에서 원가 정산.
+  productId        String?          @map("product_id")
+  product          Product?         @relation(fields: [productId], references: [id])
+  // 자유부속 표시명·규격 (productId 없을 때). 카탈로그 부속은 product.name 사용.
+  name             String?
+  spec             String?
+  // 선판매 마커 — "used"(미등록 중고 부속). 자유부속에만 부여, /presale 정산 대상 구별.
+  presaleKind      String?          @map("presale_kind")
   quantity         Decimal          @db.Decimal(15, 4)
   unitPrice        Decimal          @map("unit_price") @db.Decimal(15, 2)
   totalPrice       Decimal          @map("total_price") @db.Decimal(15, 2)
@@ -2551,6 +2558,8 @@ model RepairPart {
   createdAt        DateTime         @default(now()) @map("created_at")
 
   lotConsumptions LotConsumption[]
+  // 자유부속 정산 시 생성된 중고품 link (UsedItem.repairPartId 역) — 1:1
+  soldUsedItem    UsedItem?
 
   @@index([repairTicketId])
   @@map("repair_parts")
@@ -3105,6 +3114,10 @@ model UsedItem {
   // (SCRAPPED 시는 lineage 없음, 자동 Expense 만)
   orderItemId String?    @unique @map("order_item_id")
   orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  // 수리 자유부속으로 소비된 link — /presale 정산 시 생성. orderItemId 와 대칭. 1:1
+  repairPartId String?     @unique @map("repair_part_id")
+  repairPart   RepairPart? @relation(fields: [repairPartId], references: [id], onDelete: SetNull)
 
   // 임대 자산에서 전환된 출처 (역방향) — 1:1
   rentalAssetId String?      @unique @map("rental_asset_id")

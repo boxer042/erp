@@ -47,13 +47,23 @@ export const repairTicketUpdateSchema = z.object({
 
 export type RepairTicketUpdateInput = z.infer<typeof repairTicketUpdateSchema>;
 
-export const repairPartCreateSchema = z.object({
-  productId: z.string().min(1),
-  quantity: z.coerce.number().positive(),
-  unitPrice: z.coerce.number().min(0),
-  discount: z.string().default("0"),
-  status: z.enum(["USED", "LOST"]).default("USED"),
-});
+export const repairPartCreateSchema = z
+  .object({
+    // 카탈로그 부속이면 productId, 미등록 자유부속이면 name(+규격) — 둘 중 하나 필수
+    productId: z.string().nullish(),
+    name: z.string().nullish(),
+    spec: z.string().nullish(),
+    /** 자유부속 선판매 마커 — "used"(미등록 중고 부속). productId 없을 때만 의미 */
+    presaleKind: z.enum(["used"]).nullish(),
+    quantity: z.coerce.number().positive(),
+    unitPrice: z.coerce.number().min(0),
+    discount: z.string().default("0"),
+    status: z.enum(["USED", "LOST"]).default("USED"),
+  })
+  .refine((v) => !!v.productId?.trim() || !!v.name?.trim(), {
+    message: "상품을 선택하거나 부속명을 입력해주세요",
+    path: ["productId"],
+  });
 
 export type RepairPartCreateInput = z.infer<typeof repairPartCreateSchema>;
 

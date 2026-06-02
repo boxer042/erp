@@ -211,7 +211,7 @@ export function RepairTicketActionMenu({
         }
         parts={t.parts.map((p) => ({
           id: p.id,
-          name: p.product.name,
+          name: p.product?.name ?? p.name ?? "부속",
           status: p.status,
         }))}
         onConfirm={(reason, memo) =>

@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search, Package } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
-import { JmBadge, JmCard, JmComboboxDrawer } from "@/jm";
+import { JmBadge, JmCard, JmComboboxDrawer, JmInput, JmNumberInput } from "@/jm";
 import { fmtKRWInc } from "./_helpers";
 import type { RepairPart } from "./_types";
 import { useRepairMutations } from "./_use-repair-mutations";
 import { PosLineItemRow } from "@/components/pos/line-item-row";
+import { BottomSheet } from "@/app/(pos)/pos/_components/bottom-sheet";
 import { PriceInputDialog } from "@/app/(pos)/pos/_components/price-input-dialog";
 
 interface ProductOption {
@@ -44,6 +45,7 @@ interface Props {
 export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }: Props) {
   const m = useRepairMutations(ticketId);
   const [picker, setPicker] = useState(false);
+  const [addFreeOpen, setAddFreeOpen] = useState(false);
 
   const productsQuery = useQuery({
     queryKey: ["repairs", "products"],
@@ -99,17 +101,17 @@ export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }:
           )}
         </div>
 
-        {/* 가로 카드 — [+추가] + 추천(정사각, 1탭) */}
+        {/* 가로 카드 — [+직접추가] + 추천(정사각, 1탭) + [🔍 검색] (D7) */}
         {!readonly && (
           <div className="flex gap-2 overflow-x-auto px-4 pb-3 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {/* + 추가 (검색 드로워) */}
+            {/* 맨 앞: 직접추가 (자유부속 모달 — 이름+규격+가격) */}
             <button
               type="button"
-              onClick={() => setPicker(true)}
+              onClick={() => setAddFreeOpen(true)}
               className="flex h-[88px] w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
             >
               <Plus className="size-5" />
-              <span className="text-jm-2xs font-medium">추가</span>
+              <span className="text-jm-2xs font-medium">직접추가</span>
             </button>
 
             {recs.map((r) => (
@@ -132,6 +134,16 @@ export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }:
                 </span>
               </button>
             ))}
+
+            {/* 끝: 카탈로그 검색 (롱테일) */}
+            <button
+              type="button"
+              onClick={() => setPicker(true)}
+              className="flex h-[88px] w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+            >
+              <Search className="size-5" />
+              <span className="text-jm-2xs font-medium">검색</span>
+            </button>
           </div>
         )}
 
@@ -188,7 +200,58 @@ export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }:
           setPicker(false);
         }}
       />
+
+      {/* 자유부속 직접추가 — 미등록 부속(이름+규격+가격). 재고 미차감 → /presale 정산 */}
+      {addFreeOpen && (
+        <FreePartAddSheet
+          onClose={() => setAddFreeOpen(false)}
+          onAdd={(name, spec, unitPrice) => {
+            m.addPart.mutate({ name, spec, presaleKind: "used", quantity: 1, unitPrice });
+            setAddFreeOpen(false);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function FreePartAddSheet({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (name: string, spec: string | null, unitPrice: number) => void;
+}) {
+  const [name, setName] = useState("");
+  const [spec, setSpec] = useState("");
+  const [price, setPrice] = useState("");
+  const canAdd = name.trim().length > 0 && !!price;
+
+  return (
+    <BottomSheet
+      open
+      onOpenChange={(v) => !v && onClose()}
+      title="미등록 부속 직접 추가"
+      footer={
+        <button
+          type="button"
+          disabled={!canAdd}
+          onClick={() => onAdd(name.trim(), spec.trim() || null, parseInt(price.replace(/,/g, ""), 10) || 0)}
+          className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
+        >
+          추가
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-3 pt-2">
+        <JmInput autoFocus size="md" value={name} onChange={(e) => setName(e.target.value)} placeholder="부속명 (예: 중고 기화기)" />
+        <JmInput size="md" value={spec} onChange={(e) => setSpec(e.target.value)} placeholder="규격 (선택)" />
+        <JmNumberInput value={price} onValueChange={setPrice} placeholder="₩ 가격 (공급가액)" />
+        <p className="text-jm-2xs text-[var(--jm-text-muted)]">
+          재고에 없는 부속 — 손님 청구는 지금, 원가는 결제 후 [선판매]에서 정산. 항상 과세(VAT 10%).
+        </p>
+      </div>
+    </BottomSheet>
   );
 }
 
@@ -204,17 +267,25 @@ function PartRow({
   const [priceOpen, setPriceOpen] = useState(false);
   const [totalOpen, setTotalOpen] = useState(false);
   const isLost = part.status === "LOST";
+  const isFree = !part.productId;
+  const displayName = part.product?.name ?? part.name ?? "부속";
+  const displaySku = part.product?.sku ?? (part.spec || "");
 
   return (
     <>
       <PosLineItemRow
         className={isLost ? "sm:px-5 opacity-60" : "sm:px-5"}
-        name={part.product.name}
+        name={displayName}
         nameStrikethrough={isLost && !part.billLost}
-        sku={part.product.sku}
+        sku={displaySku}
         headerEnd={
           readonly ? undefined : (
             <>
+              {isFree && (
+                <JmBadge variant="success" size="sm">
+                  선판매
+                </JmBadge>
+              )}
               {isLost && (
                 <button
                   type="button"
@@ -257,7 +328,7 @@ function PartRow({
       <PriceInputDialog
         open={priceOpen}
         onOpenChange={setPriceOpen}
-        title={part.product.name}
+        title={displayName}
         initialNet={Number(part.unitPrice) || 0}
         taxType="TAXABLE"
         onSubmit={(net) => m.updatePart.mutate({ partId: part.id, unitPrice: net })}
@@ -265,7 +336,7 @@ function PartRow({
       <PriceInputDialog
         open={totalOpen}
         onOpenChange={setTotalOpen}
-        title={`${part.product.name} — 라인 합계`}
+        title={`${displayName} — 라인 합계`}
         initialNet={Number(part.totalPrice) || 0}
         taxType="TAXABLE"
         allowService={false}

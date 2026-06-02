@@ -243,7 +243,9 @@ export async function PUT(
                 where: { repairTicketId: id, status: "USED" },
                 select: { productId: true },
               })
-            ).map((p) => p.productId),
+            )
+              .map((p) => p.productId)
+              .filter((pid): pid is string => pid !== null),
           ),
           laborNames: new Set(
             (

@@ -40,11 +40,17 @@ export async function POST(
     );
   }
 
-  const product = await prisma.product.findUnique({
-    where: { id: data.productId },
-    select: { id: true, name: true, sku: true },
-  });
-  if (!product) {
+  // 자유부속(productId 없음) — 상품 조회·FIFO 차감 없이 이름/규격 직접 저장.
+  // 카탈로그 부속은 기존대로 상품 검증 + FIFO.
+  const isFreePart = !data.productId;
+
+  const product = isFreePart
+    ? null
+    : await prisma.product.findUnique({
+        where: { id: data.productId! },
+        select: { id: true, name: true, sku: true },
+      });
+  if (!isFreePart && !product) {
     return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 });
   }
 
@@ -55,20 +61,23 @@ export async function POST(
       // 진단↔부속 frequency 추천 — 변경 전 snapshot
       const before = await snapshotTicketUsage(tx, id);
 
-      // 같은 productId 행이 이미 있으면 수량 증가 (카트 패턴)
-      const existing = await tx.repairPart.findFirst({
-        where: { repairTicketId: id, productId: data.productId, status: data.status },
-      });
+      // 자유부속은 합치지 않고 항상 새 행 (이름/규격이 매번 다를 수 있음)
+      // 카탈로그 부속만 같은 productId 행 수량 증가 (카트 패턴)
+      const existing = isFreePart
+        ? null
+        : await tx.repairPart.findFirst({
+            where: { repairTicketId: id, productId: data.productId, status: data.status },
+          });
 
       let resultPart;
       if (existing) {
         const additionalQty = data.quantity;
-        // 추가 분량만큼 FIFO 차감
+        // 추가 분량만큼 FIFO 차감 (existing 은 카탈로그 부속만 — product 보장)
         await consumeRepairPart(tx, existing.id, {
           ticketId: ticket.id,
           ticketNo: ticket.ticketNo,
-          productId: product.id,
-          productName: product.name,
+          productId: product!.id,
+          productName: product!.name,
           quantity: additionalQty,
         }, allowOversell);
         // 수량/총액 업데이트 (existing.consumedAt은 consumeRepairPart에서 갱신됨)
@@ -83,11 +92,14 @@ export async function POST(
           include: { product: { select: { id: true, name: true, sku: true } } },
         });
       } else {
-        // 신규 행
+        // 신규 행 — 카탈로그 부속은 productId, 자유부속은 name/spec/presaleKind
         const part = await tx.repairPart.create({
           data: {
             repairTicketId: id,
-            productId: data.productId,
+            productId: data.productId ?? null,
+            name: isFreePart ? data.name?.trim() || "부속" : null,
+            spec: isFreePart ? data.spec?.trim() || null : null,
+            presaleKind: isFreePart ? data.presaleKind ?? null : null,
             quantity: data.quantity,
             unitPrice: data.unitPrice,
             totalPrice: data.quantity * data.unitPrice,
@@ -96,13 +108,16 @@ export async function POST(
           },
         });
 
-        await consumeRepairPart(tx, part.id, {
-          ticketId: ticket.id,
-          ticketNo: ticket.ticketNo,
-          productId: product.id,
-          productName: product.name,
-          quantity: data.quantity,
-        }, allowOversell);
+        // 카탈로그 부속만 FIFO 차감. 자유부속은 재고 미차감 → /presale 에서 사후 정산.
+        if (!isFreePart) {
+          await consumeRepairPart(tx, part.id, {
+            ticketId: ticket.id,
+            ticketNo: ticket.ticketNo,
+            productId: product!.id,
+            productName: product!.name,
+            quantity: data.quantity,
+          }, allowOversell);
+        }
 
         resultPart = await tx.repairPart.findUnique({
           where: { id: part.id },

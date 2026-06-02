@@ -49,6 +49,7 @@ export const serialDetailInclude = {
       parts: {
         select: {
           id: true,
+          name: true,
           quantity: true,
           totalPrice: true,
           product: { select: { name: true } },
@@ -178,7 +179,7 @@ export function buildSerialProfile(
     amount: masked ? null : Number(t.finalAmount),
     warrantyEnds: t.repairWarrantyEnds?.toISOString() ?? null,
     parts: t.parts.map((p) => ({
-      name: p.product.name,
+      name: p.product?.name ?? p.name ?? "부속",
       quantity: Number(p.quantity),
       amount: masked ? null : Number(p.totalPrice),
     })),

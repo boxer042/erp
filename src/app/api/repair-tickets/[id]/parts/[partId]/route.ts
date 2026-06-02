@@ -55,23 +55,25 @@ export async function PATCH(
         const newQty = data.quantity != null ? Number(data.quantity) : oldQty;
         const newPrice = data.unitPrice != null ? Number(data.unitPrice) : Number(part.unitPrice);
 
-        // 수량 변경 — 차이만큼 추가 차감 또는 부분 복원
-        if (newQty > oldQty) {
+        // 수량 변경 시 FIFO 재고 조정 — 카탈로그 부속(productId 있음)만.
+        // 자유부속(productId=null)은 재고 미차감 → 수량/가격만 업데이트.
+        const pName = part.product?.name ?? part.name ?? "부속";
+        if (part.productId && newQty > oldQty) {
           const delta = newQty - oldQty;
           await consumeRepairPart(tx, part.id, {
             ticketId: ticket.id,
             ticketNo: ticket.ticketNo,
             productId: part.productId,
-            productName: part.product.name,
+            productName: pName,
             quantity: delta,
           }, allowOversell);
-        } else if (newQty < oldQty) {
+        } else if (part.productId && newQty < oldQty) {
           // 부분 복원 — 단순화: 전체 복원 후 새 수량으로 재차감
           await restoreRepairPart(tx, part.id, {
             ticketId: ticket.id,
             ticketNo: ticket.ticketNo,
             productId: part.productId,
-            productName: part.product.name,
+            productName: pName,
             quantity: oldQty,
             reason: "수량 변경",
           });
@@ -80,7 +82,7 @@ export async function PATCH(
               ticketId: ticket.id,
               ticketNo: ticket.ticketNo,
               productId: part.productId,
-              productName: part.product.name,
+              productName: pName,
               quantity: newQty,
             }, allowOversell);
           }
@@ -149,12 +151,13 @@ export async function DELETE(
     await prisma.$transaction(
       async (tx) => {
         const before = await snapshotTicketUsage(tx, ticket.id);
-        if (part.consumedAt) {
+        // 자유부속(productId=null)은 FIFO 미차감이라 복원 대상 아님
+        if (part.consumedAt && part.productId) {
           await restoreRepairPart(tx, part.id, {
             ticketId: ticket.id,
             ticketNo: ticket.ticketNo,
             productId: part.productId,
-            productName: part.product.name,
+            productName: part.product?.name ?? part.name ?? "부속",
             quantity: Number(part.quantity),
             reason: "부속 행 삭제",
           });

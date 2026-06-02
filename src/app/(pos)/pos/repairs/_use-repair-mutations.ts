@@ -42,15 +42,21 @@ export function useRepairMutations(ticketId: string) {
   // ─── 부속 ───────────────────────────────────────────────────────────
   const addPart = useMutation({
     mutationFn: (p: {
-      productId: string;
+      /** 카탈로그 부속이면 productId, 자유부속이면 생략(null) */
+      productId?: string | null;
       name: string;
-      sku: string;
+      sku?: string;
+      /** 자유부속 규격 */
+      spec?: string | null;
+      /** 자유부속 선판매 마커 */
+      presaleKind?: "used" | null;
       quantity: number;
       unitPrice: number;
       status?: RepairPartStatus;
     }) =>
       apiMutate<RepairPart>(`/api/repair-tickets/${ticketId}/parts`, "POST", {
-        productId: p.productId,
+        productId: p.productId ?? null,
+        ...(p.productId ? {} : { name: p.name, spec: p.spec ?? null, presaleKind: p.presaleKind ?? null }),
         quantity: p.quantity,
         unitPrice: p.unitPrice,
         status: p.status ?? "USED",
@@ -58,11 +64,12 @@ export function useRepairMutations(ticketId: string) {
     onMutate: async (p) => {
       const ctx = await begin();
       const status = p.status ?? "USED";
+      const isFree = !p.productId;
       patch((t) => {
-        // 같은 상품+상태 행 있으면 수량 증가 (서버 merge 규칙 미러)
-        const existing = t.parts.find(
-          (x) => x.productId === p.productId && x.status === status,
-        );
+        // 카탈로그 부속만 같은 상품+상태 행 수량 증가 (서버 merge 규칙 미러). 자유부속은 항상 새 행.
+        const existing = isFree
+          ? undefined
+          : t.parts.find((x) => x.productId === p.productId && x.status === status);
         if (existing) {
           const q = num(existing.quantity) + p.quantity;
           return {
@@ -76,8 +83,11 @@ export function useRepairMutations(ticketId: string) {
         }
         const temp: RepairPart = {
           id: `tmp-${crypto.randomUUID()}`,
-          productId: p.productId,
-          product: { id: p.productId, name: p.name, sku: p.sku },
+          productId: p.productId ?? null,
+          product: p.productId ? { id: p.productId, name: p.name, sku: p.sku ?? "" } : null,
+          name: isFree ? p.name : null,
+          spec: isFree ? p.spec ?? null : null,
+          presaleKind: isFree ? p.presaleKind ?? null : null,
           quantity: String(p.quantity),
           unitPrice: String(p.unitPrice),
           totalPrice: String(p.quantity * p.unitPrice),

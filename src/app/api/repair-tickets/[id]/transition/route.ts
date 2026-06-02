@@ -358,7 +358,8 @@ export async function POST(
       await prisma.$transaction(async (tx) => {
         for (const part of ticket.parts) {
           if (part.status !== "USED") continue;
-          if (!part.consumedAt) continue;
+          // 자유부속(productId=null)은 FIFO 미차감이라 복원 대상 아님
+          if (!part.consumedAt || !part.productId) continue;
           await restoreRepairPart(tx, part.id, {
             ticketId: ticket.id,
             ticketNo: ticket.ticketNo,

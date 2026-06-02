@@ -72,8 +72,8 @@ export default async function RepairPrintPage({
     diagnosis: ticket.diagnosis,
     repairNotes: ticket.repairNotes,
     parts: ticket.parts.map((p) => ({
-      name: p.product.name,
-      sku: p.product.sku,
+      name: p.product?.name ?? p.name ?? "부속",
+      sku: p.product?.sku ?? "",
       quantity: p.quantity.toString(),
       unitPrice: p.unitPrice.toString(),
       totalPrice: p.totalPrice.toString(),

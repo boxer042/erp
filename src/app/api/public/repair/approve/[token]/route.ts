@@ -33,7 +33,7 @@ export async function GET(
     quotedTotalAmount: Number(ticket.quotedTotalAmount),
     approvedAt: ticket.approvedAt,
     parts: ticket.parts.map((p) => ({
-      name: p.product.name,
+      name: p.product?.name ?? p.name ?? "부속",
       quantity: Number(p.quantity),
       unitPrice: Number(p.unitPrice),
       totalPrice: Number(p.totalPrice),

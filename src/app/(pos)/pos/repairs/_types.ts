@@ -65,8 +65,14 @@ export interface RepairTicketRow {
 
 export interface RepairPart {
   id: string;
-  productId: string;
-  product: { id: string; name: string; sku: string };
+  /** 카탈로그 부속이면 상품 id, 자유부속이면 null */
+  productId: string | null;
+  product: { id: string; name: string; sku: string } | null;
+  /** 자유부속 표시명·규격 (productId 없을 때) */
+  name: string | null;
+  spec: string | null;
+  /** 자유부속 선판매 마커 — "used"(미등록 중고 부속) */
+  presaleKind: string | null;
   quantity: string;
   unitPrice: string;
   totalPrice: string;
