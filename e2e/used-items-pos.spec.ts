@@ -120,7 +120,7 @@ test.describe("Phase 3 — POS UsedItem 통합", () => {
 
   test("선판매 정리 페이지 로드 + 알림 텍스트", async ({ page }) => {
     await page.goto("/presale");
-    await expect(page.getByText(/\[선판매\] 로 결제된 미등록/)).toBeVisible({
+    await expect(page.getByText(/결제됐지만 미등록인 라인/)).toBeVisible({
       timeout: 30_000,
     });
     // 두 카드 (미등록 선판매 목록 / 매입 정보 등록) 노출
