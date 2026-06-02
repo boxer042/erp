@@ -27,19 +27,30 @@ import {
 
 interface PendingPresaleItem {
   id: string;
-  serviceName: string | null;
-  /** "used"=미등록 중고(활성). 향후 "catalog"(내상품)·수리 등. */
+  /** 출처 — 판매분(주문 자유라인) / 수리사용분(수리 자유부속) */
+  sourceType: "order" | "repair";
+  name: string;
+  spec: string | null;
+  /** "used"=미등록 중고(활성). 향후 "catalog"(내상품). */
   presaleKind: string | null;
   quantity: string;
   unitPrice: string;
   totalPrice: string;
-  order: {
-    id: string;
-    orderNo: string;
-    orderDate: string;
-    customerId: string | null;
-    customerName: string | null;
-  };
+  refId: string;
+  refNo: string;
+  refDate: string;
+  customerId: string | null;
+  customerName: string | null;
+}
+
+const SOURCE_META: Record<"order" | "repair", { label: string; href: (id: string) => string }> = {
+  order: { label: "판매", href: (id) => `/orders?id=${id}` },
+  repair: { label: "수리", href: (id) => `/pos/repairs/${id}` },
+};
+
+/** VAT 포함 표시 (선판매 부속·라인은 항상 과세) */
+function fmtInc(net: number): string {
+  return `₩${Math.round(net * 1.1).toLocaleString("ko-KR")}`;
 }
 
 // 선판매 종류별 표시 (확장 지점) — 현재 "used"만 활성.
@@ -52,7 +63,8 @@ const PRESALE_KIND_META: Record<
 };
 
 interface RegisterFormValue {
-  orderItemId: string;
+  sourceType: "order" | "repair" | "";
+  lineId: string;
   displayName: string;
   acquiredCost: string;
   sourceMemo: string;
@@ -60,7 +72,8 @@ interface RegisterFormValue {
 }
 
 const EMPTY_FORM: RegisterFormValue = {
-  orderItemId: "",
+  sourceType: "",
+  lineId: "",
   displayName: "",
   acquiredCost: "",
   sourceMemo: "",
@@ -80,7 +93,8 @@ export default function PresalePage() {
   const registerMutation = useMutation({
     mutationFn: () =>
       apiMutate("/api/presale", "POST", {
-        orderItemId: form.orderItemId,
+        sourceType: form.sourceType,
+        lineId: form.lineId,
         displayName: form.displayName,
         acquiredCost: form.acquiredCost || "0",
         sourceMemo: form.sourceMemo || null,
@@ -100,8 +114,9 @@ export default function PresalePage() {
   const select = (item: PendingPresaleItem) => {
     setSelectedKind(item.presaleKind);
     setForm({
-      orderItemId: item.id,
-      displayName: item.serviceName ?? "",
+      sourceType: item.sourceType,
+      lineId: item.id,
+      displayName: item.name,
       acquiredCost: "",
       sourceMemo: "",
       memo: "",
@@ -109,7 +124,7 @@ export default function PresalePage() {
   };
 
   const handleSubmit = () => {
-    if (!form.orderItemId) {
+    if (!form.lineId) {
       toast.error("먼저 선판매 항목을 선택하세요");
       return;
     }
@@ -135,9 +150,9 @@ export default function PresalePage() {
 
       <JmContainer width="default" padded={false} className="p-6">
         <JmAlert variant="info" className="mb-4">
-          [선판매] 로 결제된 미등록 라인입니다. 매입 정보를 등록하면 중고품으로
-          연결되고 원가가 보정돼 마진 리포트 정합성이 회복됩니다. 최근 30일. (내상품·수리
-          연결은 준비 중)
+          결제됐지만 미등록인 라인입니다 — <b>판매</b>(주문 [선판매] 자유라인) +{" "}
+          <b>수리</b>(수리에 쓴 미등록 자유부속). 매입 정보를 등록하면 중고품으로 연결되고
+          원가가 보정돼 마진 정합성이 회복됩니다. 최근 30일. (내상품 연결은 준비 중)
         </JmAlert>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -157,10 +172,8 @@ export default function PresalePage() {
                 </p>
               ) : (
                 pending.map((item) => {
-                  const selected = form.orderItemId === item.id;
-                  const meta = item.presaleKind
-                    ? PRESALE_KIND_META[item.presaleKind]
-                    : undefined;
+                  const selected = form.lineId === item.id;
+                  const src = SOURCE_META[item.sourceType];
                   return (
                     <button
                       key={item.id}
@@ -173,37 +186,42 @@ export default function PresalePage() {
                     >
                       <div className="flex w-full items-center justify-between gap-2">
                         <span className="flex min-w-0 items-center gap-1.5">
+                          {/* 유형 컬럼 — 판매 / 수리 한눈에 구분 */}
                           <span
-                            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-jm-2xs font-semibold ${
-                              meta?.active
-                                ? "bg-[var(--jm-success-bg)] text-[var(--jm-success-fg)]"
+                            className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-jm-2xs font-semibold ${
+                              item.sourceType === "repair"
+                                ? "bg-[var(--jm-info-bg)] text-[var(--jm-info-fg)]"
                                 : "bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)]"
                             }`}
                           >
-                            선판매 {meta?.label ?? "기타"}
+                            {src.label}
                           </span>
                           <span className="truncate font-medium text-[var(--jm-text)]">
-                            {item.serviceName ?? "(이름 없음)"}
+                            {item.name}
                           </span>
+                          {item.spec && (
+                            <span className="shrink-0 text-jm-2xs text-[var(--jm-text-muted)]">
+                              {item.spec}
+                            </span>
+                          )}
                         </span>
-                        {selected && (
-                          <Check className="size-4 shrink-0 text-[var(--jm-cta)]" />
-                        )}
+                        {selected && <Check className="size-4 shrink-0 text-[var(--jm-cta)]" />}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-jm-xs text-[var(--jm-text-muted)]">
                         <Link
-                          href={`/orders?id=${item.order.id}`}
+                          href={src.href(item.refId)}
                           onClick={(e) => e.stopPropagation()}
                           className="font-[family-name:var(--jm-font-mono)] hover:underline"
                         >
-                          {item.order.orderNo}
+                          {item.refNo}
                         </Link>
                         <span>·</span>
-                        <span>{format(new Date(item.order.orderDate), "yyyy-MM-dd")}</span>
+                        <span>{format(new Date(item.refDate), "yyyy-MM-dd")}</span>
                         <span>·</span>
-                        <span>{item.order.customerName ?? "비회원"}</span>
+                        <span>{item.customerName ?? "비회원"}</span>
+                        {/* 금액 — VAT 포함 */}
                         <span className="ml-auto tabular-nums">
-                          ₩{parseFloat(item.totalPrice).toLocaleString("ko-KR")}
+                          {fmtInc(parseFloat(item.totalPrice) || 0)}
                         </span>
                       </div>
                     </button>
@@ -219,7 +237,7 @@ export default function PresalePage() {
               <JmCardTitle>매입 정보 등록</JmCardTitle>
             </JmCardHeader>
             <JmCardContent className="space-y-3">
-              {!form.orderItemId ? (
+              {!form.lineId ? (
                 <p className="py-8 text-center text-jm-sm text-[var(--jm-text-muted)]">
                   좌측 목록에서 항목을 선택하세요
                 </p>

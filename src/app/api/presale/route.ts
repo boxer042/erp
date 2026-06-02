@@ -5,17 +5,34 @@ import { nextUsedItemCode } from "@/lib/used-item-code";
 import { z } from "zod";
 
 /**
- * 선판매 정리 — 결제됐지만 미등록인 자유 라인(presaleKind 보유)을 모아
- * 종류별(중고/내상품/수리)로 실제 등록해 연결하는 cross-domain 허브.
+ * 선판매 정리 — 결제됐지만 미등록인 라인(presaleKind 보유)을 모아
+ * 종류별로 실제 등록(중고품 생성)해 연결하는 cross-domain 허브.
  *
- * presaleKind 가 없는 순수 기술료/공임 라인은 등록할 원가·상품이 없어 제외.
- * 현재 "used"(중고)만 활성, "catalog"(내상품)·수리는 향후 확장.
+ * 두 출처:
+ *  - order  (판매분): OrderItem 자유 라인 — POS/주문 [선판매] 버튼으로 판매
+ *  - repair (수리사용분): RepairPart 자유부속 — 수리에 쓴 미등록 부속 (PICKED_UP 결제완료)
+ *
+ * 순수 기술료/공임(presaleKind=null)은 등록할 원가·상품이 없어 제외.
+ * 현재 "used"(중고)만 활성, "catalog"(내상품)은 향후.
  */
 
-/**
- * GET /api/presale
- * 미정리 선판매 라인 목록 — presaleKind 가 있고 아직 등록(link) 안 된 자유 라인.
- */
+interface PresaleRow {
+  id: string;
+  sourceType: "order" | "repair";
+  name: string;
+  spec: string | null;
+  presaleKind: string | null;
+  quantity: string;
+  unitPrice: string;
+  totalPrice: string;
+  /** 원천 문서 — 판매=주문, 수리사용=수리티켓 */
+  refId: string;
+  refNo: string;
+  refDate: string;
+  customerId: string | null;
+  customerName: string | null;
+}
+
 export async function GET(request: NextRequest) {
   const [, deny] = await guardUser();
   if (deny) return deny;
@@ -25,18 +42,14 @@ export async function GET(request: NextRequest) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const items = await prisma.orderItem.findMany({
+  // ① 판매분 — OrderItem 자유 라인
+  const orderItems = await prisma.orderItem.findMany({
     where: {
       productId: null,
-      // 이미 link 된 OrderItem 은 제외 (UsedItem.orderItemId @unique)
       soldUsedItem: null,
       serviceName: { not: null },
-      // 선판매 마커 있는 라인만 — 순수 기술료(presaleKind=null)는 등록 대상 아님
       presaleKind: { not: null },
-      order: {
-        orderDate: { gte: since },
-        status: { notIn: ["CANCELLED", "RETURNED"] },
-      },
+      order: { orderDate: { gte: since }, status: { notIn: ["CANCELLED", "RETURNED"] } },
     },
     select: {
       id: true,
@@ -46,30 +59,87 @@ export async function GET(request: NextRequest) {
       unitPrice: true,
       totalPrice: true,
       order: {
-        select: {
-          id: true,
-          orderNo: true,
-          orderDate: true,
-          customerId: true,
-          customerName: true,
-        },
+        select: { id: true, orderNo: true, orderDate: true, customerId: true, customerName: true },
       },
     },
     orderBy: [{ order: { orderDate: "desc" } }],
     take: 100,
   });
 
-  // 중고(used) 우선 — 향후 catalog/수리 종류 섞일 때 그룹 정렬 (V8 stable sort 로 날짜 순서 유지)
-  items.sort(
-    (a, b) =>
-      (b.presaleKind === "used" ? 1 : 0) - (a.presaleKind === "used" ? 1 : 0),
-  );
+  // ② 수리사용분 — RepairPart 자유부속 (결제완료 티켓)
+  const repairParts = await prisma.repairPart.findMany({
+    where: {
+      productId: null,
+      presaleKind: { not: null },
+      soldUsedItem: null,
+      repairTicket: { status: "PICKED_UP", pickedUpAt: { gte: since } },
+    },
+    select: {
+      id: true,
+      name: true,
+      spec: true,
+      presaleKind: true,
+      quantity: true,
+      unitPrice: true,
+      totalPrice: true,
+      repairTicket: {
+        select: {
+          id: true,
+          ticketNo: true,
+          pickedUpAt: true,
+          customerId: true,
+          customer: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: [{ repairTicket: { pickedUpAt: "desc" } }],
+    take: 100,
+  });
 
-  return NextResponse.json(items);
+  const rows: PresaleRow[] = [
+    ...orderItems.map((o) => ({
+      id: o.id,
+      sourceType: "order" as const,
+      name: o.serviceName ?? "(이름 없음)",
+      spec: null,
+      presaleKind: o.presaleKind,
+      quantity: String(o.quantity),
+      unitPrice: String(o.unitPrice),
+      totalPrice: String(o.totalPrice),
+      refId: o.order.id,
+      refNo: o.order.orderNo,
+      refDate: o.order.orderDate.toISOString(),
+      customerId: o.order.customerId,
+      customerName: o.order.customerName,
+    })),
+    ...repairParts.map((p) => ({
+      id: p.id,
+      sourceType: "repair" as const,
+      name: p.name ?? "(이름 없음)",
+      spec: p.spec,
+      presaleKind: p.presaleKind,
+      quantity: String(p.quantity),
+      unitPrice: String(p.unitPrice),
+      totalPrice: String(p.totalPrice),
+      refId: p.repairTicket.id,
+      refNo: p.repairTicket.ticketNo,
+      refDate: (p.repairTicket.pickedUpAt ?? new Date(0)).toISOString(),
+      customerId: p.repairTicket.customerId,
+      customerName: p.repairTicket.customer?.name ?? null,
+    })),
+  ];
+
+  // 최근순 + used 우선 (V8 stable sort)
+  rows.sort((a, b) => b.refDate.localeCompare(a.refDate));
+  rows.sort((a, b) => (b.presaleKind === "used" ? 1 : 0) - (a.presaleKind === "used" ? 1 : 0));
+
+  return NextResponse.json(rows);
 }
 
 const reconcileSchema = z.object({
-  orderItemId: z.string().min(1),
+  sourceType: z.enum(["order", "repair"]),
+  /** OrderItem.id (order) 또는 RepairPart.id (repair) */
+  lineId: z.string().min(1),
   displayName: z.string().min(1, "품명을 입력해주세요"),
   acquiredCost: z.string().regex(/^-?\d+(\.\d+)?$/).default("0"),
   productId: z.string().nullish(),
@@ -80,10 +150,10 @@ const reconcileSchema = z.object({
 
 /**
  * POST /api/presale
- * 선판매 라인을 종류(presaleKind)에 따라 실제 도메인 레코드로 등록 + link.
- *  - "used"    → UsedItem 생성 (status=SOLD, acquiredFrom=EMERGENCY_USE) + OrderItem.unitCostSnapshot 보정
- *  - "catalog" → (향후) 카탈로그 상품 등록/연결
- *  - 그 외/수리 → (향후) 미지원
+ * 선판매 라인을 UsedItem 으로 등록 + link. 출처별 분기:
+ *  - order  → UsedItem(orderItemId link) + OrderItem.unitCostSnapshot 보정
+ *  - repair → UsedItem(repairPartId link) + RepairPart.unitCostSnapshot 보정
+ * 둘 다 acquiredFrom=EMERGENCY_USE, status=SOLD.
  */
 export async function POST(request: NextRequest) {
   const [user, deny] = await guardUser();
@@ -94,41 +164,69 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-
   const data = parsed.data;
-
-  const orderItem = await prisma.orderItem.findUnique({
-    where: { id: data.orderItemId },
-    include: {
-      order: { select: { orderDate: true, customerId: true } },
-      soldUsedItem: { select: { id: true } },
-    },
-  });
-  if (!orderItem) {
-    return NextResponse.json({ error: "주문 항목을 찾을 수 없습니다" }, { status: 404 });
-  }
-  if (orderItem.soldUsedItem) {
-    return NextResponse.json(
-      { error: "이미 등록되어 연결된 라인입니다" },
-      { status: 400 },
-    );
-  }
-
-  // 종류 분기 — 현재 중고만 활성
-  if (orderItem.presaleKind !== "used") {
-    return NextResponse.json(
-      { error: "아직 지원하지 않는 선판매 유형입니다 (내상품·수리는 준비 중)" },
-      { status: 400 },
-    );
-  }
-
-  const acquiredAt = orderItem.order.orderDate;
   const acquiredCost = parseFloat(data.acquiredCost) || 0;
 
   try {
+    if (data.sourceType === "order") {
+      const orderItem = await prisma.orderItem.findUnique({
+        where: { id: data.lineId },
+        include: {
+          order: { select: { orderDate: true } },
+          soldUsedItem: { select: { id: true } },
+        },
+      });
+      if (!orderItem) return NextResponse.json({ error: "주문 항목을 찾을 수 없습니다" }, { status: 404 });
+      if (orderItem.soldUsedItem)
+        return NextResponse.json({ error: "이미 등록되어 연결된 라인입니다" }, { status: 400 });
+      if (orderItem.presaleKind !== "used")
+        return NextResponse.json({ error: "아직 지원하지 않는 선판매 유형입니다" }, { status: 400 });
+
+      const created = await prisma.$transaction(async (tx) => {
+        const internalCode = await nextUsedItemCode(tx, orderItem.order.orderDate);
+        const usedItem = await tx.usedItem.create({
+          data: {
+            internalCode,
+            displayName: data.displayName,
+            productId: data.productId ?? null,
+            acquiredFrom: "EMERGENCY_USE",
+            acquiredCost,
+            isAcquiredTaxable: false,
+            acquiredAt: orderItem.order.orderDate,
+            sourceCustomerId: data.sourceCustomerId ?? null,
+            sourceMemo: data.sourceMemo ?? null,
+            memo: data.memo ?? null,
+            status: "SOLD",
+            orderItemId: orderItem.id,
+            createdById: user!.id,
+          },
+        });
+        await tx.orderItem.update({
+          where: { id: orderItem.id },
+          data: { unitCostSnapshot: acquiredCost / Math.max(1, Number(orderItem.quantity)) },
+        });
+        return usedItem;
+      });
+      return NextResponse.json(created, { status: 201 });
+    }
+
+    // repair — RepairPart 자유부속
+    const part = await prisma.repairPart.findUnique({
+      where: { id: data.lineId },
+      include: {
+        repairTicket: { select: { pickedUpAt: true } },
+        soldUsedItem: { select: { id: true } },
+      },
+    });
+    if (!part) return NextResponse.json({ error: "수리 부속을 찾을 수 없습니다" }, { status: 404 });
+    if (part.soldUsedItem)
+      return NextResponse.json({ error: "이미 등록되어 연결된 부속입니다" }, { status: 400 });
+    if (part.presaleKind !== "used")
+      return NextResponse.json({ error: "아직 지원하지 않는 선판매 유형입니다" }, { status: 400 });
+
+    const acquiredAt = part.repairTicket.pickedUpAt ?? new Date();
     const created = await prisma.$transaction(async (tx) => {
       const internalCode = await nextUsedItemCode(tx, acquiredAt);
-
       const usedItem = await tx.usedItem.create({
         data: {
           internalCode,
@@ -142,22 +240,17 @@ export async function POST(request: NextRequest) {
           sourceMemo: data.sourceMemo ?? null,
           memo: data.memo ?? null,
           status: "SOLD",
-          orderItemId: orderItem.id,
+          repairPartId: part.id,
           createdById: user!.id,
         },
       });
-
-      // OrderItem.unitCostSnapshot 갱신 — 마진 리포트 정합성
-      await tx.orderItem.update({
-        where: { id: orderItem.id },
-        data: {
-          unitCostSnapshot: acquiredCost / Math.max(1, Number(orderItem.quantity)),
-        },
+      // 수리 부속 원가 보정 — 마진 정합성
+      await tx.repairPart.update({
+        where: { id: part.id },
+        data: { unitCostSnapshot: acquiredCost / Math.max(1, Number(part.quantity)) },
       });
-
       return usedItem;
     });
-
     return NextResponse.json(created, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "선판매 정리에 실패했습니다";
