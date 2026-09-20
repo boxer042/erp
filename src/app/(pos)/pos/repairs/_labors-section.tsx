@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2, Wrench } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
-import { JmButton, JmCard, JmIconButton, JmInput, JmNumberInput } from "@/jm";
+import { JmButton, JmCard, JmIconButton, JmInput } from "@/jm";
 import { fmtKRWInc } from "./_helpers";
 import type { RepairLabor } from "./_types";
 import { useRepairMutations } from "./_use-repair-mutations";
@@ -139,8 +139,9 @@ function LaborAddSheet({
   onAdd: (name: string, unitRate: number) => void;
 }) {
   const [name, setName] = useState("");
-  const [rate, setRate] = useState("");
-  const canAdd = name.trim().length > 0 && !!rate;
+  const [amount, setAmount] = useState(0);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const canAdd = name.trim().length > 0 && amount > 0;
 
   return (
     <BottomSheet
@@ -151,7 +152,7 @@ function LaborAddSheet({
         <button
           type="button"
           disabled={!canAdd}
-          onClick={() => onAdd(name.trim(), parseInt(rate.replace(/,/g, ""), 10) || 0)}
+          onClick={() => onAdd(name.trim(), Math.max(0, Math.round(amount)))}
           className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
         >
           추가
@@ -166,11 +167,28 @@ function LaborAddSheet({
           onChange={(e) => setName(e.target.value)}
           placeholder="공임명 (예: 분해/조립)"
         />
-        <JmNumberInput value={rate} onValueChange={setRate} placeholder="₩ 금액 (공급가액)" />
-        <p className="text-jm-2xs text-[var(--jm-text-muted)]">
-          공임은 항상 과세(VAT 10%) — 입력은 공급가액(세전) 기준입니다.
-        </p>
+        {/* 금액 — 선판매 시트와 동일하게 PriceInputDialog 재사용 (VAT 토글 내장) */}
+        <button
+          type="button"
+          onClick={() => setPriceOpen(true)}
+          className="flex h-12 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 active:bg-[var(--jm-surface-muted)]"
+        >
+          <span className="text-jm-sm text-[var(--jm-text-muted)]">금액</span>
+          <span className="text-jm-md font-semibold tabular-nums text-[var(--jm-text)]">
+            {fmtKRWInc(amount)}
+          </span>
+        </button>
       </div>
+
+      <PriceInputDialog
+        open={priceOpen}
+        onOpenChange={setPriceOpen}
+        title="공임 금액"
+        initialNet={amount}
+        taxType="TAXABLE"
+        allowService={false}
+        onSubmit={(net) => setAmount(net)}
+      />
     </BottomSheet>
   );
 }

@@ -146,13 +146,13 @@ function Body({ onOpenChange, onAdd }: Props) {
               onClick={() => setPriceOpen(true)}
               className="flex h-12 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 active:bg-[var(--jm-surface-muted)]"
             >
-              <span className="text-jm-sm text-[var(--jm-text-muted)]">금액 (공급가액)</span>
+              <span className="text-jm-sm text-[var(--jm-text-muted)]">금액</span>
               <span className="text-jm-md font-semibold tabular-nums text-[var(--jm-text)]">
                 ₩{amount.toLocaleString("ko-KR")}
               </span>
             </button>
             <p className="text-jm-2xs text-[var(--jm-text-muted)]">
-              입력은 공급가액(세전) 기준 — 항상 과세(VAT 10%). 결제 후 [선판매 정리]에서{" "}
+              결제 후 [선판매 정리]에서{" "}
               {kind === "used" ? "중고품으로 등록하면" : "카탈로그 상품을 연결하면"} 원가가 보정됩니다.
             </p>
           </div>

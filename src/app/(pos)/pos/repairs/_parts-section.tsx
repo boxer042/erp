@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search, Package } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
-import { JmBadge, JmCard, JmComboboxDrawer, JmInput, JmNumberInput } from "@/jm";
+import { JmBadge, JmCard, JmComboboxDrawer, JmInput } from "@/jm";
 import { fmtKRWInc } from "./_helpers";
 import type { RepairPart } from "./_types";
 import { useRepairMutations } from "./_use-repair-mutations";
@@ -224,8 +224,9 @@ function FreePartAddSheet({
 }) {
   const [name, setName] = useState("");
   const [spec, setSpec] = useState("");
-  const [price, setPrice] = useState("");
-  const canAdd = name.trim().length > 0 && !!price;
+  const [amount, setAmount] = useState(0);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const canAdd = name.trim().length > 0 && amount > 0;
 
   return (
     <BottomSheet
@@ -236,7 +237,7 @@ function FreePartAddSheet({
         <button
           type="button"
           disabled={!canAdd}
-          onClick={() => onAdd(name.trim(), spec.trim() || null, parseInt(price.replace(/,/g, ""), 10) || 0)}
+          onClick={() => onAdd(name.trim(), spec.trim() || null, Math.max(0, Math.round(amount)))}
           className="h-14 w-full rounded-2xl bg-[var(--jm-action)] text-jm-lg font-semibold text-white transition-transform active:scale-[0.99] disabled:opacity-50"
         >
           추가
@@ -246,11 +247,31 @@ function FreePartAddSheet({
       <div className="flex flex-col gap-3 pt-2">
         <JmInput autoFocus size="md" value={name} onChange={(e) => setName(e.target.value)} placeholder="부속명 (예: 중고 기화기)" />
         <JmInput size="md" value={spec} onChange={(e) => setSpec(e.target.value)} placeholder="규격 (선택)" />
-        <JmNumberInput value={price} onValueChange={setPrice} placeholder="₩ 가격 (공급가액)" />
+        {/* 금액 — 선판매 시트와 동일하게 PriceInputDialog 재사용 (VAT 토글 내장) */}
+        <button
+          type="button"
+          onClick={() => setPriceOpen(true)}
+          className="flex h-12 items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-bg)] px-4 active:bg-[var(--jm-surface-muted)]"
+        >
+          <span className="text-jm-sm text-[var(--jm-text-muted)]">금액</span>
+          <span className="text-jm-md font-semibold tabular-nums text-[var(--jm-text)]">
+            {fmtKRWInc(amount)}
+          </span>
+        </button>
         <p className="text-jm-2xs text-[var(--jm-text-muted)]">
-          재고에 없는 부속 — 손님 청구는 지금, 원가는 결제 후 [선판매]에서 정산. 항상 과세(VAT 10%).
+          재고에 없는 부속 — 손님 청구는 지금, 원가는 결제 후 [선판매]에서 정산합니다.
         </p>
       </div>
+
+      <PriceInputDialog
+        open={priceOpen}
+        onOpenChange={setPriceOpen}
+        title="부속 가격"
+        initialNet={amount}
+        taxType="TAXABLE"
+        allowService={false}
+        onSubmit={(net) => setAmount(net)}
+      />
     </BottomSheet>
   );
 }

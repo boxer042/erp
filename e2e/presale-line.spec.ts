@@ -45,7 +45,7 @@ test.describe("선판매 자유 라인 — PresaleSheet 공용", () => {
     await page.getByPlaceholder(/센다이 엔진/).fill(itemName);
 
     // 금액 → PriceInputDialog
-    await page.getByRole("button", { name: /금액 \(공급가액\)/ }).click();
+    await page.getByRole("button", { name: /^금액/ }).click();
     await expect(page.getByRole("heading", { name: "선판매 금액" })).toBeVisible();
     // 공급가액 입력 (PriceInputDialog 내 유일 numeric 입력 2개 중 첫 번째)
     await page.locator('input[inputmode="numeric"]').first().fill("50000");
