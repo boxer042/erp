@@ -9,13 +9,13 @@ import { test, expect } from "@playwright/test";
  *
  * 검증:
  *  - 카트 액션 그리드에 [선판매] 버튼 노출
- *  - 모달에서 [내상품] 비활성 + [중고상품] 활성 (설계: 중고만 활성)
+ *  - 모달에서 [내상품]·[중고상품] 모두 활성 (내상품 선판매 개시)
  *  - 중고상품 → 품명/금액 자유 입력 → 카트에 "중고 선판매" 배지 라인 추가
  *  - 주문 미제출 (DB 미기록 → 정리 불필요)
  */
 
 test.describe("선판매 자유 라인 — PresaleSheet 공용", () => {
-  test("[선판매] → 모달(내상품 비활/중고 활성) → 중고 자유입력 → 중고 선판매 배지 라인", async ({
+  test("[선판매] → 모달(내상품·중고 모두 활성) → 중고 자유입력 → 중고 선판매 배지 라인", async ({
     page,
   }) => {
     const itemName = `테스트중고엔진_${Date.now()}`;
@@ -32,10 +32,10 @@ test.describe("선판매 자유 라인 — PresaleSheet 공용", () => {
       page.getByRole("heading", { name: "선판매 — 미등록 항목 추가" }),
     ).toBeVisible();
 
-    // 내상품 = 비활성, 중고상품 = 활성 (설계 결정)
+    // 내상품·중고상품 모두 활성 (내상품 선판매 개시)
     const catalogOpt = page.getByRole("button", { name: /내상품/ });
     await expect(catalogOpt).toBeVisible();
-    await expect(catalogOpt).toBeDisabled();
+    await expect(catalogOpt).toBeEnabled();
 
     const usedOpt = page.getByRole("button", { name: /중고상품/ });
     await expect(usedOpt).toBeEnabled();

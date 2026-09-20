@@ -20,6 +20,7 @@ import {
   JmCardTitle,
   JmContainer,
   JmFormField,
+  JmCombobox,
   JmInput,
   JmSkeleton,
   JmTextarea,
@@ -43,6 +44,13 @@ interface PendingPresaleItem {
   customerName: string | null;
 }
 
+interface ProductOption {
+  id: string;
+  name: string;
+  sku: string;
+  sellingPrice: string;
+}
+
 const SOURCE_META: Record<"order" | "repair", { label: string; href: (id: string) => string }> = {
   order: { label: "판매", href: (id) => `/orders?id=${id}` },
   repair: { label: "수리", href: (id) => `/pos/repairs/${id}` },
@@ -59,7 +67,7 @@ const PRESALE_KIND_META: Record<
   { label: string; active: boolean }
 > = {
   used: { label: "중고", active: true },
-  catalog: { label: "내상품", active: false },
+  catalog: { label: "내상품", active: true },
 };
 
 interface RegisterFormValue {
@@ -69,6 +77,10 @@ interface RegisterFormValue {
   acquiredCost: string;
   sourceMemo: string;
   memo: string;
+  /** 내상품(catalog) 전용 — 연결할 카탈로그 상품 */
+  productId: string;
+  /** 내상품 전용 — 계속 취급할 재고 관리 대상인지 (FIFO 차감 여부) */
+  trackStock: boolean;
 }
 
 const EMPTY_FORM: RegisterFormValue = {
@@ -78,6 +90,8 @@ const EMPTY_FORM: RegisterFormValue = {
   acquiredCost: "",
   sourceMemo: "",
   memo: "",
+  productId: "",
+  trackStock: false,
 };
 
 export default function PresalePage() {
@@ -90,6 +104,14 @@ export default function PresalePage() {
     queryFn: () => apiGet<PendingPresaleItem[]>("/api/presale?days=30"),
   });
 
+  // 내상품 정산용 카탈로그 상품 목록 — catalog 라인 선택 시에만 fetch
+  const productsQuery = useQuery<ProductOption[]>({
+    queryKey: ["presale", "products"],
+    queryFn: () => apiGet<ProductOption[]>("/api/products?isBulk=all&excludeVariants=true"),
+    enabled: selectedKind === "catalog",
+    staleTime: 1000 * 60 * 5,
+  });
+
   const registerMutation = useMutation({
     mutationFn: () =>
       apiMutate("/api/presale", "POST", {
@@ -99,6 +121,10 @@ export default function PresalePage() {
         acquiredCost: form.acquiredCost || "0",
         sourceMemo: form.sourceMemo || null,
         memo: form.memo || null,
+        // 내상품 전용 — 연결 상품 + 재고 관리 여부
+        ...(selectedKind === "catalog"
+          ? { productId: form.productId || null, trackStock: form.trackStock }
+          : {}),
       }),
     onSuccess: () => {
       toast.success("선판매 항목이 등록되었습니다");
@@ -114,12 +140,10 @@ export default function PresalePage() {
   const select = (item: PendingPresaleItem) => {
     setSelectedKind(item.presaleKind);
     setForm({
+      ...EMPTY_FORM,
       sourceType: item.sourceType,
       lineId: item.id,
       displayName: item.name,
-      acquiredCost: "",
-      sourceMemo: "",
-      memo: "",
     });
   };
 
@@ -130,6 +154,10 @@ export default function PresalePage() {
     }
     if (!form.displayName.trim()) {
       toast.error("품명을 입력해주세요");
+      return;
+    }
+    if (selectedKind === "catalog" && !form.productId) {
+      toast.error("연결할 상품을 선택해주세요");
       return;
     }
     registerMutation.mutate();
@@ -152,7 +180,7 @@ export default function PresalePage() {
         <JmAlert variant="info" className="mb-4">
           결제됐지만 미등록인 라인입니다 — <b>판매</b>(주문 [선판매] 자유라인) +{" "}
           <b>수리</b>(수리에 쓴 미등록 자유부속). 매입 정보를 등록하면 중고품으로 연결되고
-          원가가 보정돼 마진 정합성이 회복됩니다. 최근 30일. (내상품 연결은 준비 중)
+          원가가 보정돼 마진 정합성이 회복됩니다. 최근 30일.
         </JmAlert>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -243,9 +271,7 @@ export default function PresalePage() {
                 </p>
               ) : !selectedActive ? (
                 <JmAlert variant="warning">
-                  {selectedKind === "catalog"
-                    ? "내상품 선판매 등록은 준비 중입니다."
-                    : "이 유형의 선판매 등록은 아직 지원하지 않습니다."}
+                  이 유형의 선판매 등록은 아직 지원하지 않습니다.
                 </JmAlert>
               ) : (
                 <>
@@ -273,13 +299,58 @@ export default function PresalePage() {
                       </span>
                     </div>
                   </JmFormField>
-                  <JmFormField label="매입처 메모">
-                    <JmInput
-                      value={form.sourceMemo}
-                      onChange={(e) => setForm({ ...form, sourceMemo: e.target.value })}
-                      placeholder="(선택) 박OO 등"
-                    />
-                  </JmFormField>
+                  {/* 내상품 — 카탈로그 상품 연결 + 재고 관리 여부 */}
+                  {selectedKind === "catalog" && (
+                    <>
+                      <JmFormField label="상품 연결" required>
+                        <JmCombobox
+                          items={(productsQuery.data ?? []).map((pr) => ({
+                            id: pr.id,
+                            label: pr.name,
+                            description: pr.sku,
+                          }))}
+                          value={form.productId}
+                          onChange={(item) => setForm({ ...form, productId: item.id })}
+                          placeholder={
+                            productsQuery.isPending ? "상품 불러오는 중…" : "카탈로그에서 상품 선택"
+                          }
+                          searchPlaceholder="상품명 또는 SKU 검색"
+                          emptyMessage="상품이 없습니다 — 먼저 상품을 등록하세요"
+                          clearable
+                          onClear={() => setForm({ ...form, productId: "" })}
+                        />
+                      </JmFormField>
+                      <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-bg)] p-3">
+                        <input
+                          type="checkbox"
+                          checked={form.trackStock}
+                          onChange={(e) => setForm({ ...form, trackStock: e.target.checked })}
+                          className="mt-0.5 size-4 shrink-0 accent-[var(--jm-action)]"
+                        />
+                        <span className="flex flex-col gap-0.5">
+                          <span className="text-jm-sm font-medium text-[var(--jm-text)]">
+                            재고 관리 대상
+                          </span>
+                          <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                            {form.trackStock
+                              ? "재고를 차감합니다. 입고 기록이 없으면 적자(음수) 재고로 남고, 나중에 입고하면 자동 상쇄됩니다."
+                              : "원가만 기록합니다 (일회성). 재고 수량은 건드리지 않습니다."}
+                          </span>
+                        </span>
+                      </label>
+                    </>
+                  )}
+
+                  {/* 중고 전용 — 매입처·상태 메모 */}
+                  {selectedKind === "used" && (
+                    <JmFormField label="매입처 메모">
+                      <JmInput
+                        value={form.sourceMemo}
+                        onChange={(e) => setForm({ ...form, sourceMemo: e.target.value })}
+                        placeholder="(선택) 박OO 등"
+                      />
+                    </JmFormField>
+                  )}
                   <JmFormField label="메모">
                     <JmTextarea
                       value={form.memo}

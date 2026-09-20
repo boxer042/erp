@@ -53,8 +53,8 @@ export const repairPartCreateSchema = z
     productId: z.string().nullish(),
     name: z.string().nullish(),
     spec: z.string().nullish(),
-    /** 자유부속 선판매 마커 — "used"(미등록 중고 부속). productId 없을 때만 의미 */
-    presaleKind: z.enum(["used"]).nullish(),
+    /** 자유부속 선판매 마커 — "used"(미등록 중고) / "catalog"(미등록 내상품). productId 없을 때만 의미 */
+    presaleKind: z.enum(["used", "catalog"]).nullish(),
     quantity: z.coerce.number().positive(),
     unitPrice: z.coerce.number().min(0),
     discount: z.string().default("0"),
