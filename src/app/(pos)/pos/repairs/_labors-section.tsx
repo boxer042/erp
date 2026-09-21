@@ -55,9 +55,12 @@ export function LaborsSection({ ticketId, labors, readonly, diagnosisTemplateId 
     staleTime: 1000 * 60 * 5,
   });
 
-  const addedNames = new Set(labors.map((l) => l.name));
-  const source = diagRecs.length > 0 ? diagRecs : recentQuery.data?.labors ?? [];
-  const recs = source.filter((r) => !addedNames.has(r.name));
+  // 담긴 건수 — 추천에서 빼지 않고 배지로 표시 (같은 공임을 두 번 청구하는 경우도 있음)
+  const addedCountByName = new Map<string, number>();
+  for (const l of labors) {
+    addedCountByName.set(l.name, (addedCountByName.get(l.name) ?? 0) + 1);
+  }
+  const recs = diagRecs.length > 0 ? diagRecs : recentQuery.data?.labors ?? [];
   const fromRecent = diagRecs.length === 0 && recs.length > 0;
 
   const total = labors.reduce((s, l) => s + Number(l.totalPrice), 0);
@@ -100,32 +103,45 @@ export function LaborsSection({ ticketId, labors, readonly, diagnosisTemplateId 
             <button
               type="button"
               onClick={() => setAddOpen(true)}
-              className="flex h-[88px] w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+              className="flex size-[88px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
             >
               <Plus className="size-5" />
               <span className="text-jm-2xs font-medium">직접추가</span>
             </button>
 
-            {recs.map((r) => (
-              <button
-                key={r.name}
-                type="button"
-                disabled={m.addLabor.isPending}
-                onClick={() => m.addLabor.mutate({ name: r.name, unitRate: r.unitRate })}
-                className="relative flex h-[88px] w-[76px] shrink-0 flex-col items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-1.5 text-center transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
-              >
-                <span className="absolute right-1 top-1 rounded bg-[var(--jm-accent-bg)] px-1 text-jm-3xs font-semibold text-[var(--jm-accent-fg)]">
-                  {r.occurrenceCount}
-                </span>
-                <Wrench className="size-5 shrink-0 text-[var(--jm-text-muted)]" />
-                <span className="line-clamp-2 text-jm-3xs leading-tight text-[var(--jm-text)]">
-                  {r.name}
-                </span>
-                <span className="text-jm-3xs font-semibold tabular-nums text-[var(--jm-text-muted)]">
-                  {fmtKRWInc(r.unitRate)}
-                </span>
-              </button>
-            ))}
+            {recs.map((r) => {
+              const cnt = addedCountByName.get(r.name) ?? 0;
+              return (
+                <button
+                  key={r.name}
+                  type="button"
+                  disabled={m.addLabor.isPending}
+                  onClick={() => m.addLabor.mutate({ name: r.name, unitRate: r.unitRate })}
+                  className={`relative flex size-[88px] shrink-0 flex-col items-center justify-between rounded-xl border p-1.5 text-center transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50 ${
+                    cnt > 0
+                      ? "border-[var(--jm-action)] bg-[var(--jm-surface)]"
+                      : "border-[var(--jm-border)] bg-[var(--jm-surface)]"
+                  }`}
+                >
+                  {cnt > 0 ? (
+                    <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-[var(--jm-action)] text-jm-3xs font-bold text-white">
+                      {cnt}
+                    </span>
+                  ) : (
+                    <span className="absolute right-1 top-1 rounded bg-[var(--jm-accent-bg)] px-1 text-jm-3xs font-semibold text-[var(--jm-accent-fg)]">
+                      {r.occurrenceCount}
+                    </span>
+                  )}
+                  <Wrench className="size-5 shrink-0 text-[var(--jm-text-muted)]" />
+                  <span className="line-clamp-2 text-jm-3xs leading-tight text-[var(--jm-text)]">
+                    {r.name}
+                  </span>
+                  <span className="text-jm-3xs font-semibold tabular-nums text-[var(--jm-text-muted)]">
+                    {fmtKRWInc(r.unitRate)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 

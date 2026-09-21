@@ -75,9 +75,14 @@ export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }:
     staleTime: 1000 * 60 * 5,
   });
 
-  const addedProductIds = new Set(parts.map((p) => p.productId));
-  const source = diagRecs.length > 0 ? diagRecs : recentQuery.data?.parts ?? [];
-  const recs = source.filter((r) => !addedProductIds.has(r.productId));
+  // 담긴 수량 — 추천에서 빼지 않고 배지로 표시해 계속 눌러 수량을 올릴 수 있게 한다
+  // (서버가 같은 productId 를 수량 증가로 합쳐줌 — 카트 패턴)
+  const addedQtyByProduct = new Map<string, number>();
+  for (const p of parts) {
+    if (!p.productId) continue;
+    addedQtyByProduct.set(p.productId, (addedQtyByProduct.get(p.productId) ?? 0) + Number(p.quantity));
+  }
+  const recs = diagRecs.length > 0 ? diagRecs : recentQuery.data?.parts ?? [];
   const fromRecent = diagRecs.length === 0 && recs.length > 0;
 
   const usedTotal = parts
@@ -136,49 +141,62 @@ export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }:
           </div>
         )}
 
-        {/* 가로 카드 — [+직접추가] + 추천(정사각, 1탭) + [🔍 검색] (D7) */}
+        {/* 가로 카드 — [+직접추가] [🔍검색] 먼저, 이어서 추천(정사각, 1탭 · 재탭으로 수량 증가) */}
         {!readonly && recs.length > 0 && (
           <div className="flex gap-2 overflow-x-auto px-4 pb-3 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* 맨 앞: 직접추가 (자유부속 모달 — 이름+규격+가격) */}
             <button
               type="button"
               onClick={() => setAddFreeOpen(true)}
-              className="flex h-[88px] w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+              className="flex size-[88px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
             >
               <Plus className="size-5" />
               <span className="text-jm-2xs font-medium">직접추가</span>
             </button>
-
-            {recs.map((r) => (
-              <button
-                key={r.productId}
-                type="button"
-                disabled={m.addPart.isPending}
-                onClick={() => add({ id: r.productId, name: r.name, sku: r.sku, sellingPrice: r.sellingPrice })}
-                className="relative flex h-[88px] w-[76px] shrink-0 flex-col items-center justify-between rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface)] p-1.5 text-center transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50"
-              >
-                <span className="absolute right-1 top-1 rounded bg-[var(--jm-accent-bg)] px-1 text-jm-3xs font-semibold text-[var(--jm-accent-fg)]">
-                  {r.occurrenceCount}
-                </span>
-                <Package className="size-5 shrink-0 text-[var(--jm-text-muted)]" />
-                <span className="line-clamp-2 text-jm-3xs leading-tight text-[var(--jm-text)]">
-                  {r.name}
-                </span>
-                <span className="text-jm-3xs font-semibold tabular-nums text-[var(--jm-text-muted)]">
-                  {fmtKRWInc(parseFloat(r.sellingPrice) || 0)}
-                </span>
-              </button>
-            ))}
-
-            {/* 끝: 카탈로그 검색 (롱테일) */}
+            {/* 그 다음: 카탈로그 검색 */}
             <button
               type="button"
               onClick={() => setPicker(true)}
-              className="flex h-[88px] w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+              className="flex size-[88px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
             >
               <Search className="size-5" />
               <span className="text-jm-2xs font-medium">검색</span>
             </button>
+
+            {recs.map((r) => {
+              const qty = addedQtyByProduct.get(r.productId) ?? 0;
+              return (
+                <button
+                  key={r.productId}
+                  type="button"
+                  disabled={m.addPart.isPending}
+                  onClick={() => add({ id: r.productId, name: r.name, sku: r.sku, sellingPrice: r.sellingPrice })}
+                  className={`relative flex size-[88px] shrink-0 flex-col items-center justify-between rounded-xl border p-1.5 text-center transition-colors active:bg-[var(--jm-surface-muted)] disabled:opacity-50 ${
+                    qty > 0
+                      ? "border-[var(--jm-action)] bg-[var(--jm-surface)]"
+                      : "border-[var(--jm-border)] bg-[var(--jm-surface)]"
+                  }`}
+                >
+                  {/* 담긴 수량 우선 표시 — 없으면 사용 빈도 */}
+                  {qty > 0 ? (
+                    <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-[var(--jm-action)] text-jm-3xs font-bold text-white">
+                      {qty}
+                    </span>
+                  ) : (
+                    <span className="absolute right-1 top-1 rounded bg-[var(--jm-accent-bg)] px-1 text-jm-3xs font-semibold text-[var(--jm-accent-fg)]">
+                      {r.occurrenceCount}
+                    </span>
+                  )}
+                  <Package className="size-5 shrink-0 text-[var(--jm-text-muted)]" />
+                  <span className="line-clamp-2 text-jm-3xs leading-tight text-[var(--jm-text)]">
+                    {r.name}
+                  </span>
+                  <span className="text-jm-3xs font-semibold tabular-nums text-[var(--jm-text-muted)]">
+                    {fmtKRWInc(parseFloat(r.sellingPrice) || 0)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -331,6 +349,20 @@ function PartRow({
     <>
       <PosLineItemRow
         className={isLost ? "sm:px-5 opacity-60" : "sm:px-5"}
+        image={
+          part.product?.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={part.product.imageUrl}
+              alt={displayName}
+              className="size-12 shrink-0 rounded-xl bg-[var(--jm-surface-muted)] object-cover"
+            />
+          ) : (
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--jm-surface-muted)] text-[var(--jm-text-subtle)]">
+              <Package className="size-5" />
+            </div>
+          )
+        }
         name={displayName}
         nameStrikethrough={isLost && !part.billLost}
         sku={displaySku}

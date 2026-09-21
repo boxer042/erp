@@ -89,7 +89,7 @@ export async function POST(
             quantity: newQty,
             totalPrice: newTotal,
           },
-          include: { product: { select: { id: true, name: true, sku: true } } },
+          include: { product: { select: { id: true, name: true, sku: true, imageUrl: true } } },
         });
       } else {
         // 신규 행 — 카탈로그 부속은 productId, 자유부속은 name/spec/presaleKind
@@ -121,7 +121,7 @@ export async function POST(
 
         resultPart = await tx.repairPart.findUnique({
           where: { id: part.id },
-          include: { product: { select: { id: true, name: true, sku: true } } },
+          include: { product: { select: { id: true, name: true, sku: true, imageUrl: true } } },
         });
       }
 

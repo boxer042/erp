@@ -67,7 +67,7 @@ export interface RepairPart {
   id: string;
   /** 카탈로그 부속이면 상품 id, 자유부속이면 null */
   productId: string | null;
-  product: { id: string; name: string; sku: string } | null;
+  product: { id: string; name: string; sku: string; imageUrl?: string | null } | null;
   /** 자유부속 표시명·규격 (productId 없을 때) */
   name: string | null;
   spec: string | null;

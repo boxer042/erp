@@ -98,7 +98,7 @@ export async function PATCH(
             ...(data.status !== undefined ? { status: data.status } : {}),
             ...(data.billLost !== undefined ? { billLost: data.billLost } : {}),
           },
-          include: { product: { select: { id: true, name: true, sku: true } } },
+          include: { product: { select: { id: true, name: true, sku: true, imageUrl: true } } },
         });
 
         // status USED↔LOST 변경 시 set 이 바뀌므로 delta 적용

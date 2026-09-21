@@ -44,7 +44,7 @@ export async function GET(
         orderBy: { receivedAt: "desc" },
       },
       parts: {
-        include: { product: { select: { id: true, name: true, sku: true } } },
+        include: { product: { select: { id: true, name: true, sku: true, imageUrl: true } } },
         orderBy: { createdAt: "asc" },
       },
       labors: { orderBy: { createdAt: "asc" } },
