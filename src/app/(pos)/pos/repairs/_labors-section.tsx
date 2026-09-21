@@ -44,8 +44,21 @@ export function LaborsSection({ ticketId, labors, readonly, diagnosisTemplateId 
     staleTime: 1000 * 60,
   });
 
+  // 원인 추천이 없을 때 fallback — 최근 자주 쓴 공임
+  const diagRecs = recommendationsQuery.data?.labors ?? [];
+  const recentQuery = useQuery<{ labors: RecommendedLabor[] }>({
+    queryKey: ["repairs", "recent-usage"],
+    queryFn: () => apiGet<{ parts: unknown[]; labors: RecommendedLabor[] }>(
+      "/api/repair-tickets/recent-usage",
+    ),
+    enabled: !readonly && diagRecs.length === 0,
+    staleTime: 1000 * 60 * 5,
+  });
+
   const addedNames = new Set(labors.map((l) => l.name));
-  const recs = (recommendationsQuery.data?.labors ?? []).filter((r) => !addedNames.has(r.name));
+  const source = diagRecs.length > 0 ? diagRecs : recentQuery.data?.labors ?? [];
+  const recs = source.filter((r) => !addedNames.has(r.name));
+  const fromRecent = diagRecs.length === 0 && recs.length > 0;
 
   const total = labors.reduce((s, l) => s + Number(l.totalPrice), 0);
 
@@ -60,13 +73,29 @@ export function LaborsSection({ ticketId, labors, readonly, diagnosisTemplateId 
               {labors.length === 0 ? "여러 개" : `${labors.length}건`}
             </span>
           </div>
-          {diagnosisTemplateId && recs.length > 0 && (
-            <span className="text-jm-2xs text-[var(--jm-text-subtle)]">진단 추천순</span>
+          {recs.length > 0 && (
+            <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
+              {fromRecent ? "자주 쓴 순" : "원인 추천순"}
+            </span>
           )}
         </div>
 
+        {/* 추천 없으면 한 줄 버튼 — 빈 카드가 자리만 먹는 것 방지 */}
+        {!readonly && recs.length === 0 && (
+          <div className="px-4 pb-3 sm:px-5">
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-sm font-medium text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+            >
+              <Plus className="size-4" />
+              직접추가
+            </button>
+          </div>
+        )}
+
         {/* 가로 카드 — [+직접추가] + 추천(1탭) */}
-        {!readonly && (
+        {!readonly && recs.length > 0 && (
           <div className="flex gap-2 overflow-x-auto px-4 pb-3 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               type="button"

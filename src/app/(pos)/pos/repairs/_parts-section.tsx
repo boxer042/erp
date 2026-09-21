@@ -64,10 +64,21 @@ export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }:
     staleTime: 1000 * 60,
   });
 
+  // 진단(원인) 추천이 없을 때의 fallback — 최근 자주 쓴 부속
+  const diagRecs = recommendationsQuery.data?.parts ?? [];
+  const recentQuery = useQuery<{ parts: RecommendedPart[] }>({
+    queryKey: ["repairs", "recent-usage"],
+    queryFn: () => apiGet<{ parts: RecommendedPart[]; labors: unknown[] }>(
+      "/api/repair-tickets/recent-usage",
+    ),
+    enabled: !readonly && diagRecs.length === 0,
+    staleTime: 1000 * 60 * 5,
+  });
+
   const addedProductIds = new Set(parts.map((p) => p.productId));
-  const recs = (recommendationsQuery.data?.parts ?? []).filter(
-    (r) => !addedProductIds.has(r.productId),
-  );
+  const source = diagRecs.length > 0 ? diagRecs : recentQuery.data?.parts ?? [];
+  const recs = source.filter((r) => !addedProductIds.has(r.productId));
+  const fromRecent = diagRecs.length === 0 && recs.length > 0;
 
   const usedTotal = parts
     .filter((p) => p.status === "USED")
@@ -96,13 +107,37 @@ export function PartsSection({ ticketId, parts, readonly, diagnosisTemplateId }:
               {parts.length === 0 ? "여러 개" : `${parts.length}건`}
             </span>
           </div>
-          {diagnosisTemplateId && recs.length > 0 && (
-            <span className="text-jm-2xs text-[var(--jm-text-subtle)]">진단 추천순</span>
+          {recs.length > 0 && (
+            <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
+              {fromRecent ? "자주 쓴 순" : "원인 추천순"}
+            </span>
           )}
         </div>
 
+        {/* 보여줄 추천이 없으면 카드 대신 한 줄 버튼 — 빈 카드가 자리만 먹는 것 방지 */}
+        {!readonly && recs.length === 0 && (
+          <div className="flex gap-2 px-4 pb-3 sm:px-5">
+            <button
+              type="button"
+              onClick={() => setAddFreeOpen(true)}
+              className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-sm font-medium text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+            >
+              <Plus className="size-4" />
+              직접추가
+            </button>
+            <button
+              type="button"
+              onClick={() => setPicker(true)}
+              className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--jm-border)] bg-[var(--jm-surface-muted)] text-jm-sm font-medium text-[var(--jm-text-muted)] transition-colors active:bg-[var(--jm-border)]"
+            >
+              <Search className="size-4" />
+              검색
+            </button>
+          </div>
+        )}
+
         {/* 가로 카드 — [+직접추가] + 추천(정사각, 1탭) + [🔍 검색] (D7) */}
-        {!readonly && (
+        {!readonly && recs.length > 0 && (
           <div className="flex gap-2 overflow-x-auto px-4 pb-3 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* 맨 앞: 직접추가 (자유부속 모달 — 이름+규격+가격) */}
             <button
