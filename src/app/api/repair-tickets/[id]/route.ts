@@ -151,6 +151,7 @@ export async function PUT(
           ...(d.workKind !== undefined ? { workKind: d.workKind } : {}),
           ...(d.symptom !== undefined ? { symptom: d.symptom?.trim() || null } : {}),
           ...(d.diagnosis !== undefined ? { diagnosis: d.diagnosis?.trim() || null } : {}),
+          ...(d.repairContent !== undefined ? { repairContent: d.repairContent?.trim() || null } : {}),
           ...(d.repairNotes !== undefined ? { repairNotes: d.repairNotes?.trim() || null } : {}),
           ...(d.customerMachineId !== undefined
             ? { customerMachineId: d.customerMachineId || null }

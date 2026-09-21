@@ -2316,6 +2316,9 @@ model RepairTicket {
   diagnosis              String?
   diagnosisTemplateId    String?                  @map("diagnosis_template_id")
   diagnosisTemplate      RepairDiagnosisTemplate? @relation(fields: [diagnosisTemplateId], references: [id], onDelete: SetNull)
+  /** 수리내용 — 무슨 조치를 했는지 (영수증·손님 안내용). 작업 후 기록 */
+  repairContent          String?                  @map("repair_content")
+  /** 특이사항 — 정상 범위를 벗어난 점·고객과 합의한 내용 (내부 기록) */
   repairNotes            String?                  @map("repair_notes")
   // 가져온 기기 정보 — 시리얼/판매상품 카탈로그에 없을 때 자유 입력 fallback
   repairProductId        String?                  @map("repair_product_id")

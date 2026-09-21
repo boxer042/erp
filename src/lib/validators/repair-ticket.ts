@@ -31,6 +31,9 @@ export const repairTicketUpdateSchema = z.object({
   repairProductText: z.string().nullable().optional(),
   symptom: z.string().nullable().optional(),
   diagnosis: z.string().nullable().optional(),
+  /** 수리내용 — 무슨 조치를 했는지 (영수증·손님 안내용) */
+  repairContent: z.string().nullable().optional(),
+  /** 특이사항 — 내부 기록 */
   repairNotes: z.string().nullable().optional(),
   diagnosisFee: z.coerce.number().min(0).optional(),
   totalDiscount: z.string().optional(),

@@ -103,6 +103,9 @@ export interface RepairTicketDetail {
   symptomTemplateId: string | null;
   diagnosis: string | null;
   diagnosisTemplateId: string | null;
+  /** 수리내용 — 무슨 조치를 했는지 (작업 후 기록) */
+  repairContent: string | null;
+  /** 특이사항 — 내부 기록 */
   repairNotes: string | null;
   diagnosisFee: string;
   totalDiscount: string;

@@ -152,7 +152,7 @@ export function SymptomCard({
   );
 }
 
-// ──── 진단·수리내용 칩 — 증상 매칭 진단 우선 추천 ────
+// ──── 원인 칩 — 증상 매칭 원인 우선 추천 (부속·공임 추천의 열쇠) ────
 interface DiagnosisTemplate {
   id: string;
   text: string;
@@ -199,7 +199,7 @@ export function DiagnosisCard({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-            진단·수리내용
+            원인
           </span>
           <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
             {symptomTemplateId ? "증상 기반 추천 · 한 개" : "한 개"}
@@ -242,8 +242,8 @@ export function DiagnosisCard({
         items={templates}
         loading={templatesQuery.isPending}
         getKey={(t) => t.id}
-        title="진단·수리내용"
-        placeholder="진단·수리내용 검색 또는 새로 입력"
+        title="원인"
+        placeholder="원인 검색 또는 새로 입력"
         filterFn={(t, q) => t.text.toLowerCase().includes(q.toLowerCase())}
         renderItem={(t) => (
           <div className="flex w-full items-center justify-between gap-3">
@@ -272,29 +272,42 @@ export function DiagnosisCard({
           setPicker(false);
         }}
         createLabel={(q) => `"${q}" 새로 등록`}
-        emptyText="기존 진단 없음 — 입력해서 새로 등록"
+        emptyText="기존 원인 없음 — 입력해서 새로 등록"
       />
     </Card>
   );
 }
 
 // ──── 수리 메모 카드 — 자유 텍스트 (체계화 대상 아님) ────
+/**
+ * 자유 텍스트 카드 — 수리내용(repairContent) / 특이사항(repairNotes) 공용.
+ * blur 시 저장. field 로 어느 칸인지 지정.
+ */
 export function NotesCard({
   ticket,
   readonly,
   onSaved,
+  field = "repairNotes",
+  label,
+  hint,
+  placeholder,
 }: {
   ticket: RepairTicketDetail;
   readonly: boolean;
   onSaved: () => void;
+  field?: "repairContent" | "repairNotes";
+  label?: string;
+  hint?: string;
+  placeholder?: string;
 }) {
-  const [repairNotes, setRepairNotes] = useState(ticket.repairNotes ?? "");
+  const [repairNotes, setRepairNotes] = useState(ticket[field] ?? "");
   const [savedFlash, setSavedFlash] = useState(false);
 
-  const dirty = repairNotes !== (ticket.repairNotes ?? "");
+  const dirty = repairNotes !== (ticket[field] ?? "");
 
   const saveMutation = useMutation({
-    mutationFn: () => apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", { repairNotes }),
+    mutationFn: () =>
+      apiMutate(`/api/repair-tickets/${ticket.id}`, "PUT", { [field]: repairNotes }),
     onSuccess: () => {
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 3000);
@@ -321,16 +334,18 @@ export function NotesCard({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
-            수리 메모
+            {label ?? "특이사항"}
           </span>
-          <span className="text-jm-3xs text-[var(--jm-text-subtle)]">내부 작업 메모</span>
+          <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
+            {hint ?? "내부 기록"}
+          </span>
         </div>
         <JmTextarea
           value={repairNotes}
           onChange={(e) => setRepairNotes(e.target.value)}
           onBlur={handleBlur}
           disabled={readonly}
-          placeholder="작업 메모 (분해 순서, 주의사항 등)"
+          placeholder={placeholder ?? "정상 범위를 벗어난 점·고객과 합의한 내용"}
           rows={2}
         />
         {!readonly && (

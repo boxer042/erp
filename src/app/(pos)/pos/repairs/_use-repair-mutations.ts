@@ -250,7 +250,7 @@ export function useRepairMutations(ticketId: string) {
   type FieldPatch = Partial<
     Pick<
       RepairTicketDetail,
-      "symptom" | "diagnosis" | "repairNotes" | "diagnosisFee" | "repairWarrantyMonths"
+      "symptom" | "diagnosis" | "repairContent" | "repairNotes" | "diagnosisFee" | "repairWarrantyMonths"
     >
   >;
   const setField = useMutation({

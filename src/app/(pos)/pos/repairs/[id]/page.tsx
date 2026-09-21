@@ -301,11 +301,8 @@ export function RepairDetail({
           {/* 증상 — 콤보박스 (기존 템플릿 + 새 입력) */}
           <SymptomCard ticket={t} readonly={readonly} onSaved={invalidate} />
 
-          {/* 진단 — 증상에 자주 매칭된 항목 우선 추천 */}
+          {/* 원인 — 증상에 자주 매칭된 항목 우선 추천. 부속·공임 추천의 열쇠 */}
           <DiagnosisCard ticket={t} readonly={readonly} onSaved={invalidate} />
-
-          {/* 수리 메모 — 자유 텍스트 (체계화 대상 아님) */}
-          <NotesCard ticket={t} readonly={readonly} onSaved={invalidate} />
 
           {/* 패키지 빠른 추가 */}
           {!readonly && <PackagesCard ticketId={t.id} onApplied={invalidate} />}
@@ -336,6 +333,28 @@ export function RepairDetail({
             readonly={readonly}
             onChanged={invalidate}
             diagnosisTemplateId={t.diagnosisTemplateId}
+          />
+
+          {/* 수리내용 — 무슨 조치를 했는지. 작업(부속·공임) 뒤에 기록 */}
+          <NotesCard
+            ticket={t}
+            readonly={readonly}
+            onSaved={invalidate}
+            field="repairContent"
+            label="수리내용"
+            hint="손님 안내·영수증"
+            placeholder="예: 기화기 세척 후 재조립, 프라이머벌브 교체"
+          />
+
+          {/* 특이사항 — 정상 범위를 벗어난 점·고객 합의 (내부 기록) */}
+          <NotesCard
+            ticket={t}
+            readonly={readonly}
+            onSaved={invalidate}
+            field="repairNotes"
+            label="특이사항"
+            hint="내부 기록"
+            placeholder="정상 범위를 벗어난 점·고객과 합의한 내용"
           />
 
           {/* 참조 정보 (시리얼 이력 + 재수리) — 보조 정보, 접힘 기본 */}
