@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, apiGet, apiMutate } from "@/lib/api-client";
@@ -79,11 +79,16 @@ function TemplatesSkeletonRows({ rows = 6 }: { rows?: number }) {
 }
 
 export default function RepairTemplatesPage() {
+  const queryClient = useQueryClient();
   const [kind, setKind] = useState<Kind>("symptom");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [editing, setEditing] = useState<Template | null>(null);
   const [confirming, setConfirming] = useState<Template | null>(null);
+  // 병합 — 다중 선택 후 대표 지정
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeTargetId, setMergeTargetId] = useState<string>("");
 
   const categoriesQuery = useQuery<Category[]>({
     queryKey: ["product-categories"],
@@ -100,6 +105,23 @@ export default function RepairTemplatesPage() {
           : "/api/repair-diagnosis-templates",
       ),
     staleTime: 1000 * 30,
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: () =>
+      apiMutate("/api/repair-templates/merge", "POST", {
+        kind,
+        targetId: mergeTargetId,
+        sourceIds: Array.from(selectedIds).filter((id) => id !== mergeTargetId),
+      }),
+    onSuccess: () => {
+      toast.success("병합되었습니다");
+      setSelectedIds(new Set());
+      setMergeOpen(false);
+      setMergeTargetId("");
+      queryClient.invalidateQueries({ queryKey: ["repair-templates"] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "병합 실패"),
   });
 
   const templates = templatesQuery.data ?? [];
@@ -180,9 +202,54 @@ export default function RepairTemplatesPage() {
                   </JmTableToolbarFilters>
                 </JmTableToolbar>
 
+                {/* 병합 바 — 2개 이상 선택 시 노출 (D5) */}
+                {selectedIds.size > 0 && (
+                  <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--jm-action)] bg-[var(--jm-bg)] px-3 py-2">
+                    <span className="text-jm-sm font-medium text-[var(--jm-text)]">
+                      {selectedIds.size}개 선택됨
+                    </span>
+                    <span className="text-jm-2xs text-[var(--jm-text-muted)]">
+                      같은 뜻으로 갈라진 항목을 하나로 합칩니다 — 사용 횟수·추천 학습이 대표로 모입니다
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <JmButton variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                        선택 해제
+                      </JmButton>
+                      <JmButton
+                        variant="cta"
+                        size="sm"
+                        disabled={selectedIds.size < 2}
+                        onClick={() => {
+                          // 기본 대표 = 사용 횟수가 가장 많은 항목
+                          const chosen = filtered
+                            .filter((t) => selectedIds.has(t.id))
+                            .sort((a, b) => b.usageCount - a.usageCount)[0];
+                          setMergeTargetId(chosen?.id ?? "");
+                          setMergeOpen(true);
+                        }}
+                      >
+                        병합
+                      </JmButton>
+                    </div>
+                  </div>
+                )}
+
                 <JmTable>
                   <JmTableHeader>
                     <JmTableRow>
+                      <JmTableHead className="w-[44px]">
+                        <input
+                          type="checkbox"
+                          aria-label="전체 선택"
+                          className="size-4 accent-[var(--jm-action)]"
+                          checked={filtered.length > 0 && filtered.every((t) => selectedIds.has(t.id))}
+                          onChange={(e) =>
+                            setSelectedIds(
+                              e.target.checked ? new Set(filtered.map((t) => t.id)) : new Set(),
+                            )
+                          }
+                        />
+                      </JmTableHead>
                       <JmTableHead>텍스트</JmTableHead>
                       <JmTableHead>카테고리</JmTableHead>
                       <JmTableHead className="text-right">사용 횟수</JmTableHead>
@@ -195,7 +262,7 @@ export default function RepairTemplatesPage() {
                     ) : filtered.length === 0 ? (
                       <JmTableRow>
                         <JmTableCell
-                          colSpan={4}
+                          colSpan={5}
                           className="py-8 text-center text-jm-sm text-[var(--jm-text-subtle)]"
                         >
                           {search || categoryFilter !== "all"
@@ -206,6 +273,20 @@ export default function RepairTemplatesPage() {
                     ) : (
                       filtered.map((t) => (
                         <JmTableRow key={t.id}>
+                          <JmTableCell>
+                            <input
+                              type="checkbox"
+                              aria-label={`${t.text} 선택`}
+                              className="size-4 accent-[var(--jm-action)]"
+                              checked={selectedIds.has(t.id)}
+                              onChange={(e) => {
+                                const next = new Set(selectedIds);
+                                if (e.target.checked) next.add(t.id);
+                                else next.delete(t.id);
+                                setSelectedIds(next);
+                              }}
+                            />
+                          </JmTableCell>
                           <JmTableCell className="font-medium text-[var(--jm-text)]">
                             {t.text}
                           </JmTableCell>
@@ -271,6 +352,70 @@ export default function RepairTemplatesPage() {
           onClose={() => setConfirming(null)}
         />
       )}
+
+      {/* 병합 다이얼로그 — 대표 선택 (D5) */}
+      <JmDialog open={mergeOpen} onOpenChange={(v) => !v && setMergeOpen(false)}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>
+              {kind === "symptom" ? "증상" : "원인"} 병합
+            </JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody>
+            <p className="mb-3 text-jm-sm text-[var(--jm-text-muted)]">
+              대표로 남길 항목을 고르세요. 나머지는 삭제되고, 연결된 티켓·사용 횟수·부속/공임
+              추천 학습이 모두 대표로 합쳐집니다.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {filtered
+                .filter((t) => selectedIds.has(t.id))
+                .sort((a, b) => b.usageCount - a.usageCount)
+                .map((t) => (
+                  <label
+                    key={t.id}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5 transition-colors ${
+                      mergeTargetId === t.id
+                        ? "border-[var(--jm-action)] bg-[var(--jm-bg)]"
+                        : "border-[var(--jm-border)] bg-[var(--jm-surface)]"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="merge-target"
+                      className="size-4 accent-[var(--jm-action)]"
+                      checked={mergeTargetId === t.id}
+                      onChange={() => setMergeTargetId(t.id)}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-jm-sm text-[var(--jm-text)]">
+                      {t.text}
+                    </span>
+                    <span className="shrink-0 text-jm-2xs text-[var(--jm-text-muted)]">
+                      {t.usageCount}회
+                    </span>
+                    {mergeTargetId === t.id && (
+                      <JmBadge variant="accent" size="sm">
+                        대표
+                      </JmBadge>
+                    )}
+                  </label>
+                ))}
+            </div>
+          </JmDialogBody>
+          <JmDialogFooter>
+            <JmButton variant="ghost" onClick={() => setMergeOpen(false)}>
+              취소
+            </JmButton>
+            <JmButton
+              variant="cta"
+              disabled={!mergeTargetId || mergeMutation.isPending}
+              onClick={() => mergeMutation.mutate()}
+            >
+              {mergeMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              {selectedIds.size - 1}개 흡수
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
     </div>
   );
 }
