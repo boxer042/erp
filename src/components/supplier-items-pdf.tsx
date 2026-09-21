@@ -1,7 +1,7 @@
 "use client";
 
 import "@/lib/pdf-fonts";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   Document,
   Page,
@@ -11,7 +11,7 @@ import {
   PDFViewer,
   pdf,
 } from "@react-pdf/renderer";
-import { Loader2 } from "lucide-react";
+import { downloadPdfBlob } from "@/lib/pdf-download";
 
 interface PartyInfo {
   name: string;
@@ -157,6 +157,20 @@ function PartyBlock({ label, party }: { label: string; party: PartyInfo }) {
   );
 }
 
+/** 기간 라벨 — "2026-01-01 ~ 2026-01-31" / 미지정은 "전체" */
+function periodLabelOf(periodFrom?: string | null, periodTo?: string | null) {
+  return (
+    (periodFrom ? new Date(periodFrom).toISOString().slice(0, 10) : "전체") +
+    " ~ " +
+    (periodTo ? new Date(periodTo).toISOString().slice(0, 10) : "전체")
+  );
+}
+
+/** 파일명 — 거래처_품목원장_기간 */
+function docTitleOf(props: SupplierItemsPdfProps) {
+  return `${props.supplier.name}_품목원장_${periodLabelOf(props.periodFrom, props.periodTo)}`;
+}
+
 function ItemsDocument(props: SupplierItemsPdfProps) {
   const { company, supplier, periodFrom, periodTo, openingBalance, endingBalance, rows } = props;
 
@@ -170,13 +184,10 @@ function ItemsDocument(props: SupplierItemsPdfProps) {
     0,
   );
 
-  const periodLabel =
-    (periodFrom ? new Date(periodFrom).toISOString().slice(0, 10) : "전체") +
-    " ~ " +
-    (periodTo ? new Date(periodTo).toISOString().slice(0, 10) : "전체");
+  const periodLabel = periodLabelOf(periodFrom, periodTo);
 
   return (
-    <Document title={`${supplier.name}_품목원장_${periodLabel}`}>
+    <Document title={docTitleOf(props)}>
       <Page size="A4" style={s.page}>
         <Text style={s.title}>품 목 별 거 래 원 장</Text>
         <Text style={s.subtitle}>기간: {periodLabel}</Text>
@@ -335,7 +346,12 @@ function ItemsDocument(props: SupplierItemsPdfProps) {
 }
 
 export function SupplierItemsPdf(props: SupplierItemsPdfProps) {
-  const [autoLoading, setAutoLoading] = useState(props.autoPrint);
+  const docTitle = docTitleOf(props);
+
+  // 새 탭 인쇄 → 브라우저 "PDF로 저장" 기본 파일명이 document.title 이다
+  useEffect(() => {
+    document.title = docTitle;
+  }, [docTitle]);
 
   useEffect(() => {
     if (!props.autoPrint) return;
@@ -343,26 +359,12 @@ export function SupplierItemsPdf(props: SupplierItemsPdfProps) {
     (async () => {
       const blob = await pdf(<ItemsDocument {...props} />).toBlob();
       if (cancelled) return;
-      const url = URL.createObjectURL(blob);
-      window.location.href = url;
-      setAutoLoading(false);
+      downloadPdfBlob(blob, docTitle);
     })();
     return () => {
       cancelled = true;
     };
-  }, [props]);
-
-  if (props.autoPrint) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        {autoLoading && (
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <Loader2 className="h-4 w-4 animate-spin" /> PDF 생성 중...
-          </div>
-        )}
-      </div>
-    );
-  }
+  }, [props, docTitle]);
 
   return (
     <PDFViewer style={{ width: "100%", height: "100vh", border: "none" }}>

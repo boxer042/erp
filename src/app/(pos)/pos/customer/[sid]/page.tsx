@@ -673,7 +673,8 @@ function PrintModal({
       : item.kind === "statement"
         ? {
             title: "거래명세표 미리보기",
-            src: `/statements/${item.id}/print?auto=1`,
+            // auto=1 은 "자동 다운로드" 의미 — 미리보기 모달은 인쇄 페이지의 뷰어를 그대로 임베드
+            src: `/statements/${item.id}/print`,
             maxW: "max-w-4xl",
           }
         : {

@@ -1,7 +1,7 @@
 "use client";
 
 import "@/lib/pdf-fonts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Document,
   Page,
@@ -13,6 +13,7 @@ import {
 } from "@react-pdf/renderer";
 import { JmButton } from "@/jm";
 import { Printer, Loader2 } from "lucide-react";
+import { downloadPdfBlob } from "@/lib/pdf-download";
 
 interface PartyInfo {
   name: string;
@@ -690,25 +691,24 @@ export function DocumentPdf(props: DocumentPdfProps) {
   const doc = useMemo(() => <PdfContent {...props} />, [JSON.stringify(props)]);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
-  const autoPrintedRef = useRef(false);
+
+  const docTitle = `${props.supplier.name}_${props.buyer.name}_${props.documentNo}`;
 
   useEffect(() => {
-    document.title = `${props.supplier.name}_${props.buyer.name}_${props.documentNo}`;
-  }, [props.supplier.name, props.buyer.name, props.documentNo]);
+    document.title = docTitle;
+  }, [docTitle]);
 
   const buildBlob = async () => {
     const instance = pdf();
     instance.updateContainer(doc);
-    const blob = await instance.toBlob();
-    return URL.createObjectURL(blob);
+    return instance.toBlob();
   };
 
   const handleExport = async () => {
     if (generating) return;
     setGenerating(true);
     try {
-      const url = await buildBlob();
-      window.open(url, "_blank");
+      downloadPdfBlob(await buildBlob(), docTitle);
     } catch (e) {
       if (process.env.NODE_ENV !== "production") console.error("PDF 생성 실패", e);
       alert("PDF 생성에 실패했습니다");
@@ -717,20 +717,26 @@ export function DocumentPdf(props: DocumentPdfProps) {
     }
   };
 
+  // StrictMode 는 effect 를 setup→cleanup→setup 으로 두 번 돌린다.
+  // ref 가드로 막으면 dev 에서 아예 다운로드가 안 걸리므로 cancel 플래그로 처리.
   useEffect(() => {
-    if (!props.autoPrint || autoPrintedRef.current) return;
-    autoPrintedRef.current = true;
+    if (!props.autoPrint) return;
+    let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const url = await buildBlob();
-        window.location.href = url;
+        const blob = await buildBlob();
+        if (cancelled) return;
+        downloadPdfBlob(blob, docTitle);
       } catch (e) {
         if (process.env.NODE_ENV !== "production") console.error("PDF 자동 생성 실패", e);
       }
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.autoPrint]);
+  }, [props.autoPrint, docTitle]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>

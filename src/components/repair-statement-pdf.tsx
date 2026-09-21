@@ -2,6 +2,7 @@
 
 import "@/lib/pdf-fonts";
 import { useEffect } from "react";
+import { downloadPdfBlob } from "@/lib/pdf-download";
 import {
   Document,
   Page,
@@ -46,7 +47,10 @@ export interface RepairStatementData {
   deviceLine: string | null;
   serialCode: string | null;
   symptom: string | null;
+  /** 원인 — 왜 고장났는지 */
   diagnosis: string | null;
+  /** 수리내용 — 무슨 조치를 했는지 */
+  repairContent: string | null;
   repairNotes: string | null;
   parts: RepairStatementPart[];
   labors: RepairStatementLabor[];
@@ -274,11 +278,14 @@ function RepairStatementDocument({ company, repair, supplyOnly }: Props) {
           />
         </View>
 
-        {/* 증상/진단/수리내용 */}
-        <Text style={s.sectionTitle}>증상 · 진단 · 수리내용</Text>
+        {/* 증상 · 원인 · 수리내용 */}
+        <Text style={s.sectionTitle}>증상 · 원인 · 수리내용</Text>
         <View style={s.infoBox}>
           <InfoRow label="증상" value={repair.symptom ?? "-"} />
-          <InfoRow label="진단" value={repair.diagnosis ?? "-"} />
+          <InfoRow label="원인" value={repair.diagnosis ?? "-"} />
+          {repair.repairContent && (
+            <InfoRow label="수리내용" value={repair.repairContent} />
+          )}
           <InfoRow label="수리내용" value={repair.repairNotes ?? "-"} last />
         </View>
 
@@ -419,6 +426,13 @@ function RepairStatementDocument({ company, repair, supplyOnly }: Props) {
 }
 
 export function RepairStatementPdf({ company, repair, autoPrint, supplyOnly }: Props) {
+  const docTitle = `수리내역서_${repair.ticketNo}`;
+
+  // 새 탭 인쇄 → 브라우저 "PDF로 저장" 기본 파일명이 document.title 이다
+  useEffect(() => {
+    document.title = docTitle;
+  }, [docTitle]);
+
   useEffect(() => {
     if (!autoPrint) return;
     let canceled = false;
@@ -427,15 +441,12 @@ export function RepairStatementPdf({ company, repair, autoPrint, supplyOnly }: P
         <RepairStatementDocument company={company} repair={repair} supplyOnly={supplyOnly} />,
       ).toBlob();
       if (canceled) return;
-      const url = URL.createObjectURL(blob);
-      window.location.href = url;
+      downloadPdfBlob(blob, docTitle);
     })();
     return () => {
       canceled = true;
     };
-  }, [autoPrint, company, repair, supplyOnly]);
-
-  if (autoPrint) return null;
+  }, [autoPrint, company, repair, supplyOnly, docTitle]);
 
   return (
     <PDFViewer style={{ width: "100%", height: "100%", border: 0 }}>

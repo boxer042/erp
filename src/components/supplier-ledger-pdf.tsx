@@ -1,7 +1,7 @@
 "use client";
 
 import "@/lib/pdf-fonts";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   Document,
   Page,
@@ -11,7 +11,7 @@ import {
   PDFViewer,
   pdf,
 } from "@react-pdf/renderer";
-import { Loader2 } from "lucide-react";
+import { downloadPdfBlob } from "@/lib/pdf-download";
 
 interface PartyInfo {
   name: string;
@@ -137,6 +137,23 @@ function PartyBlock({ label, party }: { label: string; party: PartyInfo }) {
   );
 }
 
+/** 기간 라벨 — "2026-01-01 ~ 2026-01-31" / 미지정은 "전체" */
+function periodLabelOf(periodFrom?: string | null, periodTo?: string | null) {
+  return (
+    (periodFrom ? new Date(periodFrom).toISOString().slice(0, 10) : "전체") +
+    " ~ " +
+    (periodTo ? new Date(periodTo).toISOString().slice(0, 10) : "전체")
+  );
+}
+
+/**
+ * 파일명 — 다른 문서들(statement/quotation)과 동일한 "공급자_상대방_문서번호" 패턴.
+ * 문서번호 위치엔 "원장_기간" 사용.
+ */
+function docTitleOf(props: SupplierLedgerPdfProps) {
+  return `${props.company.name}_${props.supplier.name}_원장_${periodLabelOf(props.periodFrom, props.periodTo)}`;
+}
+
 function LedgerDocument(props: SupplierLedgerPdfProps) {
   const { company, supplier, periodFrom, periodTo, openingBalance, entries, supplyOnly } = props;
 
@@ -148,14 +165,8 @@ function LedgerDocument(props: SupplierLedgerPdfProps) {
   const endingBalance =
     entries.length > 0 ? parseFloat(String(entries[entries.length - 1].balance)) : openingBalance;
 
-  const periodLabel =
-    (periodFrom ? new Date(periodFrom).toISOString().slice(0, 10) : "전체") +
-    " ~ " +
-    (periodTo ? new Date(periodTo).toISOString().slice(0, 10) : "전체");
-
-  // 파일명 — 다른 문서들(statement/quotation)과 동일한 "공급자_상대방_문서번호" 패턴.
-  // 문서번호 위치엔 "원장_기간" 사용.
-  const docTitle = `${company.name}_${supplier.name}_원장_${periodLabel}`;
+  const periodLabel = periodLabelOf(periodFrom, periodTo);
+  const docTitle = docTitleOf(props);
 
   return (
     <Document title={docTitle}>
@@ -250,7 +261,12 @@ function LedgerDocument(props: SupplierLedgerPdfProps) {
 }
 
 export function SupplierLedgerPdf(props: SupplierLedgerPdfProps) {
-  const [autoLoading, setAutoLoading] = useState(props.autoPrint);
+  const docTitle = docTitleOf(props);
+
+  // 새 탭 인쇄 → 브라우저 "PDF로 저장" 기본 파일명이 document.title 이다
+  useEffect(() => {
+    document.title = docTitle;
+  }, [docTitle]);
 
   useEffect(() => {
     if (!props.autoPrint) return;
@@ -258,26 +274,12 @@ export function SupplierLedgerPdf(props: SupplierLedgerPdfProps) {
     (async () => {
       const blob = await pdf(<LedgerDocument {...props} />).toBlob();
       if (cancelled) return;
-      const url = URL.createObjectURL(blob);
-      window.location.href = url;
-      setAutoLoading(false);
+      downloadPdfBlob(blob, docTitle);
     })();
     return () => {
       cancelled = true;
     };
-  }, [props]);
-
-  if (props.autoPrint) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        {autoLoading && (
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <Loader2 className="h-4 w-4 animate-spin" /> PDF 생성 중...
-          </div>
-        )}
-      </div>
-    );
-  }
+  }, [props, docTitle]);
 
   return (
     <PDFViewer style={{ width: "100%", height: "100vh", border: "none" }}>
