@@ -248,16 +248,22 @@ function LaborRow({
   m: ReturnType<typeof useRepairMutations>;
 }) {
   const [priceOpen, setPriceOpen] = useState(false);
+  // 서버 id 미수신 낙관 행 — 이 행만 조작 잠금 (tmp id 요청은 404)
+  const pending = labor.id.startsWith("tmp-");
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[var(--jm-border)] px-4 py-3 last:border-b-0 sm:px-5">
+    <div
+      className={`flex items-center justify-between gap-3 border-b border-[var(--jm-border)] px-4 py-3 last:border-b-0 sm:px-5 ${
+        pending ? "opacity-50 pointer-events-none" : ""
+      }`}
+    >
       <span className="line-clamp-1 flex-1 text-jm-sm font-medium text-[var(--jm-text)]">
         {labor.name}
       </span>
       <button
         type="button"
-        onClick={() => !readonly && setPriceOpen(true)}
-        disabled={readonly}
+        onClick={() => !readonly && !pending && setPriceOpen(true)}
+        disabled={readonly || pending}
         className="rounded-md px-2 py-1 text-right hover:bg-[var(--jm-bg)] disabled:hover:bg-transparent"
       >
         <span className="text-jm-sm font-semibold tabular-nums text-[var(--jm-text)]">
@@ -269,7 +275,7 @@ function LaborRow({
           size="sm"
           variant="ghost"
           onClick={() => m.deleteLabor.mutate(labor.id)}
-          disabled={m.deleteLabor.isPending}
+          disabled={m.deleteLabor.isPending || pending}
           aria-label="삭제"
         >
           <Trash2 className="size-4" />

@@ -342,13 +342,21 @@ function PartRow({
   const [totalOpen, setTotalOpen] = useState(false);
   const isLost = part.status === "LOST";
   const isFree = !part.productId;
+  // 서버 id 를 아직 못 받은 낙관 행 — 이 행만 조작 잠금 (tmp id 로 PATCH/DELETE 나가면 404)
+  const pending = part.id.startsWith("tmp-");
   const displayName = part.product?.name ?? part.name ?? "부속";
   const displaySku = part.product?.sku ?? (part.spec || "");
 
   return (
     <>
       <PosLineItemRow
-        className={isLost ? "sm:px-5 opacity-60" : "sm:px-5"}
+        className={
+          pending
+            ? "sm:px-5 opacity-50 pointer-events-none"
+            : isLost
+              ? "sm:px-5 opacity-60"
+              : "sm:px-5"
+        }
         image={
           part.product?.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -398,19 +406,20 @@ function PartRow({
             </>
           )
         }
-        onDelete={readonly ? undefined : () => m.deletePart.mutate(part.id)}
-        deleteDisabled={m.deletePart.isPending}
+        onDelete={readonly || pending ? undefined : () => m.deletePart.mutate(part.id)}
+        deleteDisabled={m.deletePart.isPending || pending}
         unitPrice={fmtKRWInc(part.unitPrice)}
-        onUnitPriceClick={readonly ? undefined : () => setPriceOpen(true)}
+        onUnitPriceClick={readonly || pending ? undefined : () => setPriceOpen(true)}
         quantity={{
           value: Number(part.quantity),
           onChange: (next) => {
+            if (pending) return;
             if (next !== Number(part.quantity)) m.updatePart.mutate({ partId: part.id, quantity: next });
           },
         }}
         total={fmtKRWInc(part.totalPrice)}
-        onTotalClick={readonly ? undefined : () => setTotalOpen(true)}
-        disabled={readonly}
+        onTotalClick={readonly || pending ? undefined : () => setTotalOpen(true)}
+        disabled={readonly || pending}
       />
 
       <PriceInputDialog
