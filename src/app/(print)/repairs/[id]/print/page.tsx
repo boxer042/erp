@@ -70,6 +70,7 @@ export default async function RepairPrintPage({
     serialCode: ticket.serialItem?.code ?? null,
     symptom: ticket.symptom,
     diagnosis: ticket.diagnosis,
+    repairContent: ticket.repairContent,
     repairNotes: ticket.repairNotes,
     parts: ticket.parts.map((p) => ({
       name: p.product?.name ?? p.name ?? "부속",
