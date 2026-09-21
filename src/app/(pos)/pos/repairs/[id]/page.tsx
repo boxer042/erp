@@ -35,7 +35,6 @@ import {
   type RepairTicketRow,
 } from "../_types";
 import { calcFinal, nextActions, fmtKRW, fmtKRWInc, fmtKRWTax } from "../_helpers";
-import { StatusStepperBar } from "../_stepper";
 import { CustomerChip } from "../../_components/customer-chip";
 import { PartsSection } from "../_parts-section";
 import { LaborsSection } from "../_labors-section";
@@ -258,10 +257,6 @@ export function RepairDetail({
                   </span>
                 )}
               </div>
-              {/* 진행률 stepper — 현재 단계 시각화 (customer 통일 헤더와 동일) */}
-              {t.status !== "CANCELLED" && (
-                <StatusStepperBar status={t.status} type={t.type} />
-              )}
             </div>
             <JmIconButton
               size="md"
