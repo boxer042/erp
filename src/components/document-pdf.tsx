@@ -4,11 +4,12 @@ import "@/lib/pdf-fonts";
 import { useEffect, useMemo, useState } from "react";
 import {
   Document,
-  Page,
-  View,
-  Text,
-  StyleSheet,
+  Image,
   PDFViewer,
+  Page,
+  StyleSheet,
+  Text,
+  View,
   pdf,
 } from "@react-pdf/renderer";
 import { JmButton } from "@/jm";
@@ -156,7 +157,19 @@ const s = StyleSheet.create({
 const COLS = [4, 17, 12, 6, 7, 11, 8, 11, 13, 11]; // percentages, sum=100
 const COLS_NO_TAX = [4, 19, 13, 7, 8, 13, 9, 13, 14]; // 세액 컬럼 제외, sum=100
 
-function PartyCompact({ label, info }: { label: string; info: PartyInfo }) {
+/** 날인 이미지 — public/도장.png (한글 파일명이라 URL 인코딩 필요) */
+const STAMP_SRC = encodeURI("/도장.png");
+
+function PartyCompact({
+  label,
+  info,
+  stamp,
+}: {
+  label: string;
+  info: PartyInfo;
+  /** 공급자(우리 회사) 박스에만 대표자 옆 날인 */
+  stamp?: boolean;
+}) {
   const rows: { label: string; value: string; bold?: boolean }[] = [];
   if (info.businessNumber) rows.push({ label: "등록번호", value: info.businessNumber });
   rows.push({ label: "사업장명", value: info.name, bold: true });
@@ -193,15 +206,25 @@ function PartyCompact({ label, info }: { label: string; info: PartyInfo }) {
             >
               {r.label}
             </Text>
-            <Text
-              style={[
-                s.tdValue,
-                { width: "68%", fontSize: 11 },
-                r.bold ? s.bold : {},
-              ]}
-            >
-              {r.value}
-            </Text>
+            <View style={{ width: "68%", position: "relative", justifyContent: "center" }}>
+              <Text style={[s.tdValue, { fontSize: 11 }, r.bold ? s.bold : {}]}>
+                {r.value}
+              </Text>
+              {/* 대표자 행 — 이름 옆에 날인 (공급자 박스만) */}
+              {stamp && r.label === "대표자" ? (
+                <Image
+                  src={STAMP_SRC}
+                  style={{
+                    position: "absolute",
+                    right: 6,
+                    top: -9,
+                    width: 38,
+                    height: 38,
+                    opacity: 0.9,
+                  }}
+                />
+              ) : null}
+            </View>
           </View>
         );
       })}
@@ -387,7 +410,7 @@ function PdfContent(props: DocumentPdfProps) {
               </View>
               {/* 우측 */}
               <View style={{ width: "42%" }}>
-                <PartyCompact label="공급자" info={props.supplier} />
+                <PartyCompact label="공급자" info={props.supplier} stamp />
               </View>
             </View>
           </View>

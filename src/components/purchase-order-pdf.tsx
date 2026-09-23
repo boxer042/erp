@@ -4,11 +4,12 @@ import "@/lib/pdf-fonts";
 import { useEffect, useMemo, useState } from "react";
 import {
   Document,
-  Page,
-  View,
-  Text,
-  StyleSheet,
+  Image,
   PDFViewer,
+  Page,
+  StyleSheet,
+  Text,
+  View,
   pdf,
 } from "@react-pdf/renderer";
 import { JmButton } from "@/jm";
@@ -292,9 +293,14 @@ function PdfDoc(props: PurchaseOrderPdfProps) {
                 <Text style={s.rowValueBold}>{props.issuer.name}</Text>
               </View>
               {props.issuer.ceo && (
-                <View style={s.row}>
+                <View style={[s.row, { position: "relative" }]}>
                   <Text style={s.rowLabel}>대표자</Text>
                   <Text style={s.rowValue}>{props.issuer.ceo}</Text>
+                  {/* 발행자(우리) 대표자 옆 날인 */}
+                  <Image
+                    src={STAMP_SRC}
+                    style={{ position: "absolute", right: 4, top: -10, width: 36, height: 36, opacity: 0.9 }}
+                  />
                 </View>
               )}
               {props.issuer.phone && (
@@ -406,6 +412,9 @@ function PdfDoc(props: PurchaseOrderPdfProps) {
     </Document>
   );
 }
+
+/** 날인 이미지 — public/도장.png (한글 파일명이라 URL 인코딩 필요) */
+const STAMP_SRC = encodeURI("/도장.png");
 
 export function PurchaseOrderPdf(props: PurchaseOrderPdfProps) {
   const doc = useMemo(() => <PdfDoc {...props} />, [JSON.stringify(props)]);
