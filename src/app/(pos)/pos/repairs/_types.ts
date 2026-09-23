@@ -105,6 +105,10 @@ export interface RepairTicketDetail {
   diagnosisTemplateId: string | null;
   /** 수리내용 — 무슨 조치를 했는지 (작업 후 기록) */
   repairContent: string | null;
+  /** 복수 선택 목록 — 표시 텍스트는 위 필드에서 파생됨 */
+  symptomLinks?: { symptomId: string; symptom: { text: string } }[];
+  diagnosisLinks?: { diagnosisId: string; diagnosis: { text: string } }[];
+  contentLinks?: { contentId: string; content: { text: string } }[];
   /** 특이사항 — 내부 기록 */
   repairNotes: string | null;
   diagnosisFee: string;

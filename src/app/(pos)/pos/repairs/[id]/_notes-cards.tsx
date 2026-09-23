@@ -11,7 +11,7 @@ import type { RepairTicketDetail } from "../_types";
 import { useRepairMutations } from "../_use-repair-mutations";
 import { Card } from "./_shared";
 
-/** 가로 칩 — 단일선택 (증상·진단 공용) */
+/** 가로 칩 — 복수선택 (증상·원인·수리내용 공용). 누르면 토글 */
 function Chip({
   selected,
   onClick,
@@ -87,9 +87,19 @@ export function SymptomCard({
 
   const templates = templatesQuery.data ?? [];
   const topChips = templates.slice(0, 12);
-  const currentInChips = !!current && topChips.some((t) => t.text === current);
 
-  const set = (text: string) => m.setField.mutate({ symptom: text });
+  // 복수 선택 — 조인 목록이 진실, 없으면 단일 텍스트에서 폴백
+  const selected = ticket.symptomLinks?.length
+    ? ticket.symptomLinks.map((l) => l.symptom.text)
+    : current
+      ? [current]
+      : [];
+  const selectedSet = new Set(selected);
+  const extras = selected.filter((t) => !topChips.some((c) => c.text === t));
+
+  const commit = (next: string[]) => m.setField.mutate({ symptoms: next });
+  const toggle = (text: string) =>
+    commit(selectedSet.has(text) ? selected.filter((t) => t !== text) : [...selected, text]);
 
   return (
     <Card>
@@ -98,7 +108,7 @@ export function SymptomCard({
           <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
             증상
           </span>
-          <span className="text-jm-3xs text-[var(--jm-text-subtle)]">고객 호소 · 한 개</span>
+          <span className="text-jm-3xs text-[var(--jm-text-subtle)]">고객 호소 · 여러 개</span>
         </div>
 
         {readonly ? (
@@ -106,13 +116,13 @@ export function SymptomCard({
         ) : (
           <div className={CHIP_ROW}>
             <AddChip onClick={() => setPicker(true)} />
-            {current && !currentInChips && (
-              <Chip selected onClick={() => set("")}>
-                {current}
+            {extras.map((text) => (
+              <Chip key={text} selected onClick={() => toggle(text)}>
+                {text}
               </Chip>
-            )}
+            ))}
             {topChips.map((t) => (
-              <Chip key={t.id} selected={t.text === current} onClick={() => set(t.text === current ? "" : t.text)}>
+              <Chip key={t.id} selected={selectedSet.has(t.text)} onClick={() => toggle(t.text)}>
                 {t.text}
               </Chip>
             ))}
@@ -138,11 +148,11 @@ export function SymptomCard({
           </div>
         )}
         onSelect={(t) => {
-          set(t.text);
+          if (!selectedSet.has(t.text)) commit([...selected, t.text]);
           setPicker(false);
         }}
         onCreate={(q) => {
-          set(q);
+          if (!selectedSet.has(q)) commit([...selected, q]);
           setPicker(false);
         }}
         createLabel={(q) => `"${q}" 새로 등록`}
@@ -190,9 +200,18 @@ export function DiagnosisCard({
 
   const templates = templatesQuery.data ?? [];
   const topChips = templates.slice(0, 12);
-  const currentInChips = !!current && topChips.some((t) => t.text === current);
 
-  const set = (text: string) => m.setField.mutate({ diagnosis: text });
+  const selected = ticket.diagnosisLinks?.length
+    ? ticket.diagnosisLinks.map((l) => l.diagnosis.text)
+    : current
+      ? [current]
+      : [];
+  const selectedSet = new Set(selected);
+  const extras = selected.filter((t) => !topChips.some((c) => c.text === t));
+
+  const commit = (next: string[]) => m.setField.mutate({ diagnoses: next });
+  const toggle = (text: string) =>
+    commit(selectedSet.has(text) ? selected.filter((t) => t !== text) : [...selected, text]);
 
   return (
     <Card>
@@ -202,7 +221,7 @@ export function DiagnosisCard({
             원인
           </span>
           <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
-            {symptomTemplateId ? "증상 기반 추천 · 한 개" : "한 개"}
+            {symptomTemplateId ? "증상 기반 추천 · 여러 개" : "여러 개"}
           </span>
         </div>
 
@@ -211,18 +230,18 @@ export function DiagnosisCard({
         ) : (
           <div className={CHIP_ROW}>
             <AddChip onClick={() => setPicker(true)} />
-            {current && !currentInChips && (
-              <Chip selected onClick={() => set("")}>
-                {current}
+            {extras.map((text) => (
+              <Chip key={text} selected onClick={() => toggle(text)}>
+                {text}
               </Chip>
-            )}
+            ))}
             {topChips.map((t) => (
               <Chip
                 key={t.id}
-                selected={t.text === current}
-                onClick={() => set(t.text === current ? "" : t.text)}
+                selected={selectedSet.has(t.text)}
+                onClick={() => toggle(t.text)}
                 badge={
-                  t.isLinked && t.text !== current ? (
+                  t.isLinked && !selectedSet.has(t.text) ? (
                     <span className="rounded bg-[var(--jm-accent-bg)] px-1 text-jm-3xs font-semibold text-[var(--jm-accent-fg)]">
                       추천
                     </span>
@@ -264,15 +283,125 @@ export function DiagnosisCard({
           </div>
         )}
         onSelect={(t) => {
-          set(t.text);
+          if (!selectedSet.has(t.text)) commit([...selected, t.text]);
           setPicker(false);
         }}
         onCreate={(q) => {
-          set(q);
+          if (!selectedSet.has(q)) commit([...selected, q]);
           setPicker(false);
         }}
         createLabel={(q) => `"${q}" 새로 등록`}
         emptyText="기존 원인 없음 — 입력해서 새로 등록"
+      />
+    </Card>
+  );
+}
+
+
+// ──── 수리내용 칩 — 무슨 조치를 했는지 (복수). 작업 후 기록 ────
+interface ContentTemplate {
+  id: string;
+  text: string;
+  categoryId: string | null;
+  usageCount: number;
+}
+
+export function ContentCard({
+  ticket,
+  readonly,
+}: {
+  ticket: RepairTicketDetail;
+  readonly: boolean;
+  onSaved?: () => void;
+}) {
+  const m = useRepairMutations(ticket.id);
+  const [picker, setPicker] = useState(false);
+  const categoryId = ticket.repairCategory?.id ?? null;
+  const current = ticket.repairContent;
+
+  const templatesQuery = useQuery<ContentTemplate[]>({
+    queryKey: ["repairs", "content-templates", categoryId ?? "all"],
+    queryFn: () =>
+      apiGet<ContentTemplate[]>(
+        `/api/repair-content-templates${categoryId ? `?categoryId=${categoryId}` : ""}`,
+      ),
+    enabled: !readonly,
+    staleTime: 1000 * 60,
+  });
+
+  const templates = templatesQuery.data ?? [];
+  const topChips = templates.slice(0, 12);
+
+  const selected = ticket.contentLinks?.length
+    ? ticket.contentLinks.map((l) => l.content.text)
+    : current
+      ? [current]
+      : [];
+  const selectedSet = new Set(selected);
+  const extras = selected.filter((t) => !topChips.some((c) => c.text === t));
+
+  const commit = (next: string[]) => m.setField.mutate({ repairContents: next });
+  const toggle = (text: string) =>
+    commit(selectedSet.has(text) ? selected.filter((t) => t !== text) : [...selected, text]);
+
+  return (
+    <Card>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-jm-xs font-semibold uppercase tracking-wider text-[var(--jm-text-muted)]">
+            수리내용
+          </span>
+          <span className="text-jm-3xs text-[var(--jm-text-subtle)]">
+            손님 안내·영수증 · 여러 개
+          </span>
+        </div>
+
+        {readonly ? (
+          <p className="text-jm-sm text-[var(--jm-text)]">{current || "—"}</p>
+        ) : (
+          <div className={CHIP_ROW}>
+            <AddChip onClick={() => setPicker(true)} />
+            {extras.map((text) => (
+              <Chip key={text} selected onClick={() => toggle(text)}>
+                {text}
+              </Chip>
+            ))}
+            {topChips.map((t) => (
+              <Chip key={t.id} selected={selectedSet.has(t.text)} onClick={() => toggle(t.text)}>
+                {t.text}
+              </Chip>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <JmComboboxDrawer<ContentTemplate>
+        open={picker}
+        onOpenChange={setPicker}
+        items={templates}
+        loading={templatesQuery.isPending}
+        getKey={(t) => t.id}
+        title="수리내용"
+        placeholder="수리내용 검색 또는 새로 입력"
+        filterFn={(t, q) => t.text.toLowerCase().includes(q.toLowerCase())}
+        renderItem={(t) => (
+          <div className="flex w-full items-center justify-between gap-3">
+            <span className="line-clamp-2 text-jm-sm text-[var(--jm-text)]">{t.text}</span>
+            {t.usageCount > 0 && (
+              <span className="shrink-0 text-jm-2xs text-[var(--jm-text-subtle)]">{t.usageCount}회</span>
+            )}
+          </div>
+        )}
+        onSelect={(t) => {
+          if (!selectedSet.has(t.text)) commit([...selected, t.text]);
+          setPicker(false);
+        }}
+        onCreate={(q) => {
+          if (!selectedSet.has(q)) commit([...selected, q]);
+          setPicker(false);
+        }}
+        createLabel={(q) => `"${q}" 새로 등록`}
+        emptyText="기존 수리내용 없음 — 입력해서 새로 등록"
       />
     </Card>
   );

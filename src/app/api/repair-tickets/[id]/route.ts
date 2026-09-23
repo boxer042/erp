@@ -48,6 +48,19 @@ export async function GET(
         orderBy: { createdAt: "asc" },
       },
       labors: { orderBy: { createdAt: "asc" } },
+      // 복수 선택 — UI 가 칩 선택 상태를 그리는 근거
+      symptomLinks: {
+        orderBy: { position: "asc" },
+        select: { symptomId: true, symptom: { select: { text: true } } },
+      },
+      diagnosisLinks: {
+        orderBy: { position: "asc" },
+        select: { diagnosisId: true, diagnosis: { select: { text: true } } },
+      },
+      contentLinks: {
+        orderBy: { position: "asc" },
+        select: { contentId: true, content: { select: { text: true } } },
+      },
       order: {
         select: {
           id: true,

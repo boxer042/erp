@@ -252,13 +252,43 @@ export function useRepairMutations(ticketId: string) {
       RepairTicketDetail,
       "symptom" | "diagnosis" | "repairContent" | "repairNotes" | "diagnosisFee" | "repairWarrantyMonths"
     >
-  >;
+  > & {
+    /** 복수 선택 — 서버가 조인 테이블을 replace 하고 표시 텍스트를 파생 */
+    symptoms?: string[];
+    diagnoses?: string[];
+    repairContents?: string[];
+  };
   const setField = useMutation({
     mutationFn: (p: FieldPatch) =>
       apiMutate<Partial<RepairTicketDetail>>(`/api/repair-tickets/${ticketId}`, "PUT", p),
     onMutate: async (p) => {
       const ctx = await begin();
-      patch((t) => ({ ...t, ...p }));
+      patch((t) => {
+        const next = { ...t, ...p } as RepairTicketDetail;
+        // 배열이 오면 화면이 읽는 표시 텍스트·링크도 즉시 맞춰준다 (서버와 동일 규칙)
+        if (p.symptoms) {
+          next.symptom = p.symptoms.join(" · ") || null;
+          next.symptomLinks = p.symptoms.map((text) => ({
+            symptomId: `tmp-${text}`,
+            symptom: { text },
+          }));
+        }
+        if (p.diagnoses) {
+          next.diagnosis = p.diagnoses.join(" · ") || null;
+          next.diagnosisLinks = p.diagnoses.map((text) => ({
+            diagnosisId: `tmp-${text}`,
+            diagnosis: { text },
+          }));
+        }
+        if (p.repairContents) {
+          next.repairContent = p.repairContents.join(" · ") || null;
+          next.contentLinks = p.repairContents.map((text) => ({
+            contentId: `tmp-${text}`,
+            content: { text },
+          }));
+        }
+        return next;
+      });
       return ctx;
     },
     onError: (e, _v, ctx) => rollback(ctx, "저장 실패")(e),

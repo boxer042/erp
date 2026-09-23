@@ -38,12 +38,14 @@ test.describe("수리 4칸 구조", () => {
         await expect(page.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
       }
 
-      // 수리내용 입력 → blur 저장
-      const content = page.getByPlaceholder(/기화기 세척 후 재조립/);
-      await content.fill("기화기 세척 후 재조립");
-      await content.blur();
+      // 수리내용 — 칩 UI 로 변경됨. [직접입력] 드로워로 새 내용 등록
+      const contentCard = page.locator("div").filter({ hasText: /^수리내용/ }).first();
+      await contentCard.getByRole("button", { name: "직접입력" }).click();
+      await page.getByPlaceholder(/수리내용 검색 또는 새로 입력/).fill("기화기 세척 후 재조립");
+      await page.getByText(/"기화기 세척 후 재조립" 새로 등록/).click();
+      await page.waitForTimeout(1200);
 
-      // 특이사항 입력 → blur 저장
+      // 특이사항 입력 → blur 저장 (여전히 textarea)
       const notes = page.getByPlaceholder(/정상 범위를 벗어난 점/);
       await notes.fill("고객 상의 후 마무리");
       await notes.blur();

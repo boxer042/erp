@@ -45,7 +45,7 @@ import { cancelReasonLabel, HardDeleteButton } from "./_cancel-sheet";
 import { DetailSkeleton } from "./_detail-skeleton";
 import { RejectSheet, quoteRejectReasonLabel } from "./_reject-sheet";
 import { RepairTicketActionMenu } from "./_repair-action-menu";
-import { SymptomCard, DiagnosisCard, NotesCard } from "./_notes-cards";
+import { SymptomCard, DiagnosisCard, ContentCard, NotesCard } from "./_notes-cards";
 import { PackagesCard, ReferenceInfoSection } from "./_reference-cards";
 import { ReceivedAtEditor } from "./_received-at-editor";
 import { Card, Field } from "./_shared";
@@ -330,16 +330,8 @@ export function RepairDetail({
             diagnosisTemplateId={t.diagnosisTemplateId}
           />
 
-          {/* 수리내용 — 무슨 조치를 했는지. 작업(부속·공임) 뒤에 기록 */}
-          <NotesCard
-            ticket={t}
-            readonly={readonly}
-            onSaved={invalidate}
-            field="repairContent"
-            label="수리내용"
-            hint="손님 안내·영수증"
-            placeholder="예: 기화기 세척 후 재조립, 프라이머벌브 교체"
-          />
+          {/* 수리내용 — 무슨 조치를 했는지. 작업(부속·공임) 뒤에 기록 (복수 칩) */}
+          <ContentCard ticket={t} readonly={readonly} onSaved={invalidate} />
 
           {/* 특이사항 — 정상 범위를 벗어난 점·고객 합의 (내부 기록) */}
           <NotesCard
