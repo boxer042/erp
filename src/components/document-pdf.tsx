@@ -157,8 +157,8 @@ const s = StyleSheet.create({
 const COLS = [4, 17, 12, 6, 7, 11, 8, 11, 13, 11]; // percentages, sum=100
 const COLS_NO_TAX = [4, 19, 13, 7, 8, 13, 9, 13, 14]; // 세액 컬럼 제외, sum=100
 
-/** 날인 이미지 — public/도장.png (한글 파일명이라 URL 인코딩 필요) */
-const STAMP_SRC = encodeURI("/도장.png");
+/** 날인 이미지 — public/stamp.png */
+const STAMP_SRC = "/stamp.png";
 
 function PartyCompact({
   label,

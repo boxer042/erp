@@ -413,8 +413,8 @@ function PdfDoc(props: PurchaseOrderPdfProps) {
   );
 }
 
-/** 날인 이미지 — public/도장.png (한글 파일명이라 URL 인코딩 필요) */
-const STAMP_SRC = encodeURI("/도장.png");
+/** 날인 이미지 — public/stamp.png */
+const STAMP_SRC = "/stamp.png";
 
 export function PurchaseOrderPdf(props: PurchaseOrderPdfProps) {
   const doc = useMemo(() => <PdfDoc {...props} />, [JSON.stringify(props)]);
