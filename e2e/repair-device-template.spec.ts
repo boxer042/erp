@@ -19,7 +19,7 @@ test.describe("기기 템플릿 정규화", () => {
     const ts = String(Date.now()).slice(-6);
     const user = await prisma.user.findFirst({ select: { id: true } });
     const variants = [`에코 ${ts}es`, `에코 ${ts}-ES`, `에코${ts}Es`];
-    const tickets = [];
+    const tickets: { id: string }[] = [];
 
     try {
       for (const v of variants) {

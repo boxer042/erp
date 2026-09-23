@@ -34,6 +34,7 @@ import {
   JmTabsList,
   JmTabsPanel,
   JmTabsTrigger,
+  JmCombobox,
 } from "@/jm";
 
 interface Template {
@@ -48,7 +49,7 @@ interface Category {
   name: string;
 }
 
-type Kind = "symptom" | "diagnosis";
+type Kind = "symptom" | "diagnosis" | "device";
 
 function TemplatesSkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
@@ -160,7 +161,13 @@ export default function RepairTemplatesPage() {
           <JmTabsList>
             <JmTabsTrigger value="symptom">증상</JmTabsTrigger>
             <JmTabsTrigger value="diagnosis">원인</JmTabsTrigger>
+            <JmTabsTrigger value="device">기기</JmTabsTrigger>
           </JmTabsList>
+
+          {/* 기기 — 정규화로 중복이 자동 흡수되므로 병합 대신 카탈로그 매핑이 핵심 (D11) */}
+          <JmTabsPanel value="device">
+            <DevicePanel />
+          </JmTabsPanel>
 
           {(["symptom", "diagnosis"] as const).map((k) => (
             <JmTabsPanel key={k} value={k}>
@@ -417,6 +424,187 @@ export default function RepairTemplatesPage() {
         </JmDialogContent>
       </JmDialog>
     </div>
+  );
+}
+
+
+interface DeviceTemplate {
+  id: string;
+  text: string;
+  normalizedText: string;
+  usageCount: number;
+  productId: string | null;
+  product: { id: string; name: string; sku: string } | null;
+}
+
+interface ProductOpt {
+  id: string;
+  name: string;
+  sku: string;
+}
+
+/**
+ * 기기 탭 — 자유 입력으로 쌓인 기기 마스터 (D11).
+ * 표기 흔들림은 normalizedText 로 자동 흡수되므로 병합 UI 불필요.
+ * 여기선 카탈로그 상품 매핑이 핵심 — 매핑하면 이후 표시는 내상품명을 따라간다.
+ */
+function DevicePanel() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [mapping, setMapping] = useState<DeviceTemplate | null>(null);
+  const [pickedProductId, setPickedProductId] = useState("");
+
+  const devicesQuery = useQuery<DeviceTemplate[]>({
+    queryKey: ["repair-device-templates"],
+    queryFn: () => apiGet<DeviceTemplate[]>("/api/repair-device-templates"),
+    staleTime: 1000 * 30,
+  });
+
+  const productsQuery = useQuery<ProductOpt[]>({
+    queryKey: ["repair-device-products"],
+    queryFn: () => apiGet<ProductOpt[]>("/api/products?isBulk=all&excludeVariants=true"),
+    enabled: !!mapping,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const saveMapping = useMutation({
+    mutationFn: (v: { id: string; productId: string | null }) =>
+      apiMutate(`/api/repair-device-templates/${v.id}`, "PATCH", { productId: v.productId }),
+    onSuccess: () => {
+      toast.success("매핑되었습니다");
+      setMapping(null);
+      setPickedProductId("");
+      queryClient.invalidateQueries({ queryKey: ["repair-device-templates"] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "매핑 실패"),
+  });
+
+  const rows = (devicesQuery.data ?? []).filter((d) =>
+    search.trim() ? d.text.toLowerCase().includes(search.trim().toLowerCase()) : true,
+  );
+
+  return (
+    <>
+      <JmCard className="overflow-hidden p-0">
+        <JmTableToolbar>
+          <JmTableToolbarSearch>
+            <JmSearchInput
+              size="sm"
+              placeholder="기기명 검색"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClear={() => setSearch("")}
+            />
+          </JmTableToolbarSearch>
+        </JmTableToolbar>
+
+        <JmTable>
+          <JmTableHeader>
+            <JmTableRow>
+              <JmTableHead>기기명</JmTableHead>
+              <JmTableHead>카탈로그 매핑</JmTableHead>
+              <JmTableHead className="text-right">사용 횟수</JmTableHead>
+              <JmTableHead className="w-[120px]"></JmTableHead>
+            </JmTableRow>
+          </JmTableHeader>
+          <JmTableBody>
+            {devicesQuery.isPending ? (
+              <TemplatesSkeletonRows />
+            ) : rows.length === 0 ? (
+              <JmTableRow>
+                <JmTableCell colSpan={4} className="py-8 text-center text-jm-sm text-[var(--jm-text-subtle)]">
+                  {search ? "조건에 맞는 기기가 없습니다" : "등록된 기기가 없습니다 — 수리 접수 시 자동 생성"}
+                </JmTableCell>
+              </JmTableRow>
+            ) : (
+              rows.map((d) => (
+                <JmTableRow key={d.id}>
+                  <JmTableCell className="font-medium text-[var(--jm-text)]">{d.text}</JmTableCell>
+                  <JmTableCell>
+                    {d.product ? (
+                      <span className="flex items-center gap-1.5">
+                        <JmBadge variant="accent" size="sm">연결됨</JmBadge>
+                        <span className="text-jm-sm text-[var(--jm-text)]">{d.product.name}</span>
+                      </span>
+                    ) : (
+                      <span className="text-jm-2xs text-[var(--jm-text-subtle)]">미연결</span>
+                    )}
+                  </JmTableCell>
+                  <JmTableCell className="text-right tabular-nums text-[var(--jm-text)]">
+                    {d.usageCount}
+                  </JmTableCell>
+                  <JmTableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <JmButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setMapping(d);
+                          setPickedProductId(d.productId ?? "");
+                        }}
+                      >
+                        {d.product ? "매핑 변경" : "상품 연결"}
+                      </JmButton>
+                    </div>
+                  </JmTableCell>
+                </JmTableRow>
+              ))
+            )}
+          </JmTableBody>
+        </JmTable>
+      </JmCard>
+
+      {/* 카탈로그 매핑 다이얼로그 */}
+      <JmDialog open={!!mapping} onOpenChange={(v) => !v && setMapping(null)}>
+        <JmDialogContent>
+          <JmDialogHeader>
+            <JmDialogTitle>카탈로그 상품 연결</JmDialogTitle>
+          </JmDialogHeader>
+          <JmDialogBody>
+            <p className="mb-3 text-jm-sm text-[var(--jm-text-muted)]">
+              <b>{mapping?.text}</b> 를 내상품과 연결합니다. 연결하면 이 기기의 수리 이력이
+              해당 상품으로 모여 추적됩니다.
+            </p>
+            <JmCombobox
+              items={(productsQuery.data ?? []).map((pr) => ({
+                id: pr.id,
+                label: pr.name,
+                description: pr.sku,
+              }))}
+              value={pickedProductId}
+              onChange={(item) => setPickedProductId(item.id)}
+              placeholder={productsQuery.isPending ? "상품 불러오는 중…" : "카탈로그에서 상품 선택"}
+              searchPlaceholder="상품명 또는 SKU 검색"
+              emptyMessage="상품이 없습니다"
+              clearable
+              onClear={() => setPickedProductId("")}
+            />
+          </JmDialogBody>
+          <JmDialogFooter>
+            {mapping?.productId && (
+              <JmButton
+                variant="ghost"
+                onClick={() => mapping && saveMapping.mutate({ id: mapping.id, productId: null })}
+                disabled={saveMapping.isPending}
+              >
+                연결 해제
+              </JmButton>
+            )}
+            <JmButton variant="ghost" onClick={() => setMapping(null)}>
+              취소
+            </JmButton>
+            <JmButton
+              variant="cta"
+              disabled={!pickedProductId || saveMapping.isPending}
+              onClick={() => mapping && saveMapping.mutate({ id: mapping.id, productId: pickedProductId })}
+            >
+              {saveMapping.isPending && <Loader2 className="size-4 animate-spin" />}
+              연결
+            </JmButton>
+          </JmDialogFooter>
+        </JmDialogContent>
+      </JmDialog>
+    </>
   );
 }
 
