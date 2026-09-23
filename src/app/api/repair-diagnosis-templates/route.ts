@@ -34,8 +34,35 @@ export async function GET(request: NextRequest) {
       orderBy: [{ usageCount: "desc" }, { text: "asc" }],
       select: { id: true, text: true, categoryId: true, usageCount: true },
     });
+    // 각 원인에 자주 붙는 증상 — 템플릿 관리의 연결 관계 표시용
+    const links = list.length
+      ? await prisma.symptomDiagnosisLink.findMany({
+          where: { diagnosisId: { in: list.map((d) => d.id) } },
+          orderBy: { occurrenceCount: "desc" },
+          select: {
+            diagnosisId: true,
+            occurrenceCount: true,
+            symptom: { select: { id: true, text: true } },
+          },
+        })
+      : [];
+
+    const byDiagnosis = new Map<string, { id: string; text: string; count: number }[]>();
+    for (const l of links) {
+      const arr = byDiagnosis.get(l.diagnosisId) ?? [];
+      if (arr.length < 3) {
+        arr.push({ id: l.symptom.id, text: l.symptom.text, count: l.occurrenceCount });
+        byDiagnosis.set(l.diagnosisId, arr);
+      }
+    }
+
     return NextResponse.json(
-      list.map((d) => ({ ...d, isLinked: false, linkCount: 0 })),
+      list.map((d) => ({
+        ...d,
+        isLinked: false,
+        linkCount: 0,
+        linkedSymptoms: byDiagnosis.get(d.id) ?? [],
+      })),
     );
   }
 

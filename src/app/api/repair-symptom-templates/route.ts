@@ -29,7 +29,31 @@ export async function GET(request: NextRequest) {
     select: { id: true, text: true, categoryId: true, usageCount: true },
   });
 
-  return NextResponse.json(templates);
+  // 각 증상에 자주 붙는 원인 — 템플릿 관리에서 연결 관계를 보여주기 위함
+  const links = templates.length
+    ? await prisma.symptomDiagnosisLink.findMany({
+        where: { symptomId: { in: templates.map((t) => t.id) } },
+        orderBy: { occurrenceCount: "desc" },
+        select: {
+          symptomId: true,
+          occurrenceCount: true,
+          diagnosis: { select: { id: true, text: true } },
+        },
+      })
+    : [];
+
+  const bySymptom = new Map<string, { id: string; text: string; count: number }[]>();
+  for (const l of links) {
+    const arr = bySymptom.get(l.symptomId) ?? [];
+    if (arr.length < 3) {
+      arr.push({ id: l.diagnosis.id, text: l.diagnosis.text, count: l.occurrenceCount });
+      bySymptom.set(l.symptomId, arr);
+    }
+  }
+
+  return NextResponse.json(
+    templates.map((t) => ({ ...t, linkedDiagnoses: bySymptom.get(t.id) ?? [] })),
+  );
 }
 
 const createSchema = z.object({

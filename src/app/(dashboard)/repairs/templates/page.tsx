@@ -37,11 +37,21 @@ import {
   JmCombobox,
 } from "@/jm";
 
+interface LinkedItem {
+  id: string;
+  text: string;
+  count: number;
+}
+
 interface Template {
   id: string;
   text: string;
   categoryId: string | null;
   usageCount: number;
+  /** 증상 탭 — 이 증상에 자주 붙는 원인 Top3 */
+  linkedDiagnoses?: LinkedItem[];
+  /** 원인 탭 — 이 원인에 자주 붙는 증상 Top3 */
+  linkedSymptoms?: LinkedItem[];
 }
 
 interface Category {
@@ -258,6 +268,9 @@ export default function RepairTemplatesPage() {
                         />
                       </JmTableHead>
                       <JmTableHead>텍스트</JmTableHead>
+                      <JmTableHead>
+                        {k === "symptom" ? "자주 붙는 원인" : "자주 붙는 증상"}
+                      </JmTableHead>
                       <JmTableHead>카테고리</JmTableHead>
                       <JmTableHead className="text-right">사용 횟수</JmTableHead>
                       <JmTableHead className="w-[120px]"></JmTableHead>
@@ -269,7 +282,7 @@ export default function RepairTemplatesPage() {
                     ) : filtered.length === 0 ? (
                       <JmTableRow>
                         <JmTableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="py-8 text-center text-jm-sm text-[var(--jm-text-subtle)]"
                         >
                           {search || categoryFilter !== "all"
@@ -296,6 +309,33 @@ export default function RepairTemplatesPage() {
                           </JmTableCell>
                           <JmTableCell className="font-medium text-[var(--jm-text)]">
                             {t.text}
+                          </JmTableCell>
+                          <JmTableCell>
+                            {(() => {
+                              const linked =
+                                k === "symptom" ? t.linkedDiagnoses : t.linkedSymptoms;
+                              if (!linked || linked.length === 0) {
+                                return (
+                                  <span className="text-jm-2xs text-[var(--jm-text-subtle)]">
+                                    —
+                                  </span>
+                                );
+                              }
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {linked.map((l) => (
+                                    <span
+                                      key={l.id}
+                                      className="inline-flex items-center gap-1 rounded-full bg-[var(--jm-accent-bg)] px-2 py-0.5 text-jm-2xs text-[var(--jm-accent-fg)]"
+                                      title={`${l.count}회 함께 기록됨`}
+                                    >
+                                      <span className="line-clamp-1 max-w-[140px]">{l.text}</span>
+                                      <span className="opacity-70">{l.count}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </JmTableCell>
                           <JmTableCell>
                             {t.categoryId ? (
