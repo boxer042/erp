@@ -156,6 +156,60 @@ export async function PUT(
         }
       }
 
+      // ── 복수 선택 (증상/원인/수리내용) — 조인 테이블 replace + 표시 텍스트 파생
+      // 대표 FK(symptomTemplateId 등) 는 첫 항목으로 유지해 기존 추천·통계가 계속 동작.
+      let multiPatch: Record<string, unknown> = {};
+
+      if (d.symptoms !== undefined) {
+        const texts = [...new Set(d.symptoms.map((t) => t.trim()).filter(Boolean))];
+        const tpls = [];
+        for (const text of texts) tpls.push(await upsertSymptomTemplate(tx, text, nextCategoryId, user.id));
+        await tx.repairTicketSymptom.deleteMany({ where: { ticketId: id } });
+        if (tpls.length) {
+          await tx.repairTicketSymptom.createMany({
+            data: tpls.map((t, i) => ({ ticketId: id, symptomId: t.id, position: i })),
+            skipDuplicates: true,
+          });
+        }
+        multiPatch = {
+          ...multiPatch,
+          symptom: texts.length ? texts.join(JOIN_SEP) : null,
+          symptomTemplateId: tpls[0]?.id ?? null,
+        };
+      }
+
+      if (d.diagnoses !== undefined) {
+        const texts = [...new Set(d.diagnoses.map((t) => t.trim()).filter(Boolean))];
+        const tpls = [];
+        for (const text of texts) tpls.push(await upsertDiagnosisTemplate(tx, text, nextCategoryId, user.id));
+        await tx.repairTicketDiagnosis.deleteMany({ where: { ticketId: id } });
+        if (tpls.length) {
+          await tx.repairTicketDiagnosis.createMany({
+            data: tpls.map((t, i) => ({ ticketId: id, diagnosisId: t.id, position: i })),
+            skipDuplicates: true,
+          });
+        }
+        multiPatch = {
+          ...multiPatch,
+          diagnosis: texts.length ? texts.join(JOIN_SEP) : null,
+          diagnosisTemplateId: tpls[0]?.id ?? null,
+        };
+      }
+
+      if (d.repairContents !== undefined) {
+        const texts = [...new Set(d.repairContents.map((t) => t.trim()).filter(Boolean))];
+        const tpls = [];
+        for (const text of texts) tpls.push(await upsertContentTemplate(tx, text, nextCategoryId, user.id));
+        await tx.repairTicketContent.deleteMany({ where: { ticketId: id } });
+        if (tpls.length) {
+          await tx.repairTicketContent.createMany({
+            data: tpls.map((t, i) => ({ ticketId: id, contentId: t.id, position: i })),
+            skipDuplicates: true,
+          });
+        }
+        multiPatch = { ...multiPatch, repairContent: texts.length ? texts.join(JOIN_SEP) : null };
+      }
+
       const updated = await tx.repairTicket.update({
         where: { id },
         data: {
@@ -196,6 +250,7 @@ export async function PUT(
           ...(symptomTemplateIdPatch ?? {}),
           ...(diagnosisTemplateIdPatch ?? {}),
           ...(devicePatch ?? {}),
+          ...multiPatch,
         },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
@@ -283,6 +338,31 @@ export async function PUT(
     if (authResp) return authResp;
     throw e;
   }
+}
+
+/** 표시용 파생 텍스트 — 복수 항목을 한 줄로 */
+const JOIN_SEP = " · ";
+
+/** 수리내용 template upsert (증상·원인과 동형) */
+async function upsertContentTemplate(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  text: string,
+  categoryId: string | null,
+  userId: string,
+) {
+  const existing = categoryId
+    ? await tx.repairContentTemplate.findUnique({ where: { categoryId_text: { categoryId, text } } })
+    : await tx.repairContentTemplate.findFirst({ where: { categoryId: null, text } });
+  if (existing) {
+    await tx.repairContentTemplate.update({
+      where: { id: existing.id },
+      data: { usageCount: { increment: 1 } },
+    });
+    return existing;
+  }
+  return tx.repairContentTemplate.create({
+    data: { text, categoryId, createdById: userId, usageCount: 1 },
+  });
 }
 
 /**

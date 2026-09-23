@@ -33,6 +33,14 @@ export const repairTicketUpdateSchema = z.object({
   diagnosis: z.string().nullable().optional(),
   /** 수리내용 — 무슨 조치를 했는지 (영수증·손님 안내용) */
   repairContent: z.string().nullable().optional(),
+  /**
+   * 복수 선택 — 증상/원인/수리내용을 여러 개 기록할 때 사용.
+   * 지정 시 조인 테이블을 이 목록으로 replace 하고, 표시용 텍스트는 여기서 파생한다.
+   * (단일 필드 symptom/diagnosis/repairContent 는 하위 호환으로 계속 동작)
+   */
+  symptoms: z.array(z.string().min(1)).optional(),
+  diagnoses: z.array(z.string().min(1)).optional(),
+  repairContents: z.array(z.string().min(1)).optional(),
   /** 특이사항 — 내부 기록 */
   repairNotes: z.string().nullable().optional(),
   diagnosisFee: z.coerce.number().min(0).optional(),

@@ -48,6 +48,7 @@ model User {
 
   @@map("users")
   createdDeviceTemplates RepairDeviceTemplate[] @relation("DeviceTemplateCreator")
+  createdContentTemplates RepairContentTemplate[] @relation("ContentTemplateCreator")
 }
 
 // ============================================================
@@ -835,6 +836,7 @@ model ProductCategory {
   slotLabels         AssemblySlotLabel[]       @relation("SlotLabelCategory")
 
   @@map("product_categories")
+  contentTemplates RepairContentTemplate[] @relation("ContentCategory")
 }
 
 model ChannelCategoryMapping {
@@ -2326,6 +2328,10 @@ model RepairTicket {
   repairProductId        String?                  @map("repair_product_id")
   repairProduct          Product?                 @relation("RepairProduct", fields: [repairProductId], references: [id], onDelete: SetNull)
   repairProductText      String?                  @map("repair_product_text") // 카탈로그에 없을 때 자유 입력 (예: "Sony A7M4 Black")
+  /** 복수 선택 — 표시용 텍스트(symptom/diagnosis/repairContent)는 이 목록에서 파생 */
+  symptomLinks   RepairTicketSymptom[]
+  diagnosisLinks RepairTicketDiagnosis[]
+  contentLinks   RepairTicketContent[]
   /** 자유 입력 기기의 정규화 마스터 — 같은 기기 반복 입력을 하나로 모음 (D11) */
   repairDeviceTemplateId String?                  @map("repair_device_template_id")
   repairDeviceTemplate   RepairDeviceTemplate?    @relation(fields: [repairDeviceTemplateId], references: [id], onDelete: SetNull)
@@ -2418,6 +2424,7 @@ model RepairSymptomTemplate {
   @@unique([categoryId, text])
   @@index([categoryId, usageCount(sort: Desc)])
   @@map("repair_symptom_templates")
+  ticketLinks RepairTicketSymptom[]
 }
 
 /**
@@ -2431,6 +2438,74 @@ model RepairSymptomTemplate {
  * "에코 420es" / "에코 420-es" 처럼 갈라져 이력 추적이 끊긴다.
  * normalizedText(공백·하이픈·대소문자 제거)로 중복 입력을 자동 흡수한다.
  */
+/**
+ * 수리내용 템플릿 — "무슨 조치를 했는가" 마스터 (증상·원인 템플릿과 동형).
+ * 자유 입력이 쌓여 "기화기 세척 후 재조립" 같은 조치가 파편화되는 것을 막는다.
+ */
+model RepairContentTemplate {
+  id          String           @id @default(uuid())
+  text        String
+  categoryId  String?          @map("category_id")
+  category    ProductCategory? @relation("ContentCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  usageCount  Int              @default(0) @map("usage_count")
+  createdById String?          @map("created_by_id")
+  createdBy   User?            @relation("ContentTemplateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  ticketLinks RepairTicketContent[]
+
+  @@unique([categoryId, text])
+  @@index([categoryId, usageCount(sort: Desc)])
+  @@map("repair_content_templates")
+}
+
+/**
+ * 티켓 ↔ 증상 (복수). 한 수리에 증상이 여러 개일 수 있다.
+ * RepairTicket.symptom 은 이 목록에서 만들어지는 표시용 파생 텍스트.
+ */
+model RepairTicketSymptom {
+  ticketId  String @map("ticket_id")
+  symptomId String @map("symptom_id")
+  /** 입력 순서 — 표시·대표 결정에 사용 */
+  position  Int    @default(0)
+
+  ticket  RepairTicket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  symptom RepairSymptomTemplate @relation(fields: [symptomId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, symptomId])
+  @@index([symptomId])
+  @@map("repair_ticket_symptoms")
+}
+
+/** 티켓 ↔ 원인 (복수) */
+model RepairTicketDiagnosis {
+  ticketId    String @map("ticket_id")
+  diagnosisId String @map("diagnosis_id")
+  position    Int    @default(0)
+
+  ticket    RepairTicket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  diagnosis RepairDiagnosisTemplate @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, diagnosisId])
+  @@index([diagnosisId])
+  @@map("repair_ticket_diagnoses")
+}
+
+/** 티켓 ↔ 수리내용 (복수) */
+model RepairTicketContent {
+  ticketId  String @map("ticket_id")
+  contentId String @map("content_id")
+  position  Int    @default(0)
+
+  ticket  RepairTicket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  content RepairContentTemplate @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, contentId])
+  @@index([contentId])
+  @@map("repair_ticket_contents")
+}
+
 model RepairDeviceTemplate {
   id   String @id @default(uuid())
   text String // 표시용 원문 — 예: "에코 엔진톱 420ES"
@@ -2474,6 +2549,7 @@ model RepairDiagnosisTemplate {
   @@unique([categoryId, text])
   @@index([categoryId, usageCount(sort: Desc)])
   @@map("repair_diagnosis_templates")
+  ticketLinks RepairTicketDiagnosis[]
 }
 
 /**
