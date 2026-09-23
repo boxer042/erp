@@ -57,6 +57,8 @@ interface DocumentPdfProps {
   memo?: string | null;
   terms?: string | null;
   autoPrint?: boolean;
+  /** 모달 iframe 임베드 — 자체 [PDF 생성] 버튼 숨김 (헤더 버튼과 중복) */
+  embed?: boolean;
   fillPage?: boolean;
   compactSupplier?: boolean;
   /** true 면 세액 컬럼·세액 합계를 숨기고 공급가액 기준으로만 출력 */
@@ -740,28 +742,30 @@ export function DocumentPdf(props: DocumentPdfProps) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          padding: 12,
-          backgroundColor: "#fff",
-          borderBottom: "1px solid #ddd",
-        }}
-      >
-        <JmButton
-          variant="cta"
-          onClick={handleExport}
-          disabled={generating}
+      {!props.embed && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: 12,
+            backgroundColor: "#fff",
+            borderBottom: "1px solid #ddd",
+          }}
         >
-          {generating ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Printer className="h-4 w-4 mr-2" />
-          )}
-          {generating ? "PDF 생성 중..." : "PDF 생성"}
-        </JmButton>
-      </div>
+          <JmButton
+            variant="cta"
+            onClick={handleExport}
+            disabled={generating}
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4 mr-2" />
+            )}
+            {generating ? "PDF 생성 중..." : "PDF 생성"}
+          </JmButton>
+        </div>
+      )}
       <div style={{ flex: 1, minHeight: 0 }}>
         <PDFViewer width="100%" height="100%" showToolbar>
           {doc}

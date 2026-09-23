@@ -46,11 +46,11 @@ export default async function OrderStatementPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ auto?: string; supplyOnly?: string }>;
+  searchParams: Promise<{ auto?: string; supplyOnly?: string; embed?: string }>;
 }) {
   const { id } = await params;
   const { our: OUR_COMPANY, bank: BANK_INFO } = await loadOurCompany();
-  const { auto, supplyOnly } = await searchParams;
+  const { auto, supplyOnly, embed } = await searchParams;
 
   // 분할 출고 — 같은 splitGroupId 형제 주문(매장수령 A + 택배 백오더 B)을 합산해
   // 증빙 1장으로 발행 (docs/SPLIT_FULFILLMENT.md §8). 비분할(splitGroupId=null)이면
@@ -157,6 +157,7 @@ export default async function OrderStatementPrintPage({
       memo={docMemo || null}
       autoPrint={auto === "1"}
       supplyOnly={supplyOnly === "1"}
+      embed={embed === "1"}
       fillPage
       compactSupplier
       bankName={BANK_INFO.name}

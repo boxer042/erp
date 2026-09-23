@@ -36,11 +36,11 @@ export default async function StatementPrintPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ auto?: string; supplyOnly?: string }>;
+  searchParams: Promise<{ auto?: string; supplyOnly?: string; embed?: string }>;
 }) {
   const { id } = await params;
   const { our: OUR_COMPANY, bank: BANK_INFO } = await loadOurCompany();
-  const { auto, supplyOnly } = await searchParams;
+  const { auto, supplyOnly, embed } = await searchParams;
   const s = await prisma.statement.findUnique({
     where: { id },
     include: {
@@ -117,6 +117,7 @@ export default async function StatementPrintPage({
       memo={docMemo || null}
       autoPrint={auto === "1"}
       supplyOnly={supplyOnly === "1"}
+      embed={embed === "1"}
       fillPage
       compactSupplier
       bankName={BANK_INFO.name}
