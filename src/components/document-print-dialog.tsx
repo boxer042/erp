@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   JmButton,
   JmDialog,
@@ -31,6 +31,7 @@ type Props = {
  */
 export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Props) {
   const [supplyOnly, setSupplyOnly] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   /** printPath 에 supplyOnly / auto / embed 쿼리를 합쳐 최종 URL 생성 */
   const buildPath = (auto?: boolean, embed?: boolean): string | null => {
@@ -66,8 +67,11 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
               size="sm"
               disabled={!printPath}
               onClick={() => {
-                const url = buildPath(true);
-                if (url) window.open(url, "_blank");
+                // 새 탭을 열면 다운로드 후 빈 탭이 남는다 — iframe 안에서 직접 생성·저장
+                iframeRef.current?.contentWindow?.postMessage(
+                  { type: "jm-pdf-download" },
+                  window.location.origin,
+                );
               }}
             >
               <FileDown className="size-3.5" />
@@ -78,6 +82,7 @@ export function DocumentPrintDialog({ open, onOpenChange, printPath, title }: Pr
         {iframeSrc ? (
           <iframe
             key={iframeSrc}
+            ref={iframeRef}
             src={iframeSrc}
             className="size-full flex-1 border-0"
             title={title}

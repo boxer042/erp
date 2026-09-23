@@ -1,7 +1,7 @@
 "use client";
 
 import "@/lib/pdf-fonts";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Document,
   Image,
@@ -741,6 +741,22 @@ export function DocumentPdf(props: DocumentPdfProps) {
       setGenerating(false);
     }
   };
+
+  // 모달 임베드 — 부모 다이얼로그의 [PDF 다운로드] 명령을 받아 이 프레임 안에서 생성·저장.
+  // (부모가 새 탭을 열면 다운로드 후 빈 탭이 남으므로 postMessage 로 처리)
+  const exportRef = useRef(handleExport);
+  exportRef.current = handleExport;
+  useEffect(() => {
+    if (!props.embed) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      if ((e.data as { type?: string })?.type === "jm-pdf-download") {
+        void exportRef.current();
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [props.embed]);
 
   // StrictMode 는 effect 를 setup→cleanup→setup 으로 두 번 돌린다.
   // ref 가드로 막으면 dev 에서 아예 다운로드가 안 걸리므로 cancel 플래그로 처리.
