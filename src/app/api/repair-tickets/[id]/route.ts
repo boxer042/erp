@@ -130,6 +130,18 @@ export async function PUT(
         }
       }
 
+      // 기기 template resolve — 자유 입력일 때만 (D11)
+      let devicePatch: { repairDeviceTemplateId: string | null } | null = null;
+      if (d.repairProductText !== undefined) {
+        const text = d.repairProductText?.trim() ?? "";
+        if (!text) {
+          devicePatch = { repairDeviceTemplateId: null };
+        } else {
+          const tpl = await upsertDeviceTemplate(tx, text, user.id);
+          devicePatch = { repairDeviceTemplateId: tpl?.id ?? null };
+        }
+      }
+
       // 진단 template resolve — 동일 패턴
       let diagnosisTemplateIdPatch: {
         diagnosisTemplateId: string | null;
@@ -183,6 +195,7 @@ export async function PUT(
             : {}),
           ...(symptomTemplateIdPatch ?? {}),
           ...(diagnosisTemplateIdPatch ?? {}),
+          ...(devicePatch ?? {}),
         },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
@@ -270,6 +283,41 @@ export async function PUT(
     if (authResp) return authResp;
     throw e;
   }
+}
+
+/**
+ * 기기 입력 정규화 키 — 공백·하이픈·대소문자 제거.
+ * "에코 420es" / "에코 420-es" / "에코420ES" 를 같은 기기로 본다.
+ */
+export function normalizeDeviceText(text: string): string {
+  return text.replace(/[\s\-_/]/g, "").toLowerCase();
+}
+
+/**
+ * 기기 template 찾거나 생성 + usageCount++ (D11).
+ * normalizedText unique — 표기만 다른 같은 기기는 기존 행을 재사용한다.
+ */
+async function upsertDeviceTemplate(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  text: string,
+  userId: string,
+) {
+  const normalizedText = normalizeDeviceText(text);
+  if (!normalizedText) return null;
+
+  const existing = await tx.repairDeviceTemplate.findUnique({
+    where: { normalizedText },
+  });
+  if (existing) {
+    await tx.repairDeviceTemplate.update({
+      where: { id: existing.id },
+      data: { usageCount: { increment: 1 } },
+    });
+    return existing;
+  }
+  return tx.repairDeviceTemplate.create({
+    data: { text, normalizedText, createdById: userId, usageCount: 1 },
+  });
 }
 
 /**

@@ -47,6 +47,7 @@ model User {
   kakaoConnection           KakaoConnection?
 
   @@map("users")
+  createdDeviceTemplates RepairDeviceTemplate[] @relation("DeviceTemplateCreator")
 }
 
 // ============================================================
@@ -589,6 +590,7 @@ model Product {
   priceHistory ProductPriceHistory[]
 
   @@map("products")
+  repairDeviceTemplates RepairDeviceTemplate[] @relation("RepairDeviceProduct")
 }
 
 /**
@@ -2324,6 +2326,9 @@ model RepairTicket {
   repairProductId        String?                  @map("repair_product_id")
   repairProduct          Product?                 @relation("RepairProduct", fields: [repairProductId], references: [id], onDelete: SetNull)
   repairProductText      String?                  @map("repair_product_text") // 카탈로그에 없을 때 자유 입력 (예: "Sony A7M4 Black")
+  /** 자유 입력 기기의 정규화 마스터 — 같은 기기 반복 입력을 하나로 모음 (D11) */
+  repairDeviceTemplateId String?                  @map("repair_device_template_id")
+  repairDeviceTemplate   RepairDeviceTemplate?    @relation(fields: [repairDeviceTemplateId], references: [id], onDelete: SetNull)
   diagnosisFee           Decimal                  @default(0) @map("diagnosis_fee") @db.Decimal(15, 2)
   totalDiscount          String                   @default("0") @map("total_discount") // "1000" or "10%"
   quotedLaborAmount      Decimal                  @default(0) @map("quoted_labor_amount") @db.Decimal(15, 2)
@@ -2419,6 +2424,36 @@ model RepairSymptomTemplate {
  * 진단 템플릿 — 증상에 대응되는 진단(원인). 부속/공임과 별개의 자유 텍스트 차원.
  * SymptomDiagnosisLink 와 함께 사용 시: 증상 선택 → 자주 매칭된 진단 자동 추천.
  */
+/**
+ * 기기 템플릿 — 수리 접수 시 "가져온 기기" 자유 입력의 정규화 마스터.
+ *
+ * 증상·원인 템플릿과 동형. 같은 기기를 매번 새로 타이핑하면
+ * "에코 420es" / "에코 420-es" 처럼 갈라져 이력 추적이 끊긴다.
+ * normalizedText(공백·하이픈·대소문자 제거)로 중복 입력을 자동 흡수한다.
+ */
+model RepairDeviceTemplate {
+  id   String @id @default(uuid())
+  text String // 표시용 원문 — 예: "에코 엔진톱 420ES"
+  /** 정규화 키 — 공백/하이픈/대소문자 제거. 같은 값이면 같은 기기로 간주 */
+  normalizedText String @map("normalized_text")
+
+  /** 카탈로그 매핑 — 연결되면 이후 표시는 내상품명을 따라감 (Option B) */
+  productId String?  @map("product_id")
+  product   Product? @relation("RepairDeviceProduct", fields: [productId], references: [id], onDelete: SetNull)
+
+  usageCount  Int      @default(0) @map("usage_count")
+  createdById String?  @map("created_by_id")
+  createdBy   User?    @relation("DeviceTemplateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tickets RepairTicket[]
+
+  @@unique([normalizedText])
+  @@index([usageCount(sort: Desc)])
+  @@map("repair_device_templates")
+}
+
 model RepairDiagnosisTemplate {
   id          String           @id @default(uuid())
   text        String // 예: "패킹 마모"
