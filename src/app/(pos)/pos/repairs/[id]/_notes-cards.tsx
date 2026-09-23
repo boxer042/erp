@@ -27,10 +27,10 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-jm-sm transition-colors ${
+      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-jm-sm transition-colors ${
         selected
-          ? "bg-[var(--jm-cta)] text-[var(--jm-cta-foreground)]"
-          : "border border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] active:bg-[var(--jm-surface-muted)]"
+          ? "border-[var(--jm-action)] bg-[var(--jm-action)] font-semibold text-white"
+          : "border-[var(--jm-border)] bg-[var(--jm-surface)] text-[var(--jm-text)] active:bg-[var(--jm-surface-muted)]"
       }`}
     >
       {badge}
